@@ -1,0 +1,95 @@
+/* ============================================================
+   Orion Terminal — themes
+   Each theme overrides the :root design tokens (tokens.css) via a
+   `data-theme` attribute on <html>. The vast majority of the UI reads
+   var(--token), so overriding tokens reskins the app wholesale.
+
+   "neon" is the default (the :root values in tokens.css), so it needs no
+   block here. All themes are dark-base for now — a light theme would need a
+   pass over the hardcoded rgba(255,255,255,…) / rgba(0,0,0,…) literals that
+   assume a dark canvas.
+   ============================================================ */
+
+/* ---------- Minimal — calm monochrome, no glow, flatter ---------- */
+[data-theme="minimal"] {
+  --bg-0: #0b0c0d;
+  --bg-1: #111315;
+  --bg-2: #16191b;
+  --bg-3: #1d2124;
+
+  /* desaturated pastels — app identity stays distinguishable but quiet */
+  --neon-green: #8ed3b0;
+  --neon-cyan: #9bc7d6;
+  --neon-yellow: #d6cf9b;
+  --neon-magenta: #d6a8bf;
+  --neon-violet: #b3a8d6;
+
+  --t-primary: #eceeed;
+  --t-secondary: #a3aaa7;
+  --t-tertiary: #6b726f;
+  --t-faint: #3f4543;
+
+  --glass-bg: rgba(20, 22, 24, 0.9);
+  --glass-bg-strong: rgba(16, 18, 20, 0.94);
+  --glass-bg-deep: rgba(10, 11, 12, 0.96);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-bright: rgba(255, 255, 255, 0.14);
+  --glass-highlight: rgba(255, 255, 255, 0.03);
+
+  /* flatter corners */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+
+  /* no neon bloom — soft neutral shadow only */
+  --shadow-window: 0 16px 44px -18px rgba(0, 0, 0, 0.6),
+    0 4px 14px -6px rgba(0, 0, 0, 0.45);
+  --shadow-glow-green: none;
+  --shadow-glow-cyan: none;
+  --shadow-glow-magenta: none;
+
+  --xd-accent-rgb: 205, 214, 222;
+}
+
+/* ---------- Modern — refined slate + soft, tasteful accents ---------- */
+[data-theme="modern"] {
+  --bg-0: #0a0c12;
+  --bg-1: #10131c;
+  --bg-2: #161a26;
+  --bg-3: #1f2433;
+
+  /* vivid-but-not-neon (Tailwind-ish) palette */
+  --neon-green: #4ade80;
+  --neon-cyan: #38bdf8;
+  --neon-yellow: #fbbf24;
+  --neon-magenta: #f472b6;
+  --neon-violet: #a78bfa;
+
+  --t-primary: #e8ecf4;
+  --t-secondary: #9aa3b8;
+  --t-tertiary: #5e6781;
+  --t-faint: #353c4d;
+
+  --glass-bg: rgba(22, 26, 38, 0.82);
+  --glass-bg-strong: rgba(16, 19, 28, 0.9);
+  --glass-bg-deep: rgba(10, 12, 18, 0.94);
+  --glass-border: rgba(148, 163, 184, 0.14);
+  --glass-border-bright: rgba(148, 163, 184, 0.24);
+  --glass-highlight: rgba(255, 255, 255, 0.05);
+
+  /* generous, modern corners */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+
+  /* soft glows — present but restrained */
+  --shadow-window: 0 30px 80px -24px rgba(0, 0, 0, 0.7),
+    0 8px 28px -10px rgba(0, 0, 0, 0.5);
+  --shadow-glow-green: 0 0 20px -6px rgba(74, 222, 128, 0.4);
+  --shadow-glow-cyan: 0 0 20px -6px rgba(56, 189, 248, 0.4);
+  --shadow-glow-magenta: 0 0 20px -6px rgba(244, 114, 182, 0.4);
+
+  --xd-accent-rgb: 148, 163, 184;
+}

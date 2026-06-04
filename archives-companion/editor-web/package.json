@@ -1,0 +1,20 @@
+{
+  "name": "archives-editor-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@blocknote/core": "^0.39.1",
+    "@blocknote/mantine": "^0.39.1",
+    "@blocknote/react": "^0.39.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^7.0.4",
+    "vite-plugin-singlefile": "^2.0.0"
+  }
+}

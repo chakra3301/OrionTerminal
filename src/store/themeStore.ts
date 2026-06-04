@@ -1,0 +1,53 @@
+import { create } from "zustand";
+import { setAppState } from "@/lib/db";
+
+/** Named visual themes. Each is a full set of design-token overrides applied
+ * via `data-theme` on <html> (see styles/themes.css). All are dark-base for
+ * now, so we keep the `.dark` class on too for any dark-scoped styling. */
+export type ThemeName = "neon" | "minimal" | "modern";
+
+export const THEMES: { id: ThemeName; label: string; blurb: string }[] = [
+  { id: "neon", label: "Neon", blurb: "Neo-Tokyo glow — the original." },
+  { id: "minimal", label: "Minimal", blurb: "Calm monochrome, no glow, flatter." },
+  { id: "modern", label: "Modern", blurb: "Refined slate with soft accents." },
+];
+
+const KNOWN = new Set<ThemeName>(THEMES.map((t) => t.id));
+
+/** Map any stored value (incl. legacy "dark"/"light") to a known theme. */
+function normalize(v: string | null | undefined): ThemeName {
+  return v && KNOWN.has(v as ThemeName) ? (v as ThemeName) : "neon";
+}
+
+function applyToDOM(theme: ThemeName) {
+  const root = document.documentElement;
+  root.dataset.theme = theme;
+  root.classList.add("dark");
+}
+
+type ThemeState = {
+  theme: ThemeName;
+  set: (theme: ThemeName) => void;
+  /** Cycle to the next theme — backs the "Cycle Theme" command. */
+  toggle: () => void;
+  hydrate: (value: string | null | undefined) => void;
+};
+
+export const useThemeStore = create<ThemeState>((set, get) => ({
+  theme: "neon",
+  set: (theme) => {
+    set({ theme });
+    applyToDOM(theme);
+    void setAppState("theme", theme);
+  },
+  toggle: () => {
+    const order = THEMES.map((t) => t.id);
+    const next = order[(order.indexOf(get().theme) + 1) % order.length]!;
+    get().set(next);
+  },
+  hydrate: (value) => {
+    const theme = normalize(value);
+    set({ theme });
+    applyToDOM(theme);
+  },
+}));

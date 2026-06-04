@@ -1,0 +1,50 @@
+const EXT_TO_LANG: Record<string, string> = {
+  ts: "typescript",
+  tsx: "typescript",
+  js: "javascript",
+  jsx: "javascript",
+  mjs: "javascript",
+  cjs: "javascript",
+  json: "json",
+  md: "markdown",
+  mdx: "markdown",
+  html: "html",
+  htm: "html",
+  css: "css",
+  scss: "scss",
+  less: "less",
+  rs: "rust",
+  go: "go",
+  py: "python",
+  rb: "ruby",
+  java: "java",
+  kt: "kotlin",
+  swift: "swift",
+  c: "c",
+  h: "c",
+  cpp: "cpp",
+  hpp: "cpp",
+  cc: "cpp",
+  cs: "csharp",
+  php: "php",
+  sh: "shell",
+  bash: "shell",
+  zsh: "shell",
+  yml: "yaml",
+  yaml: "yaml",
+  toml: "ini",
+  ini: "ini",
+  sql: "sql",
+  xml: "xml",
+  svg: "xml",
+  vue: "html",
+  graphql: "graphql",
+  dockerfile: "dockerfile",
+};
+
+export function languageForPath(path: string): string {
+  const fname = path.split(/[\\/]/).pop() ?? "";
+  if (/^Dockerfile/i.test(fname)) return "dockerfile";
+  const ext = fname.includes(".") ? fname.split(".").pop()!.toLowerCase() : "";
+  return EXT_TO_LANG[ext] ?? "plaintext";
+}

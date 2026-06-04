@@ -1,0 +1,46 @@
+[package]
+name = "orion-terminal"
+version = "0.1.0"
+description = "Orion Terminal — personal workstation"
+authors = ["Luca Orion"]
+edition = "2021"
+
+[lib]
+name = "orion_terminal_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset", "devtools"] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+walkdir = "2"
+keyring = "3"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
+tokio = { version = "1", features = ["full"] }
+futures-util = "0.3"
+bytes = "1"
+portable-pty = "0.9"
+parking_lot = "0.12"
+once_cell = "1"
+# Used by the in-process MCP server (mode-switched via --mcp-serve) to read
+# the Orion SQLite DB directly. `bundled` ships its own libsqlite3 so it
+# can't conflict with tauri-plugin-sql's sqlx-bundled sqlite.
+rusqlite = { version = "0.31", features = ["bundled"] }
+# Match the frontend `ulid` package — note ids etc. should be the same
+# shape regardless of who creates them (frontend zustand stores vs. the
+# in-process MCP server's write tools).
+ulid = "1"
+# Filesystem watching for Cursor-like auto-refresh of the file tree when
+# anything outside the app (external editor, git, Finder, downloads) touches
+# the project. `notify` is the de-facto standard (FSEvents on macOS, inotify
+# on Linux, ReadDirectoryChangesW on Windows); `notify-debouncer-mini`
+# batches the firehose of raw events into ~300ms windows so we refresh once
+# instead of thousands of times during npm install / webpack builds.
+notify = "6"
+notify-debouncer-mini = "0.4"

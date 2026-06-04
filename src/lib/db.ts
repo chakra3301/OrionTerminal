@@ -1,0 +1,961 @@
+import Database from "@tauri-apps/plugin-sql";
+import { log } from "@/lib/log";
+
+const DB_URL = "sqlite:orion.db";
+
+let dbPromise: Promise<Database> | null = null;
+
+export function getDb(): Promise<Database> {
+  if (!dbPromise) {
+    dbPromise = Database.load(DB_URL).then((db) => {
+      log.info("db loaded:", DB_URL);
+      return db;
+    });
+  }
+  return dbPromise;
+}
+
+export type AppStateKey =
+  | "last_project_id"
+  | "tabs.open"
+  | "tabs.active"
+  | "workspace.layout"
+  | "workspace.focusedPanel"
+  | "panel_sizes"
+  | "window_size"
+  | "theme"
+  | "right_rail_open"
+  | "sidebar_open"
+  | "terminal_open"
+  | "terminal_height"
+  | "today.weekRead"
+  | "shell.windows"
+  | "wallpaper"
+  | "preview"
+  | "xdesign.doc"
+  | "shell.focusedWindowId"
+  | "rosie.ttsEnabled"
+  | "voice.listenMode"
+  | "mcp.servers";
+
+export async function getAppState<T = unknown>(
+  key: AppStateKey,
+): Promise<T | null> {
+  const db = await getDb();
+  const rows = await db.select<{ value: string }[]>(
+    "SELECT value FROM app_state WHERE key = $1",
+    [key],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  try {
+    return JSON.parse(row.value) as T;
+  } catch {
+    return null;
+  }
+}
+
+export async function setAppState<T = unknown>(
+  key: AppStateKey,
+  value: T,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO app_state (key, value) VALUES ($1, $2)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [key, JSON.stringify(value)],
+  );
+}
+
+// ── Per-project workspace layouts ─────────────────────────────
+
+export type WorkspaceLayoutRow<TLayout = unknown> = {
+  layout: TLayout;
+  focusedPanelId: string | null;
+};
+
+type WorkspaceLayoutDbRow = {
+  project_id: string;
+  layout_json: string;
+  focused_panel_id: string | null;
+};
+
+export async function getWorkspaceLayout<TLayout = unknown>(
+  projectId: string,
+): Promise<WorkspaceLayoutRow<TLayout> | null> {
+  const db = await getDb();
+  const rows = await db.select<WorkspaceLayoutDbRow[]>(
+    "SELECT * FROM workspace_layouts WHERE project_id = $1",
+    [projectId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  try {
+    return {
+      layout: JSON.parse(row.layout_json) as TLayout,
+      focusedPanelId: row.focused_panel_id,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function setWorkspaceLayout<TLayout = unknown>(
+  projectId: string,
+  layout: TLayout,
+  focusedPanelId: string | null,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO workspace_layouts (project_id, layout_json, focused_panel_id, updated_at)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT(project_id) DO UPDATE SET
+       layout_json = excluded.layout_json,
+       focused_panel_id = excluded.focused_panel_id,
+       updated_at = excluded.updated_at`,
+    [projectId, JSON.stringify(layout), focusedPanelId, Date.now()],
+  );
+}
+
+export type ProjectRow = {
+  id: string;
+  name: string;
+  root_path: string;
+  last_opened_at: number;
+};
+
+export async function upsertProject(p: ProjectRow): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO projects (id, name, root_path, last_opened_at)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT(root_path) DO UPDATE SET last_opened_at = excluded.last_opened_at`,
+    [p.id, p.name, p.root_path, p.last_opened_at],
+  );
+}
+
+export async function getProjectByPath(
+  rootPath: string,
+): Promise<ProjectRow | null> {
+  const db = await getDb();
+  const rows = await db.select<ProjectRow[]>(
+    "SELECT * FROM projects WHERE root_path = $1",
+    [rootPath],
+  );
+  return rows[0] ?? null;
+}
+
+export async function listProjects(): Promise<ProjectRow[]> {
+  const db = await getDb();
+  return db.select<ProjectRow[]>(
+    "SELECT * FROM projects ORDER BY last_opened_at DESC",
+  );
+}
+
+export async function getProjectById(id: string): Promise<ProjectRow | null> {
+  const db = await getDb();
+  const rows = await db.select<ProjectRow[]>(
+    "SELECT * FROM projects WHERE id = $1",
+    [id],
+  );
+  return rows[0] ?? null;
+}
+
+/** Which app the chat was authored in. Routes `openChatById` back to the
+ * right surface. Legacy rows from before migration 0012 have origin=null,
+ * which is treated as 'archives'. */
+export type ChatOrigin = "archives" | "orion" | "xdesign" | "rosie";
+
+export type ChatRow = {
+  id: string;
+  title: string;
+  messages_json: string;
+  searchable_text: string;
+  session_id: string | null;
+  project_id: string | null;
+  total_cost_usd: number;
+  origin: ChatOrigin | null;
+  created_at: number;
+  updated_at: number;
+};
+
+export async function upsertChat(c: ChatRow): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO chats (id, title, messages_json, searchable_text, session_id, project_id, total_cost_usd, origin, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT(id) DO UPDATE SET
+       title = excluded.title,
+       messages_json = excluded.messages_json,
+       searchable_text = excluded.searchable_text,
+       session_id = excluded.session_id,
+       project_id = excluded.project_id,
+       total_cost_usd = excluded.total_cost_usd,
+       origin = excluded.origin,
+       updated_at = excluded.updated_at`,
+    [
+      c.id,
+      c.title,
+      c.messages_json,
+      c.searchable_text,
+      c.session_id,
+      c.project_id,
+      c.total_cost_usd,
+      c.origin,
+      c.created_at,
+      c.updated_at,
+    ],
+  );
+}
+
+export async function listChatsForProject(
+  projectId: string | null,
+): Promise<ChatRow[]> {
+  const db = await getDb();
+  if (projectId === null) {
+    return db.select<ChatRow[]>(
+      "SELECT * FROM chats WHERE project_id IS NULL ORDER BY updated_at DESC",
+    );
+  }
+  return db.select<ChatRow[]>(
+    "SELECT * FROM chats WHERE project_id = $1 ORDER BY updated_at DESC",
+    [projectId],
+  );
+}
+
+export async function listAllChats(limit = 50): Promise<ChatRow[]> {
+  const db = await getDb();
+  return db.select<ChatRow[]>(
+    "SELECT * FROM chats ORDER BY updated_at DESC LIMIT $1",
+    [limit],
+  );
+}
+
+export async function renameChat(id: string, title: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("UPDATE chats SET title = $1 WHERE id = $2", [title, id]);
+}
+
+export async function deleteChat(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM chats WHERE id = $1", [id]);
+}
+
+export async function countNotes(): Promise<number> {
+  const db = await getDb();
+  const rows = await db.select<{ n: number }[]>("SELECT COUNT(*) AS n FROM notes");
+  return rows[0]?.n ?? 0;
+}
+
+export async function countAssets(): Promise<number> {
+  const db = await getDb();
+  const rows = await db.select<{ n: number }[]>("SELECT COUNT(*) AS n FROM assets");
+  return rows[0]?.n ?? 0;
+}
+
+export type AssetKind = "image" | "video" | "audio" | "doc" | "other";
+
+export type AssetRow = {
+  id: string;
+  kind: AssetKind;
+  title: string | null;
+  file_path: string | null;
+  url: string | null;
+  metadata_json: string | null;
+  mime_type: string;
+  size_bytes: number;
+  original_name: string;
+  created_at: number;
+  favorite: number;
+};
+
+export async function setAssetFavorite(
+  id: string,
+  favorite: boolean,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute("UPDATE assets SET favorite = $1 WHERE id = $2", [
+    favorite ? 1 : 0,
+    id,
+  ]);
+}
+
+export async function listAssets(limit = 500): Promise<AssetRow[]> {
+  const db = await getDb();
+  return db.select<AssetRow[]>(
+    "SELECT * FROM assets ORDER BY created_at DESC LIMIT $1",
+    [limit],
+  );
+}
+
+export async function insertAsset(
+  a: Omit<AssetRow, "favorite">,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO assets (
+       id, kind, title, file_path, url, metadata_json,
+       mime_type, size_bytes, original_name, created_at
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [
+      a.id,
+      a.kind,
+      a.title,
+      a.file_path,
+      a.url,
+      a.metadata_json,
+      a.mime_type,
+      a.size_bytes,
+      a.original_name,
+      a.created_at,
+    ],
+  );
+}
+
+export async function deleteAsset(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM assets WHERE id = $1", [id]);
+}
+
+// ── Tags ─────────────────────────────────────────────────────
+
+/**
+ * Upsert tags by name, returning the rows. Tag names are case-insensitive on
+ * lookup (we lowercase before matching) but the original casing is preserved
+ * on insert.
+ */
+export async function upsertTagsByName(
+  names: string[],
+): Promise<Array<{ id: string; name: string }>> {
+  const db = await getDb();
+  const out: Array<{ id: string; name: string }> = [];
+  for (const raw of names) {
+    const name = raw.trim();
+    if (!name) continue;
+    const existing = await db.select<Array<{ id: string; name: string }>>(
+      "SELECT id, name FROM tags WHERE LOWER(name) = LOWER($1) LIMIT 1",
+      [name],
+    );
+    if (existing[0]) {
+      out.push(existing[0]);
+      continue;
+    }
+    // ulid-ish: ms timestamp + small random; collisions are not a concern.
+    const id = `${Date.now().toString(36)}${Math.random()
+      .toString(36)
+      .slice(2, 10)}`;
+    await db.execute("INSERT INTO tags (id, name) VALUES ($1, $2)", [id, name]);
+    out.push({ id, name });
+  }
+  return out;
+}
+
+export async function attachAssetTags(
+  assetId: string,
+  tagIds: string[],
+): Promise<void> {
+  const db = await getDb();
+  for (const tagId of tagIds) {
+    await db.execute(
+      `INSERT INTO asset_tags (asset_id, tag_id) VALUES ($1, $2)
+       ON CONFLICT(asset_id, tag_id) DO NOTHING`,
+      [assetId, tagId],
+    );
+  }
+}
+
+export async function listAssetTags(assetId: string): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.select<Array<{ name: string }>>(
+    `SELECT t.name FROM tags t
+     JOIN asset_tags at ON at.tag_id = t.id
+     WHERE at.asset_id = $1
+     ORDER BY t.name`,
+    [assetId],
+  );
+  return rows.map((r) => r.name);
+}
+
+// ── Mood boards ──────────────────────────────────────────────
+
+export type MoodBoardRow = {
+  id: string;
+  title: string;
+  cover_asset_id: string | null;
+  created_at: number;
+  updated_at: number;
+  favorite: number;
+};
+
+export async function setMoodBoardFavorite(
+  id: string,
+  favorite: boolean,
+  updatedAt: number,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE mood_boards SET favorite = $1, updated_at = $2 WHERE id = $3",
+    [favorite ? 1 : 0, updatedAt, id],
+  );
+}
+
+export type MoodBoardMemberRow = {
+  board_id: string;
+  asset_id: string;
+  position: number;
+  added_at: number;
+};
+
+export async function listMoodBoards(): Promise<MoodBoardRow[]> {
+  const db = await getDb();
+  return db.select<MoodBoardRow[]>(
+    "SELECT * FROM mood_boards ORDER BY updated_at DESC",
+  );
+}
+
+export async function insertMoodBoard(
+  b: Omit<MoodBoardRow, "favorite">,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO mood_boards (id, title, cover_asset_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [b.id, b.title, b.cover_asset_id, b.created_at, b.updated_at],
+  );
+}
+
+export async function renameMoodBoard(
+  id: string,
+  title: string,
+  updatedAt: number,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE mood_boards SET title = $1, updated_at = $2 WHERE id = $3",
+    [title, updatedAt, id],
+  );
+}
+
+export async function setMoodBoardCover(
+  id: string,
+  coverAssetId: string | null,
+  updatedAt: number,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE mood_boards SET cover_asset_id = $1, updated_at = $2 WHERE id = $3",
+    [coverAssetId, updatedAt, id],
+  );
+}
+
+export async function deleteMoodBoard(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM mood_boards WHERE id = $1", [id]);
+}
+
+export async function listAllMoodBoardMembers(): Promise<MoodBoardMemberRow[]> {
+  const db = await getDb();
+  return db.select<MoodBoardMemberRow[]>(
+    "SELECT * FROM mood_board_assets ORDER BY board_id, position",
+  );
+}
+
+export async function addAssetToMoodBoard(
+  boardId: string,
+  assetId: string,
+): Promise<void> {
+  const db = await getDb();
+  // Position = current max + 1 within this board (new members go to the end).
+  const rows = await db.select<Array<{ next: number }>>(
+    `SELECT COALESCE(MAX(position), -1) + 1 AS next
+     FROM mood_board_assets WHERE board_id = $1`,
+    [boardId],
+  );
+  const position = rows[0]?.next ?? 0;
+  const now = Date.now();
+  await db.execute(
+    `INSERT INTO mood_board_assets (board_id, asset_id, position, added_at)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT(board_id, asset_id) DO NOTHING`,
+    [boardId, assetId, position, now],
+  );
+  await db.execute(
+    "UPDATE mood_boards SET updated_at = $1 WHERE id = $2",
+    [now, boardId],
+  );
+}
+
+export async function removeAssetFromMoodBoard(
+  boardId: string,
+  assetId: string,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "DELETE FROM mood_board_assets WHERE board_id = $1 AND asset_id = $2",
+    [boardId, assetId],
+  );
+  await db.execute(
+    "UPDATE mood_boards SET updated_at = $1 WHERE id = $2",
+    [Date.now(), boardId],
+  );
+}
+
+/**
+ * Rewrite the position column for every member of a board to match the given
+ * ordered list. Runs as a single transaction so a partial reorder never
+ * leaves the table inconsistent.
+ */
+export async function reorderMoodBoardAssets(
+  boardId: string,
+  orderedAssetIds: string[],
+): Promise<void> {
+  const db = await getDb();
+  await db.execute("BEGIN");
+  try {
+    for (let i = 0; i < orderedAssetIds.length; i++) {
+      await db.execute(
+        "UPDATE mood_board_assets SET position = $1 WHERE board_id = $2 AND asset_id = $3",
+        [i, boardId, orderedAssetIds[i]],
+      );
+    }
+    await db.execute(
+      "UPDATE mood_boards SET updated_at = $1 WHERE id = $2",
+      [Date.now(), boardId],
+    );
+    await db.execute("COMMIT");
+  } catch (e) {
+    await db.execute("ROLLBACK");
+    throw e;
+  }
+}
+
+/** Bulk variant: returns a map of assetId → tag names. */
+export async function listAllAssetTags(): Promise<Map<string, string[]>> {
+  const db = await getDb();
+  const rows = await db.select<Array<{ asset_id: string; name: string }>>(
+    `SELECT at.asset_id, t.name FROM tags t
+     JOIN asset_tags at ON at.tag_id = t.id
+     ORDER BY t.name`,
+  );
+  const map = new Map<string, string[]>();
+  for (const r of rows) {
+    const arr = map.get(r.asset_id) ?? [];
+    arr.push(r.name);
+    map.set(r.asset_id, arr);
+  }
+  return map;
+}
+
+export async function listAllNoteTags(): Promise<Map<string, string[]>> {
+  const db = await getDb();
+  const rows = await db.select<Array<{ note_id: string; name: string }>>(
+    `SELECT nt.note_id, t.name FROM tags t
+     JOIN note_tags nt ON nt.tag_id = t.id
+     ORDER BY t.name`,
+  );
+  const map = new Map<string, string[]>();
+  for (const r of rows) {
+    const arr = map.get(r.note_id) ?? [];
+    arr.push(r.name);
+    map.set(r.note_id, arr);
+  }
+  return map;
+}
+
+export async function attachNoteTags(
+  noteId: string,
+  tagIds: string[],
+): Promise<void> {
+  const db = await getDb();
+  for (const tagId of tagIds) {
+    await db.execute(
+      `INSERT INTO note_tags (note_id, tag_id) VALUES ($1, $2)
+       ON CONFLICT(note_id, tag_id) DO NOTHING`,
+      [noteId, tagId],
+    );
+  }
+}
+
+export async function detachNoteTagByName(
+  noteId: string,
+  tagName: string,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `DELETE FROM note_tags
+     WHERE note_id = $1 AND tag_id IN (
+       SELECT id FROM tags WHERE LOWER(name) = LOWER($2)
+     )`,
+    [noteId, tagName],
+  );
+}
+
+export async function getChatById(id: string): Promise<ChatRow | null> {
+  const db = await getDb();
+  const rows = await db.select<ChatRow[]>(
+    "SELECT * FROM chats WHERE id = $1",
+    [id],
+  );
+  return rows[0] ?? null;
+}
+
+export type NoteKind = "note" | "journal" | "project";
+
+// ── FTS5 search across notes / chats / assets ────────────────
+
+export type SearchEntityType = "note" | "chat" | "asset";
+
+export type SearchHit = {
+  entityId: string;
+  entityType: SearchEntityType;
+  title: string;
+  snippet: string;
+  /** For notes: the underlying kind (note | journal | project) so the result
+   * can be routed to the right view. Null for chat/asset. */
+  noteKind?: NoteKind | null;
+};
+
+type SearchRow = {
+  entity_id: string;
+  entity_type: SearchEntityType;
+  title: string;
+  snip: string;
+  note_kind: NoteKind | null;
+};
+
+/**
+ * Run an FTS5 query against `search_index` and return ranked hits. Cleans the
+ * input (drops FTS5 syntax chars) and appends `*` to each term so partial
+ * typing matches prefixes. Joins back to `notes` to pull each note's `kind`
+ * so the caller can route to the right Archives view.
+ */
+export async function searchArchive(
+  query: string,
+  limit = 20,
+): Promise<SearchHit[]> {
+  const cleaned = query.replace(/["*()]/g, " ").trim();
+  if (!cleaned) return [];
+  const ftsQuery = cleaned
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((t) => t + "*")
+    .join(" ");
+  const db = await getDb();
+  const rows = await db.select<SearchRow[]>(
+    `SELECT s.entity_id  AS entity_id,
+            s.entity_type AS entity_type,
+            s.title       AS title,
+            snippet(search_index, 3, '〔', '〕', '…', 16) AS snip,
+            n.kind        AS note_kind
+       FROM search_index s
+       LEFT JOIN notes n
+         ON n.id = s.entity_id AND s.entity_type = 'note'
+      WHERE search_index MATCH $1
+      ORDER BY rank
+      LIMIT $2`,
+    [ftsQuery, limit],
+  );
+  return rows.map((r) => ({
+    entityId: r.entity_id,
+    entityType: r.entity_type,
+    title: r.title || "Untitled",
+    snippet: r.snip || "",
+    noteKind: r.note_kind ?? null,
+  }));
+}
+
+// ── Embeddings (semantic search) ─────────────────────────────
+
+export type EmbeddingKind = "note" | "chat" | "asset";
+
+export type StoredEmbedding = {
+  kind: EmbeddingKind;
+  id: string;
+  vector: Uint8Array;
+  textHash: string;
+};
+
+type EmbeddingRow = {
+  entity_kind: EmbeddingKind;
+  entity_id: string;
+  vector: number[] | Uint8Array;
+  text_hash: string;
+};
+
+type EmbeddingHashRow = {
+  entity_kind: EmbeddingKind;
+  entity_id: string;
+  text_hash: string;
+};
+
+/** Map of "kind:id" → text_hash, used by the indexer to decide whether to
+ * re-embed an entity (skipped if its current text hash matches the stored
+ * one). One bulk read at boot is cheap and avoids per-entity lookups. */
+export async function listEmbeddingHashes(): Promise<Map<string, string>> {
+  const db = await getDb();
+  const rows = await db.select<EmbeddingHashRow[]>(
+    "SELECT entity_kind, entity_id, text_hash FROM embeddings",
+  );
+  const out = new Map<string, string>();
+  for (const r of rows) out.set(`${r.entity_kind}:${r.entity_id}`, r.text_hash);
+  return out;
+}
+
+/** All embedding rows. The vector column comes back as either a Uint8Array
+ * or a number[] depending on tauri-plugin-sql's BLOB handling — callers run
+ * it through `deserializeVector` to get a Float32Array. */
+export async function listEmbeddings(): Promise<StoredEmbedding[]> {
+  const db = await getDb();
+  const rows = await db.select<EmbeddingRow[]>(
+    "SELECT entity_kind, entity_id, vector, text_hash FROM embeddings",
+  );
+  return rows.map((r) => ({
+    kind: r.entity_kind,
+    id: r.entity_id,
+    vector: r.vector instanceof Uint8Array ? r.vector : new Uint8Array(r.vector),
+    textHash: r.text_hash,
+  }));
+}
+
+export async function upsertEmbedding(
+  kind: EmbeddingKind,
+  id: string,
+  vectorBytes: Uint8Array,
+  textHash: string,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO embeddings(entity_kind, entity_id, vector, text_hash, updated_at)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT(entity_kind, entity_id) DO UPDATE SET
+       vector = excluded.vector,
+       text_hash = excluded.text_hash,
+       updated_at = excluded.updated_at`,
+    [kind, id, Array.from(vectorBytes), textHash, Date.now()],
+  );
+}
+
+export async function deleteEmbedding(
+  kind: EmbeddingKind,
+  id: string,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "DELETE FROM embeddings WHERE entity_kind = $1 AND entity_id = $2",
+    [kind, id],
+  );
+}
+
+export type NoteRow = {
+  id: string;
+  title: string;
+  blocks_json: string;
+  plaintext: string;
+  parent_id: string | null;
+  kind: NoteKind;
+  location: string;
+  collection_id: string | null;
+  created_at: number;
+  updated_at: number;
+  favorite: number;
+};
+
+export async function setNoteFavorite(
+  id: string,
+  favorite: boolean,
+  updatedAt: number,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE notes SET favorite = $1, updated_at = $2 WHERE id = $3",
+    [favorite ? 1 : 0, updatedAt, id],
+  );
+}
+
+export type CollectionRow = {
+  id: string;
+  name: string;
+  color: string;
+  created_at: number;
+  updated_at: number;
+};
+
+export async function listCollections(): Promise<CollectionRow[]> {
+  const db = await getDb();
+  return db.select<CollectionRow[]>(
+    "SELECT * FROM collections ORDER BY updated_at DESC",
+  );
+}
+
+export async function insertCollection(c: CollectionRow): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO collections (id, name, color, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [c.id, c.name, c.color, c.created_at, c.updated_at],
+  );
+}
+
+export async function renameCollection(
+  id: string,
+  name: string,
+  updatedAt: number,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE collections SET name = $1, updated_at = $2 WHERE id = $3",
+    [name, updatedAt, id],
+  );
+}
+
+export async function setCollectionColor(
+  id: string,
+  color: string,
+  updatedAt: number,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE collections SET color = $1, updated_at = $2 WHERE id = $3",
+    [color, updatedAt, id],
+  );
+}
+
+export async function deleteCollection(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM collections WHERE id = $1", [id]);
+}
+
+export async function setNoteCollection(
+  noteId: string,
+  collectionId: string | null,
+  updatedAt: number,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE notes SET collection_id = $1, updated_at = $2 WHERE id = $3",
+    [collectionId, updatedAt, noteId],
+  );
+}
+
+/**
+ * Tag-name → count for tags that are attached to assets and/or notes.
+ * Used by the sidebar tag cloud to surface top tags from real data.
+ */
+export async function listTagsWithCounts(
+  limit = 20,
+): Promise<Array<{ name: string; count: number }>> {
+  const db = await getDb();
+  const rows = await db.select<Array<{ name: string; count: number }>>(
+    `SELECT t.name AS name,
+            (SELECT COUNT(*) FROM asset_tags at WHERE at.tag_id = t.id) +
+            (SELECT COUNT(*) FROM note_tags nt WHERE nt.tag_id = t.id) AS count
+       FROM tags t
+       ORDER BY count DESC
+       LIMIT $1`,
+    [limit],
+  );
+  return rows.filter((r) => r.count > 0);
+}
+
+export async function listNotes(): Promise<NoteRow[]> {
+  const db = await getDb();
+  return db.select<NoteRow[]>(
+    "SELECT * FROM notes ORDER BY updated_at DESC",
+  );
+}
+
+export async function getNoteById(id: string): Promise<NoteRow | null> {
+  const db = await getDb();
+  const rows = await db.select<NoteRow[]>(
+    "SELECT * FROM notes WHERE id = $1",
+    [id],
+  );
+  return rows[0] ?? null;
+}
+
+export async function insertNote(
+  n: Omit<NoteRow, "favorite">,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO notes (id, title, blocks_json, plaintext, parent_id, kind, location, collection_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [
+      n.id,
+      n.title,
+      n.blocks_json,
+      n.plaintext,
+      n.parent_id,
+      n.kind,
+      n.location,
+      n.collection_id,
+      n.created_at,
+      n.updated_at,
+    ],
+  );
+}
+
+export async function updateNote(
+  id: string,
+  patch: {
+    title?: string;
+    blocks_json?: string;
+    plaintext?: string;
+    parent_id?: string | null;
+    location?: string;
+    updated_at: number;
+  },
+): Promise<void> {
+  const db = await getDb();
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  let i = 1;
+  if (patch.title !== undefined) {
+    sets.push(`title = $${i++}`);
+    vals.push(patch.title);
+  }
+  if (patch.blocks_json !== undefined) {
+    sets.push(`blocks_json = $${i++}`);
+    vals.push(patch.blocks_json);
+  }
+  if (patch.plaintext !== undefined) {
+    sets.push(`plaintext = $${i++}`);
+    vals.push(patch.plaintext);
+  }
+  if (patch.parent_id !== undefined) {
+    sets.push(`parent_id = $${i++}`);
+    vals.push(patch.parent_id);
+  }
+  if (patch.location !== undefined) {
+    sets.push(`location = $${i++}`);
+    vals.push(patch.location);
+  }
+  sets.push(`updated_at = $${i++}`);
+  vals.push(patch.updated_at);
+  vals.push(id);
+  await db.execute(
+    `UPDATE notes SET ${sets.join(", ")} WHERE id = $${i}`,
+    vals,
+  );
+}
+
+export async function deleteNote(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM notes WHERE id = $1", [id]);
+}
+
+// Removes empty placeholder notes left over from "Mod+N then closed without
+// typing." Safe at app start: a note with no title, no plaintext, and no
+// children is effectively non-existent to the user.
+export async function purgeEmptyNotes(): Promise<number> {
+  const db = await getDb();
+  const result = await db.execute(
+    `DELETE FROM notes
+     WHERE COALESCE(title, '') = ''
+       AND COALESCE(plaintext, '') = ''
+       AND id NOT IN (
+         SELECT parent_id FROM notes WHERE parent_id IS NOT NULL
+       )`,
+  );
+  return result.rowsAffected ?? 0;
+}
