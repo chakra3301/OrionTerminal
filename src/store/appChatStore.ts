@@ -73,6 +73,9 @@ export const useAppChat = create<AppChatState>((set) => ({
     archives: makeThread(),
     orion: makeThread(),
     xdesign: makeThread(),
+    // Hermes has no chat rail (ROSIE orchestrates it via MCP tools), but the
+    // per-app thread map is keyed by AppId, so it gets an inert thread.
+    hermes: makeThread(),
   },
 
   appendUser: (app, content) =>

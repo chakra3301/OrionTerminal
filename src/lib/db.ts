@@ -857,6 +857,172 @@ export async function listTagsWithCounts(
   return rows.filter((r) => r.count > 0);
 }
 
+// ─────────────────────────────────────────────────────────────
+// Hermes — Kanban tasks + parallel-swarm agents (migration 0015)
+// ─────────────────────────────────────────────────────────────
+
+export type HermesTaskRow = {
+  id: string;
+  title: string;
+  prompt: string;
+  column_id: string;
+  position: number;
+  status: string;
+  parent_id: string | null;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+  dispatched_at: number | null;
+};
+
+export type HermesAgentRow = {
+  id: string;
+  task_id: string;
+  label: string;
+  prompt: string;
+  status: string;
+  output: string;
+  error: string;
+  session_id: string | null;
+  position: number;
+  created_at: number;
+  updated_at: number;
+  started_at: number | null;
+  finished_at: number | null;
+};
+
+export async function listHermesTasks(): Promise<HermesTaskRow[]> {
+  const db = await getDb();
+  return db.select<HermesTaskRow[]>(
+    "SELECT * FROM hermes_tasks ORDER BY column_id, position, created_at",
+  );
+}
+
+export async function listHermesAgents(): Promise<HermesAgentRow[]> {
+  const db = await getDb();
+  return db.select<HermesAgentRow[]>(
+    "SELECT * FROM hermes_agents ORDER BY task_id, position, created_at",
+  );
+}
+
+export async function insertHermesTask(t: HermesTaskRow): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO hermes_tasks
+       (id, title, prompt, column_id, position, status, parent_id, created_by, created_at, updated_at, dispatched_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [
+      t.id,
+      t.title,
+      t.prompt,
+      t.column_id,
+      t.position,
+      t.status,
+      t.parent_id,
+      t.created_by,
+      t.created_at,
+      t.updated_at,
+      t.dispatched_at,
+    ],
+  );
+}
+
+export async function updateHermesTask(
+  id: string,
+  patch: {
+    title?: string;
+    prompt?: string;
+    column_id?: string;
+    position?: number;
+    status?: string;
+    dispatched_at?: number | null;
+    updated_at: number;
+  },
+): Promise<void> {
+  const db = await getDb();
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  let i = 1;
+  if (patch.title !== undefined) { sets.push(`title = $${i++}`); vals.push(patch.title); }
+  if (patch.prompt !== undefined) { sets.push(`prompt = $${i++}`); vals.push(patch.prompt); }
+  if (patch.column_id !== undefined) { sets.push(`column_id = $${i++}`); vals.push(patch.column_id); }
+  if (patch.position !== undefined) { sets.push(`position = $${i++}`); vals.push(patch.position); }
+  if (patch.status !== undefined) { sets.push(`status = $${i++}`); vals.push(patch.status); }
+  if (patch.dispatched_at !== undefined) { sets.push(`dispatched_at = $${i++}`); vals.push(patch.dispatched_at); }
+  sets.push(`updated_at = $${i++}`);
+  vals.push(patch.updated_at);
+  vals.push(id);
+  await db.execute(`UPDATE hermes_tasks SET ${sets.join(", ")} WHERE id = $${i}`, vals);
+}
+
+export async function deleteHermesTask(id: string): Promise<void> {
+  const db = await getDb();
+  // No FK cascade (rusqlite writers don't enable foreign_keys); cascade here.
+  await db.execute("DELETE FROM hermes_agents WHERE task_id = $1", [id]);
+  await db.execute("DELETE FROM hermes_tasks WHERE id = $1", [id]);
+}
+
+export async function insertHermesAgent(a: HermesAgentRow): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO hermes_agents
+       (id, task_id, label, prompt, status, output, error, session_id, position, created_at, updated_at, started_at, finished_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    [
+      a.id,
+      a.task_id,
+      a.label,
+      a.prompt,
+      a.status,
+      a.output,
+      a.error,
+      a.session_id,
+      a.position,
+      a.created_at,
+      a.updated_at,
+      a.started_at,
+      a.finished_at,
+    ],
+  );
+}
+
+export async function updateHermesAgent(
+  id: string,
+  patch: {
+    label?: string;
+    prompt?: string;
+    status?: string;
+    output?: string;
+    error?: string;
+    session_id?: string | null;
+    started_at?: number | null;
+    finished_at?: number | null;
+    updated_at: number;
+  },
+): Promise<void> {
+  const db = await getDb();
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  let i = 1;
+  if (patch.label !== undefined) { sets.push(`label = $${i++}`); vals.push(patch.label); }
+  if (patch.prompt !== undefined) { sets.push(`prompt = $${i++}`); vals.push(patch.prompt); }
+  if (patch.status !== undefined) { sets.push(`status = $${i++}`); vals.push(patch.status); }
+  if (patch.output !== undefined) { sets.push(`output = $${i++}`); vals.push(patch.output); }
+  if (patch.error !== undefined) { sets.push(`error = $${i++}`); vals.push(patch.error); }
+  if (patch.session_id !== undefined) { sets.push(`session_id = $${i++}`); vals.push(patch.session_id); }
+  if (patch.started_at !== undefined) { sets.push(`started_at = $${i++}`); vals.push(patch.started_at); }
+  if (patch.finished_at !== undefined) { sets.push(`finished_at = $${i++}`); vals.push(patch.finished_at); }
+  sets.push(`updated_at = $${i++}`);
+  vals.push(patch.updated_at);
+  vals.push(id);
+  await db.execute(`UPDATE hermes_agents SET ${sets.join(", ")} WHERE id = $${i}`, vals);
+}
+
+export async function deleteHermesAgent(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM hermes_agents WHERE id = $1", [id]);
+}
+
 export async function listNotes(): Promise<NoteRow[]> {
   const db = await getDb();
   return db.select<NoteRow[]>(

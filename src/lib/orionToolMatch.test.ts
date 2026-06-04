@@ -3,6 +3,7 @@ import {
   isOrionNoteWriteTool,
   isOrionMoodWriteTool,
   isOrionAssetWriteTool,
+  isOrionHermesWriteTool,
 } from "@/lib/orionToolMatch";
 
 describe("orion tool matchers", () => {
@@ -38,5 +39,21 @@ describe("orion tool matchers", () => {
     // Guards against the loose endsWith() the original code used.
     expect(isOrionNoteWriteTool("xorion_create_note")).toBe(false);
     expect(isOrionNoteWriteTool("notorion_attach_tag")).toBe(false);
+  });
+
+  it("matches Hermes board write tools (drives the board refresh)", () => {
+    expect(isOrionHermesWriteTool("mcp__orion__orion_hermes_create_task")).toBe(true);
+    expect(isOrionHermesWriteTool("mcp__orion__orion_hermes_add_agent")).toBe(true);
+    expect(isOrionHermesWriteTool("mcp__orion__orion_hermes_update_task")).toBe(true);
+    expect(isOrionHermesWriteTool("mcp__orion__orion_hermes_move_task")).toBe(true);
+    expect(isOrionHermesWriteTool("mcp__orion__orion_hermes_decompose")).toBe(true);
+    expect(isOrionHermesWriteTool("orion_hermes_create_task")).toBe(true);
+  });
+
+  it("treats Hermes read tools + other categories as non-refreshing", () => {
+    expect(isOrionHermesWriteTool("mcp__orion__orion_hermes_list_tasks")).toBe(false);
+    expect(isOrionHermesWriteTool("mcp__orion__orion_hermes_get_task")).toBe(false);
+    expect(isOrionHermesWriteTool("mcp__orion__orion_create_note")).toBe(false);
+    expect(isOrionNoteWriteTool("mcp__orion__orion_hermes_create_task")).toBe(false);
   });
 });

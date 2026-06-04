@@ -15,6 +15,7 @@ import { useNotesStore } from "@/store/notesStore";
 import { useAssetsStore } from "@/store/assetsStore";
 import { useMoodBoardsStore } from "@/store/moodBoardsStore";
 import { useCollectionsStore } from "@/store/collectionsStore";
+import { useHermes } from "@/store/hermesStore";
 import { LinkInsertPalette } from "@/features/notes/LinkInsertPalette";
 import { purgeEmptyNotes } from "@/lib/db";
 import { ipc } from "@/lib/ipc";
@@ -180,6 +181,11 @@ async function hydrate() {
     await useCollectionsStore.getState().load();
   } catch (err) {
     log.warn("collections load failed", err);
+  }
+  try {
+    await useHermes.getState().load();
+  } catch (err) {
+    log.warn("hermes load failed", err);
   }
 
   if (typeof terminalHeight === "number") {

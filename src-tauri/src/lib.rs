@@ -3,6 +3,7 @@ mod asset;
 mod claude_cli;
 mod fs_ops;
 mod fs_watch;
+mod hermes;
 mod inline_edit;
 mod mcp_config;
 pub mod mcp_server;
@@ -100,6 +101,12 @@ pub fn run() {
             sql: include_str!("../migrations/0014_favorites.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 15,
+            description: "hermes tasks + parallel-swarm agents",
+            sql: include_str!("../migrations/0015_hermes.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
@@ -143,6 +150,9 @@ pub fn run() {
             claude_cli::claude_cancel,
             claude_cli::claude_oneshot,
             claude_cli::claude_oneshot_with_image,
+            hermes::hermes_dispatch_task,
+            hermes::hermes_stop_agent,
+            hermes::hermes_stop_task,
             terminal::terminal_open,
             terminal::terminal_open_claude,
             terminal::terminal_write,

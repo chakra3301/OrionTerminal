@@ -82,6 +82,18 @@ export const ipc = {
   ): Promise<string> =>
     invoke("claude_oneshot_with_image", { prompt, imagePath }),
 
+  // Hermes — dispatch a task's swarm of parallel claude agents. Returns the
+  // number of agents launched; progress arrives via `hermes:*` events.
+  hermesDispatchTask: (
+    taskId: string,
+    projectRoot: string | null = null,
+  ): Promise<number> =>
+    invoke<number>("hermes_dispatch_task", { taskId, projectRoot }),
+  hermesStopTask: (taskId: string): Promise<void> =>
+    invoke("hermes_stop_task", { taskId }),
+  hermesStopAgent: (agentId: string): Promise<void> =>
+    invoke("hermes_stop_agent", { agentId }),
+
   terminalOpen: (
     ptyId: string,
     cwd: string,

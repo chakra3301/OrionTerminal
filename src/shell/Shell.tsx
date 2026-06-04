@@ -26,6 +26,9 @@ const ArchivesApp = lazy(() =>
 const XDesignApp = lazy(() =>
   import("@/apps/xdesign/XDesignApp").then((m) => ({ default: m.XDesignApp })),
 );
+const HermesApp = lazy(() =>
+  import("@/apps/hermes/HermesApp").then((m) => ({ default: m.HermesApp })),
+);
 // three.js + r3f are heavy — keep the companion (and its 3D stack) out of the
 // main bundle; it streams in after first paint.
 const CompanionAvatar = lazy(() =>
@@ -48,6 +51,7 @@ function AppBody({ app }: { app: AppId }) {
       {app === "orion" && <OrionApp />}
       {app === "archives" && <ArchivesApp />}
       {app === "xdesign" && <XDesignApp />}
+      {app === "hermes" && <HermesApp />}
     </Suspense>
   );
 }
@@ -56,6 +60,7 @@ const APP_TITLES: Record<AppId, { title: string; subtitle: string }> = {
   orion:    { title: "ORION",        subtitle: "orix47" },
   archives: { title: "ARCHIVES 47",  subtitle: "today" },
   xdesign:  { title: "XDESIGN",      subtitle: "untitled frame" },
+  hermes:   { title: "HERMES",       subtitle: "agent board" },
 };
 
 export function Shell() {

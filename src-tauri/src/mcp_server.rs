@@ -176,15 +176,16 @@ fn tool_definitions() -> Value {
             "name": "orion_open_app",
             "description": "Open (or focus, if already open) one of Orion \
                 Terminal's apps in a new window: 'archives' (notes/journal/\
-                projects/mood boards/media), 'orion' (code editor), or \
-                'xdesign' (design studio). Returns immediately; the window \
+                projects/mood boards/media), 'orion' (code editor), \
+                'xdesign' (design studio), or 'hermes' (the multi-agent \
+                orchestration board). Returns immediately; the window \
                 animates in.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "app": {
                         "type": "string",
-                        "enum": ["archives", "orion", "xdesign"]
+                        "enum": ["archives", "orion", "xdesign", "hermes"]
                     }
                 },
                 "required": ["app"]
@@ -467,6 +468,131 @@ fn tool_definitions() -> Value {
                 },
                 "required": ["id"]
             }
+        },
+        {
+            "name": "orion_hermes_list_tasks",
+            "description": "List tasks on the Hermes board (the multi-agent \
+                orchestration Kanban). Returns id, title, prompt, column \
+                (backlog/ready/running/review/done/blocked), status, \
+                created_by, and agent_count per task. Optional `column` \
+                filter. Use to survey what work exists before planning.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "column": {
+                        "type": "string",
+                        "enum": ["backlog", "ready", "running", "review", "done", "blocked"]
+                    }
+                }
+            }
+        },
+        {
+            "name": "orion_hermes_get_task",
+            "description": "Read one Hermes task in full: its prompt plus every \
+                agent (the swarm) with each agent's status and output. Use \
+                this to GATHER results after a task's agents have run — read \
+                their outputs and synthesize.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "id": { "type": "string" } },
+                "required": ["id"]
+            }
+        },
+        {
+            "name": "orion_hermes_create_task",
+            "description": "Create a Hermes task (a Kanban card). Returns the \
+                new task id. `prompt` is the goal/instruction. `column` \
+                defaults to 'backlog'; use 'ready' to STAGE it for the user \
+                to dispatch. You CANNOT create it in 'running' — dispatching \
+                the swarm is approval-gated (the user clicks Dispatch). After \
+                creating, add one or more agents with orion_hermes_add_agent.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string" },
+                    "prompt": { "type": "string" },
+                    "column": {
+                        "type": "string",
+                        "enum": ["backlog", "ready", "review", "done", "blocked"]
+                    }
+                },
+                "required": ["title"]
+            }
+        },
+        {
+            "name": "orion_hermes_add_agent",
+            "description": "Add an agent to a Hermes task's swarm. Each agent is \
+                a headless claude worker that runs in PARALLEL with the task's \
+                other agents when dispatched. `prompt` is this agent's specific \
+                instruction (defaults to the task's prompt if blank); `label` \
+                is an optional name/role. Returns the new agent id. Add several \
+                to fan a task out across the swarm.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task_id": { "type": "string" },
+                    "prompt": { "type": "string" },
+                    "label": { "type": "string" }
+                },
+                "required": ["task_id"]
+            }
+        },
+        {
+            "name": "orion_hermes_update_task",
+            "description": "Edit a Hermes task's title and/or prompt by id.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string" },
+                    "title": { "type": "string" },
+                    "prompt": { "type": "string" }
+                },
+                "required": ["id"]
+            }
+        },
+        {
+            "name": "orion_hermes_move_task",
+            "description": "Move a Hermes task to another column. Allowed: \
+                backlog, ready, review, done, blocked. You CANNOT move to \
+                'running' — dispatching is approval-gated; stage in 'ready' \
+                and the user dispatches the swarm.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string" },
+                    "column": {
+                        "type": "string",
+                        "enum": ["backlog", "ready", "review", "done", "blocked"]
+                    }
+                },
+                "required": ["id", "column"]
+            }
+        },
+        {
+            "name": "orion_hermes_decompose",
+            "description": "Decompose a Hermes task into sub-tasks. Creates \
+                child tasks (parent_id set) in the backlog. `subtasks` is an \
+                array of { title, prompt? }. Returns the new task ids. Use for \
+                breaking a big goal into a plan the user can dispatch piece by \
+                piece.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "parent_id": { "type": "string" },
+                    "subtasks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": { "type": "string" },
+                                "prompt": { "type": "string" }
+                            },
+                            "required": ["title"]
+                        }
+                    }
+                },
+                "required": ["parent_id", "subtasks"]
+            }
         }
     ])
 }
@@ -506,6 +632,13 @@ fn call_tool(params: &Value) -> Result<Value, RpcError> {
         "orion_add_to_mood_board" => tool_add_to_mood_board(&args),
         "orion_attach_tag" => tool_attach_tag(&args),
         "orion_delete_note" => tool_delete_note(&args),
+        "orion_hermes_list_tasks" => tool_hermes_list_tasks(&args),
+        "orion_hermes_get_task" => tool_hermes_get_task(&args),
+        "orion_hermes_create_task" => tool_hermes_create_task(&args),
+        "orion_hermes_add_agent" => tool_hermes_add_agent(&args),
+        "orion_hermes_update_task" => tool_hermes_update_task(&args),
+        "orion_hermes_move_task" => tool_hermes_move_task(&args),
+        "orion_hermes_decompose" => tool_hermes_decompose(&args),
         other => Err(format!("unknown tool: {}", other)),
     };
 
@@ -749,8 +882,8 @@ fn tool_open_app(args: &Value) -> Result<String, String> {
         .get("app")
         .and_then(|v| v.as_str())
         .ok_or_else(|| "app required".to_string())?;
-    if !matches!(app, "archives" | "orion" | "xdesign") {
-        return Err(format!("invalid app: {} (archives|orion|xdesign)", app));
+    if !matches!(app, "archives" | "orion" | "xdesign" | "hermes") {
+        return Err(format!("invalid app: {} (archives|orion|xdesign|hermes)", app));
     }
     send_ui_action(
         "open_app",
@@ -1320,4 +1453,292 @@ fn tool_list_projects(_args: &Value) -> Result<String, String> {
         .map_err(|e| e.to_string())?;
     let collected: Vec<Value> = rows.filter_map(|r| r.ok()).collect();
     Ok(json!({ "projects": collected }).to_string())
+}
+
+// ── Hermes board tools (DB-only; ROSIE plans, never dispatches) ──────────
+
+const HERMES_COLUMNS: &[&str] = &["backlog", "ready", "review", "done", "blocked"];
+
+fn tool_hermes_list_tasks(args: &Value) -> Result<String, String> {
+    let column = args.get("column").and_then(|v| v.as_str());
+    let conn = open_db()?;
+    let sql = match column {
+        Some(c) => format!(
+            "SELECT id, title, prompt, column_id, status, created_by, \
+                (SELECT COUNT(*) FROM hermes_agents a WHERE a.task_id = hermes_tasks.id) \
+             FROM hermes_tasks WHERE column_id = '{}' ORDER BY position, created_at",
+            c.replace('\'', "")
+        ),
+        None => "SELECT id, title, prompt, column_id, status, created_by, \
+                (SELECT COUNT(*) FROM hermes_agents a WHERE a.task_id = hermes_tasks.id) \
+             FROM hermes_tasks ORDER BY column_id, position, created_at"
+            .to_string(),
+    };
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(json!({
+                "id": r.get::<_, String>(0)?,
+                "title": r.get::<_, String>(1)?,
+                "prompt": r.get::<_, String>(2)?,
+                "column": r.get::<_, String>(3)?,
+                "status": r.get::<_, String>(4)?,
+                "created_by": r.get::<_, String>(5)?,
+                "agent_count": r.get::<_, i64>(6)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?;
+    let collected: Vec<Value> = rows.filter_map(|r| r.ok()).collect();
+    Ok(json!({ "tasks": collected }).to_string())
+}
+
+fn tool_hermes_get_task(args: &Value) -> Result<String, String> {
+    let id = args
+        .get("id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "id required".to_string())?;
+    let conn = open_db()?;
+    let task = conn
+        .query_row(
+            "SELECT id, title, prompt, column_id, status, created_by FROM hermes_tasks WHERE id = ?1",
+            params![id],
+            |r| {
+                Ok(json!({
+                    "id": r.get::<_, String>(0)?,
+                    "title": r.get::<_, String>(1)?,
+                    "prompt": r.get::<_, String>(2)?,
+                    "column": r.get::<_, String>(3)?,
+                    "status": r.get::<_, String>(4)?,
+                    "created_by": r.get::<_, String>(5)?,
+                }))
+            },
+        )
+        .map_err(|_| format!("no task with id: {}", id))?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, label, prompt, status, output, error FROM hermes_agents \
+             WHERE task_id = ?1 ORDER BY position, created_at",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![id], |r| {
+            let output: String = r.get(4)?;
+            // Cap each agent's output so a gather call can't blow the context.
+            let capped = if output.len() > 4000 {
+                format!("{}…[truncated]", &output[..4000])
+            } else {
+                output
+            };
+            Ok(json!({
+                "id": r.get::<_, String>(0)?,
+                "label": r.get::<_, String>(1)?,
+                "prompt": r.get::<_, String>(2)?,
+                "status": r.get::<_, String>(3)?,
+                "output": capped,
+                "error": r.get::<_, String>(5)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?;
+    let agents: Vec<Value> = rows.filter_map(|r| r.ok()).collect();
+    Ok(json!({ "task": task, "agents": agents }).to_string())
+}
+
+fn tool_hermes_create_task(args: &Value) -> Result<String, String> {
+    let title = args
+        .get("title")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "title required".to_string())?
+        .trim();
+    if title.is_empty() {
+        return Err("title cannot be blank".to_string());
+    }
+    let prompt = args.get("prompt").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let column = args.get("column").and_then(|v| v.as_str()).unwrap_or("backlog");
+    if !HERMES_COLUMNS.contains(&column) {
+        return Err(format!(
+            "invalid column: {} — ROSIE cannot create in 'running' (dispatch is approval-gated)",
+            column
+        ));
+    }
+    let id = ulid::Ulid::new().to_string();
+    let now = chrono_like_millis();
+    let conn = open_db()?;
+    let pos: i64 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(position) + 1, 0) FROM hermes_tasks WHERE column_id = ?1",
+            params![column],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    conn.execute(
+        "INSERT INTO hermes_tasks \
+            (id, title, prompt, column_id, position, status, parent_id, created_by, created_at, updated_at, dispatched_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, 'idle', NULL, 'rosie', ?6, ?6, NULL)",
+        params![id, title, prompt, column, pos, now],
+    )
+    .map_err(|e| format!("insert task: {}", e))?;
+    Ok(json!({ "ok": true, "id": id, "column": column }).to_string())
+}
+
+fn tool_hermes_add_agent(args: &Value) -> Result<String, String> {
+    let task_id = args
+        .get("task_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "task_id required".to_string())?;
+    let prompt = args.get("prompt").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let label = args.get("label").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let conn = open_db()?;
+    let exists: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM hermes_tasks WHERE id = ?1",
+            params![task_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if exists == 0 {
+        return Err(format!("no task with id: {}", task_id));
+    }
+    let id = ulid::Ulid::new().to_string();
+    let now = chrono_like_millis();
+    let pos: i64 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(position) + 1, 0) FROM hermes_agents WHERE task_id = ?1",
+            params![task_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    conn.execute(
+        "INSERT INTO hermes_agents \
+            (id, task_id, label, prompt, status, output, error, session_id, position, created_at, updated_at, started_at, finished_at) \
+         VALUES (?1, ?2, ?3, ?4, 'idle', '', '', NULL, ?5, ?6, ?6, NULL, NULL)",
+        params![id, task_id, label, prompt, pos, now],
+    )
+    .map_err(|e| format!("insert agent: {}", e))?;
+    Ok(json!({ "ok": true, "id": id, "task_id": task_id }).to_string())
+}
+
+fn tool_hermes_update_task(args: &Value) -> Result<String, String> {
+    let id = args
+        .get("id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "id required".to_string())?;
+    let title = args.get("title").and_then(|v| v.as_str());
+    let prompt = args.get("prompt").and_then(|v| v.as_str());
+    if title.is_none() && prompt.is_none() {
+        return Err("nothing to update — pass title and/or prompt".to_string());
+    }
+    let now = chrono_like_millis();
+    let conn = open_db()?;
+    let affected = if let (Some(t), Some(p)) = (title, prompt) {
+        conn.execute(
+            "UPDATE hermes_tasks SET title = ?2, prompt = ?3, updated_at = ?4 WHERE id = ?1",
+            params![id, t, p, now],
+        )
+    } else if let Some(t) = title {
+        conn.execute(
+            "UPDATE hermes_tasks SET title = ?2, updated_at = ?3 WHERE id = ?1",
+            params![id, t, now],
+        )
+    } else {
+        conn.execute(
+            "UPDATE hermes_tasks SET prompt = ?2, updated_at = ?3 WHERE id = ?1",
+            params![id, prompt.unwrap(), now],
+        )
+    }
+    .map_err(|e| format!("update task: {}", e))?;
+    if affected == 0 {
+        return Err(format!("no task with id: {}", id));
+    }
+    Ok(json!({ "ok": true, "id": id }).to_string())
+}
+
+fn tool_hermes_move_task(args: &Value) -> Result<String, String> {
+    let id = args
+        .get("id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "id required".to_string())?;
+    let column = args
+        .get("column")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "column required".to_string())?;
+    if column == "running" {
+        return Err("ROSIE can't move a task to 'running' — dispatching the swarm is \
+                    approval-gated. Move it to 'ready' and the user will dispatch."
+            .to_string());
+    }
+    if !HERMES_COLUMNS.contains(&column) {
+        return Err(format!("invalid column: {}", column));
+    }
+    let now = chrono_like_millis();
+    let conn = open_db()?;
+    let pos: i64 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(position) + 1, 0) FROM hermes_tasks WHERE column_id = ?1",
+            params![column],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    let affected = conn
+        .execute(
+            "UPDATE hermes_tasks SET column_id = ?2, position = ?3, updated_at = ?4 WHERE id = ?1",
+            params![id, column, pos, now],
+        )
+        .map_err(|e| format!("move task: {}", e))?;
+    if affected == 0 {
+        return Err(format!("no task with id: {}", id));
+    }
+    Ok(json!({ "ok": true, "id": id, "column": column }).to_string())
+}
+
+fn tool_hermes_decompose(args: &Value) -> Result<String, String> {
+    let parent_id = args
+        .get("parent_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "parent_id required".to_string())?;
+    let subtasks = args
+        .get("subtasks")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| "subtasks (array) required".to_string())?;
+    if subtasks.is_empty() {
+        return Err("subtasks is empty".to_string());
+    }
+    let conn = open_db()?;
+    let exists: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM hermes_tasks WHERE id = ?1",
+            params![parent_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if exists == 0 {
+        return Err(format!("no parent task with id: {}", parent_id));
+    }
+    let now = chrono_like_millis();
+    let mut created: Vec<String> = Vec::new();
+    let mut base: i64 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(position) + 1, 0) FROM hermes_tasks WHERE column_id = 'backlog'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    for st in subtasks {
+        let title = st.get("title").and_then(|v| v.as_str()).unwrap_or("").trim();
+        if title.is_empty() {
+            continue;
+        }
+        let prompt = st.get("prompt").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let id = ulid::Ulid::new().to_string();
+        let res = conn.execute(
+            "INSERT INTO hermes_tasks \
+                (id, title, prompt, column_id, position, status, parent_id, created_by, created_at, updated_at, dispatched_at) \
+             VALUES (?1, ?2, ?3, 'backlog', ?4, 'idle', ?5, 'rosie', ?6, ?6, NULL)",
+            params![id, title, prompt, base, parent_id, now],
+        );
+        if res.is_ok() {
+            created.push(id);
+            base += 1;
+        }
+    }
+    Ok(json!({ "ok": true, "parent_id": parent_id, "created": created }).to_string())
 }

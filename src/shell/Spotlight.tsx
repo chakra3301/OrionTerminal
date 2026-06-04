@@ -162,7 +162,14 @@ export function Spotlight() {
       kind: "app",
       id: `app:${id}`,
       label: `Open ${APP_NAMES[id]}`,
-      hint: id === "orion" ? "code editor" : id === "archives" ? "personal knowledge base" : "design studio",
+      hint:
+        id === "orion"
+          ? "code editor"
+          : id === "archives"
+            ? "personal knowledge base"
+            : id === "xdesign"
+              ? "design studio"
+              : "agent orchestration board",
       appId: id,
       run: () => {
         openApp(id);

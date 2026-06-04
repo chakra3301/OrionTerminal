@@ -25,6 +25,7 @@ const APP_MENUS: Record<string, string[]> = {
   archives: ["File", "Edit", "View", "Insert", "Format"],
   orion: ["File", "Edit", "Selection", "View", "Run", "Terminal"],
   xdesign: ["File", "Edit", "Object", "Type", "Effect", "View"],
+  hermes: ["Board", "Task", "Agents", "View"],
 };
 
 const DEFAULT_MENU = ["File", "Edit", "View", "Window"];

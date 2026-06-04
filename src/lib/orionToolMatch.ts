@@ -14,6 +14,13 @@ const NOTE_WRITE = [
 ];
 const MOOD_WRITE = ["orion_create_mood_board", "orion_add_to_mood_board"];
 const ASSET_WRITE = ["orion_attach_tag"];
+const HERMES_WRITE = [
+  "orion_hermes_create_task",
+  "orion_hermes_add_agent",
+  "orion_hermes_update_task",
+  "orion_hermes_move_task",
+  "orion_hermes_decompose",
+];
 
 function endsWithAny(name: string, suffixes: string[]): boolean {
   return suffixes.some((s) => name === s || name.endsWith(`__${s}`));
@@ -27,4 +34,7 @@ export function isOrionMoodWriteTool(name: string): boolean {
 }
 export function isOrionAssetWriteTool(name: string): boolean {
   return endsWithAny(name, ASSET_WRITE);
+}
+export function isOrionHermesWriteTool(name: string): boolean {
+  return endsWithAny(name, HERMES_WRITE);
 }

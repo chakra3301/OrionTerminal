@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { ulid } from "ulid";
 
-export type AppId = "archives" | "orion" | "xdesign";
+export type AppId = "archives" | "orion" | "xdesign" | "hermes";
 
 export type WindowState = {
   id: string;
@@ -48,6 +48,7 @@ const DEFAULT_SIZE: Record<AppId, { w: number; h: number }> = {
   orion:    { w: 1280, h: 800 },
   archives: { w: 1080, h: 720 },
   xdesign:  { w: 1180, h: 760 },
+  hermes:   { w: 1240, h: 780 },
 };
 
 function clampY(y: number): number {
@@ -228,4 +229,5 @@ export const APP_NAMES: Record<AppId, string> = {
   archives: "Archives 47",
   orion: "Orion",
   xdesign: "XDesign",
+  hermes: "Hermes",
 };

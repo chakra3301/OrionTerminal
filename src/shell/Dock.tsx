@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Archive, Code2, Palette, Search } from "lucide-react";
+import { Archive, Code2, Palette, Search, Workflow } from "lucide-react";
 import { useShell, type AppId, APP_NAMES } from "@/shell/store/useShell";
 import { useRosie } from "@/features/rosie/rosieStore";
 
@@ -36,6 +36,14 @@ const DOCK_APPS: DockApp[] = [
     glow: "0 0 14px -2px rgba(255,62,165,0.4)",
     fg: "#1b0613",
     Icon: Palette,
+  },
+  {
+    id: "hermes",
+    title: APP_NAMES.hermes,
+    bg: "linear-gradient(135deg, rgba(255,179,71,0.42), rgba(255,179,71,0.05))",
+    glow: "0 0 14px -2px rgba(255,179,71,0.45)",
+    fg: "#1c1003",
+    Icon: Workflow,
   },
 ];
 

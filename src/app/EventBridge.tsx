@@ -19,7 +19,9 @@ import {
   isOrionNoteWriteTool,
   isOrionMoodWriteTool,
   isOrionAssetWriteTool,
+  isOrionHermesWriteTool,
 } from "@/lib/orionToolMatch";
+import { useHermes, type HermesStatus, type HermesColumn } from "@/store/hermesStore";
 import { log } from "@/lib/log";
 
 /** UI actions the MCP server can request via the local TCP bridge. Each
@@ -63,7 +65,13 @@ type UiActionEnvelope = UiAction & { requestId: string };
 async function handleUiAction(action: UiAction): Promise<unknown> {
   if (action.kind === "open_app") {
     const app = (action.payload as { app?: AppId } | undefined)?.app;
-    if (app && (app === "archives" || app === "orion" || app === "xdesign")) {
+    if (
+      app &&
+      (app === "archives" ||
+        app === "orion" ||
+        app === "xdesign" ||
+        app === "hermes")
+    ) {
       useShell.getState().openApp(app);
     }
     return;
@@ -318,6 +326,16 @@ function scheduleAssetsRefresh() {
     );
   }, 250);
 }
+let hermesRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleHermesRefresh() {
+  if (hermesRefreshTimer) clearTimeout(hermesRefreshTimer);
+  // refresh() (not load()) so a live swarm's in-memory state survives ROSIE's
+  // board writes landing via her MCP tools.
+  hermesRefreshTimer = setTimeout(() => {
+    hermesRefreshTimer = null;
+    void useHermes.getState().refresh();
+  }, 250);
+}
 
 // Tools whose completion changes the project's file layout. When a
 // tool_result for one of these lands, we bump the file-tree refresh counter
@@ -436,6 +454,7 @@ function trackOrionToolSideEffects(env: ClaudeEnvelope) {
           if (isOrionNoteWriteTool(name)) scheduleNotesRefresh();
           if (isOrionMoodWriteTool(name)) scheduleMoodRefresh();
           if (isOrionAssetWriteTool(name)) scheduleAssetsRefresh();
+          if (isOrionHermesWriteTool(name)) scheduleHermesRefresh();
         }
         // GC: each tool_use id is one-shot — drop after first result.
         toolUseIdToName.delete(tr.tool_use_id);
@@ -546,6 +565,35 @@ export function EventBridge() {
     listen<ClaudeEnvelope>("claude:event", (e) => handleClaude(e.payload)).then(
       (u) => unlisteners.push(u),
     );
+
+    // Hermes swarm — the engine streams each agent's assistant text + status
+    // and rolls the task up; mirror it into the store for the live board.
+    listen<{ taskId: string; agentId: string; text: string }>(
+      "hermes:agent",
+      (e) => {
+        useHermes
+          .getState()
+          .applyAgentText(e.payload.taskId, e.payload.agentId, e.payload.text);
+      },
+    ).then((u) => unlisteners.push(u));
+
+    listen<{
+      taskId: string;
+      agentId: string;
+      status: HermesStatus;
+      output: string;
+      error: string;
+      sessionId: string | null;
+    }>("hermes:agentStatus", (e) => {
+      useHermes.getState().applyAgentStatus(e.payload);
+    }).then((u) => unlisteners.push(u));
+
+    listen<{ taskId: string; status: HermesStatus; columnId: HermesColumn }>(
+      "hermes:task",
+      (e) => {
+        useHermes.getState().applyTask(e.payload);
+      },
+    ).then((u) => unlisteners.push(u));
 
     // UI-action bridge: out-of-process MCP server → main app via TCP →
     // Tauri event → here. Lets agents drive UI-state changes (open_app,
