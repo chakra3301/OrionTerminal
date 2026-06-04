@@ -48,7 +48,8 @@ const DEFAULT_SIZE: Record<AppId, { w: number; h: number }> = {
   orion:    { w: 1280, h: 800 },
   archives: { w: 1080, h: 720 },
   xdesign:  { w: 1180, h: 760 },
-  hermes:   { w: 1240, h: 780 },
+  // Hermes is a dashboard — open large; clamped to the viewport in openApp.
+  hermes:   { w: 1760, h: 1080 },
 };
 
 function clampY(y: number): number {
@@ -74,16 +75,20 @@ export const useShell = create<ShellState>((set, get) => ({
     const id = ulid();
     const offset = get().windows.length * 24;
     const size = DEFAULT_SIZE[app];
-    const x = Math.max(60, Math.round((window.innerWidth - size.w) / 2) + offset);
-    const y = clampY(Math.round((window.innerHeight - size.h) / 2) + offset);
+    // Clamp the default to the viewport so a large default (e.g. the Hermes
+    // dashboard) fills a big screen but never overflows a small one.
+    const w = Math.min(size.w, window.innerWidth - 48);
+    const h = Math.min(size.h, window.innerHeight - 104);
+    const x = Math.max(24, Math.round((window.innerWidth - w) / 2) + offset);
+    const y = clampY(Math.round((window.innerHeight - h) / 2) + offset);
     const nextZ = get().maxZ + 1;
     const next: WindowState = {
       id,
       app,
       x,
       y,
-      w: size.w,
-      h: size.h,
+      w,
+      h,
       z: nextZ,
       minimized: false,
       maximized: false,
