@@ -2,6 +2,8 @@ import { Wifi, BatteryMedium, Mic, MicOff, Loader2 } from "lucide-react";
 import { useShell, focusedApp, APP_NAMES } from "@/shell/store/useShell";
 import { useClock } from "@/shell/useClock";
 import { useVoice } from "@/store/voiceStore";
+import { useContextMenu } from "@/components/ContextMenu";
+import { buildMenu, appMenu } from "@/shell/menus";
 
 // Twelve bars driven by CSS animations. Heights/delays are pseudo-random
 // (hand-picked) so each bar moves on its own beat — gives the impression of
@@ -122,6 +124,7 @@ function VoiceIndicator() {
 export function MenuBar() {
   const time = useClock();
   const app = useShell(focusedApp);
+  const { openUnder, menu } = useContextMenu();
 
   const items = app ? APP_MENUS[app] ?? DEFAULT_MENU : DEFAULT_MENU;
   const appLabel = app ? APP_NAMES[app] : "Desktop";
@@ -146,13 +149,24 @@ export function MenuBar() {
       </div>
       <div className="ot-menubar-sep" />
       <div className="ot-menubar-items">
-        <span className="ot-menubar-app">{appLabel}</span>
+        <button
+          type="button"
+          className="ot-menubar-app"
+          onClick={(e) => openUnder(e.currentTarget, appMenu())}
+        >
+          {appLabel}
+        </button>
         {items.map((it) => (
-          <button type="button" key={it}>
+          <button
+            type="button"
+            key={it}
+            onClick={(e) => openUnder(e.currentTarget, buildMenu(app ?? null, it))}
+          >
             {it}
           </button>
         ))}
       </div>
+      {menu}
       <div className="ot-menubar-spacer" />
       <div className="ot-menubar-status">
         <VoiceIndicator />

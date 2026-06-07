@@ -369,7 +369,7 @@
   background: rgba(255,255,255,0.08);
 }
 
-.ot-menubar-app {
+.ot-menubar-items button.ot-menubar-app {
   color: var(--t-primary);
   font-weight: 600;
   font-size: 11px;

@@ -59,13 +59,21 @@ export function useContextMenu() {
     setState({ x: r.right, y: r.bottom + 4, items, align: "right" });
   }, []);
 
+  // Left-aligned dropdown under a button — for menubar-style menus that should
+  // hang from the button's LEFT edge and grow rightward.
+  const openUnder = useCallback((el: HTMLElement, items: MenuItem[]) => {
+    if (items.length === 0) return;
+    const r = el.getBoundingClientRect();
+    setState({ x: r.left, y: r.bottom + 4, items, align: "left" });
+  }, []);
+
   const close = useCallback(() => setState(null), []);
 
   const menu = state ? (
     <ContextMenuView state={state} onClose={close} />
   ) : null;
 
-  return { openAt, openFromButton, close, menu, isOpen: state !== null };
+  return { openAt, openFromButton, openUnder, close, menu, isOpen: state !== null };
 }
 
 function ContextMenuView({
