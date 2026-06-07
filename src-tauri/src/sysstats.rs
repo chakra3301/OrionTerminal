@@ -59,9 +59,16 @@ impl UsageWindow {
 
 #[derive(Serialize, Default)]
 pub struct ClaudeUsage {
-    last_5h: UsageWindow,
+    /// Usage in the CURRENT 5-hour limit block. Anthropic anchors the window to
+    /// your first message and resets 5h later; we reconstruct that block rather
+    /// than a rolling sum, so `block_start_ms + 5h` is a real "resets at" time.
+    block: UsageWindow,
+    block_start_ms: i64,
+    /// Trailing 24h, informational.
     last_24h: UsageWindow,
 }
+
+const FIVE_H_MS: i64 = 5 * 3_600_000;
 
 struct Usage {
     input: u64,
@@ -152,8 +159,11 @@ pub fn claude_usage() -> ClaudeUsage {
     };
     let root = std::path::Path::new(&home).join(".claude").join("projects");
     let now = now_ms();
-    let cut_5h = now - 5 * 3_600_000;
     let cut_24h = now - 24 * 3_600_000;
+
+    // Collect every usage event in the last 24h, then derive both the trailing
+    // 24h total and the current 5h block from the same set.
+    let mut events: Vec<(i64, Usage, String)> = Vec::new();
 
     for entry in WalkDir::new(&root)
         .into_iter()
@@ -191,8 +201,27 @@ pub fn claude_usage() -> ClaudeUsage {
                 continue;
             };
             out.last_24h.add(&usage, &model);
-            if ts >= cut_5h {
-                out.last_5h.add(&usage, &model);
+            events.push((ts, usage, model));
+        }
+    }
+
+    // Reconstruct the current limit block: walking oldest->newest, a new 5h
+    // window opens whenever an event lands 5h+ after the open window's start.
+    // The window holding the newest event is the live block.
+    events.sort_by_key(|e| e.0);
+    let mut block_start = 0i64;
+    for (ts, _, _) in &events {
+        if block_start == 0 || *ts - block_start >= FIVE_H_MS {
+            block_start = *ts;
+        }
+    }
+    // Only report a block if its window is still open (start + 5h in the
+    // future); otherwise the limit has already reset and the block is empty.
+    if block_start != 0 && block_start + FIVE_H_MS > now {
+        out.block_start_ms = block_start;
+        for (ts, usage, model) in &events {
+            if *ts >= block_start {
+                out.block.add(usage, model);
             }
         }
     }

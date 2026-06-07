@@ -186,6 +186,7 @@ export type UsageWindow = {
 };
 
 export type ClaudeUsage = {
-  last_5h: UsageWindow;
+  block: UsageWindow;
+  block_start_ms: number;
   last_24h: UsageWindow;
 };

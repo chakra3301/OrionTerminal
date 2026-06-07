@@ -9227,6 +9227,22 @@
   border-radius: var(--r-pill);
   transition: width 280ms ease;
 }
+.ot-mon-budget {
+  color: var(--t-secondary);
+  border-bottom: 1px dashed var(--t-faint);
+  cursor: pointer;
+}
+.ot-mon-budget:hover { color: var(--t-primary); }
+.ot-mon-budget-input {
+  width: 40px;
+  background: var(--bg-2);
+  border: 1px solid var(--neon-cyan);
+  border-radius: var(--r-sm);
+  color: var(--t-primary);
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  padding: 0 3px;
+}
 .ot-mon-pill {
   position: fixed;
   z-index: 600;

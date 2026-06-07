@@ -7,10 +7,12 @@ import { log } from "@/lib/log";
 
 const SYS_POLL_MS = 2000;
 const USAGE_POLL_MS = 30_000;
-// Rough capacity anchor for the 5h gauge — not an official limit (Anthropic
-// doesn't publish one), just a reference so the bar means something. Opus-
-// weighted tokens; tune to taste.
-const FIVE_H_REF_TOKENS = 12_000_000;
+const FIVE_H_MS = 5 * 3_600_000;
+// Calibratable ceiling for the 5h limit gauge, in estimated USD (cost is the
+// best local proxy for Anthropic's weighted limit — it discounts cache reads
+// and accounts for model). No official number exists; the user tunes this by
+// noting the figure when they actually hit the cap. Default is a placeholder.
+const DEFAULT_BUDGET_USD = 25;
 
 type Pos = { x: number; y: number };
 
@@ -22,6 +24,13 @@ function fmtTokens(n: number): string {
 
 function fmtBytes(n: number): string {
   return `${(n / 1024 ** 3).toFixed(1)} GB`;
+}
+
+function fmtCountdown(ms: number): string {
+  if (ms <= 0) return "now";
+  const m = Math.floor(ms / 60000);
+  const h = Math.floor(m / 60);
+  return h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
 }
 
 function Bar({ pct, tone }: { pct: number; tone: string }) {
@@ -38,17 +47,23 @@ function Bar({ pct, tone }: { pct: number; tone: string }) {
 export function MonitorWidget() {
   const [pos, setPos] = useState<Pos | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [budget, setBudget] = useState(DEFAULT_BUDGET_USD);
+  const [editingBudget, setEditingBudget] = useState(false);
   const [sys, setSys] = useState<SystemStats | null>(null);
   const [usage, setUsage] = useState<ClaudeUsage | null>(null);
+  const [now, setNow] = useState(Date.now());
   const posRef = useRef<Pos>({ x: 0, y: 0 });
 
-  // Hydrate persisted position + collapsed state once.
+  // Hydrate persisted position + collapsed + budget once.
   useEffect(() => {
-    void getAppState<{ pos: Pos; collapsed?: boolean }>("widget.monitor").then((v) => {
-      const init = v?.pos ?? { x: window.innerWidth - 268, y: 52 };
+    void getAppState<{ pos: Pos; collapsed?: boolean; budget?: number }>(
+      "widget.monitor",
+    ).then((v) => {
+      const init = v?.pos ?? { x: window.innerWidth - 280, y: 52 };
       posRef.current = init;
       setPos(init);
       if (v?.collapsed) setCollapsed(true);
+      if (typeof v?.budget === "number" && v.budget > 0) setBudget(v.budget);
     });
   }, []);
 
@@ -64,17 +79,20 @@ export function MonitorWidget() {
     pullUsage();
     const a = setInterval(pullSys, SYS_POLL_MS);
     const b = setInterval(pullUsage, USAGE_POLL_MS);
+    const c = setInterval(() => alive && setNow(Date.now()), 30_000);
     return () => {
       alive = false;
       clearInterval(a);
       clearInterval(b);
+      clearInterval(c);
     };
   }, [collapsed, pos]);
 
-  const persist = (next: Partial<{ pos: Pos; collapsed: boolean }>) => {
+  const persist = (next: Partial<{ pos: Pos; collapsed: boolean; budget: number }>) => {
     void setAppState("widget.monitor", {
       pos: next.pos ?? posRef.current,
       collapsed: next.collapsed ?? collapsed,
+      budget: next.budget ?? budget,
     }).catch((e) => log.warn("monitor widget persist failed", e));
   };
 
@@ -115,10 +133,16 @@ export function MonitorWidget() {
   }
 
   const memPct = sys ? (sys.mem_used / sys.mem_total) * 100 : 0;
-  const w5 = usage?.last_5h;
+  const block = usage?.block;
   const w24 = usage?.last_24h;
-  const tok5 = w5 ? w5.input + w5.output + w5.cache_creation + w5.cache_read : 0;
+  const active = !!usage && usage.block_start_ms > 0;
+  const cost5 = active ? block!.cost_usd : 0;
+  const usedPct = (cost5 / budget) * 100;
+  const tok5 = block ? block.input + block.output + block.cache_creation + block.cache_read : 0;
   const tok24 = w24 ? w24.input + w24.output + w24.cache_creation + w24.cache_read : 0;
+  const resetMs = active ? usage!.block_start_ms + FIVE_H_MS - now : 0;
+  const usedTone =
+    usedPct >= 90 ? "var(--neon-magenta)" : usedPct >= 70 ? "var(--neon-yellow)" : "var(--neon-green)";
 
   return (
     <div
@@ -146,9 +170,7 @@ export function MonitorWidget() {
       <div className="ot-mon-section">
         <div className="ot-mon-row">
           <span className="ot-mon-label">CPU</span>
-          <span className="ot-mon-val">
-            {sys ? `${sys.cpu_percent.toFixed(0)}%` : "—"}
-          </span>
+          <span className="ot-mon-val">{sys ? `${sys.cpu_percent.toFixed(0)}%` : "—"}</span>
         </div>
         <Bar pct={sys?.cpu_percent ?? 0} tone="var(--neon-cyan)" />
         <div className="ot-mon-row">
@@ -162,12 +184,47 @@ export function MonitorWidget() {
 
       <div className="ot-mon-section">
         <div className="ot-mon-row">
-          <span className="ot-mon-label">CLAUDE · 5h</span>
-          <span className="ot-mon-val">{w5 ? `${fmtTokens(tok5)} tok` : "—"}</span>
+          <span className="ot-mon-label">CLAUDE · 5h limit</span>
+          <span className="ot-mon-val" style={{ color: usedTone }}>
+            {usage ? `${usedPct.toFixed(0)}%` : "—"}
+          </span>
         </div>
-        <Bar pct={(tok5 / FIVE_H_REF_TOKENS) * 100} tone="var(--neon-green)" />
+        <Bar pct={usedPct} tone={usedTone} />
+        <div className="ot-mon-row ot-mon-sub" data-no-drag>
+          <span>
+            ${cost5.toFixed(2)} / $
+            {editingBudget ? (
+              <input
+                className="ot-mon-budget-input"
+                type="number"
+                min={1}
+                defaultValue={budget}
+                autoFocus
+                onBlur={(e) => {
+                  const v = Math.max(1, Number(e.target.value) || budget);
+                  setBudget(v);
+                  setEditingBudget(false);
+                  persist({ budget: v });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                  if (e.key === "Escape") setEditingBudget(false);
+                }}
+              />
+            ) : (
+              <span
+                className="ot-mon-budget"
+                title="Click to set your 5h ceiling (calibrate when you hit the cap)"
+                onClick={() => setEditingBudget(true)}
+              >
+                {budget}
+              </span>
+            )}
+          </span>
+          <span>{active ? `resets ${fmtCountdown(resetMs)}` : "window clear"}</span>
+        </div>
         <div className="ot-mon-row ot-mon-sub">
-          <span>${w5 ? w5.cost_usd.toFixed(2) : "0.00"} this 5h</span>
+          <span>{fmtTokens(tok5)} tok · 5h</span>
           <span>{w24 ? `${fmtTokens(tok24)} · $${w24.cost_usd.toFixed(2)} · 24h` : ""}</span>
         </div>
       </div>
