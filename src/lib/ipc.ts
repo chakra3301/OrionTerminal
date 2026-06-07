@@ -164,4 +164,28 @@ export const ipc = {
     invoke("wallpaper_store_file", { sourcePath }),
   wallpaperClearFile: (filePath: string): Promise<void> =>
     invoke("wallpaper_clear_file", { filePath }),
+
+  systemStats: (): Promise<SystemStats> => invoke("system_stats"),
+  claudeUsage: (): Promise<ClaudeUsage> => invoke("claude_usage"),
+};
+
+export type SystemStats = {
+  cpu_percent: number;
+  mem_used: number;
+  mem_total: number;
+  cpu_count: number;
+};
+
+export type UsageWindow = {
+  input: number;
+  output: number;
+  cache_creation: number;
+  cache_read: number;
+  cost_usd: number;
+  messages: number;
+};
+
+export type ClaudeUsage = {
+  last_5h: UsageWindow;
+  last_24h: UsageWindow;
 };

@@ -8,6 +8,7 @@ mod inline_edit;
 mod mcp_config;
 pub mod mcp_server;
 mod messages_chat;
+mod sysstats;
 mod terminal;
 mod ui_bridge;
 mod wallpaper;
@@ -178,6 +179,8 @@ pub fn run() {
             fs_watch::fs_watch_set_root,
             wallpaper::wallpaper_store_file,
             wallpaper::wallpaper_clear_file,
+            sysstats::system_stats,
+            sysstats::claude_usage,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

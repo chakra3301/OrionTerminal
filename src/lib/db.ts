@@ -37,7 +37,8 @@ export type AppStateKey =
   | "rosie.ttsEnabled"
   | "voice.listenMode"
   | "mcp.servers"
-  | "models";
+  | "models"
+  | "widget.monitor";
 
 export async function getAppState<T = unknown>(
   key: AppStateKey,

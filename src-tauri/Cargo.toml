@@ -44,3 +44,6 @@ ulid = "1"
 # instead of thousands of times during npm install / webpack builds.
 notify = "6"
 notify-debouncer-mini = "0.4"
+# CPU/memory stats for the desktop monitor widget. (Temp/GPU on Apple Silicon
+# need sudo/powermetrics, so the widget sticks to what sysinfo can read freely.)
+sysinfo = "0.33"
