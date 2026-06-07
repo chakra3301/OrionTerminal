@@ -22,6 +22,7 @@ import { ipc } from "@/lib/ipc";
 import { startFileDropOrchestrator } from "@/lib/fileDrop";
 import { useProjectStore } from "@/store/projectStore";
 import { useThemeStore } from "@/store/themeStore";
+import { useModelPrefs } from "@/store/modelPrefsStore";
 import { useWallpaperStore, type WallpaperState } from "@/store/wallpaperStore";
 import { usePreviewStore, type PreviewState } from "@/store/previewStore";
 import {
@@ -95,6 +96,7 @@ async function hydrate() {
     wallpaper,
     preview,
     xdesignDoc,
+    modelPrefs,
   ] = await Promise.all([
     getAppState<{ sidebar: number; main: number; right: number }>("panel_sizes"),
     getAppState<boolean>("sidebar_open"),
@@ -118,12 +120,14 @@ async function hydrate() {
           activeModeId?: string;
         }
     >("xdesign.doc"),
+    getAppState<Record<string, string>>("models"),
   ]);
 
   useThemeStore.getState().hydrate(theme ?? null);
   if (wallpaper) useWallpaperStore.getState().hydrate(wallpaper);
   if (preview) usePreviewStore.getState().hydrate(preview);
   if (xdesignDoc) useXDesign.getState().hydrate(xdesignDoc);
+  useModelPrefs.getState().hydrate(modelPrefs);
 
   useLayoutStore.getState().hydrate({
     ...(panelSizes ? { sizes: panelSizes } : {}),

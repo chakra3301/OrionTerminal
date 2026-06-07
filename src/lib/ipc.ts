@@ -64,6 +64,7 @@ export const ipc = {
     projectRoot: string | null,
     sessionId: string | null,
     imagePath: string | null = null,
+    model: string | null = null,
   ): Promise<void> =>
     invoke("claude_send", {
       chatId,
@@ -71,6 +72,7 @@ export const ipc = {
       projectRoot,
       sessionId,
       imagePath,
+      model,
     }),
   claudeCancel: (chatId: string): Promise<void> =>
     invoke("claude_cancel", { chatId }),
@@ -89,6 +91,11 @@ export const ipc = {
     projectRoot: string | null = null,
   ): Promise<number> =>
     invoke<number>("hermes_dispatch_task", { taskId, projectRoot }),
+  hermesContinueAgent: (
+    agentId: string,
+    projectRoot: string | null,
+  ): Promise<void> =>
+    invoke("hermes_continue_agent", { agentId, projectRoot }),
   hermesStopTask: (taskId: string): Promise<void> =>
     invoke("hermes_stop_task", { taskId }),
   hermesStopAgent: (agentId: string): Promise<void> =>

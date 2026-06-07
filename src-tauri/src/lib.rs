@@ -107,6 +107,12 @@ pub fn run() {
             sql: include_str!("../migrations/0015_hermes.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 16,
+            description: "per-agent model override for hermes swarms",
+            sql: include_str!("../migrations/0016_hermes_agent_model.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
@@ -151,6 +157,7 @@ pub fn run() {
             claude_cli::claude_oneshot,
             claude_cli::claude_oneshot_with_image,
             hermes::hermes_dispatch_task,
+            hermes::hermes_continue_agent,
             hermes::hermes_stop_agent,
             hermes::hermes_stop_task,
             terminal::terminal_open,

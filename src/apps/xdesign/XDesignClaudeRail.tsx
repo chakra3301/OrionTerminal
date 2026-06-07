@@ -7,6 +7,7 @@ import { useXDesign } from "@/apps/xdesign/store";
 import { upsertChat } from "@/lib/db";
 import { scheduleReindex } from "@/lib/embeddingIndexer";
 import { ipc } from "@/lib/ipc";
+import { useModelPrefs } from "@/store/modelPrefsStore";
 import { log } from "@/lib/log";
 import { xdesignClaude } from "@/apps/xdesign/claude";
 import {
@@ -233,7 +234,14 @@ export function XDesignClaudeRail() {
       // Pass the snapshot path through to claude_send, which attaches it as a
       // real stream-json image block (NOT an `@path` mention — those get
       // dropped on --resume turns). Null path → plain text-only send.
-      await ipc.claudeSend(chatId, prompt, null, thread.sessionId, snapshotPath);
+      await ipc.claudeSend(
+        chatId,
+        prompt,
+        null,
+        thread.sessionId,
+        snapshotPath,
+        useModelPrefs.getState().modelFor("xdesign"),
+      );
     } catch (e) {
       log.error("xdesign chat send failed", e);
       forgetStream(chatId);

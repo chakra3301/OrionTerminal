@@ -40,6 +40,7 @@ function agent(p: Partial<HermesAgent> & { id: string; taskId: string }): Hermes
     error: p.error ?? "",
     sessionId: p.sessionId ?? null,
     position: p.position ?? 0,
+    model: p.model ?? "",
   };
 }
 

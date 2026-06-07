@@ -36,7 +36,8 @@ export type AppStateKey =
   | "shell.focusedWindowId"
   | "rosie.ttsEnabled"
   | "voice.listenMode"
-  | "mcp.servers";
+  | "mcp.servers"
+  | "models";
 
 export async function getAppState<T = unknown>(
   key: AppStateKey,
@@ -885,6 +886,7 @@ export type HermesAgentRow = {
   error: string;
   session_id: string | null;
   position: number;
+  model: string;
   created_at: number;
   updated_at: number;
   started_at: number | null;
@@ -966,8 +968,8 @@ export async function insertHermesAgent(a: HermesAgentRow): Promise<void> {
   const db = await getDb();
   await db.execute(
     `INSERT INTO hermes_agents
-       (id, task_id, label, prompt, status, output, error, session_id, position, created_at, updated_at, started_at, finished_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+       (id, task_id, label, prompt, status, output, error, session_id, position, model, created_at, updated_at, started_at, finished_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
     [
       a.id,
       a.task_id,
@@ -978,6 +980,7 @@ export async function insertHermesAgent(a: HermesAgentRow): Promise<void> {
       a.error,
       a.session_id,
       a.position,
+      a.model,
       a.created_at,
       a.updated_at,
       a.started_at,
@@ -995,6 +998,7 @@ export async function updateHermesAgent(
     output?: string;
     error?: string;
     session_id?: string | null;
+    model?: string;
     started_at?: number | null;
     finished_at?: number | null;
     updated_at: number;
@@ -1006,6 +1010,7 @@ export async function updateHermesAgent(
   let i = 1;
   if (patch.label !== undefined) { sets.push(`label = $${i++}`); vals.push(patch.label); }
   if (patch.prompt !== undefined) { sets.push(`prompt = $${i++}`); vals.push(patch.prompt); }
+  if (patch.model !== undefined) { sets.push(`model = $${i++}`); vals.push(patch.model); }
   if (patch.status !== undefined) { sets.push(`status = $${i++}`); vals.push(patch.status); }
   if (patch.output !== undefined) { sets.push(`output = $${i++}`); vals.push(patch.output); }
   if (patch.error !== undefined) { sets.push(`error = $${i++}`); vals.push(patch.error); }

@@ -28,7 +28,8 @@ export type HermesStatus =
   | "running"
   | "completed"
   | "failed"
-  | "cancelled";
+  | "cancelled"
+  | "paused";
 
 export const HERMES_COLUMNS: { id: HermesColumn; label: string }[] = [
   { id: "backlog", label: "Backlog" },
@@ -49,6 +50,7 @@ export type HermesAgent = {
   error: string;
   sessionId: string | null;
   position: number;
+  model: string;
 };
 
 export type HermesTask = {
@@ -92,6 +94,7 @@ function rowToAgent(r: HermesAgentRow): HermesAgent {
     error: r.error,
     sessionId: r.session_id,
     position: r.position,
+    model: r.model ?? "",
   };
 }
 
@@ -128,14 +131,16 @@ type HermesState = {
     taskId: string,
     prompt?: string,
     label?: string,
+    model?: string,
   ) => Promise<HermesAgent>;
   updateAgent: (
     id: string,
-    patch: { prompt?: string; label?: string },
+    patch: { prompt?: string; label?: string; model?: string },
   ) => Promise<void>;
   removeAgent: (id: string) => Promise<void>;
 
   dispatch: (taskId: string, projectRoot?: string | null) => Promise<void>;
+  continueAgent: (agentId: string, projectRoot?: string | null) => Promise<void>;
   stopTask: (taskId: string) => Promise<void>;
   stopAgent: (agentId: string) => Promise<void>;
 
@@ -316,7 +321,7 @@ export const useHermes = create<HermesState>((set, get) => ({
     });
   },
 
-  addAgent: async (taskId, prompt = "", label = "") => {
+  addAgent: async (taskId, prompt = "", label = "", model = "") => {
     const id = ulid();
     const now = Date.now();
     const position = get().agentsForTask(taskId).length;
@@ -330,6 +335,7 @@ export const useHermes = create<HermesState>((set, get) => ({
       error: "",
       session_id: null,
       position,
+      model,
       created_at: now,
       updated_at: now,
       started_at: null,
@@ -369,7 +375,13 @@ export const useHermes = create<HermesState>((set, get) => ({
   dispatch: async (taskId, projectRoot = null) => {
     const dispatchable = get()
       .agentsForTask(taskId)
-      .filter((a) => a.status !== "running" && a.status !== "completed");
+      // Paused agents resume via Continue, not Dispatch — leave them be.
+      .filter(
+        (a) =>
+          a.status !== "running" &&
+          a.status !== "completed" &&
+          a.status !== "paused",
+      );
     if (dispatchable.length === 0) {
       throw new Error("Add an agent to this task before dispatching.");
     }
@@ -401,6 +413,33 @@ export const useHermes = create<HermesState>((set, get) => ({
         return { tasks, agents };
       });
       throw e;
+    }
+  },
+
+  continueAgent: async (agentId, projectRoot = null) => {
+    const agent = get().agents.get(agentId);
+    if (!agent) return;
+    // Optimistic: flip the agent + its task back to running.
+    set((s) => {
+      const agents = new Map(s.agents);
+      const a = s.agents.get(agentId);
+      if (a) agents.set(agentId, { ...a, status: "running", error: "" });
+      const tasks = new Map(s.tasks);
+      const t = s.tasks.get(agent.taskId);
+      if (t)
+        tasks.set(agent.taskId, { ...t, column: "running", status: "running" });
+      return { agents, tasks };
+    });
+    try {
+      await ipc.hermesContinueAgent(agentId, projectRoot);
+    } catch (e) {
+      log.warn("hermes continue failed", e);
+      set((s) => {
+        const agents = new Map(s.agents);
+        const a = s.agents.get(agentId);
+        if (a) agents.set(agentId, { ...a, status: "paused" });
+        return { agents };
+      });
     }
   },
 

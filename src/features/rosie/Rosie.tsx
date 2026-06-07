@@ -12,6 +12,7 @@ import {
 import { useSettingsStore } from "@/store/settingsStore";
 import { prettyToolName, formatToolResult } from "@/lib/toolFormat";
 import { useFileDropZone } from "@/lib/fileDrop";
+import { ModelSelect } from "@/components/ModelSelect";
 
 /** Extended-thinking block — claude emits these between/during turns when
  * reasoning. Collapsed by default so they don't dominate the surface.
@@ -299,6 +300,7 @@ export function Rosie() {
             </div>
           </div>
           <div className="ot-rosie-actions">
+            <ModelSelect surface="rosie" />
             <TtsToggle />
             <button
               type="button"

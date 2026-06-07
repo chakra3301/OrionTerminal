@@ -18,6 +18,7 @@ import {
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { archivesClaude } from "@/apps/archives/claude";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
+import { useModelPrefs } from "@/store/modelPrefsStore";
 import { useArchives, type ArchivesView } from "@/apps/archives/useArchives";
 import { useNotesStore } from "@/store/notesStore";
 import { useAssetsStore } from "@/store/assetsStore";
@@ -197,7 +198,14 @@ export function ArchivesApp() {
       const prompt = isFirstTurn
         ? `${archivesClaude.systemPrompt}\n\n---\n\n${text}`
         : text;
-      await ipc.claudeSend(chatId, prompt, null, thread.sessionId);
+      await ipc.claudeSend(
+        chatId,
+        prompt,
+        null,
+        thread.sessionId,
+        null,
+        useModelPrefs.getState().modelFor("archives"),
+      );
     } catch (e) {
       log.error("archives chat send failed", e);
       forgetStream(chatId);

@@ -40,9 +40,9 @@ const DOCK_APPS: DockApp[] = [
   {
     id: "hermes",
     title: APP_NAMES.hermes,
-    bg: "linear-gradient(135deg, rgba(255,179,71,0.42), rgba(255,179,71,0.05))",
-    glow: "0 0 14px -2px rgba(255,179,71,0.45)",
-    fg: "#1c1003",
+    bg: "linear-gradient(135deg, rgba(255,138,61,0.42), rgba(255,138,61,0.05))",
+    glow: "0 0 14px -2px rgba(255,138,61,0.45)",
+    fg: "#1c0e03",
     Icon: Workflow,
   },
 ];

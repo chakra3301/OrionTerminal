@@ -6,6 +6,7 @@ import "highlight.js/styles/github-dark.css";
 import { Sparkles, Send, StopCircle, MoreHorizontal, Plus } from "lucide-react";
 import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
 import { useFileDropZone } from "@/lib/fileDrop";
+import { ModelSelect } from "@/components/ModelSelect";
 
 export type ClaudeChatMessage = {
   id: string;
@@ -117,6 +118,7 @@ export function ClaudeChat(props: ClaudeChatProps) {
           <div className="ot-claude-name">{name}</div>
           <div className="ot-claude-sub">{subtitle}</div>
         </div>
+        <ModelSelect surface={props.appId} />
         {onNewChat ? (
           <button
             type="button"

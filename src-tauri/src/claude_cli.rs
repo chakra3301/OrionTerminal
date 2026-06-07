@@ -94,6 +94,7 @@ pub async fn claude_send(
     project_root: Option<String>,
     session_id: Option<String>,
     image_path: Option<String>,
+    model: Option<String>,
 ) -> Result<(), String> {
     // Resolve cwd: explicit project_root wins, otherwise fall back to the
     // user's home dir so chat surfaces without a project context (Archives,
@@ -114,6 +115,13 @@ pub async fn claude_send(
         .filter(|p| !p.is_empty())
         .map(|p| p.to_string());
 
+    // Per-surface model override; blank/None falls back to the shared default.
+    let model_id = model
+        .as_deref()
+        .map(str::trim)
+        .filter(|m| !m.is_empty())
+        .unwrap_or(OPUS_MODEL);
+
     let mut cmd = Command::new("claude");
     cmd.args([
         "--print",
@@ -123,7 +131,7 @@ pub async fn claude_send(
         "--permission-mode",
         "bypassPermissions",
         "--model",
-        OPUS_MODEL,
+        model_id,
     ]);
     if attach_image.is_some() {
         cmd.args(["--input-format", "stream-json"]);
