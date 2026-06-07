@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useWallpaperStore } from "@/store/wallpaperStore";
+import { useShell } from "@/shell/store/useShell";
 
 const stars: Array<{ x: number; y: number; bright?: boolean }> = [
   { x: 30, y: 20, bright: true },
@@ -156,10 +157,22 @@ function MatrixCanvas() {
     setupCanvas();
 
     let raf = 0;
+    let running = false;
     let last = performance.now();
     const FRAME_INTERVAL = reduceMotion ? 200 : 1000 / 22;
 
+    // The matrix rain is pure decoration — pause it whenever it can't be seen:
+    // the OS window is hidden/minimized, or a maximized window fully covers the
+    // desktop. Stops a constant repaint (with per-glyph shadowBlur) for nothing.
+    const occluded = () =>
+      useShell.getState().windows.some((w) => w.maximized && !w.minimized);
+    const paused = () => document.hidden || occluded();
+
     const draw = (now: number) => {
+      if (paused()) {
+        running = false;
+        return;
+      }
       raf = requestAnimationFrame(draw);
       if (now - last < FRAME_INTERVAL) return;
       last = now;
@@ -194,14 +207,26 @@ function MatrixCanvas() {
       ctx.shadowBlur = 0;
     };
 
-    raf = requestAnimationFrame(draw);
+    const resume = () => {
+      if (running || paused()) return;
+      running = true;
+      last = performance.now();
+      raf = requestAnimationFrame(draw);
+    };
+
+    resume();
 
     const onResize = () => setupCanvas();
     window.addEventListener("resize", onResize);
+    document.addEventListener("visibilitychange", resume);
+    // Restart when a window un-maximizes / closes (desktop visible again).
+    const unsubShell = useShell.subscribe(resume);
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
+      document.removeEventListener("visibilitychange", resume);
+      unsubShell();
     };
   }, []);
 

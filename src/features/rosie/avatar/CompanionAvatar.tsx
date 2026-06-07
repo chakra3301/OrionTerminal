@@ -178,7 +178,7 @@ export function CompanionAvatar() {
           <span className="bubble-text">{proactivePrompt}</span>
         </div>
       )}
-      <CompanionScene frameloop={visible && !docHidden ? "always" : "never"} />
+      <CompanionScene frameloop={visible && !docHidden ? "demand" : "never"} />
       <div className="ot-companion-base" aria-hidden />
     </div>
   );

@@ -6,7 +6,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { useVoice } from "@/store/voiceStore";
@@ -487,11 +487,26 @@ function Avatar() {
   );
 }
 
+// On "demand" the scene only renders when something calls invalidate(). This
+// ticker invalidates at a capped FPS so the idle avatar animates at ~30fps
+// instead of the GPU-pegging 60 — roughly halving her always-on cost while
+// she's visible, with no visible difference for a small holographic blob.
+function FrameThrottle({ fps }: { fps: number }) {
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    const id = setInterval(() => invalidate(), 1000 / fps);
+    invalidate();
+    return () => clearInterval(id);
+  }, [fps, invalidate]);
+  return null;
+}
+
 export function CompanionScene({
   frameloop = "always",
 }: {
   // "never" parks the render loop (dismissed / window hidden) so the one
   // long-lived WebGL context costs ~nothing when she isn't on screen.
+  // "demand" + FrameThrottle keeps her alive but at a capped framerate.
   frameloop?: "always" | "demand" | "never";
 }) {
   return (
@@ -505,6 +520,7 @@ export function CompanionScene({
       <ambientLight intensity={0.65} />
       <directionalLight position={[2, 3, 4]} intensity={1.1} />
       <Avatar />
+      {frameloop === "demand" && <FrameThrottle fps={30} />}
     </Canvas>
   );
 }

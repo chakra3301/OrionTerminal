@@ -48,7 +48,7 @@ export function MonitorWidget() {
   const [pos, setPos] = useState<Pos | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [budget, setBudget] = useState(DEFAULT_BUDGET_USD);
-  const [editingBudget, setEditingBudget] = useState(false);
+  const [calibrating, setCalibrating] = useState(false);
   const [sys, setSys] = useState<SystemStats | null>(null);
   const [usage, setUsage] = useState<ClaudeUsage | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -144,6 +144,18 @@ export function MonitorWidget() {
   const usedTone =
     usedPct >= 90 ? "var(--neon-magenta)" : usedPct >= 70 ? "var(--neon-yellow)" : "var(--neon-green)";
 
+  // Calibrate the gauge to reality: the user reads their true % from Claude and
+  // enters it here; we back-solve the 5h $ ceiling from the current block cost.
+  const commitCalibration = (raw: string) => {
+    setCalibrating(false);
+    const pct = Number(raw);
+    if (pct > 0 && cost5 > 0) {
+      const b = Math.max(1, cost5 / (pct / 100));
+      setBudget(b);
+      persist({ budget: b });
+    }
+  };
+
   return (
     <div
       className="ot-mon-widget"
@@ -185,41 +197,40 @@ export function MonitorWidget() {
       <div className="ot-mon-section">
         <div className="ot-mon-row">
           <span className="ot-mon-label">CLAUDE · 5h limit</span>
-          <span className="ot-mon-val" style={{ color: usedTone }}>
-            {usage ? `${usedPct.toFixed(0)}%` : "—"}
-          </span>
-        </div>
-        <Bar pct={usedPct} tone={usedTone} />
-        <div className="ot-mon-row ot-mon-sub" data-no-drag>
-          <span>
-            ${cost5.toFixed(2)} / $
-            {editingBudget ? (
+          {calibrating ? (
+            <span className="ot-mon-cal" data-no-drag>
               <input
                 className="ot-mon-budget-input"
                 type="number"
                 min={1}
-                defaultValue={budget}
+                max={100}
+                placeholder="real %"
+                defaultValue={usage ? Math.round(usedPct) : undefined}
                 autoFocus
-                onBlur={(e) => {
-                  const v = Math.max(1, Number(e.target.value) || budget);
-                  setBudget(v);
-                  setEditingBudget(false);
-                  persist({ budget: v });
-                }}
+                onBlur={(e) => commitCalibration(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                  if (e.key === "Escape") setEditingBudget(false);
+                  if (e.key === "Escape") setCalibrating(false);
                 }}
               />
-            ) : (
-              <span
-                className="ot-mon-budget"
-                title="Click to set your 5h ceiling (calibrate when you hit the cap)"
-                onClick={() => setEditingBudget(true)}
-              >
-                {budget}
-              </span>
-            )}
+              <span>%</span>
+            </span>
+          ) : (
+            <span
+              className="ot-mon-val ot-mon-pct"
+              data-no-drag
+              style={{ color: usedTone }}
+              title="Click to calibrate — enter your real % from Claude"
+              onClick={() => cost5 > 0 && setCalibrating(true)}
+            >
+              {usage ? `${usedPct.toFixed(0)}%` : "—"}
+            </span>
+          )}
+        </div>
+        <Bar pct={usedPct} tone={usedTone} />
+        <div className="ot-mon-row ot-mon-sub">
+          <span>
+            ${cost5.toFixed(2)} / ${budget.toFixed(0)}
           </span>
           <span>{active ? `resets ${fmtCountdown(resetMs)}` : "window clear"}</span>
         </div>
