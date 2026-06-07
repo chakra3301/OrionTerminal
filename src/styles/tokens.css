@@ -630,13 +630,12 @@
   align-items: flex-end;
   justify-content: center;
   padding: 0 0 110px 0; /* above the dock */
-  pointer-events: auto;
+  /* Click-through: the full-viewport layer must NOT eat clicks, or it blocks
+     every window behind it. Only the panel itself is interactive — R.O.S.I.E
+     floats on top but you can still click and use other windows while it's
+     open. (No backdrop dim, for the same reason — keep the desktop usable.) */
+  pointer-events: none;
   animation: ot-rosie-overlay-in 180ms ease-out;
-  background: radial-gradient(
-    circle at 50% 100%,
-    rgba(0, 0, 0, 0.35),
-    rgba(0, 0, 0, 0.0) 60%
-  );
 }
 @keyframes ot-rosie-overlay-in {
   from { opacity: 0; }
@@ -672,6 +671,7 @@
 .ot-rosie-panel {
   width: min(720px, calc(100vw - 64px));
   max-height: calc(100vh - 200px);
+  pointer-events: auto; /* interactive island on the click-through overlay */
   display: flex;
   flex-direction: column;
   background: rgba(6, 10, 15, 0.88);

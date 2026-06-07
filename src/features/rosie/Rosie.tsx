@@ -287,9 +287,7 @@ export function Rosie() {
   };
 
   return (
-    <div className="ot-rosie-overlay" onClick={(e) => {
-      if (e.target === e.currentTarget && !running) close();
-    }}>
+    <div className="ot-rosie-overlay">
       <div className="ot-rosie-panel">
         <div className="ot-rosie-head">
           <div className="ot-rosie-id">
