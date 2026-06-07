@@ -139,30 +139,67 @@ fn tool_definitions() -> Value {
         },
         {
             "name": "orion_create_note",
-            "description": "Create a new note in Archives 47. Returns the new \
-                note id. `kind` defaults to 'note'; use 'journal' for a \
-                dated entry, 'project' for a Notion-style nested page. \
-                `body` is optional plaintext; the note opens empty if \
-                omitted. The note appears in the user's UI within a few \
-                seconds (next focus/refresh).",
+            "description": "Create ONE note in Archives 47. Returns the new note \
+                id. `kind` defaults to 'note'; use 'journal' for a dated entry, \
+                'project' for a Notion-style page. `body` is MARKDOWN — use \
+                `#`/`##`/`###` headings, `**bold**`, `*italic*`, `- ` bullets, \
+                `1. ` numbered lists; it is rendered to styled blocks (do NOT \
+                expect raw markdown to show). Set `parent_id` to nest this page \
+                UNDER an existing project (makes it a subpage; forces \
+                kind=project). To build a whole project with multiple subpages \
+                at once, prefer orion_create_project instead of many calls here.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "title": { "type": "string" },
-                    "body": { "type": "string" },
+                    "body": { "type": "string", "description": "Markdown body, rendered to styled blocks." },
                     "kind": {
                         "type": "string",
                         "enum": ["note", "journal", "project"]
+                    },
+                    "parent_id": {
+                        "type": "string",
+                        "description": "Existing project id to nest this page under as a subpage."
                     }
                 },
                 "required": ["title"]
             }
         },
         {
+            "name": "orion_create_project",
+            "description": "Create a PROJECT with its SUBPAGES in one call — the \
+                correct way to fulfil 'make a project with sub pages' (never \
+                create several flat pages for that). Root page + every subpage \
+                are nested (Notion-style). `overview` is the root page's markdown \
+                body; `pages` is an ordered array of { title, body? } subpages. \
+                All bodies are MARKDOWN (headings/bold/lists) rendered to styled \
+                blocks. Returns the root id and the created subpage ids.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string", "description": "Project (root page) title." },
+                    "overview": { "type": "string", "description": "Markdown body for the root page." },
+                    "pages": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": { "type": "string" },
+                                "body": { "type": "string" }
+                            },
+                            "required": ["title"]
+                        }
+                    }
+                },
+                "required": ["title", "pages"]
+            }
+        },
+        {
             "name": "orion_update_note_body",
-            "description": "Replace the body (plaintext) of an existing note \
-                by id. Title and other metadata are left untouched. Use after \
-                orion_search_archive or orion_list_recent_notes to get an id.",
+            "description": "Replace the body of an existing note by id. `body` is \
+                MARKDOWN (headings/bold/lists), rendered to styled blocks — not \
+                shown raw. Title and other metadata are left untouched. Use \
+                after orion_search_archive or orion_list_recent_notes to get an id.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -635,6 +672,7 @@ fn call_tool(params: &Value) -> Result<Value, RpcError> {
         "orion_search_archive" => tool_search_archive(&args),
         "orion_list_projects" => tool_list_projects(&args),
         "orion_create_note" => tool_create_note(&args),
+        "orion_create_project" => tool_create_project(&args),
         "orion_update_note_body" => tool_update_note_body(&args),
         "orion_open_app" => tool_open_app(&args),
         "orion_switch_project" => tool_switch_project(&args),
@@ -769,6 +807,157 @@ fn tool_search_archive(args: &Value) -> Result<String, String> {
     .to_string())
 }
 
+/// One BlockNote block with the standard props, plus any extras (e.g. heading
+/// `level`). Matches the shape the editor (BlockNote default schema) expects.
+fn md_block(btype: &str, content: Value, extra: Value) -> Value {
+    let mut props = json!({
+        "backgroundColor": "default",
+        "textColor": "default",
+        "textAlignment": "left"
+    });
+    if let Value::Object(m) = extra {
+        for (k, v) in m {
+            props[k] = v;
+        }
+    }
+    json!({
+        "id": ulid::Ulid::new().to_string(),
+        "type": btype,
+        "props": props,
+        "content": content,
+        "children": []
+    })
+}
+
+fn find_seq(chars: &[char], from: usize, a: char, b: char) -> Option<usize> {
+    let mut i = from;
+    while i + 1 < chars.len() {
+        if chars[i] == a && chars[i + 1] == b {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Parse inline markdown (`**bold**`, `*italic*`/`_italic_`, `` `code` ``) into
+/// BlockNote inline content runs. Unclosed delimiters degrade to plain text.
+fn parse_inline(s: &str) -> Value {
+    let chars: Vec<char> = s.chars().collect();
+    let mut out: Vec<Value> = Vec::new();
+    let mut plain = String::new();
+    let push_run = |plain: &mut String, out: &mut Vec<Value>, styles: Value| {
+        if !plain.is_empty() {
+            out.push(json!({ "type": "text", "text": plain.clone(), "styles": styles }));
+            plain.clear();
+        }
+    };
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '*' && i + 1 < chars.len() && chars[i + 1] == '*' {
+            if let Some(close) = find_seq(&chars, i + 2, '*', '*') {
+                push_run(&mut plain, &mut out, json!({}));
+                let inner: String = chars[i + 2..close].iter().collect();
+                out.push(json!({ "type": "text", "text": inner, "styles": { "bold": true } }));
+                i = close + 2;
+                continue;
+            }
+        }
+        if chars[i] == '`' {
+            if let Some(close) = (i + 1..chars.len()).find(|&j| chars[j] == '`') {
+                push_run(&mut plain, &mut out, json!({}));
+                let inner: String = chars[i + 1..close].iter().collect();
+                out.push(json!({ "type": "text", "text": inner, "styles": { "code": true } }));
+                i = close + 1;
+                continue;
+            }
+        }
+        if chars[i] == '*' || chars[i] == '_' {
+            let d = chars[i];
+            if let Some(close) = (i + 1..chars.len()).find(|&j| chars[j] == d) {
+                if close > i + 1 {
+                    push_run(&mut plain, &mut out, json!({}));
+                    let inner: String = chars[i + 1..close].iter().collect();
+                    out.push(json!({ "type": "text", "text": inner, "styles": { "italic": true } }));
+                    i = close + 1;
+                    continue;
+                }
+            }
+        }
+        plain.push(chars[i]);
+        i += 1;
+    }
+    push_run(&mut plain, &mut out, json!({}));
+    if out.is_empty() {
+        out.push(json!({ "type": "text", "text": "", "styles": {} }));
+    }
+    Value::Array(out)
+}
+
+fn strip_numbered(line: &str) -> Option<String> {
+    let b = line.as_bytes();
+    let mut i = 0;
+    while i < b.len() && b[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i > 0 && i + 1 < b.len() && b[i] == b'.' && b[i + 1] == b' ' {
+        Some(line[i + 2..].trim().to_string())
+    } else {
+        None
+    }
+}
+
+/// Convert a markdown body (what ROSIE writes) into a BlockNote `blocks_json`
+/// document so headings/bold/lists actually RENDER in the editor instead of
+/// showing raw `#`/`**`. Covers the structures ROSIE emits; thematic breaks
+/// (`---`) are dropped (no divider in the default schema). Always appends a
+/// trailing empty paragraph so the cursor lands naturally.
+fn md_to_blocks(body: &str) -> String {
+    let body = body.trim();
+    if body.is_empty() {
+        return "[]".to_string();
+    }
+    let mut blocks: Vec<Value> = Vec::new();
+    let mut para: Vec<String> = Vec::new();
+    let flush_para = |para: &mut Vec<String>, blocks: &mut Vec<Value>| {
+        if !para.is_empty() {
+            let text = para.join(" ");
+            blocks.push(md_block("paragraph", parse_inline(&text), json!({})));
+            para.clear();
+        }
+    };
+    for raw in body.lines() {
+        let line = raw.trim();
+        if line.is_empty() {
+            flush_para(&mut para, &mut blocks);
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("### ") {
+            flush_para(&mut para, &mut blocks);
+            blocks.push(md_block("heading", parse_inline(rest.trim()), json!({ "level": 3 })));
+        } else if let Some(rest) = line.strip_prefix("## ") {
+            flush_para(&mut para, &mut blocks);
+            blocks.push(md_block("heading", parse_inline(rest.trim()), json!({ "level": 2 })));
+        } else if let Some(rest) = line.strip_prefix("# ") {
+            flush_para(&mut para, &mut blocks);
+            blocks.push(md_block("heading", parse_inline(rest.trim()), json!({ "level": 1 })));
+        } else if line == "---" || line == "***" || line == "___" {
+            flush_para(&mut para, &mut blocks);
+        } else if let Some(rest) = line.strip_prefix("- ").or_else(|| line.strip_prefix("* ")) {
+            flush_para(&mut para, &mut blocks);
+            blocks.push(md_block("bulletListItem", parse_inline(rest.trim()), json!({})));
+        } else if let Some(rest) = strip_numbered(line) {
+            flush_para(&mut para, &mut blocks);
+            blocks.push(md_block("numberedListItem", parse_inline(&rest), json!({})));
+        } else {
+            para.push(line.to_string());
+        }
+    }
+    flush_para(&mut para, &mut blocks);
+    blocks.push(md_block("paragraph", json!([]), json!({})));
+    Value::Array(blocks).to_string()
+}
+
 fn tool_create_note(args: &Value) -> Result<String, String> {
     let title = args
         .get("title")
@@ -784,49 +973,26 @@ fn tool_create_note(args: &Value) -> Result<String, String> {
         return Err(format!("invalid kind: {} (must be note|journal|project)", kind));
     }
 
+    // Optional parent for nesting (Notion-style project subpages). When set,
+    // `kind` is forced to 'project' since only projects nest in the UI.
+    let parent_id = args
+        .get("parent_id")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|p| !p.is_empty());
+    let kind = if parent_id.is_some() { "project" } else { kind };
+
     let id = ulid::Ulid::new().to_string();
     let now = chrono_like_millis();
-    // BlockNote-compatible shape — a single paragraph block carrying the
-    // body text, plus a trailing empty paragraph so the editor cursor lands
-    // somewhere natural when the user opens it.
-    let blocks_json = if body.is_empty() {
-        "[]".to_string()
-    } else {
-        let block_id_1 = ulid::Ulid::new().to_string();
-        let block_id_2 = ulid::Ulid::new().to_string();
-        serde_json::json!([
-            {
-                "id": block_id_1,
-                "type": "paragraph",
-                "props": {
-                    "backgroundColor": "default",
-                    "textColor": "default",
-                    "textAlignment": "left"
-                },
-                "content": [{ "type": "text", "text": body, "styles": {} }],
-                "children": []
-            },
-            {
-                "id": block_id_2,
-                "type": "paragraph",
-                "props": {
-                    "backgroundColor": "default",
-                    "textColor": "default",
-                    "textAlignment": "left"
-                },
-                "content": [],
-                "children": []
-            }
-        ])
-        .to_string()
-    };
+    // Render the markdown body into real BlockNote blocks so it displays styled.
+    let blocks_json = md_to_blocks(body);
     let conn = open_db()?;
     // The search_index FTS5 triggers fire automatically on INSERT.
     conn.execute(
         "INSERT INTO notes \
          (id, title, blocks_json, plaintext, parent_id, kind, location, collection_id, created_at, updated_at) \
-         VALUES (?1, ?2, ?3, ?4, NULL, ?5, '', NULL, ?6, ?6)",
-        params![id, title, blocks_json, body, kind, now],
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, '', NULL, ?7, ?7)",
+        params![id, title, blocks_json, body, parent_id, kind, now],
     )
     .map_err(|e| format!("insert note: {}", e))?;
     // Auto-navigate: open Archives behind the Core panel and surface the
@@ -846,6 +1012,69 @@ fn tool_create_note(args: &Value) -> Result<String, String> {
     .to_string())
 }
 
+/// Create a project page plus its subpages in ONE call — the correct way to
+/// build "a project with subpages" (vs. several flat pages). Root + children
+/// are all `kind=project` nested via `parent_id` (Notion-style). Each body is
+/// markdown, rendered to styled blocks.
+fn tool_create_project(args: &Value) -> Result<String, String> {
+    let title = args
+        .get("title")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .ok_or_else(|| "title required".to_string())?;
+    let overview = args.get("overview").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let pages = args
+        .get("pages")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    let conn = open_db()?;
+    let now = chrono_like_millis();
+    let root_id = ulid::Ulid::new().to_string();
+    conn.execute(
+        "INSERT INTO notes \
+         (id, title, blocks_json, plaintext, parent_id, kind, location, collection_id, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, NULL, 'project', '', NULL, ?5, ?5)",
+        params![root_id, title, md_to_blocks(overview), overview, now],
+    )
+    .map_err(|e| format!("insert project: {}", e))?;
+
+    let mut created: Vec<Value> = Vec::new();
+    for (i, page) in pages.iter().enumerate() {
+        let Some(ptitle) = page
+            .get("title")
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+        else {
+            continue;
+        };
+        let pbody = page.get("body").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let pid = ulid::Ulid::new().to_string();
+        let cts = now + i as i64; // keep page order stable
+        conn.execute(
+            "INSERT INTO notes \
+             (id, title, blocks_json, plaintext, parent_id, kind, location, collection_id, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, 'project', '', NULL, ?6, ?6)",
+            params![pid, ptitle, md_to_blocks(pbody), pbody, root_id, cts],
+        )
+        .map_err(|e| format!("insert subpage: {}", e))?;
+        created.push(json!({ "id": pid, "title": ptitle }));
+    }
+
+    let _ = send_ui_action("open_note", json!({ "id": root_id, "kind": "project" }));
+    Ok(json!({
+        "ok": true,
+        "id": root_id,
+        "title": title,
+        "subpages": created,
+        "note": "Project created with subpages; Archives opened to it.",
+    })
+    .to_string())
+}
+
 fn tool_update_note_body(args: &Value) -> Result<String, String> {
     let id = args
         .get("id")
@@ -855,25 +1084,8 @@ fn tool_update_note_body(args: &Value) -> Result<String, String> {
         .get("body")
         .and_then(|v| v.as_str())
         .ok_or_else(|| "body required".to_string())?;
-    let block_id = ulid::Ulid::new().to_string();
-    let blocks_json = if body.trim().is_empty() {
-        "[]".to_string()
-    } else {
-        serde_json::json!([
-            {
-                "id": block_id,
-                "type": "paragraph",
-                "props": {
-                    "backgroundColor": "default",
-                    "textColor": "default",
-                    "textAlignment": "left"
-                },
-                "content": [{ "type": "text", "text": body, "styles": {} }],
-                "children": []
-            }
-        ])
-        .to_string()
-    };
+    // Render markdown into real BlockNote blocks so the body displays styled.
+    let blocks_json = md_to_blocks(body);
     let now = chrono_like_millis();
     let conn = open_db()?;
     let affected = conn
@@ -1833,4 +2045,27 @@ fn tool_hermes_decompose(args: &Value) -> Result<String, String> {
         }
     }
     Ok(json!({ "ok": true, "parent_id": parent_id, "created": created }).to_string())
+}
+
+#[cfg(test)]
+mod md_tests {
+    use super::md_to_blocks;
+    use serde_json::Value;
+
+    #[test]
+    fn renders_headings_bold_lists() {
+        let md = "# Title\n## Sub\n\nA **bold** and *italic* line.\n\n- one\n- two\n\n1. first\n\n---\n\nTail.";
+        let blocks: Vec<Value> = serde_json::from_str(&md_to_blocks(md)).unwrap();
+        let types: Vec<&str> = blocks.iter().map(|b| b["type"].as_str().unwrap()).collect();
+        // h1, h2, paragraph, 2 bullets, 1 numbered, paragraph(tail), trailing empty para
+        assert_eq!(types, ["heading","heading","paragraph","bulletListItem","bulletListItem","numberedListItem","paragraph","paragraph"]);
+        assert_eq!(blocks[0]["props"]["level"], 1);
+        assert_eq!(blocks[1]["props"]["level"], 2);
+        // bold/italic styling present in the paragraph
+        let para = &blocks[2]["content"];
+        assert!(para.as_array().unwrap().iter().any(|r| r["styles"]["bold"] == true));
+        assert!(para.as_array().unwrap().iter().any(|r| r["styles"]["italic"] == true));
+        // last block is an empty paragraph (cursor landing)
+        assert_eq!(blocks.last().unwrap()["content"].as_array().unwrap().len(), 0);
+    }
 }
