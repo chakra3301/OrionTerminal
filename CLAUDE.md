@@ -176,6 +176,11 @@ Nice-to-have:
 
 ## Session log
 
+### 2026-06-07 — Menubar menus wired up (were inert)
+- The menubar buttons (the bold app label + File/Edit/View/Window and the per-app menu sets) did nothing. New **`src/shell/menus.ts`** `buildMenu(app, name)` + `appMenu()` return `MenuItem[]` opened via the existing `ContextMenu`. **Every item maps to a real action** — a registry command (label + shortcut auto-derived from `registry.get(id)`), a `useShell` window action (minimize/zoom/close/focus + open-window list), an app-store action (XDesign undo/redo/group/ungroup/duplicate/delete/select, Hermes `createTask`, Archives `setView`), or a `document.execCommand` for generic Edit/Format. No dead entries; unknown menus fall back to a global View block.
+- The bold app-name label became an **application menu** (Settings/Shortcuts/ROSIE/Spotlight). Added `openUnder()` to `ContextMenu` (left-aligned dropdown under a button) and fixed `.ot-menubar-app` CSS specificity now that it's a `<button>`.
+- Known limits: Hermes Floor/Board toggle is local component state (not reachable from the bar); `execCommand('paste')` may no-op in the webview (native ⌘V still works). Frontend-only (hot-reloads). tsc / **99 tests** / build green.
+
 ### 2026-06-07 — ROSIE Archives fix: markdown→blocks + projects-with-subpages (+ consolidated 6 stray pages)
 - **Bug:** ROSIE's Archives notes showed **raw markdown** (`#`/`**`/`---`) and "make a project with subpages" produced **flat separate pages**. Root cause in `mcp_server.rs`: `tool_create_note` dumped the whole body into **one paragraph block** and had **no `parent_id`**.
 - **Fix:** new **`md_to_blocks()`** (Rust) converts markdown → BlockNote blocks — headings L1–3, `**bold**`/`*italic*`/`` `code` ``, bullet + numbered lists, paragraphs (joins soft-wrapped lines); `---` dropped (no divider in default schema); trailing empty paragraph. Used by `create_note` + `update_note_body` (unit-tested `md_tests`). `orion_create_note` gains **`parent_id`** (nest as a project subpage). New **`orion_create_project`** tool = root project + ordered subpages in ONE call (the correct path). Tool descriptions rewritten so ROSIE picks the project tool and knows bodies are markdown.
