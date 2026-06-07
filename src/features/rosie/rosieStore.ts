@@ -336,10 +336,11 @@ async function runSubprocessTurn(
       resolve();
     };
 
-    // Watchdog: if 90 seconds pass without a clean exit, assume claude is
-    // hung (PATH issue, MCP server crash, model timeout) and surface the
-    // best diagnostic we have — recent stderr lines, or a generic
-    // "no response" if stderr was empty too. Better than a stuck cursor.
+    // Idle watchdog: if 180 seconds pass with NO events at all (re-armed on
+    // every claude:event below), assume claude is hung (PATH issue, MCP server
+    // crash, silent API backoff) and surface the best diagnostic we have —
+    // recent stderr lines, or a generic "no response" if stderr was empty too.
+    // Measuring silence (not total turn time) lets long active tool loops run.
     const armWatchdog = () => {
       if (watchdog) clearTimeout(watchdog);
       watchdog = setTimeout(() => {
@@ -349,7 +350,7 @@ async function runSubprocessTurn(
           .stderrLines.slice(-3)
           .join("\n");
         const detail = tail.length > 0 ? `\n${tail}` : "";
-        const msg = `R.O.S.I.E didn't respond after 90s. The claude subprocess may be hung or missing.${detail}`;
+        const msg = `R.O.S.I.E didn't respond after 180s. The claude subprocess may be hung or missing.${detail}`;
         store.setState((s) => ({
           running: false,
           activeStreamId: null,
@@ -365,7 +366,7 @@ async function runSubprocessTurn(
         // burning resources after we've given up on it.
         void ipc.claudeCancel(chatId).catch(() => undefined);
         done();
-      }, 90_000);
+      }, 180_000);
     };
     armWatchdog();
 
@@ -375,6 +376,10 @@ async function runSubprocessTurn(
           "claude:event",
           (e) => {
             if (e.payload.chatId !== chatId) return;
+            // Any event means claude is alive — reset the idle watchdog so a
+            // long-but-active turn (a multi-step tool loop) isn't killed; the
+            // 180s budget applies to silence, not total turn time.
+            armWatchdog();
             handleEvent(pendingMessageId, e.payload.event);
           },
         ),
