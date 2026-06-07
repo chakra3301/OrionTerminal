@@ -36,6 +36,7 @@ import {
   setAppState,
   getWorkspaceLayout,
   setWorkspaceLayout,
+  logActivity,
 } from "@/lib/db";
 import { runEmbeddingBackfill } from "@/lib/embeddingIndexer";
 import { startContextSnapshotter } from "@/lib/contextSnapshot";
@@ -325,6 +326,9 @@ function useShellWindowsPersistence() {
 function useXDesignPersistence() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
+    // The first flush is the post-hydrate idempotent write — not a real edit,
+    // so it shouldn't show up as activity.
+    let firstFlush = true;
     const flush = () => {
       const s = useXDesign.getState();
       // Persist the full document — snapshot the active page's live shapes
@@ -341,6 +345,18 @@ function useXDesignPersistence() {
         modes: s.modes,
         activeModeId: s.activeModeId,
       });
+      if (firstFlush) {
+        firstFlush = false;
+      } else {
+        const page = s.pages.find((p) => p.id === s.activePageId);
+        void logActivity({
+          source: "xdesign",
+          kind: "design.edit",
+          title: page?.name || "Canvas",
+          summary: `${s.shapes.length} layer${s.shapes.length === 1 ? "" : "s"}`,
+          refId: s.activePageId,
+        });
+      }
     };
     const unsubscribe = useXDesign.subscribe(() => {
       if (timer) clearTimeout(timer);

@@ -25,7 +25,7 @@ import { useLinkPaletteStore } from "@/features/notes/LinkInsertPalette";
 import { getActiveNoteEditor } from "@/features/notes/editorBridge";
 import { useShell } from "@/shell/store/useShell";
 import { ipc } from "@/lib/ipc";
-import { listChatsForProject } from "@/lib/db";
+import { listChatsForProject, logActivity } from "@/lib/db";
 import { log } from "@/lib/log";
 
 let installed = false;
@@ -36,6 +36,12 @@ async function saveFileBuffer(path: string): Promise<boolean> {
   try {
     await ipc.saveFileAtomic(path, buf.contents);
     useTabsStore.getState().markSaved(path);
+    void logActivity({
+      source: "orion",
+      kind: "file.save",
+      title: path.split("/").pop() || path,
+      refId: path,
+    });
     return true;
   } catch (e) {
     log.error("save failed", path, e);

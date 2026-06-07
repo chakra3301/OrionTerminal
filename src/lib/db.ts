@@ -68,6 +68,90 @@ export async function setAppState<T = unknown>(
   );
 }
 
+export type ActivitySource = "hermes" | "archives" | "orion" | "xdesign";
+
+export type ActivityEntry = {
+  id: string;
+  ts: number;
+  source: ActivitySource;
+  kind: string;
+  title: string;
+  summary: string;
+  ref_id: string;
+};
+
+/** Rapid repeats of the same (source, kind, ref_id) within this window bump the
+ * existing row instead of piling up — keeps "edited note X" as one rolling
+ * entry rather than one per debounced save. */
+const ACTIVITY_COLLAPSE_MS = 10 * 60 * 1000;
+
+/**
+ * Append a lightweight activity entry. Fire-and-forget and self-swallowing:
+ * activity logging must never break the action it's recording. Callers can
+ * `void logActivity(...)` without a catch.
+ */
+export async function logActivity(e: {
+  source: ActivitySource;
+  kind: string;
+  title?: string;
+  summary?: string;
+  refId?: string;
+}): Promise<void> {
+  try {
+    const db = await getDb();
+    const now = Date.now();
+    const title = (e.title ?? "").slice(0, 200);
+    const summary = (e.summary ?? "").replace(/\s+/g, " ").trim().slice(0, 400);
+    const refId = e.refId ?? "";
+    if (refId) {
+      const recent = await db.select<{ id: string; ts: number }[]>(
+        "SELECT id, ts FROM activity_log WHERE source = $1 AND kind = $2 AND ref_id = $3 ORDER BY ts DESC LIMIT 1",
+        [e.source, e.kind, refId],
+      );
+      if (recent[0] && now - recent[0].ts < ACTIVITY_COLLAPSE_MS) {
+        await db.execute(
+          "UPDATE activity_log SET ts = $1, title = $2, summary = $3 WHERE id = $4",
+          [now, title, summary, recent[0].id],
+        );
+        return;
+      }
+    }
+    const id = `${now.toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+    await db.execute(
+      "INSERT INTO activity_log (id, ts, source, kind, title, summary, ref_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      [id, now, e.source, e.kind, title, summary, refId],
+    );
+  } catch (err) {
+    log.warn("logActivity failed", err);
+  }
+}
+
+/** Most-recent activity across the terminal, newest first. */
+export async function recentActivity(opts?: {
+  limit?: number;
+  source?: ActivitySource;
+  sinceMs?: number;
+}): Promise<ActivityEntry[]> {
+  const db = await getDb();
+  const limit = Math.min(Math.max(opts?.limit ?? 30, 1), 200);
+  const where: string[] = [];
+  const params: (string | number)[] = [];
+  if (opts?.source) {
+    params.push(opts.source);
+    where.push(`source = $${params.length}`);
+  }
+  if (opts?.sinceMs) {
+    params.push(opts.sinceMs);
+    where.push(`ts >= $${params.length}`);
+  }
+  const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  params.push(limit);
+  return db.select<ActivityEntry[]>(
+    `SELECT id, ts, source, kind, title, summary, ref_id FROM activity_log ${clause} ORDER BY ts DESC LIMIT $${params.length}`,
+    params,
+  );
+}
+
 // ── Per-project workspace layouts ─────────────────────────────
 
 export type WorkspaceLayoutRow<TLayout = unknown> = {

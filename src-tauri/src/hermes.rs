@@ -17,6 +17,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
@@ -40,6 +41,26 @@ fn now_millis() -> i64 {
 fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     Ok(dir.join("orion.db"))
+}
+
+static ACTIVITY_SEQ: AtomicU64 = AtomicU64::new(0);
+
+/// Append a lightweight activity entry from the engine side (Hermes is a Rust
+/// DB writer). Mirrors `logActivity` in db.ts; shares the `activity_log` table
+/// so R.O.S.I.E sees swarm work alongside Archives/Orion/XDesign activity.
+/// Best-effort — never fails an agent run.
+fn log_activity(conn: &Connection, kind: &str, title: &str, summary: &str, ref_id: &str) {
+    let now = now_millis();
+    let seq = ACTIVITY_SEQ.fetch_add(1, Ordering::Relaxed);
+    let id = format!("{:x}{:x}", now, seq);
+    let title: String = title.chars().take(200).collect();
+    let summary: String = summary.split_whitespace().collect::<Vec<_>>().join(" ");
+    let summary: String = summary.chars().take(400).collect();
+    let _ = conn.execute(
+        "INSERT INTO activity_log (id, ts, source, kind, title, summary, ref_id) \
+         VALUES (?1, ?2, 'hermes', ?3, ?4, ?5, ?6)",
+        params![id, now, kind, title, summary, ref_id],
+    );
 }
 
 /// Fresh short-lived connection with a busy timeout so concurrent agent
@@ -666,6 +687,16 @@ async fn run_agent(
         Ok(_) => {
             let _ = finish_agent(&app, &agent.id, "completed", &final_output, "", session_id.as_deref(), now);
             emit_agent_status(&app, &task_id, &agent.id, "completed", &final_output, "", session_id.clone());
+            if let Ok(conn) = open_conn(&app) {
+                let title: String = conn
+                    .query_row(
+                        "SELECT title FROM hermes_tasks WHERE id = ?1",
+                        params![task_id],
+                        |r| r.get(0),
+                    )
+                    .unwrap_or_default();
+                log_activity(&conn, "agent.done", &title, &final_text, &task_id);
+            }
         }
     }
     maybe_finalize_task(&app, &task_id);
@@ -699,6 +730,20 @@ pub async fn hermes_dispatch_task(
             params![task_id, now],
         )
         .map_err(|e| e.to_string())?;
+        let (title, prompt): (String, String) = conn
+            .query_row(
+                "SELECT title, prompt FROM hermes_tasks WHERE id = ?1",
+                params![task_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap_or_default();
+        log_activity(
+            &conn,
+            "task.dispatch",
+            &title,
+            &format!("dispatched {} agent(s) — {}", agents.len(), prompt),
+            &task_id,
+        );
     }
     emit_task(&app, &task_id, "running", "running");
 

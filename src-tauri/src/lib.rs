@@ -113,6 +113,12 @@ pub fn run() {
             sql: include_str!("../migrations/0016_hermes_agent_model.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 17,
+            description: "ambient activity log for R.O.S.I.E cross-app awareness",
+            sql: include_str!("../migrations/0017_activity_log.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

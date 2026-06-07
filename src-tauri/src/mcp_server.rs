@@ -593,6 +593,29 @@ fn tool_definitions() -> Value {
                 },
                 "required": ["parent_id", "subtasks"]
             }
+        },
+        {
+            "name": "orion_recent_activity",
+            "description": "Read the ambient activity log — a lightweight trail of \
+                what the user (and Hermes swarms) have been doing across the whole \
+                terminal: Hermes task dispatches and completed-agent research \
+                conclusions, Archives note/journal/project edits, Orion file \
+                saves, and XDesign canvas edits. Newest first. Use this when the \
+                user asks what they've been working on, what a swarm researched, \
+                or to ground yourself in recent context. Entries are short gists, \
+                not full content (open the entity for detail). Optional `source` \
+                filter, `since_hours` window, and `limit` (default 30).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "type": "string",
+                        "enum": ["hermes", "archives", "orion", "xdesign"]
+                    },
+                    "since_hours": { "type": "number" },
+                    "limit": { "type": "number" }
+                }
+            }
         }
     ])
 }
@@ -639,6 +662,7 @@ fn call_tool(params: &Value) -> Result<Value, RpcError> {
         "orion_hermes_update_task" => tool_hermes_update_task(&args),
         "orion_hermes_move_task" => tool_hermes_move_task(&args),
         "orion_hermes_decompose" => tool_hermes_decompose(&args),
+        "orion_recent_activity" => tool_recent_activity(&args),
         other => Err(format!("unknown tool: {}", other)),
     };
 
@@ -1430,6 +1454,74 @@ fn chrono_like_millis() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
+}
+
+fn humanize_age(ms: i64) -> String {
+    if ms < 0 {
+        return "just now".to_string();
+    }
+    let s = ms / 1000;
+    if s < 60 {
+        "just now".to_string()
+    } else if s < 3600 {
+        format!("{}m ago", s / 60)
+    } else if s < 86_400 {
+        format!("{}h ago", s / 3600)
+    } else {
+        format!("{}d ago", s / 86_400)
+    }
+}
+
+fn tool_recent_activity(args: &Value) -> Result<String, String> {
+    let conn = open_db()?;
+    let limit = args
+        .get("limit")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(30)
+        .clamp(1, 200);
+    let source = args.get("source").and_then(|v| v.as_str());
+    let since = args
+        .get("since_hours")
+        .and_then(|v| v.as_f64())
+        .map(|h| chrono_like_millis() - (h * 3_600_000.0) as i64);
+
+    let mut sql = String::from(
+        "SELECT ts, source, kind, title, summary FROM activity_log WHERE 1=1",
+    );
+    if source.is_some() {
+        sql.push_str(" AND source = ?1");
+    }
+    if let Some(s) = since {
+        sql.push_str(&format!(" AND ts >= {}", s));
+    }
+    sql.push_str(" ORDER BY ts DESC LIMIT ");
+    sql.push_str(&limit.to_string());
+
+    let now = chrono_like_millis();
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let map_row = |r: &rusqlite::Row| {
+        let ts: i64 = r.get(0)?;
+        Ok(json!({
+            "when": humanize_age(now - ts),
+            "source": r.get::<_, String>(1)?,
+            "kind": r.get::<_, String>(2)?,
+            "title": r.get::<_, String>(3)?,
+            "summary": r.get::<_, String>(4)?,
+        }))
+    };
+    let rows: Vec<Value> = if let Some(s) = source {
+        stmt.query_map(params![s], map_row)
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect()
+    } else {
+        stmt.query_map([], map_row)
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect()
+    };
+
+    Ok(json!({ "count": rows.len(), "activity": rows }).to_string())
 }
 
 fn tool_list_projects(_args: &Value) -> Result<String, String> {

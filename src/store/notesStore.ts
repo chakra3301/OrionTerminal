@@ -5,6 +5,7 @@ import {
   insertNote,
   updateNote,
   deleteNote,
+  logActivity,
   setNoteCollection as dbSetNoteCollection,
   setNoteFavorite as dbSetNoteFavorite,
   listAllNoteTags,
@@ -196,6 +197,12 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       scheduleReindex("note", id, () => {
         const n = get().notes.get(id);
         return n ? `${n.title || "Untitled"}\n${n.plaintext ?? ""}` : null;
+      });
+      void logActivity({
+        source: "archives",
+        kind: `${existing.kind || "note"}.edit`,
+        title: existing.title || "Untitled",
+        refId: id,
       });
     } finally {
       set((s) => {
