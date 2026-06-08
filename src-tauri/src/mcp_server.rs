@@ -198,8 +198,9 @@ fn tool_definitions() -> Value {
             "name": "orion_update_note_body",
             "description": "Replace the body of an existing note by id. `body` is \
                 MARKDOWN (headings/bold/lists), rendered to styled blocks — not \
-                shown raw. Title and other metadata are left untouched. Use \
-                after orion_search_archive or orion_list_recent_notes to get an id.",
+                shown raw. Title and other metadata are left untouched. To EDIT \
+                rather than overwrite: first orion_read_note to get the current \
+                body, modify it, then send the full new body here.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -207,6 +208,23 @@ fn tool_definitions() -> Value {
                     "body": { "type": "string" }
                 },
                 "required": ["id", "body"]
+            }
+        },
+        {
+            "name": "orion_read_note",
+            "description": "Read the FULL body of a note/journal/project in \
+                Archives. Resolve by `id` (preferred — get it from \
+                orion_get_context's `open_note` for the page the user is looking \
+                at, or from orion_search_archive / orion_list_recent_notes) or by \
+                fuzzy `title`. Returns id, title, kind, parent_id, and body. \
+                ALWAYS call this to read a note before editing it — never ask the \
+                user to copy/paste its contents.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string" },
+                    "title": { "type": "string" }
+                }
             }
         },
         {
@@ -674,6 +692,7 @@ fn call_tool(params: &Value) -> Result<Value, RpcError> {
         "orion_create_note" => tool_create_note(&args),
         "orion_create_project" => tool_create_project(&args),
         "orion_update_note_body" => tool_update_note_body(&args),
+        "orion_read_note" => tool_read_note(&args),
         "orion_open_app" => tool_open_app(&args),
         "orion_switch_project" => tool_switch_project(&args),
         "orion_open_file" => tool_open_file(&args),
@@ -1111,6 +1130,60 @@ fn tool_update_note_body(args: &Value) -> Result<String, String> {
         json!({ "id": id, "kind": kind }),
     );
     Ok(json!({ "ok": true, "id": id, "updated_at": now }).to_string())
+}
+
+/// Read a note's FULL body so the agent can edit it without asking the user to
+/// paste anything. Resolve by `id` (preferred) or fuzzy `title`.
+fn tool_read_note(args: &Value) -> Result<String, String> {
+    let conn = open_db()?;
+    let id = args.get("id").and_then(|v| v.as_str()).map(str::trim).filter(|s| !s.is_empty());
+    let title = args.get("title").and_then(|v| v.as_str()).map(str::trim).filter(|s| !s.is_empty());
+
+    let map = |r: &rusqlite::Row| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, String>(1)?,
+            r.get::<_, String>(2)?,
+            r.get::<_, String>(3)?,
+            r.get::<_, String>(4)?,
+        ))
+    };
+    let row: (String, String, String, String, String) = if let Some(id) = id {
+        conn.query_row(
+            "SELECT id, title, kind, COALESCE(parent_id, ''), plaintext FROM notes WHERE id = ?1",
+            params![id],
+            map,
+        )
+        .map_err(|_| format!("no note with id: {}", id))?
+    } else if let Some(title) = title {
+        conn.query_row(
+            "SELECT id, title, kind, COALESCE(parent_id, ''), plaintext FROM notes \
+             WHERE title LIKE ?1 ORDER BY updated_at DESC LIMIT 1",
+            params![format!("%{}%", title)],
+            map,
+        )
+        .map_err(|_| format!("no note matching title: {}", title))?
+    } else {
+        return Err("id or title required".to_string());
+    };
+
+    let (nid, ntitle, kind, parent_id, body) = row;
+    // Cap very long bodies (char-safe) so a read can't blow the context window.
+    let truncated = body.chars().count() > 16000;
+    let body: String = if truncated {
+        body.chars().take(16000).collect::<String>() + "…[truncated]"
+    } else {
+        body
+    };
+    Ok(json!({
+        "id": nid,
+        "title": ntitle,
+        "kind": kind,
+        "parent_id": if parent_id.is_empty() { Value::Null } else { Value::String(parent_id) },
+        "body": body,
+        "truncated": truncated,
+    })
+    .to_string())
 }
 
 fn tool_open_app(args: &Value) -> Result<String, String> {

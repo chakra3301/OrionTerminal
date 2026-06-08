@@ -302,11 +302,19 @@ export const useRosie = create<RosieState>((set, get) => ({
  * inlines the system prompt + uses claude_send fresh; subsequent turns
  * `--resume` via the sessionId). Stream-json events arrive via Tauri
  * `claude:event` and `claude:exit` — we filter by our turn's chatId. */
+/** Per-turn accumulator of assistant message segments, keyed by claude's
+ * message id. Each `assistant` event is a distinct message in the agentic loop
+ * (thinking+tool, then more tool, then the final text). We KEEP every segment
+ * so the whole process stays visible, instead of the last message replacing
+ * the rest. Reset at the start of each turn. */
+let turnSegments: Array<{ id: string; blocks: RosieContentBlock[] }> = [];
+
 async function runSubprocessTurn(
   pendingMessageId: string,
   userText: string,
 ): Promise<void> {
   const store = useRosie;
+  turnSegments = [];
   const chatId = ulid();
   const isFirstTurn = store.getState().sessionId === null;
   const fullPrompt = isFirstTurn
@@ -490,11 +498,19 @@ function handleEvent(pendingId: string, ev: RosieEvent): void {
   }
 
   if (t === "assistant") {
-    const msg = (ev as { message?: { content?: RosieContentBlock[] } }).message;
+    const msg = (ev as { message?: { id?: string; content?: RosieContentBlock[] } }).message;
     if (msg && Array.isArray(msg.content)) {
-      // Replace pending assistant content with the full snapshot. Also
-      // surface any tool_use blocks as chips.
       const blocks = msg.content;
+      // Accumulate by message id so the FULL turn stays visible — each
+      // assistant message in the agentic loop (thinking → tool → text → more
+      // tool → final answer) is a segment we keep, not a replacement of the
+      // previous. (Same id arriving again replaces just that segment.)
+      const segId = msg.id ?? ulid();
+      const idx = turnSegments.findIndex((seg) => seg.id === segId);
+      if (idx >= 0) turnSegments[idx] = { id: segId, blocks };
+      else turnSegments.push({ id: segId, blocks });
+      const flat = turnSegments.flatMap((seg) => seg.blocks);
+
       const newCalls: Record<string, ToolCall> = {};
       for (const b of blocks) {
         if (b.type === "tool_use") {
@@ -513,7 +529,7 @@ function handleEvent(pendingId: string, ev: RosieEvent): void {
       }
       store.setState((s) => ({
         messages: s.messages.map((m) =>
-          m.id === pendingId ? { ...m, content: blocks } : m,
+          m.id === pendingId ? { ...m, content: flat } : m,
         ),
         toolCalls: { ...s.toolCalls, ...newCalls },
       }));
