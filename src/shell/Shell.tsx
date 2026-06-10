@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useShell, type AppId } from "@/shell/store/useShell";
 import { Wallpaper } from "@/shell/Wallpaper";
 import { MenuBar } from "@/shell/MenuBar";
@@ -12,7 +12,7 @@ import { ToastHost } from "@/components/ToastHost";
 import { WelcomeOverlay } from "@/shell/WelcomeOverlay";
 import { WakeFlash } from "@/shell/WakeFlash";
 import { RosieTaskChip } from "@/shell/RosieTaskChip";
-import { Rosie } from "@/features/rosie/Rosie";
+import { useRosie } from "@/features/rosie/rosieStore";
 import { CompanionClipTester } from "@/features/rosie/avatar/CompanionClipTester";
 import { useProactiveCompanion } from "@/features/rosie/avatar/useProactiveCompanion";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
@@ -39,6 +39,28 @@ const CompanionAvatar = lazy(() =>
     default: m.CompanionAvatar,
   })),
 );
+// The ROSIE chat surface drags react-markdown + highlight.js with it —
+// keep that whole stack out of the main bundle. The store stays eager
+// (cheap) so wake-word/commands can flip `open` before the UI ever loaded.
+const Rosie = lazy(() =>
+  import("@/features/rosie/Rosie").then((m) => ({ default: m.Rosie })),
+);
+
+/** Mounts ROSIE on first open and keeps it mounted after, so closing the
+ * panel never discards a draft or mid-turn stream state. */
+function RosieMount() {
+  const open = useRosie((s) => s.open);
+  const [everOpened, setEverOpened] = useState(false);
+  useEffect(() => {
+    if (open) setEverOpened(true);
+  }, [open]);
+  if (!everOpened) return null;
+  return (
+    <Suspense fallback={null}>
+      <Rosie />
+    </Suspense>
+  );
+}
 
 function AppLoading() {
   return (
@@ -71,6 +93,13 @@ export function Shell() {
   const focusedId = useShell((s) => s.focusedWindowId);
   useProactiveCompanion();
 
+  // Prefetch the ROSIE chunk once boot has settled so the first ⌘⇧K /
+  // wake-word open renders instantly; rendering stays deferred until then.
+  useEffect(() => {
+    const t = setTimeout(() => void import("@/features/rosie/Rosie"), 3000);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <>
       <Wallpaper />
@@ -102,7 +131,7 @@ export function Shell() {
       <ToastHost />
       <MonitorWidget />
       <ErrorBoundary label="R.O.S.I.E" compact>
-        <Rosie />
+        <RosieMount />
       </ErrorBoundary>
       <ErrorBoundary label="Companion" compact>
         <Suspense fallback={null}>
