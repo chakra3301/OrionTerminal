@@ -14,7 +14,8 @@ import {
   GitBranch,
 } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
-import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
+import { confirmAction } from "@/components/ConfirmModal";
+import { toast } from "@/store/toastStore";
 import { ipc, type TreeNode } from "@/lib/ipc";
 import { useProjectStore } from "@/store/projectStore";
 import { useTabsStore, isPathDirty } from "@/store/tabsStore";
@@ -246,14 +247,19 @@ export function OrionFileTree() {
       await refresh();
     } catch (e) {
       log.error("rename failed", e);
+      toast.error(`Couldn't rename ${node.name}`, {
+        body: e instanceof Error ? e.message : String(e),
+      });
     }
   };
 
   const doDelete = async (node: TreeNode) => {
-    const ok = await confirmDialog(
-      `Delete ${node.name}? This cannot be undone.`,
-      { title: "Delete", kind: "warning" },
-    );
+    const ok = await confirmAction({
+      title: `Delete ${node.name}?`,
+      body: "This deletes it from disk permanently. It cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
     if (!ok) return;
     try {
       await ipc.deletePath(node.path);
@@ -261,6 +267,9 @@ export function OrionFileTree() {
       await refresh();
     } catch (e) {
       log.error("delete failed", e);
+      toast.error(`Couldn't delete ${node.name}`, {
+        body: e instanceof Error ? e.message : String(e),
+      });
     }
   };
 

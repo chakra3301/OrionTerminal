@@ -41,6 +41,7 @@ import {
 import { runEmbeddingBackfill } from "@/lib/embeddingIndexer";
 import { startContextSnapshotter } from "@/lib/contextSnapshot";
 import { log } from "@/lib/log";
+import { toast } from "@/store/toastStore";
 import { Shell } from "@/shell/Shell";
 import { useShell, type WindowState } from "@/shell/store/useShell";
 import { ensureOrionTheme } from "@/apps/orion/monacoTheme";
@@ -515,7 +516,6 @@ function useArchivesLiveRefresh() {
 
 export default function App() {
   const [hydrated, setHydrated] = useState(false);
-  const [hydrateError, setHydrateError] = useState<string | null>(null);
   useWindowSizePersistence();
   useShellWindowsPersistence();
   useXDesignPersistence();
@@ -528,7 +528,11 @@ export default function App() {
     hydrate()
       .catch((err) => {
         log.error("hydrate failed", err);
-        setHydrateError(err instanceof Error ? err.message : String(err));
+        // Sticky toast (renders once the Shell's ToastHost mounts) — boot
+        // continues with whatever state did load.
+        toast.error("Startup hydrate failed", {
+          body: err instanceof Error ? err.message : String(err),
+        });
       })
       .finally(() => setHydrated(true));
   }, []);
@@ -564,26 +568,6 @@ export default function App() {
       <KeybindingsOverlay />
       <InlineEditOverlay />
       <LinkInsertPalette />
-      {hydrateError && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 60,
-            right: 16,
-            maxWidth: 420,
-            padding: 12,
-            borderRadius: 8,
-            border: "1px solid rgba(255,62,165,0.4)",
-            background: "rgba(255,62,165,0.08)",
-            color: "var(--neon-magenta)",
-            fontFamily: "var(--f-mono)",
-            fontSize: 11,
-            zIndex: 3000,
-          }}
-        >
-          hydrate failed: {hydrateError}
-        </div>
-      )}
     </ErrorBoundary>
   );
 }
