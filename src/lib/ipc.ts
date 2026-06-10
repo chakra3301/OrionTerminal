@@ -7,6 +7,17 @@ export type TreeNode = {
   children: TreeNode[] | null;
 };
 
+export type SearchMatch = {
+  line: number;
+  column: number;
+  preview: string;
+};
+
+export type FileMatches = {
+  path: string;
+  matches: SearchMatch[];
+};
+
 export type InlineEditCtxPayload = {
   path: string;
   language: string;
@@ -28,6 +39,26 @@ export const ipc = {
     invoke<boolean>("path_exists", { path }),
   saveFileAtomic: (path: string, contents: string): Promise<void> =>
     invoke("save_file_atomic", { path, contents }),
+  searchInFiles: (
+    root: string,
+    query: string,
+    caseSensitive = false,
+    maxResults = 2000,
+  ): Promise<FileMatches[]> =>
+    invoke<FileMatches[]>("search_in_files", {
+      root,
+      query,
+      caseSensitive,
+      maxResults,
+    }),
+  createPath: (path: string, isDir: boolean): Promise<void> =>
+    invoke("create_path", { path, isDir }),
+  renamePath: (from: string, to: string): Promise<void> =>
+    invoke("rename_path", { from, to }),
+  deletePath: (path: string): Promise<void> =>
+    invoke("delete_path", { path }),
+  revealInOs: (path: string): Promise<void> =>
+    invoke("reveal_in_os", { path }),
 
   apiKeySet: (key: string): Promise<void> => invoke("api_key_set", { key }),
   apiKeyClear: (): Promise<void> => invoke("api_key_clear"),

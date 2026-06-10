@@ -1,4 +1,4 @@
-import { File as FileIcon, FolderTree, Sparkles, Terminal as TerminalIcon, Eye, Folder, StickyNote, Bot, Image as ImageIcon, Film, Music, FileText } from "lucide-react";
+import { File as FileIcon, FolderTree, Sparkles, Terminal as TerminalIcon, Eye, Folder, StickyNote, Bot, Image as ImageIcon, Film, Music, FileText, AlertCircle, Search, GitPullRequestArrow, FileDiff } from "lucide-react";
 import { mediaTypeForPath } from "@/lib/mediaTypes";
 import { OrionMediaViewer } from "@/apps/orion/MediaViewer";
 import { useProjectStore } from "@/store/projectStore";
@@ -9,6 +9,7 @@ import {
   type ContentRegistry,
   type AddMenuItem,
 } from "@/components/workspace/Workspace";
+import { ulid } from "ulid";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
 import type {
   LayoutPanel,
@@ -20,6 +21,10 @@ import { OrionEditor } from "@/apps/orion/Editor";
 import { OrionPreview } from "@/apps/orion/Preview";
 import { OrionTerminalPanel } from "@/apps/orion/Terminal";
 import { OrionClaudeCodePanel } from "@/apps/orion/ClaudeCodePanel";
+import { OrionProblemsPanel } from "@/apps/orion/ProblemsPanel";
+import { OrionSearchPanel } from "@/apps/orion/SearchPanel";
+import { OrionChangesPanel } from "@/apps/orion/ChangesPanel";
+import { OrionDiffReview } from "@/apps/orion/DiffReview";
 import { OrionStatusBar } from "@/apps/orion/StatusBar";
 import { OrionClaudeRail } from "@/apps/orion/OrionClaudeRail";
 import { NoteEditor } from "@/features/notes/NoteEditor";
@@ -33,11 +38,19 @@ const orionRegistry: ContentRegistry = {
       case "preview":
         return <OrionPreview />;
       case "terminal":
-        return <OrionTerminalPanel />;
+        return <OrionTerminalPanel id={tab.descriptor.id} />;
       case "claude":
         return <OrionClaudeRail />;
       case "claude-code":
         return <OrionClaudeCodePanel />;
+      case "problems":
+        return <OrionProblemsPanel />;
+      case "search":
+        return <OrionSearchPanel />;
+      case "changes":
+        return <OrionChangesPanel />;
+      case "diff-review":
+        return <OrionDiffReview path={tab.descriptor.path} />;
       case "file":
         return mediaTypeForPath(tab.descriptor.path) ? (
           <OrionMediaViewer path={tab.descriptor.path} />
@@ -62,6 +75,14 @@ const orionRegistry: ContentRegistry = {
         return <Sparkles size={11} color="var(--neon-cyan)" />;
       case "claude-code":
         return <Bot size={11} color="var(--neon-violet)" />;
+      case "problems":
+        return <AlertCircle size={11} color="var(--neon-magenta)" />;
+      case "search":
+        return <Search size={11} color="var(--t-secondary)" />;
+      case "changes":
+        return <GitPullRequestArrow size={11} color="var(--neon-yellow)" />;
+      case "diff-review":
+        return <FileDiff size={11} color="var(--neon-cyan)" />;
       case "file": {
         const m = mediaTypeForPath(tab.descriptor.path);
         if (m?.kind === "image")
@@ -119,7 +140,7 @@ const orionRegistry: ContentRegistry = {
         id: "claude-code",
         label: "Claude Code",
         icon: <Bot size={13} color="var(--neon-violet)" />,
-        onSelect: () => open({ kind: "claude-code" }),
+        onSelect: () => open({ kind: "claude-code", id: ulid() }),
       },
     ];
 
@@ -138,7 +159,7 @@ const orionRegistry: ContentRegistry = {
         id: "terminal",
         label: "Terminal",
         icon: <TerminalIcon size={13} color="var(--neon-green)" />,
-        onSelect: () => open({ kind: "terminal" }),
+        onSelect: () => open({ kind: "terminal", id: ulid() }),
       },
       {
         id: "preview",

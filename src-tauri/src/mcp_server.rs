@@ -275,6 +275,45 @@ fn tool_definitions() -> Value {
             }
         },
         {
+            "name": "orion_apply_edit",
+            "description": "Edit a file in the user's project by replacing an \
+                exact string, then SHOW the change to the user as a reviewable \
+                diff in the Orion editor — they Accept or Reject it. Use this \
+                for EVERY modification to an existing file: the built-in \
+                Edit/Write/MultiEdit tools are disabled here so all changes \
+                stay reviewable. Read the file first (native Read) to get the \
+                exact text. `old_string` must match the file EXACTLY including \
+                whitespace and be unique, unless `replace_all` is true. Path \
+                may be absolute or relative to the active project root.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string" },
+                    "old_string": { "type": "string" },
+                    "new_string": { "type": "string" },
+                    "replace_all": { "type": "boolean" }
+                },
+                "required": ["path", "old_string", "new_string"]
+            }
+        },
+        {
+            "name": "orion_write_file",
+            "description": "Create a new file, or fully overwrite an existing \
+                one, with the given contents — shown to the user as a \
+                reviewable diff in the Orion editor (Accept/Reject). Use \
+                instead of the built-in Write tool. Prefer orion_apply_edit \
+                for targeted changes to existing files. Path may be absolute \
+                or relative to the active project root.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string" },
+                    "content": { "type": "string" }
+                },
+                "required": ["path", "content"]
+            }
+        },
+        {
             "name": "orion_get_context",
             "description": "Snapshot of what the user is currently looking at: \
                 focused app, active code project, open file/note, current \
@@ -696,6 +735,8 @@ fn call_tool(params: &Value) -> Result<Value, RpcError> {
         "orion_open_app" => tool_open_app(&args),
         "orion_switch_project" => tool_switch_project(&args),
         "orion_open_file" => tool_open_file(&args),
+        "orion_apply_edit" => tool_apply_edit(&args),
+        "orion_write_file" => tool_write_file(&args),
         "orion_get_context" => tool_get_context(&args),
         "orion_search_files" => tool_search_files(&args),
         "orion_list_assets" => tool_list_assets(&args),
@@ -1224,6 +1265,159 @@ fn tool_open_file(args: &Value) -> Result<String, String> {
     }
     send_ui_action("open_file", serde_json::json!({ "path": path }))?;
     Ok(json!({ "ok": true, "opened": path }).to_string())
+}
+
+fn project_root_from_context() -> Option<String> {
+    let context_path = std::env::var("ORION_CONTEXT_PATH").ok()?;
+    let s = std::fs::read_to_string(&context_path).ok()?;
+    let snap: Value = serde_json::from_str(&s).ok()?;
+    snap.get("active_project")?
+        .get("root_path")?
+        .as_str()
+        .map(|s| s.to_string())
+}
+
+/// Absolute path as-is; otherwise joined onto the active project root.
+fn resolve_path(path: &str) -> Result<std::path::PathBuf, String> {
+    let p = std::path::Path::new(path);
+    if p.is_absolute() {
+        return Ok(p.to_path_buf());
+    }
+    let root = project_root_from_context().ok_or_else(|| {
+        "relative path but no active project — pass an absolute path".to_string()
+    })?;
+    Ok(std::path::Path::new(&root).join(path))
+}
+
+fn write_atomic(path: &std::path::Path, contents: &str) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let fname = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "file".into());
+    let tmp = path.with_file_name(format!(".{}.orion-mcp.tmp", fname));
+    std::fs::write(&tmp, contents).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        e.to_string()
+    })
+}
+
+/// Replace an exact string in a file, write it, and stage the change for the
+/// user to review (Accept/Reject) in the editor. Mirrors the built-in Edit
+/// tool's contract so the agent behaves the same — only the review changes.
+fn tool_apply_edit(args: &Value) -> Result<String, String> {
+    let path = args
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "path required".to_string())?
+        .trim();
+    let old = args
+        .get("old_string")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "old_string required".to_string())?;
+    let new = args
+        .get("new_string")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "new_string required".to_string())?;
+    let replace_all = args
+        .get("replace_all")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if path.is_empty() {
+        return Err("path cannot be blank".to_string());
+    }
+    if old.is_empty() {
+        return Err(
+            "old_string cannot be empty — use orion_write_file to create or overwrite".to_string(),
+        );
+    }
+    let abs = resolve_path(path)?;
+    let original = std::fs::read_to_string(&abs)
+        .map_err(|e| format!("read {}: {}", abs.display(), e))?;
+    let count = original.matches(old).count();
+    if count == 0 {
+        return Err(
+            "old_string not found (must match the file exactly, including whitespace)".to_string(),
+        );
+    }
+    if count > 1 && !replace_all {
+        return Err(format!(
+            "old_string is not unique ({} matches) — add surrounding context or set replace_all",
+            count
+        ));
+    }
+    let updated = if replace_all {
+        original.replace(old, new)
+    } else {
+        original.replacen(old, new, 1)
+    };
+    if updated == original {
+        return Err("edit produced no change".to_string());
+    }
+    write_atomic(&abs, &updated)?;
+    let abs_str = abs.to_string_lossy().into_owned();
+    let _ = send_ui_action(
+        "staged_edit",
+        json!({
+            "path": abs_str,
+            "original": original,
+            "updated": updated,
+            "is_new": false,
+        }),
+    );
+    Ok(json!({
+        "ok": true,
+        "path": abs_str,
+        "review": "change applied and shown to the user for Accept/Reject",
+    })
+    .to_string())
+}
+
+/// Create or fully overwrite a file, then stage it for review.
+fn tool_write_file(args: &Value) -> Result<String, String> {
+    let path = args
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "path required".to_string())?
+        .trim();
+    let content = args
+        .get("content")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "content required".to_string())?;
+    if path.is_empty() {
+        return Err("path cannot be blank".to_string());
+    }
+    let abs = resolve_path(path)?;
+    let existed = abs.exists();
+    let original = if existed {
+        std::fs::read_to_string(&abs).unwrap_or_default()
+    } else {
+        String::new()
+    };
+    if existed && original == content {
+        return Err("content is identical to the existing file — no change".to_string());
+    }
+    write_atomic(&abs, content)?;
+    let abs_str = abs.to_string_lossy().into_owned();
+    let _ = send_ui_action(
+        "staged_edit",
+        json!({
+            "path": abs_str,
+            "original": original,
+            "updated": content,
+            "is_new": !existed,
+        }),
+    );
+    Ok(json!({
+        "ok": true,
+        "path": abs_str,
+        "is_new": !existed,
+        "review": "change applied and shown to the user for Accept/Reject",
+    })
+    .to_string())
 }
 
 /// Reads + returns the JSON snapshot the frontend writes whenever UI state

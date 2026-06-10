@@ -20,6 +20,9 @@ type FocusState = {
   setSelectionContextProvider: (
     fn: (() => SelectionContext | null) | null,
   ) => void;
+  /** Runs a Monaco action (e.g. "editor.action.formatDocument") on the focused editor. */
+  runEditorAction: ((actionId: string) => void) | null;
+  setEditorActionRunner: (fn: ((actionId: string) => void) | null) => void;
 };
 
 export const useFocusStore = create<FocusState>((set) => ({
@@ -29,4 +32,6 @@ export const useFocusStore = create<FocusState>((set) => ({
   setHasSelection: (has) => set({ hasSelection: has }),
   getSelectionContext: null,
   setSelectionContextProvider: (fn) => set({ getSelectionContext: fn }),
+  runEditorAction: null,
+  setEditorActionRunner: (fn) => set({ runEditorAction: fn }),
 }));

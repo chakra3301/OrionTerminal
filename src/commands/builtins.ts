@@ -230,6 +230,52 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
+    id: "view.problems",
+    label: "Show Problems",
+    hotkey: "mod+shift+m",
+    keywords: ["errors", "warnings", "diagnostics", "problems"],
+    group: "View",
+    run: () => {
+      useWorkspace.getState().openTab({ kind: "problems" });
+    },
+  });
+
+  registry.register({
+    id: "view.changes",
+    label: "Review AI Changes",
+    keywords: ["changes", "diff", "review", "ai", "accept", "reject"],
+    group: "View",
+    run: () => {
+      useWorkspace.getState().openTab({ kind: "changes" });
+    },
+  });
+
+  registry.register({
+    id: "search.inFiles",
+    label: "Find in Files",
+    hotkey: "mod+shift+f",
+    keywords: ["search", "grep", "find", "files", "content"],
+    group: "View",
+    run: () => {
+      useWorkspace.getState().openTab({ kind: "search" });
+    },
+  });
+
+  registry.register({
+    id: "editor.format",
+    label: "Format Document",
+    hotkey: "shift+alt+f",
+    keywords: ["prettier", "format", "indent"],
+    group: "View",
+    when: () => !!focusedFilePath(),
+    run: () => {
+      useFocusStore
+        .getState()
+        .runEditorAction?.("editor.action.formatDocument");
+    },
+  });
+
+  registry.register({
     id: "view.toggleTheme",
     label: "Cycle Theme (Neon / Minimal / Modern)",
     group: "View",

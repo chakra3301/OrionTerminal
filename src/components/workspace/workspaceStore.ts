@@ -502,8 +502,16 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
     // Terminal docks at the bottom of the whole workspace (Cursor-style),
     // full width — never as a tab in the clicked panel. (`opts.panelId` from
-    // the panel "+" dropdown is intentionally ignored for terminals.)
+    // the panel "+" dropdown is intentionally ignored for terminals.) A second
+    // terminal tabs into the existing dock rather than stacking another strip.
     if (descriptor.kind === "terminal") {
+      const dock = findPanelByRole(root, "terminal");
+      if (dock) {
+        const nextRoot = insertTabIntoPanel(root, dock.id, tab);
+        set({ root: nextRoot, focusedPanelId: dock.id });
+        persistLayout(nextRoot, dock.id);
+        return tab.id;
+      }
       const { tree: nextRoot, newPanelId } = dockTabAtBottom(
         root,
         tab,

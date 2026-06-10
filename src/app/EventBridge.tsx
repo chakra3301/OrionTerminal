@@ -8,6 +8,7 @@ import {
   forgetStream,
 } from "@/store/appChatStore";
 import { useFileTreeRefresh } from "@/store/fileTreeRefreshStore";
+import { useTabsStore } from "@/store/tabsStore";
 import { useNotesStore } from "@/store/notesStore";
 import { useArchives } from "@/apps/archives/useArchives";
 import { useShell, type AppId } from "@/shell/store/useShell";
@@ -221,6 +222,31 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
       { kind: "file", path },
       { label, preferRole: "editor" },
     );
+    return;
+  }
+  if (action.kind === "staged_edit") {
+    // The chat agent edited a file via orion_apply_edit / orion_write_file.
+    // The new content is already on disk; stage it for the user to review and
+    // surface the diff. We reply immediately (no blocking on the human).
+    const p = action.payload as {
+      path?: string;
+      original?: string;
+      updated?: string;
+      is_new?: boolean;
+    };
+    if (!p.path || typeof p.updated !== "string") return;
+    const { usePendingEdits } = await import("@/store/pendingEditsStore");
+    usePendingEdits.getState().stage({
+      path: p.path,
+      original: p.original ?? "",
+      updated: p.updated,
+      isNew: !!p.is_new,
+    });
+    // Refresh any open buffer to the new content (clean — disk matches).
+    useTabsStore.getState().markLoaded(p.path, p.updated);
+    useFileTreeRefresh.getState().bump();
+    useShell.getState().openApp("orion");
+    useWorkspace.getState().openTab({ kind: "diff-review", path: p.path });
     return;
   }
   if (action.kind === "open_note") {

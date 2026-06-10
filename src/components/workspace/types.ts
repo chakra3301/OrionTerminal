@@ -12,8 +12,12 @@ export type TabDescriptor =
   | { kind: "files-tree" }
   | { kind: "preview" }
   | { kind: "claude" }
-  | { kind: "claude-code" }
-  | { kind: "terminal" };
+  | { kind: "claude-code"; id?: string }
+  | { kind: "terminal"; id?: string }
+  | { kind: "problems" }
+  | { kind: "search" }
+  | { kind: "changes" }
+  | { kind: "diff-review"; path: string };
 
 export type Tab = {
   id: string;
@@ -66,9 +70,17 @@ export function descriptorKey(d: TabDescriptor): string {
     case "claude":
       return "claude";
     case "claude-code":
-      return "claude-code";
+      return `claude-code:${d.id ?? "default"}`;
     case "terminal":
-      return "terminal";
+      return `terminal:${d.id ?? "main"}`;
+    case "problems":
+      return "problems";
+    case "search":
+      return "search";
+    case "changes":
+      return "changes";
+    case "diff-review":
+      return `diff-review:${d.path}`;
   }
 }
 
@@ -109,6 +121,16 @@ export function defaultLabel(d: TabDescriptor): string {
       return "Claude Code";
     case "terminal":
       return "Terminal";
+    case "problems":
+      return "Problems";
+    case "search":
+      return "Search";
+    case "changes":
+      return "Changes";
+    case "diff-review": {
+      const parts = d.path.split(/[\\/]/);
+      return `Review: ${parts[parts.length - 1] ?? d.path}`;
+    }
   }
 }
 

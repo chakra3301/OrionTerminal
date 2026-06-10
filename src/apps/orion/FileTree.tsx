@@ -5,20 +5,38 @@ import {
   File as FileIcon,
   Folder,
   FolderOpen,
-  Plus,
+  FilePlus,
+  FolderPlus,
+  Pencil,
+  Trash2,
+  Copy,
+  FolderSearch,
   GitBranch,
 } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
+import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
 import { ipc, type TreeNode } from "@/lib/ipc";
 import { useProjectStore } from "@/store/projectStore";
 import { useTabsStore, isPathDirty } from "@/store/tabsStore";
 import { useFileTreeRefresh } from "@/store/fileTreeRefreshStore";
-import { useWorkspace } from "@/components/workspace/workspaceStore";
+import { useWorkspace, allTabs } from "@/components/workspace/workspaceStore";
+import { useContextMenu, type MenuItem } from "@/components/ContextMenu";
+import { promptText } from "@/components/PromptModal";
 import { registry } from "@/commands/registry";
 import { log } from "@/lib/log";
 import { useFileDropZone } from "@/lib/fileDrop";
 
-function TreeRow({ node, depth }: { node: TreeNode; depth: number }) {
+type RowContext = (e: React.MouseEvent, node: TreeNode) => void;
+
+function TreeRow({
+  node,
+  depth,
+  onContext,
+}: {
+  node: TreeNode;
+  depth: number;
+  onContext: RowContext;
+}) {
   const [open, setOpen] = useState(depth === 0);
   const openTab = useWorkspace((s) => s.openTab);
   const root = useWorkspace((s) => s.root);
@@ -54,6 +72,7 @@ function TreeRow({ node, depth }: { node: TreeNode; depth: number }) {
         className={classes}
         style={{ paddingLeft: 12 + depth * 12 }}
         onClick={onClick}
+        onContextMenu={(e) => onContext(e, node)}
         title={node.path}
       >
         {node.is_dir ? (
@@ -91,7 +110,12 @@ function TreeRow({ node, depth }: { node: TreeNode; depth: number }) {
       {open && node.is_dir && node.children && (
         <div>
           {node.children.map((c) => (
-            <TreeRow key={c.path} node={c} depth={depth + 1} />
+            <TreeRow
+              key={c.path}
+              node={c}
+              depth={depth + 1}
+              onContext={onContext}
+            />
           ))}
         </div>
       )}
@@ -110,6 +134,9 @@ function tabIsActiveAnywhere(
   return node.children.some((c) => tabIsActiveAnywhere(c, path));
 }
 
+const parentDir = (p: string) => p.replace(/[\\/][^\\/]*$/, "") || p;
+const joinPath = (dir: string, name: string) => `${dir}/${name}`;
+
 export function OrionFileTree() {
   const project = useProjectStore((s) => s.active);
   const [tree, setTree] = useState<TreeNode | null>(null);
@@ -117,6 +144,7 @@ export function OrionFileTree() {
   const [dropOver, setDropOver] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const openTab = useWorkspace((s) => s.openTab);
+  const { openAt, menu } = useContextMenu();
 
   // Drop files from Finder onto the tree → open each as a workspace tab.
   // (Doesn't copy them into the project — opening matches VS Code's
@@ -153,6 +181,152 @@ export function OrionFileTree() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const closeTabsFor = (path: string) => {
+    const ws = useWorkspace.getState();
+    for (const t of allTabs(ws.root)) {
+      if (t.descriptor.kind === "file" && t.descriptor.path === path) {
+        ws.closeTab(t.id);
+      }
+    }
+  };
+
+  const doNewFile = async (dir: string) => {
+    const name = await promptText({
+      title: "New File",
+      label: `in ${dir.split(/[\\/]/).pop()}`,
+      placeholder: "component.tsx",
+      confirmLabel: "Create",
+    });
+    if (!name) return;
+    const target = joinPath(dir, name);
+    try {
+      await ipc.createPath(target, false);
+      await refresh();
+      openTab({ kind: "file", path: target }, { label: name, preferRole: "editor" });
+    } catch (e) {
+      log.error("create file failed", e);
+    }
+  };
+
+  const doNewFolder = async (dir: string) => {
+    const name = await promptText({
+      title: "New Folder",
+      label: `in ${dir.split(/[\\/]/).pop()}`,
+      confirmLabel: "Create",
+    });
+    if (!name) return;
+    try {
+      await ipc.createPath(joinPath(dir, name), true);
+      await refresh();
+    } catch (e) {
+      log.error("create folder failed", e);
+    }
+  };
+
+  const doRename = async (node: TreeNode) => {
+    const next = await promptText({
+      title: "Rename",
+      initialValue: node.name,
+      confirmLabel: "Rename",
+    });
+    if (!next || next === node.name) return;
+    const target = joinPath(parentDir(node.path), next);
+    const wasOpen =
+      !node.is_dir &&
+      allTabs(useWorkspace.getState().root).some(
+        (t) => t.descriptor.kind === "file" && t.descriptor.path === node.path,
+      );
+    try {
+      await ipc.renamePath(node.path, target);
+      if (wasOpen) {
+        closeTabsFor(node.path);
+        openTab({ kind: "file", path: target }, { label: next, preferRole: "editor" });
+      }
+      await refresh();
+    } catch (e) {
+      log.error("rename failed", e);
+    }
+  };
+
+  const doDelete = async (node: TreeNode) => {
+    const ok = await confirmDialog(
+      `Delete ${node.name}? This cannot be undone.`,
+      { title: "Delete", kind: "warning" },
+    );
+    if (!ok) return;
+    try {
+      await ipc.deletePath(node.path);
+      closeTabsFor(node.path);
+      await refresh();
+    } catch (e) {
+      log.error("delete failed", e);
+    }
+  };
+
+  const buildMenu = (node: TreeNode): MenuItem[] => {
+    const items: MenuItem[] = [];
+    if (node.is_dir) {
+      items.push({
+        label: "New File…",
+        icon: <FilePlus size={13} />,
+        onClick: () => void doNewFile(node.path),
+      });
+      items.push({
+        label: "New Folder…",
+        icon: <FolderPlus size={13} />,
+        onClick: () => void doNewFolder(node.path),
+      });
+      items.push({ type: "separator" });
+    }
+    items.push({
+      label: "Rename…",
+      icon: <Pencil size={13} />,
+      onClick: () => void doRename(node),
+    });
+    items.push({
+      label: "Copy Path",
+      icon: <Copy size={13} />,
+      onClick: () => void navigator.clipboard.writeText(node.path),
+    });
+    items.push({
+      label: "Reveal in Finder",
+      icon: <FolderSearch size={13} />,
+      onClick: () =>
+        void ipc.revealInOs(node.path).catch((e) => log.error("reveal", e)),
+    });
+    items.push({ type: "separator" });
+    items.push({
+      label: "Delete",
+      icon: <Trash2 size={13} />,
+      danger: true,
+      onClick: () => void doDelete(node),
+    });
+    return items;
+  };
+
+  const onRowContext: RowContext = (e, node) => openAt(e, buildMenu(node));
+
+  const onRootContext = (e: React.MouseEvent) => {
+    if (!project) return;
+    openAt(e, [
+      {
+        label: "New File…",
+        icon: <FilePlus size={13} />,
+        onClick: () => void doNewFile(project.root_path),
+      },
+      {
+        label: "New Folder…",
+        icon: <FolderPlus size={13} />,
+        onClick: () => void doNewFolder(project.root_path),
+      },
+      { type: "separator" },
+      {
+        label: "Refresh",
+        onClick: () => void refresh(),
+      },
+    ]);
+  };
 
   useEffect(() => {
     if (!project) return;
@@ -192,23 +366,29 @@ export function OrionFileTree() {
     >
       <div className="or-files-header">
         <span>EXPLORER</span>
-        <button
-          type="button"
-          onClick={() => registry.run("file.openProject")}
-          title="Open project"
-          style={{
-            background: "none",
-            border: 0,
-            color: "var(--t-tertiary)",
-            cursor: "pointer",
-            padding: 2,
-          }}
-        >
-          <Plus size={11} />
-        </button>
+        <div style={{ display: "flex", gap: 2 }}>
+          <button
+            type="button"
+            onClick={() => project && doNewFile(project.root_path)}
+            disabled={!project}
+            title="New file"
+            className="or-files-hbtn"
+          >
+            <FilePlus size={12} />
+          </button>
+          <button
+            type="button"
+            onClick={() => project && doNewFolder(project.root_path)}
+            disabled={!project}
+            title="New folder"
+            className="or-files-hbtn"
+          >
+            <FolderPlus size={12} />
+          </button>
+        </div>
       </div>
 
-      <div className="or-tree-scroll scroll">
+      <div className="or-tree-scroll scroll" onContextMenu={onRootContext}>
         {!project && (
           <div style={{ padding: 14, fontSize: 12, color: "var(--t-tertiary)" }}>
             <p style={{ marginBottom: 8 }}>No project open.</p>
@@ -237,7 +417,12 @@ export function OrionFileTree() {
         {project && !loading && tree && (
           <div className="or-tree">
             {tree.children?.map((c) => (
-              <TreeRow key={c.path} node={c} depth={0} />
+              <TreeRow
+                key={c.path}
+                node={c}
+                depth={0}
+                onContext={onRowContext}
+              />
             ))}
           </div>
         )}
@@ -252,6 +437,7 @@ export function OrionFileTree() {
           <div>orion · workspace</div>
         </div>
       )}
+      {menu}
     </div>
   );
 }

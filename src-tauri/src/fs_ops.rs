@@ -156,6 +156,163 @@ pub fn count_files(path: String) -> Result<usize, String> {
     Ok(count)
 }
 
+#[derive(Serialize)]
+pub struct SearchMatch {
+    line: usize,
+    column: usize,
+    preview: String,
+}
+
+#[derive(Serialize)]
+pub struct FileMatches {
+    path: String,
+    matches: Vec<SearchMatch>,
+}
+
+/// Project-wide content search (the ⌘⇧F panel). Literal substring match,
+/// case-insensitive by default; skips ignored dirs, binary/non-UTF-8 files,
+/// and anything over 2 MB. Bounded by `max_results` so a broad query can't
+/// stall the UI.
+#[tauri::command]
+pub fn search_in_files(
+    root: String,
+    query: String,
+    case_sensitive: Option<bool>,
+    max_results: Option<usize>,
+) -> Result<Vec<FileMatches>, String> {
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+    let root_path = PathBuf::from(&root);
+    if !root_path.is_dir() {
+        return Err("not a directory".into());
+    }
+    let cs = case_sensitive.unwrap_or(false);
+    let needle = if cs { query.clone() } else { query.to_lowercase() };
+    let cap = max_results.unwrap_or(2000);
+    let mut out: Vec<FileMatches> = Vec::new();
+    let mut total = 0usize;
+
+    let walker = WalkDir::new(&root_path).into_iter().filter_entry(|e| {
+        e.file_name()
+            .to_str()
+            .map(|s| !is_ignored(s))
+            .unwrap_or(true)
+    });
+
+    for entry in walker.filter_map(|e| e.ok()) {
+        if total >= cap {
+            break;
+        }
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let path = entry.path();
+        if let Ok(meta) = path.metadata() {
+            if meta.len() > 2_000_000 {
+                continue;
+            }
+        }
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue, // binary / non-utf8
+        };
+        let mut file_matches: Vec<SearchMatch> = Vec::new();
+        for (i, line) in content.lines().enumerate() {
+            let hay = if cs { line.to_string() } else { line.to_lowercase() };
+            let mut start = 0usize;
+            while let Some(rel) = hay[start..].find(&needle) {
+                let col_byte = start + rel;
+                let column = hay[..col_byte].chars().count() + 1;
+                let preview: String = line.chars().take(400).collect();
+                file_matches.push(SearchMatch {
+                    line: i + 1,
+                    column,
+                    preview,
+                });
+                total += 1;
+                start = col_byte + needle.len().max(1);
+                if total >= cap || start >= hay.len() {
+                    break;
+                }
+            }
+            if total >= cap {
+                break;
+            }
+        }
+        if !file_matches.is_empty() {
+            out.push(FileMatches {
+                path: path.to_string_lossy().into_owned(),
+                matches: file_matches,
+            });
+        }
+    }
+
+    out.sort_by(|a, b| a.path.to_lowercase().cmp(&b.path.to_lowercase()));
+    Ok(out)
+}
+
+/// Create a new file (with parent dirs) or directory. Errors if it exists.
+#[tauri::command]
+pub fn create_path(path: String, is_dir: bool) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if p.exists() {
+        return Err(format!("already exists: {}", path));
+    }
+    if is_dir {
+        std::fs::create_dir_all(&p).map_err(|e| e.to_string())
+    } else {
+        if let Some(parent) = p.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::File::create(&p).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+}
+
+/// Rename/move a path. Refuses to clobber an existing target.
+#[tauri::command]
+pub fn rename_path(from: String, to: String) -> Result<(), String> {
+    let to_p = PathBuf::from(&to);
+    if to_p.exists() {
+        return Err(format!("target exists: {}", to));
+    }
+    if let Some(parent) = to_p.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&from, &to).map_err(|e| e.to_string())
+}
+
+/// Permanently delete a file or directory tree. The UI confirms first.
+#[tauri::command]
+pub fn delete_path(path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return Ok(());
+    }
+    if p.is_dir() {
+        std::fs::remove_dir_all(&p).map_err(|e| e.to_string())
+    } else {
+        std::fs::remove_file(&p).map_err(|e| e.to_string())
+    }
+}
+
+/// Reveal a path in Finder (macOS).
+#[tauri::command]
+pub fn reveal_in_os(path: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    #[allow(unreachable_code)]
+    Err("unsupported platform".into())
+}
+
 #[tauri::command]
 pub fn save_file_atomic(path: String, contents: String) -> Result<(), String> {
     use std::fs::{rename, File};

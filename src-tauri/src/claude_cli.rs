@@ -136,6 +136,16 @@ pub async fn claude_send(
     if attach_image.is_some() {
         cmd.args(["--input-format", "stream-json"]);
     }
+    // Route file edits through Orion's reviewable tools (orion_apply_edit /
+    // orion_write_file) instead of the built-ins that silently write to disk.
+    // This is what gives the chat agent its Cursor-style Accept/Reject diffs.
+    cmd.args([
+        "--disallowed-tools",
+        "Edit",
+        "Write",
+        "MultiEdit",
+        "NotebookEdit",
+    ]);
     // Hand claude our Orion MCP server so this chat has access to the
     // Orion-aware tools (list_recent_notes, search_archive, etc.) alongside
     // claude-code's built-in Bash/Read/Edit/Write toolset. Failure to write

@@ -5,6 +5,8 @@ import { useTabsStore } from "@/store/tabsStore";
 import { useFocusStore } from "@/store/focusStore";
 import { useInlineEditStore } from "@/store/inlineEditStore";
 import { useAssetsStore } from "@/store/assetsStore";
+import { useEditorStatusStore } from "@/store/editorStatusStore";
+import { useEditorNavStore } from "@/store/editorNavStore";
 import { languageForPath } from "@/apps/orion/lang";
 import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
 import "@/apps/orion/monacoTheme";
@@ -21,6 +23,7 @@ export function OrionEditor({ path }: { path: string }) {
   const setSelectionContextProvider = useFocusStore(
     (s) => s.setSelectionContextProvider,
   );
+  const setEditorActionRunner = useFocusStore((s) => s.setEditorActionRunner);
 
   const editorRef = useRef<MonacoEditor | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,11 +48,52 @@ export function OrionEditor({ path }: { path: string }) {
     };
   }, [path, buffer?.loaded, markLoaded]);
 
+  const reportStatus = () => {
+    const ed = editorRef.current;
+    if (!ed) return;
+    const model = ed.getModel();
+    const pos = ed.getPosition();
+    const sel = ed.getSelection();
+    if (!model || !pos) return;
+    const hasSel = !!sel && !sel.isEmpty();
+    const opts = model.getOptions();
+    useEditorStatusStore.getState().set({
+      line: pos.lineNumber,
+      column: pos.column,
+      selectionChars: hasSel ? model.getValueInRange(sel).length : 0,
+      selectionLines: hasSel ? sel.endLineNumber - sel.startLineNumber + 1 : 0,
+      language: model.getLanguageId(),
+      indentKind: opts.insertSpaces ? "spaces" : "tabs",
+      indentSize: opts.tabSize,
+    });
+  };
+
+  // Scroll to + focus a position when something (Problems panel, search,
+  // go-to-def) requests a reveal for this file.
+  const tryReveal = () => {
+    const target = useEditorNavStore.getState().pending;
+    if (!target || target.path !== path) return;
+    const ed = editorRef.current;
+    if (!ed) return;
+    useEditorNavStore.getState().consume(path);
+    ed.revealLineInCenter(target.line);
+    ed.setPosition({ lineNumber: target.line, column: target.column });
+    ed.focus();
+  };
+
   const onMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monaco.editor.setTheme("orion-neon");
 
+    editor.onDidChangeCursorPosition(reportStatus);
+    reportStatus();
+    tryReveal();
+
     editor.onDidFocusEditorWidget(() => {
+      reportStatus();
+      setEditorActionRunner((actionId) => {
+        editorRef.current?.getAction(actionId)?.run();
+      });
       setEditorFocus(true);
       setSelectionContextProvider(() => {
         const ed = editorRef.current;
@@ -97,16 +141,23 @@ export function OrionEditor({ path }: { path: string }) {
     editor.onDidBlurEditorWidget(() => setEditorFocus(false));
     editor.onDidChangeCursorSelection((e) => {
       setHasSelection(!e.selection.isEmpty());
+      reportStatus();
     });
   };
 
   useEffect(() => {
+    // Late reveal requests (set after mount) land here.
+    const unsub = useEditorNavStore.subscribe(tryReveal);
     return () => {
+      unsub();
       setEditorFocus(false);
       setHasSelection(false);
       setSelectionContextProvider(null);
+      setEditorActionRunner(null);
+      useEditorStatusStore.getState().clear();
     };
-  }, [setEditorFocus, setHasSelection, setSelectionContextProvider]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, setEditorFocus, setHasSelection, setSelectionContextProvider]);
 
   const inlineEditVisible = useInlineEditStore((s) => s.visible);
 
@@ -215,15 +266,31 @@ export function OrionEditor({ path }: { path: string }) {
           minimap: { enabled: false },
           fontSize: 12.5,
           fontFamily: "JetBrains Mono, SF Mono, ui-monospace, Menlo, monospace",
+          fontLigatures: true,
           lineHeight: 1.65 * 12.5,
           smoothScrolling: true,
+          cursorSmoothCaretAnimation: "on",
+          cursorBlinking: "smooth",
           scrollBeyondLastLine: false,
           renderWhitespace: "selection",
-          renderLineHighlight: "line",
+          renderLineHighlight: "all",
           wordWrap: "off",
           automaticLayout: true,
           tabSize: 2,
+          detectIndentation: true,
           padding: { top: 14, bottom: 14 },
+          bracketPairColorization: { enabled: true },
+          guides: { bracketPairs: "active", indentation: true },
+          stickyScroll: { enabled: true },
+          folding: true,
+          matchBrackets: "always",
+          linkedEditing: true,
+          occurrencesHighlight: "singleFile",
+          suggestSelection: "first",
+          parameterHints: { enabled: true },
+          inlineSuggest: { enabled: true },
+          mouseWheelZoom: true,
+          scrollbar: { useShadows: false },
         }}
       />
     </div>

@@ -28,6 +28,35 @@ struct ExitPayload {
     pty_id: String,
 }
 
+/// Number of trailing bytes that form the start of a multi-byte UTF-8
+/// character whose continuation bytes haven't all arrived yet. These should be
+/// held back until the next read so the character isn't split across emits.
+/// Returns 0 when the buffer ends on a complete character (or invalid bytes,
+/// which we let `from_utf8_lossy` replace as before).
+fn incomplete_tail_len(bytes: &[u8]) -> usize {
+    let len = bytes.len();
+    let max_back = 3.min(len);
+    for back in 1..=max_back {
+        let b = bytes[len - back];
+        if b < 0x80 {
+            return 0; // ASCII byte — everything after it is complete
+        }
+        if b >= 0xC0 {
+            // Leading byte of a multi-byte sequence; how long should it be?
+            let expected = if b >= 0xF0 {
+                4
+            } else if b >= 0xE0 {
+                3
+            } else {
+                2
+            };
+            return if back < expected { back } else { 0 };
+        }
+        // else: continuation byte (0x80..=0xBF) — keep walking back
+    }
+    0
+}
+
 fn standard_env(builder: &mut CommandBuilder, cwd: &str) {
     builder.cwd(cwd);
     if let Ok(home) = std::env::var("HOME") {
@@ -83,21 +112,42 @@ fn spawn_pty_with(
     let id_for_reader = pty_id.clone();
     std::thread::spawn(move || {
         let mut buf = [0u8; 8192];
+        // A multi-byte UTF-8 character (box-drawing glyphs, emoji in claude's
+        // TUI, etc.) can straddle a read boundary. Decoding each chunk in
+        // isolation mangles those split bytes into U+FFFD, corrupting the
+        // stream. Hold any incomplete trailing sequence back for the next read.
+        let mut carry: Vec<u8> = Vec::new();
         loop {
             match reader.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    let s = String::from_utf8_lossy(&buf[..n]).into_owned();
-                    let _ = app_for_reader.emit(
-                        "terminal:data",
-                        DataPayload {
-                            pty_id: id_for_reader.clone(),
-                            data: s,
-                        },
-                    );
+                    carry.extend_from_slice(&buf[..n]);
+                    let hold = incomplete_tail_len(&carry);
+                    let split = carry.len() - hold;
+                    if split > 0 {
+                        let s = String::from_utf8_lossy(&carry[..split]).into_owned();
+                        let _ = app_for_reader.emit(
+                            "terminal:data",
+                            DataPayload {
+                                pty_id: id_for_reader.clone(),
+                                data: s,
+                            },
+                        );
+                        carry.drain(..split);
+                    }
                 }
                 Err(_) => break,
             }
+        }
+        if !carry.is_empty() {
+            let s = String::from_utf8_lossy(&carry).into_owned();
+            let _ = app_for_reader.emit(
+                "terminal:data",
+                DataPayload {
+                    pty_id: id_for_reader.clone(),
+                    data: s,
+                },
+            );
         }
         let _ = app_for_reader.emit(
             "terminal:exit",
@@ -197,4 +247,55 @@ pub fn terminal_resize(pty_id: String, cols: u16, rows: u16) -> Result<(), Strin
 pub fn terminal_kill(pty_id: String) -> Result<(), String> {
     PTYS.lock().remove(&pty_id);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::incomplete_tail_len;
+
+    #[test]
+    fn ascii_holds_nothing() {
+        assert_eq!(incomplete_tail_len(b"hello"), 0);
+        assert_eq!(incomplete_tail_len(b""), 0);
+    }
+
+    #[test]
+    fn complete_multibyte_holds_nothing() {
+        // '✓' = E2 9C 93 (3 bytes), fully present
+        assert_eq!(incomplete_tail_len("a✓".as_bytes()), 0);
+        // '😀' = F0 9F 98 80 (4 bytes), fully present
+        assert_eq!(incomplete_tail_len("😀".as_bytes()), 0);
+    }
+
+    #[test]
+    fn split_multibyte_holds_the_partial_tail() {
+        // First 1/2/3 bytes of the 3-byte '✓'
+        assert_eq!(incomplete_tail_len(&[0xE2]), 1);
+        assert_eq!(incomplete_tail_len(&[0xE2, 0x9C]), 2);
+        // First 3 bytes of the 4-byte '😀'
+        assert_eq!(incomplete_tail_len(&[0xF0, 0x9F, 0x98]), 3);
+        // Preceding ASCII doesn't change the held tail
+        assert_eq!(incomplete_tail_len(&[0x41, 0xE2, 0x9C]), 2);
+    }
+
+    #[test]
+    fn reassembly_across_a_boundary_round_trips() {
+        let full = "box ─┐ ✓ 😀 end".as_bytes().to_vec();
+        // Split at every position; the held tail + remainder must reconstruct
+        // the original string with no replacement characters.
+        for cut in 0..=full.len() {
+            let mut carry: Vec<u8> = Vec::new();
+            let mut out = String::new();
+            for chunk in [&full[..cut], &full[cut..]] {
+                carry.extend_from_slice(chunk);
+                let hold = incomplete_tail_len(&carry);
+                let split = carry.len() - hold;
+                out.push_str(&String::from_utf8_lossy(&carry[..split]));
+                carry.drain(..split);
+            }
+            out.push_str(&String::from_utf8_lossy(&carry));
+            assert_eq!(out, "box ─┐ ✓ 😀 end", "failed at cut {cut}");
+            assert!(!out.contains('\u{FFFD}'), "replacement char at cut {cut}");
+        }
+    }
 }

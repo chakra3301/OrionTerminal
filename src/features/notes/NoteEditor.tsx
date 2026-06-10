@@ -1,18 +1,38 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ulid } from "ulid";
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
 import "@blocknote/mantine/style.css";
 import type { PartialBlock } from "@blocknote/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useNotesStore } from "@/store/notesStore";
-import { useAssetsStore } from "@/store/assetsStore";
+import { useAssetsStore, type Asset } from "@/store/assetsStore";
 import { handleOrionUri, isOrionUri } from "@/lib/orionProtocol";
 import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
+import { useFileDropZone } from "@/lib/fileDrop";
 import {
   registerNoteEditor,
   unregisterNoteEditor,
 } from "@/features/notes/editorBridge";
 import { log } from "@/lib/log";
+
+/** A stored asset → the BlockNote block to insert for it. */
+function blockForAsset(asset: Asset): PartialBlock {
+  const url = convertFileSrc(asset.filePath);
+  if (asset.kind === "image") {
+    return {
+      type: "image",
+      props: { url, caption: asset.title || "" },
+    } as PartialBlock;
+  }
+  const text = asset.title || asset.filePath.split(/[\\/]/).pop() || asset.filePath;
+  return {
+    type: "paragraph",
+    content: [
+      { type: "link", href: url, content: [{ type: "text", text, styles: {} }] },
+    ],
+  } as PartialBlock;
+}
 
 const AUTOSAVE_MS = 500;
 
@@ -53,6 +73,10 @@ function EditorBody({
   onFirstBackspace: () => void;
 }) {
   const saveBlocks = useNotesStore((s) => s.saveBlocks);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [dropping, setDropping] = useState(false);
+  // Unique zone name per mount so two views of the same note route correctly.
+  const dropZone = useMemo(() => `note-drop-${ulid()}`, []);
 
   const initialContent = useMemo(() => {
     if (Array.isArray(initialBlocks) && initialBlocks.length > 0) {
@@ -125,47 +149,28 @@ function EditorBody({
     }
   };
 
-  // Asset drop: drag an Archives image/asset onto the body → insert as a
-  // block at the cursor. Images become inline image blocks; other kinds
-  // become a paragraph with an asset:// link so the filename is clickable.
+  // Insert blocks for already-stored assets after the cursor block.
+  const insertAssetBlocks = (assets: Asset[]) => {
+    if (assets.length === 0) return;
+    const blocks = assets.map(blockForAsset);
+    const cursor = editor.getTextCursorPosition();
+    const targetId =
+      cursor?.block?.id ?? editor.document[editor.document.length - 1]?.id;
+    if (!targetId) return;
+    editor.insertBlocks(blocks, targetId, "after");
+  };
+
+  // In-app asset drag (drag an Archives image/asset onto the body via DOM
+  // drag). Images become image blocks; other kinds a clickable asset link.
   const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
     if (!e.dataTransfer.types.includes(ASSET_DRAG_MIME)) return;
     e.preventDefault();
     const path = e.dataTransfer.getData(ASSET_DRAG_MIME);
     if (!path) return;
-    // Look up the asset by path so we know its kind + title.
     const asset = Array.from(useAssetsStore.getState().assets.values()).find(
       (a) => a.filePath === path,
     );
-    const url = convertFileSrc(path);
-    const cursor = editor.getTextCursorPosition();
-    const targetId = cursor.block.id;
-    if (asset?.kind === "image") {
-      editor.insertBlocks(
-        [
-          {
-            type: "image",
-            props: { url, caption: asset.title || "" },
-          } as PartialBlock,
-        ],
-        targetId,
-        "after",
-      );
-    } else {
-      const text = asset?.title || path.split(/[\\/]/).pop() || path;
-      editor.insertBlocks(
-        [
-          {
-            type: "paragraph",
-            content: [
-              { type: "link", href: url, content: [{ type: "text", text, styles: {} }] },
-            ],
-          } as PartialBlock,
-        ],
-        targetId,
-        "after",
-      );
-    }
+    if (asset) insertAssetBlocks([asset]);
   };
 
   const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -174,15 +179,41 @@ function EditorBody({
     e.dataTransfer.dropEffect = "copy";
   };
 
+  // Native Finder drop: Tauri intercepts OS file drags before DOM events, so
+  // they arrive through the drop orchestrator. This zone sits inside the
+  // app-wide "archives" zone and wins for drops on the editor — ingest each
+  // file as an asset, then drop it in as a block where the cursor is.
+  useFileDropZone(bodyRef, dropZone, (ev) => {
+    if (ev.type === "enter") setDropping(true);
+    else if (ev.type === "leave") setDropping(false);
+    else {
+      setDropping(false);
+      if (ev.paths.length === 0) return;
+      void (async () => {
+        try {
+          const created = await useAssetsStore.getState().ingestPaths(ev.paths);
+          editor.focus();
+          insertAssetBlocks(created);
+        } catch (err) {
+          log.error("note image drop failed", err);
+        }
+      })();
+    }
+  });
+
   return (
     <div
-      className="note-editor-body"
+      ref={bodyRef}
+      className={`note-editor-body${dropping ? " dropping" : ""}`}
       onClickCapture={onClickCapture}
       onKeyDownCapture={onKeyDown}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
       <BlockNoteView editor={editor} theme="dark" />
+      {dropping && (
+        <div className="note-drop-overlay">Drop to add to this note</div>
+      )}
     </div>
   );
 }

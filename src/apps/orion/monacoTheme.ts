@@ -1,4 +1,5 @@
 import { loader } from "@monaco-editor/react";
+import { useDiagnosticsStore } from "@/store/diagnosticsStore";
 
 loader.config({
   paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs" },
@@ -9,6 +10,8 @@ let registerPromise: Promise<void> | null = null;
 export function ensureOrionTheme(): Promise<void> {
   if (registerPromise) return registerPromise;
   registerPromise = loader.init().then((monaco) => {
+    configureTypescript(monaco);
+    trackMarkers(monaco);
     monaco.editor.defineTheme("orion-neon", {
       base: "vs-dark",
       inherit: true,
@@ -48,4 +51,70 @@ export function ensureOrionTheme(): Promise<void> {
     });
   });
   return registerPromise;
+}
+
+type Monaco = Awaited<ReturnType<typeof loader.init>>;
+
+/**
+ * Turn on Monaco's in-browser TypeScript/JavaScript service: completions,
+ * hover, signature help, go-to-definition (across open models), and document
+ * formatting. Semantic validation stays OFF — the worker has no access to
+ * node_modules type info, so it would wrongly flag every import. Syntax errors
+ * (which are always correct) stay on. Accurate semantic diagnostics arrive
+ * later via the real `typescript-language-server` (Phase 4 LSP).
+ */
+function configureTypescript(monaco: Monaco) {
+  const ts = monaco.languages.typescript;
+  const compilerOptions = {
+    target: ts.ScriptTarget.ESNext,
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.NodeJs,
+    jsx: ts.JsxEmit.ReactJSX,
+    allowJs: true,
+    allowNonTsExtensions: true,
+    esModuleInterop: true,
+    isolatedModules: true,
+    skipLibCheck: true,
+  };
+  const diagnostics = {
+    noSemanticValidation: true,
+    noSyntaxValidation: false,
+    noSuggestionDiagnostics: false,
+  };
+  ts.typescriptDefaults.setCompilerOptions(compilerOptions);
+  ts.javascriptDefaults.setCompilerOptions(compilerOptions);
+  ts.typescriptDefaults.setDiagnosticsOptions(diagnostics);
+  ts.javascriptDefaults.setDiagnosticsOptions(diagnostics);
+  ts.typescriptDefaults.setEagerModelSync(true);
+  ts.javascriptDefaults.setEagerModelSync(true);
+}
+
+type RawMarker = {
+  resource: { path: string };
+  severity: number;
+  message: string;
+  startLineNumber: number;
+  startColumn: number;
+  source?: string;
+  code?: string | { value: string };
+};
+
+/** Mirror Monaco's marker set into the diagnostics store (status bar + Problems). */
+function trackMarkers(monaco: Monaco) {
+  const sync = () => {
+    const markers = monaco.editor.getModelMarkers({}) as RawMarker[];
+    useDiagnosticsStore.getState().setMarkers(
+      markers.map((m) => ({
+        path: m.resource.path,
+        severity: m.severity,
+        message: m.message,
+        startLineNumber: m.startLineNumber,
+        startColumn: m.startColumn,
+        source: m.source,
+        code: typeof m.code === "string" ? m.code : m.code?.value,
+      })),
+    );
+  };
+  monaco.editor.onDidChangeMarkers(sync);
+  sync();
 }
