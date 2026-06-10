@@ -173,7 +173,7 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 **Phase 0 — DONE ✅**
 
 **Phase 1 — Orion ≥ Cursor** 🔨 — ranked plan APPROVED 2026-06-10 (research: [docs/research/cursor-2026.md](docs/research/cursor-2026.md)). Strategy: editor-first (Hermes owns swarms), beat Cursor on trust (context pills, never-silent writes) + integration (@archives-notes).
-- 🔨 1.1 AI editing core (~3 sessions): ✅ P2b per-hunk accept/reject + inline decorations + hunk bar (2026-06-10) · ✅ P2c in-editor streaming ⌘K + follow-ups + ⌥↵ ask mode (2026-06-10) · ⬜ P2d @-context picker (file/folder/problems/terminal/git-diff/archives-note) + context pills · ⬜ P2e codebase index on the embeddings worker (function/class chunks, gitignore-aware, incremental)
+- 🔨 1.1 AI editing core (~3 sessions): ✅ P2b per-hunk accept/reject + inline decorations + hunk bar (2026-06-10) · ✅ P2c in-editor streaming ⌘K + follow-ups + ⌥↵ ask mode (2026-06-10) · ✅ P2d @-context picker (file/folder/problems/terminal/git-diff/archives-note) + context pills (2026-06-10) · ⬜ P2e codebase index on the embeddings worker (function/class chunks, gitignore-aware, incremental)
 - ⬜ 1.2 Tab autocomplete (~2): Haiku 4.5 ghost text <300ms p50, accept full/word, recent-edit+diagnostics context; stretch: edit-diffs, next-edit jump
 - ⬜ 1.3 Navigation/feel (~1): ⌘P frecency file picker · ⌘⇧O symbols · breadcrumbs · split-editor command · cross-file go-to-def; stretch: terminal ⌘K
 - ⬜ 1.4 Git (~2): gutter markers · tree status colors · stage/commit/push UI · AI commit messages (claude_oneshot) · branch switcher · blame — via git binary, no new crate
@@ -210,6 +210,13 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-10 — AAA Rebuild (cont.): P2d — @-context picker + context pills in the Orix47 rail
+- **Type `@` in the Orion chat input** → caret-aware picker (fuzzy via fuse, ↑↓/Enter/Tab/Esc, mouse) over six providers (`src/features/context/contextProviders.ts`): **@file** (24k cap) · **@folder** (recursive listing, 200 entries) · **@problems** (live diagnosticsStore, severity-tagged) · **@terminal** (last 120 scrollback lines — new `liveTerminals` registry + `getRecentTerminalOutput()` in ptyTerminal.ts) · **@working-diff** (new Rust **`git_working_diff`**: `git status --short` + `diff HEAD`, zero-commit fallback to plain `diff`, 64k cap — groundwork for Phase 1.4) · **@archives-note** (fuzzy over titles+plaintext — the cross-app advantage). Project file tree cached 30s.
+- **Chips** stage attachments above the textarea (dedupe, removable). On send, chips resolve to exact content (per-kind caps, truncation flags), prepended as an `<attached-context>` block; the visible user message stays clean.
+- **Context pills = receipts**: every sent message keeps `pills` (kind/label/chars/truncated/400-char preview, persisted in messages_json) rendered as clickable chips under the bubble — expanding shows what was actually attached. Directly answers Cursor's #4 complaint ("I don't know what it sent").
+- ClaudeChat stays backend-decoupled: `contextSearch` prop + **type-only** imports; only Orion injects providers (Archives/XDesign rails unchanged). `onSend` gains optional `chips`; `appendUserMessage` gains optional `pills`. `detectAtToken` exported + 5 unit tests.
+- ⚠️ Needs a **`tauri dev` restart** (Rust: new `git_ops` module + command). tsc / **126 tests** (121→126) / cargo / vite build green. Commits `3fb07f4`, `a1231cc`.
 
 ### 2026-06-10 — AAA Rebuild (cont.): P2c — ⌘K rebuilt as in-editor streaming inline edit
 - **The modal is dead.** ⌘K was a centered modal (old Tailwind tokens) that waited for the FULL CLI reply before showing a whole-file DiffEditor — despite docs claiming streaming. Now it's Cursor-grade and lives in the editor (`InlineEditSession.tsx`, rendered by Editor.tsx; old `InlineEditOverlay.tsx` deleted, App.tsx mount removed):
