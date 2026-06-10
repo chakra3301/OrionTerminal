@@ -833,6 +833,78 @@ export async function deleteEmbedding(
   );
 }
 
+// ── Codebase semantic index (code_embeddings, migration 0018) ─────────────
+
+export type CodeChunkRow = {
+  path: string;
+  chunk_idx: number;
+  start_line: number;
+  end_line: number;
+  hash: string;
+  vector: Uint8Array | number[];
+};
+
+/** path → whole-file hash (any chunk row carries it). */
+export async function listCodeFileHashes(
+  projectId: string,
+): Promise<Map<string, string>> {
+  const db = await getDb();
+  const rows = await db.select<Array<{ path: string; hash: string }>>(
+    "SELECT DISTINCT path, hash FROM code_embeddings WHERE project_id = $1",
+    [projectId],
+  );
+  return new Map(rows.map((r) => [r.path, r.hash]));
+}
+
+export async function listCodeChunks(
+  projectId: string,
+): Promise<CodeChunkRow[]> {
+  const db = await getDb();
+  return db.select<CodeChunkRow[]>(
+    `SELECT path, chunk_idx, start_line, end_line, hash, vector
+     FROM code_embeddings WHERE project_id = $1`,
+    [projectId],
+  );
+}
+
+/** Replace every chunk row for a file in one pass (delete + insert). */
+export async function replaceCodeChunks(
+  projectId: string,
+  path: string,
+  hash: string,
+  chunks: Array<{
+    idx: number;
+    startLine: number;
+    endLine: number;
+    vector: Uint8Array;
+  }>,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "DELETE FROM code_embeddings WHERE project_id = $1 AND path = $2",
+    [projectId, path],
+  );
+  const now = Date.now();
+  for (const c of chunks) {
+    await db.execute(
+      `INSERT INTO code_embeddings(project_id, path, chunk_idx, start_line, end_line, hash, vector, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [projectId, path, c.idx, c.startLine, c.endLine, hash, Array.from(c.vector), now],
+    );
+  }
+}
+
+export async function deleteCodeFile(
+  projectId: string,
+  path: string,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "DELETE FROM code_embeddings WHERE project_id = $1 AND path = $2",
+    [projectId, path],
+  );
+}
+
 export type NoteRow = {
   id: string;
   title: string;

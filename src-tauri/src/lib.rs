@@ -122,6 +122,12 @@ pub fn run() {
             sql: include_str!("../migrations/0017_activity_log.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 18,
+            description: "per-project code embeddings for codebase semantic search",
+            sql: include_str!("../migrations/0018_code_embeddings.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
