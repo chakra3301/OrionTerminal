@@ -170,7 +170,18 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 - ✅ 0.3 Design tightening: global scrollbar + keyboard-focus baselines; light theme verified already-cut; theme-aware accent alphas (284 hardcoded rgba triplets → `var(--neon-*-rgb)` twins, fixing Minimal/Modern drift). EXPLICIT RE-SCOPE: per-surface typography/spacing normalization moves into each app phase's polish + the Phase 4.6 cohesion pass — doing it blind across 9900 lines of CSS without visual verification is regression roulette; surface-by-surface with eyes on it is the AAA way.
 - ✅ Phase 0 user smoke test (2026-06-10): user verified post-restart; one finding (BlockNote handles overflowing the note card) fixed `9a5e5df` and confirmed.
 
-**Phase 0 — DONE ✅** · **Phase 1 — Orion ≥ Cursor** 🔨 (research + audit underway → ranked plan for approval) · **Phase 2 — Archives ≥ Notion** ⬜ · **Phase 3 — XDesign ≥ Figma** ⬜ · **Phase 4 — One terminal, one brain** ⬜
+**Phase 0 — DONE ✅**
+
+**Phase 1 — Orion ≥ Cursor** 🔨 — ranked plan APPROVED 2026-06-10 (research: [docs/research/cursor-2026.md](docs/research/cursor-2026.md)). Strategy: editor-first (Hermes owns swarms), beat Cursor on trust (context pills, never-silent writes) + integration (@archives-notes).
+- 🔨 1.1 AI editing core (~3 sessions): P2b per-hunk accept/reject + inline decorations + review bar · P2c streaming ⌘K + follow-ups + ⌥Return quick-question · P2d @-context picker (file/folder/problems/terminal/git-diff/archives-note) + context pills · P2e codebase index on the embeddings worker (function/class chunks, gitignore-aware, incremental)
+- ⬜ 1.2 Tab autocomplete (~2): Haiku 4.5 ghost text <300ms p50, accept full/word, recent-edit+diagnostics context; stretch: edit-diffs, next-edit jump
+- ⬜ 1.3 Navigation/feel (~1): ⌘P frecency file picker · ⌘⇧O symbols · breadcrumbs · split-editor command · cross-file go-to-def; stretch: terminal ⌘K
+- ⬜ 1.4 Git (~2): gutter markers · tree status colors · stage/commit/push UI · AI commit messages (claude_oneshot) · branch switcher · blame — via git binary, no new crate
+- ⬜ 1.5 Checkpoints + whole-turn review (~1-2): auto-snapshot before agent turns, restore that never destroys history, consolidated per-turn review
+- ⬜ 1.6 Real LSP (~3): ts-language-server/pyright/rust-analyzer via Rust stdio, semantic diagnostics, cross-file refs/rename/actions, graceful degradation
+- CUT from Phase 1 (explicit): cloud agents/Slack control, in-editor browser + Design Mode, separate Plan Mode, Bugbot-style PR review, voice agent control, RL autocomplete tuning.
+
+**Phase 2 — Archives ≥ Notion** ⬜ · **Phase 3 — XDesign ≥ Figma** ⬜ · **Phase 4 — One terminal, one brain** ⬜
 
 ---
 
