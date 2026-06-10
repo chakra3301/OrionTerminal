@@ -9995,3 +9995,153 @@ html.ot-reduce-glass .note-page .note-editor-body {
   border-left: 2px solid rgba(var(--neon-magenta-rgb), 0.7);
   margin-left: 3px;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   ⌘K inline edit — in-editor session (InlineEditSession)
+   ───────────────────────────────────────────────────────────── */
+.or-ke-host { z-index: 50; }
+.or-ke-card {
+  width: 480px;
+  max-width: 70vw;
+  background: var(--bg-1);
+  border: 1px solid rgba(var(--neon-cyan-rgb), 0.35);
+  border-radius: var(--r-md);
+  box-shadow:
+    0 12px 40px -12px rgba(0, 0, 0, 0.7),
+    0 0 20px -6px rgba(var(--neon-cyan-rgb), 0.35);
+  padding: 8px 10px;
+  margin: 4px 0;
+  font-family: var(--f-ui);
+}
+.or-ke-toprow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.or-ke-spark { color: var(--neon-cyan); flex: none; margin-top: 4px; }
+.or-ke-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  color: var(--t-primary);
+  font-family: var(--f-ui);
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 1px 0;
+}
+.or-ke-input::placeholder { color: var(--t-tertiary); }
+.or-ke-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  color: var(--t-tertiary);
+}
+.or-ke-spin { animation: or-ke-rot 0.9s linear infinite; color: var(--neon-cyan); }
+@keyframes or-ke-rot { to { transform: rotate(360deg); } }
+.or-ke-mini {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 2px 8px;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--r-pill);
+  color: var(--t-secondary);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  cursor: pointer;
+}
+.or-ke-mini:hover { color: var(--t-primary); border-color: rgba(255, 255, 255, 0.2); }
+.or-ke-answer {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--bg-0);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--r-sm);
+  color: var(--t-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.or-ke-error {
+  margin-top: 6px;
+  color: var(--neon-magenta);
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  overflow-wrap: anywhere;
+}
+.or-ke-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.or-ke-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-2);
+  color: var(--t-secondary);
+  font-family: var(--f-mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+.or-ke-btn kbd {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  color: var(--t-tertiary);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+.or-ke-btn.accept {
+  color: var(--neon-green);
+  border-color: rgba(var(--neon-green-rgb), 0.35);
+  background: rgba(var(--neon-green-rgb), 0.08);
+}
+.or-ke-btn.accept:hover { background: rgba(var(--neon-green-rgb), 0.16); }
+.or-ke-btn.reject {
+  color: var(--neon-magenta);
+  border-color: rgba(var(--neon-magenta-rgb), 0.3);
+  background: rgba(var(--neon-magenta-rgb), 0.06);
+}
+.or-ke-btn.reject:hover { background: rgba(var(--neon-magenta-rgb), 0.14); }
+.or-ke-btn:hover { color: var(--t-primary); }
+.or-ke-hint {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  color: var(--t-faint);
+}
+.or-ke-region { background: rgba(var(--neon-cyan-rgb), 0.09); }
+.or-ke-zone {
+  background: rgba(var(--neon-magenta-rgb), 0.07);
+  border-left: 2px solid rgba(var(--neon-magenta-rgb), 0.5);
+  overflow: hidden;
+}
+.or-ke-zone pre {
+  margin: 0;
+  padding: 0 0 0 8px;
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: rgba(230, 244, 236, 0.45);
+  white-space: pre;
+}
+.or-ke-zone-more {
+  padding-left: 8px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  color: rgba(var(--neon-magenta-rgb), 0.6);
+}

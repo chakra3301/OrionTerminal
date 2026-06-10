@@ -576,6 +576,12 @@ export function EventBridge() {
       cur.appendDelta(e.payload.text);
     }).then((u) => unlisteners.push(u));
 
+    listen<{ streamId: string; text: string }>("inline:final", (e) => {
+      const cur = inline.getState();
+      if (cur.streamId !== e.payload.streamId) return;
+      cur.setFinal(e.payload.text);
+    }).then((u) => unlisteners.push(u));
+
     listen<{ streamId: string }>("inline:done", (e) => {
       const cur = inline.getState();
       if (cur.streamId !== e.payload.streamId) return;

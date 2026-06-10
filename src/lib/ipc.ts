@@ -68,7 +68,9 @@ export const ipc = {
     streamId: string,
     prompt: string,
     ctx: InlineEditCtxPayload,
-  ): Promise<void> => invoke("inline_edit_run", { streamId, prompt, ctx }),
+    mode?: "edit" | "ask",
+  ): Promise<void> =>
+    invoke("inline_edit_run", { streamId, prompt, ctx, mode: mode ?? null }),
   inlineEditCancel: (streamId: string): Promise<void> =>
     invoke("inline_edit_cancel", { streamId }),
 

@@ -9,6 +9,7 @@ import { useEditorStatusStore } from "@/store/editorStatusStore";
 import { useEditorNavStore } from "@/store/editorNavStore";
 import { usePendingEdits } from "@/store/pendingEditsStore";
 import { computeHunks } from "@/features/aiEdits/lineDiff";
+import { InlineEditSession } from "@/features/inlineEdit/InlineEditSession";
 import { languageForPath } from "@/apps/orion/lang";
 import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
 import "@/apps/orion/monacoTheme";
@@ -33,6 +34,7 @@ export function OrionEditor({ path }: { path: string }) {
   const monacoRef = useRef<MonacoNs | null>(null);
   const pendingDecosRef = useRef<DecorationsCollection | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mountTick, setMountTick] = useState(0);
 
   // Inline trust markers: while this file has an unreviewed agent edit,
   // tint the changed lines green (gutter bar + soft background; magenta
@@ -152,6 +154,7 @@ export function OrionEditor({ path }: { path: string }) {
     reportStatus();
     tryReveal();
     applyPendingDecorations();
+    setMountTick((t) => t + 1);
 
     editor.onDidFocusEditorWidget(() => {
       reportStatus();
@@ -223,7 +226,12 @@ export function OrionEditor({ path }: { path: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, setEditorFocus, setHasSelection, setSelectionContextProvider]);
 
-  const inlineEditVisible = useInlineEditStore((s) => s.visible);
+  // Read-only only for the file the ⌘K session targets — streamed region
+  // edits go through model.pushEditOperations, which bypasses readOnly, so
+  // the lock exclusively blocks user keystrokes from racing the stream.
+  const inlineEditVisible = useInlineEditStore(
+    (s) => s.visible && s.ctx?.path === path,
+  );
 
   if (!buffer?.loaded && !error) {
     return (
@@ -356,6 +364,12 @@ export function OrionEditor({ path }: { path: string }) {
           mouseWheelZoom: true,
           scrollbar: { useShadows: false },
         }}
+      />
+      <InlineEditSession
+        editorRef={editorRef}
+        monacoRef={monacoRef}
+        path={path}
+        mountTick={mountTick}
       />
     </div>
   );

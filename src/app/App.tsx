@@ -4,7 +4,6 @@ import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { EventBridge } from "@/app/EventBridge";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { KeybindingsOverlay } from "@/features/keybindings/KeybindingsOverlay";
-import { InlineEditOverlay } from "@/features/inlineEdit/InlineEditOverlay";
 import { installBuiltinCommands } from "@/commands/builtins";
 import { installShellCommands } from "@/shell/commands/shellCommands";
 import { HotkeyHost } from "@/lib/hotkeys";
@@ -569,7 +568,6 @@ export default function App() {
       <Shell />
       <SettingsPanel />
       <KeybindingsOverlay />
-      <InlineEditOverlay />
       <LinkInsertPalette />
     </ErrorBoundary>
   );
