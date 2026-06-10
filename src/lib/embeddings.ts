@@ -1,43 +1,74 @@
 import { log } from "@/lib/log";
-import { configureTransformers } from "@/lib/transformersEnv";
+import type {
+  WorkerRequest,
+  WorkerResponse,
+} from "@/lib/embeddingsWorker";
 
-const MODEL_ID = "Xenova/all-MiniLM-L6-v2";
+// Model load AND inference live in a dedicated Web Worker
+// (embeddingsWorker.ts) so neither the ~800KB script parse nor the ~30ms
+// per-text inference ever blocks the UI thread. Nothing spawns until the
+// first embed/warm call.
+let worker: Worker | null = null;
+let nextId = 1;
+let modelReady = false;
+const pending = new Map<
+  number,
+  { resolve: (v: ArrayBuffer[]) => void; reject: (e: Error) => void }
+>();
 
-// The transformers package is ~1.2MB minified — load it on first use via a
-// dynamic import so it lands in its own code-split chunk instead of the
-// main bundle. Until something calls embed/warm, nothing downloads.
-type EmbedPipeline = (
-  text: string,
-  opts: { pooling: "mean" | "none"; normalize: boolean },
-) => Promise<{ data: Float32Array }>;
-
-let pipelinePromise: Promise<EmbedPipeline> | null = null;
-
-function getPipeline(): Promise<EmbedPipeline> {
-  if (pipelinePromise) return pipelinePromise;
-  pipelinePromise = (async () => {
-    await configureTransformers();
-    const mod = await import("@xenova/transformers");
-    return (await mod.pipeline("feature-extraction", MODEL_ID, {
-      quantized: true,
-    })) as unknown as EmbedPipeline;
-  })().catch((err) => {
-    pipelinePromise = null;
-    throw err;
+function getWorker(): Worker {
+  if (worker) return worker;
+  const w = new Worker(new URL("./embeddingsWorker.ts", import.meta.url), {
+    type: "module",
   });
-  return pipelinePromise;
+  w.onmessage = (e: MessageEvent<WorkerResponse>) => {
+    const msg = e.data;
+    const p = pending.get(msg.id);
+    if (!p) return;
+    pending.delete(msg.id);
+    if (msg.ok) {
+      modelReady = true;
+      p.resolve(msg.vectors);
+    } else {
+      p.reject(new Error(msg.error));
+    }
+  };
+  w.onerror = (e) => {
+    // The worker script itself died (load/parse) — fail everything in
+    // flight and let the next call spawn a fresh worker.
+    const err = new Error(e.message || "embeddings worker crashed");
+    for (const p of pending.values()) p.reject(err);
+    pending.clear();
+    w.terminate();
+    if (worker === w) worker = null;
+  };
+  worker = w;
+  return w;
 }
 
-/** True once the model has loaded successfully. Useful for surfacing
- * readiness in the UI ("indexing…" spinner). */
+type WorkerCall =
+  | { op: "warm" }
+  | { op: "embed"; texts: string[] };
+
+function call(req: WorkerCall): Promise<ArrayBuffer[]> {
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    const msg: WorkerRequest = { ...req, id };
+    getWorker().postMessage(msg);
+  });
+}
+
+/** True once the model has produced at least one successful response. */
 export function isEmbeddingReady(): boolean {
-  return pipelinePromise !== null;
+  return modelReady;
 }
 
-/** Pre-warm the model. Safe to call multiple times. */
+/** Pre-warm the model (spawns the worker + downloads/loads weights).
+ * Safe to call multiple times. */
 export async function warmEmbeddings(): Promise<void> {
   try {
-    await getPipeline();
+    await call({ op: "warm" });
   } catch (err) {
     log.warn("embeddings warm failed", err);
   }
@@ -50,9 +81,8 @@ export async function embed(text: string): Promise<Float32Array | null> {
   const trimmed = text.trim();
   if (!trimmed) return null;
   try {
-    const pipe = await getPipeline();
-    const output = await pipe(trimmed, { pooling: "mean", normalize: true });
-    return new Float32Array(output.data as Float32Array);
+    const [buf] = await call({ op: "embed", texts: [trimmed] });
+    return buf ? new Float32Array(buf) : null;
   } catch (err) {
     log.warn("embed failed", err);
     return null;
