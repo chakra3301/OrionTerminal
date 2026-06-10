@@ -150,6 +150,31 @@ Nice-to-have:
 
 ---
 
+## AAA Rebuild tracker
+
+The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session rebuild: Orion ≥ Cursor, Archives ≥ Notion, XDesign ≥ Figma (single-player), shell = real OS. Paste the brief each session; THIS section is the durable progress state — continue from the first unfinished item. Per-phase protocol: research → audit → ranked plan (user approval) → green slices (commit each) → user smoke test → ✅.
+
+**First-session decisions (2026-06-10, locked):**
+- Tab autocomplete: APPROVED — Messages API w/ keychain key, model = Haiku 4.5 (`claude-haiku-4-5-20251001`).
+- New deps APPROVED: LSP servers (typescript-language-server, pyright, rust-analyzer) + a geometry lib for XDesign boolean ops.
+- Light theme: CUT — dark-only; remove toggle + dead palette in Phase 0.3.
+- Release target: unsigned personal .app/.dmg (no signing/notarization).
+
+**Phase 0 — Foundation** 🔨
+- ⬜ 0.1a Tier 2 perf: blur reduction (17 `backdrop-filter` selectors) + "reduce transparency" setting
+- ⬜ 0.1b Tier 3 perf: embeddings → Web Worker (indexing off the main thread)
+- ⬜ 0.1c Tier 3 perf: main-chunk audit/split (854KB index) + re-verify Tier 1
+- ⬜ 0.2a Toast/notification queue primitive
+- ⬜ 0.2b Per-window error boundaries
+- ⬜ 0.2c Confirm-or-undo primitive
+- ⬜ 0.2d DB backup rotation on boot (Rust)
+- ⬜ 0.3 Design tightening pass + light-theme removal
+- ⬜ Phase 0 user smoke test
+
+**Phase 1 — Orion ≥ Cursor** ⬜ · **Phase 2 — Archives ≥ Notion** ⬜ · **Phase 3 — XDesign ≥ Figma** ⬜ · **Phase 4 — One terminal, one brain** ⬜
+
+---
+
 ## Don'ts (carry-forward rules)
 
 - Don't edit prior migrations — append only.
