@@ -15,6 +15,7 @@ import {
   SquareTerminal,
   GitBranch,
   StickyNote,
+  Braces,
   X,
 } from "lucide-react";
 import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
@@ -70,6 +71,7 @@ const KIND_ICON: Record<string, typeof FileText> = {
   terminal: SquareTerminal,
   "git-diff": GitBranch,
   note: StickyNote,
+  code: Braces,
 };
 
 function PillIcon({ kind, size = 11 }: { kind: string; size?: number }) {

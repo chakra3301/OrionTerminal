@@ -16,8 +16,10 @@ import {
   searchContextSuggestions,
   resolveContextChips,
   buildContextBlock,
+  autoCodebaseContext,
   toPill,
   type ContextChip,
+  type ResolvedContext,
 } from "@/features/context/contextProviders";
 
 function blocksToText(msg: ChatMessage): string {
@@ -104,9 +106,24 @@ export function OrionClaudeRail() {
 
     // @-context: resolve chips to their exact content, prepend as a block,
     // and pin pill receipts on the message so what-was-sent stays visible.
-    let prompt = text;
+    const resolved: ResolvedContext[] = [];
     if (chips && chips.length > 0) {
-      const resolved = await resolveContextChips(chips, project.root_path);
+      resolved.push(...(await resolveContextChips(chips, project.root_path)));
+    }
+    // No explicit code context pinned → let the semantic index volunteer
+    // up to 3 relevant chunks. Receipts (pills) keep it honest.
+    const pinnedCode = chips?.some((c) => c.kind === "file" || c.kind === "folder");
+    if (!pinnedCode) {
+      try {
+        resolved.push(
+          ...(await autoCodebaseContext(text, project.id, project.root_path)),
+        );
+      } catch {
+        /* index not ready yet — send without */
+      }
+    }
+    let prompt = text;
+    if (resolved.length > 0) {
       prompt = `${buildContextBlock(resolved)}\n\n${text}`;
       appendUserMessage(text, resolved.map(toPill));
     } else {

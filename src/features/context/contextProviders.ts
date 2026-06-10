@@ -15,7 +15,8 @@ export type ContextItemKind =
   | "problems"
   | "terminal"
   | "git-diff"
-  | "note";
+  | "note"
+  | "code";
 
 /** What the user attached — light, lives in the composer until send. */
 export type ContextChip = {
@@ -184,9 +185,47 @@ function cap(s: string, max: number): { text: string; truncated: boolean } {
   return { text: `${s.slice(0, max)}\n… (truncated)`, truncated: true };
 }
 
+/** Semantic top-k over the project index, resolved to fresh file slices.
+ * Auto-attached by the Orion rail when the user didn't pin code context
+ * explicitly — the pill makes every auto-attachment visible. */
+export async function autoCodebaseContext(
+  query: string,
+  projectId: string,
+  projectRoot: string,
+  k = 3,
+): Promise<ResolvedContext[]> {
+  if (query.trim().length < 12) return [];
+  const { searchCodebase } = await import("./codebaseIndexer");
+  const hits = (await searchCodebase(query, projectId, k)).filter(
+    (h) => h.score >= 0.32,
+  );
+  const out: ResolvedContext[] = [];
+  for (const h of hits) {
+    try {
+      const content = await ipc.readFile(`${projectRoot}/${h.path}`);
+      const slice = content
+        .split("\n")
+        .slice(h.startLine - 1, h.endLine)
+        .join("\n");
+      out.push({
+        id: ulid(),
+        kind: "code",
+        label: `${h.path}:${h.startLine}-${h.endLine}`,
+        detail: `${projectRoot}/${h.path}`,
+        content: slice,
+        truncated: false,
+      });
+    } catch {
+      /* file vanished since indexing — skip */
+    }
+  }
+  return out;
+}
+
 async function resolveOne(c: ContextChip, projectRoot: string | null): Promise<ResolvedContext> {
   try {
     switch (c.kind) {
+      case "code":
       case "file": {
         const raw = await ipc.readFile(c.detail ?? c.label);
         const { text, truncated } = cap(raw, FILE_CAP);
