@@ -1,6 +1,7 @@
 mod api_key;
 mod asset;
 mod claude_cli;
+mod db_backup;
 mod fs_ops;
 mod fs_watch;
 mod hermes;
@@ -131,6 +132,9 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
+            // Synchronous on purpose: the snapshot must land before the
+            // frontend opens the DB and migrations run.
+            db_backup::run(app.handle());
             let handle = app.handle().clone();
             // Spawn the localhost UI bridge so out-of-process MCP servers
             // can reach the running app to drive UI-state actions
