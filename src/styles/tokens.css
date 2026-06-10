@@ -2914,6 +2914,41 @@ summary:focus-visible,
   background: rgba(var(--neon-magenta-rgb), 0.06);
 }
 .or-diff-btn.reject:hover { background: rgba(var(--neon-magenta-rgb), 0.14); }
+.or-diff-btn.sm { padding: 3px 8px; font-size: 10.5px; }
+.or-diff-stats { display: flex; gap: 6px; font-size: 11px; }
+.or-diff-stats em { font-style: normal; }
+.or-diff-stats .add { color: var(--neon-green); }
+.or-diff-stats .del { color: var(--neon-magenta); }
+.or-diff-hunknav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--r-pill);
+  background: var(--bg-1);
+}
+.or-diff-hunkcount {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  color: var(--t-secondary);
+  min-width: 30px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.or-diff-iconbtn {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--r-sm);
+  color: var(--t-tertiary);
+  cursor: pointer;
+}
+.or-diff-iconbtn:hover { color: var(--t-primary); background: rgba(255, 255, 255, 0.06); }
 .or-diff-body { flex: 1; min-height: 0; }
 
 .or-changes {

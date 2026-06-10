@@ -4,6 +4,12 @@ import { useTabsStore } from "@/store/tabsStore";
 import { useFileTreeRefresh } from "@/store/fileTreeRefreshStore";
 import { useWorkspace, allTabs } from "@/components/workspace/workspaceStore";
 import { log } from "@/lib/log";
+import { toast } from "@/store/toastStore";
+import {
+  computeHunks,
+  foldHunkIntoOriginal,
+  dropHunkFromUpdated,
+} from "@/features/aiEdits/lineDiff";
 
 function closeTabsMatching(predicate: (path: string) => boolean, kind: "file" | "diff-review") {
   const ws = useWorkspace.getState();
@@ -50,4 +56,48 @@ export function acceptAllEdits(): void {
 
 export async function rejectAllEdits(): Promise<void> {
   for (const path of [...usePendingEdits.getState().order]) await rejectEdit(path);
+}
+
+/** Keep ONE hunk: fold it into `original` so it leaves the remaining diff.
+ * Disk already holds it (the agent wrote `updated`), so no write needed.
+ * Resolving the last hunk resolves the whole file. */
+export function acceptHunk(path: string, index: number): void {
+  const e = usePendingEdits.getState().edits[path];
+  if (!e || e.isNew) return;
+  const hunks = computeHunks(e.original, e.updated);
+  if (!hunks[index]) return;
+  if (hunks.length === 1) {
+    acceptEdit(path);
+    return;
+  }
+  usePendingEdits
+    .getState()
+    .patch(path, { original: foldHunkIntoOriginal(e.original, hunks, index) });
+}
+
+/** Revert ONE hunk: rebuild `updated` without it and write that to disk.
+ * `original` may already contain previously-accepted hunks, so rejecting
+ * the last remaining hunk = plain rejectEdit (restores `original`). */
+export async function rejectHunk(path: string, index: number): Promise<void> {
+  const e = usePendingEdits.getState().edits[path];
+  if (!e || e.isNew) return;
+  const hunks = computeHunks(e.original, e.updated);
+  if (!hunks[index]) return;
+  if (hunks.length === 1) {
+    await rejectEdit(path);
+    return;
+  }
+  const nextUpdated = dropHunkFromUpdated(e.original, hunks, index);
+  try {
+    await ipc.saveFileAtomic(path, nextUpdated);
+  } catch (err) {
+    log.error("reject hunk failed", path, err);
+    toast.error("Couldn't revert that change", {
+      body: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
+  useTabsStore.getState().markLoaded(path, nextUpdated);
+  usePendingEdits.getState().patch(path, { updated: nextUpdated });
+  useFileTreeRefresh.getState().bump();
 }
