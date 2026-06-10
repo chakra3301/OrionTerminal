@@ -7,12 +7,16 @@ import { useInlineEditStore } from "@/store/inlineEditStore";
 import { useAssetsStore } from "@/store/assetsStore";
 import { useEditorStatusStore } from "@/store/editorStatusStore";
 import { useEditorNavStore } from "@/store/editorNavStore";
+import { usePendingEdits } from "@/store/pendingEditsStore";
+import { computeHunks } from "@/features/aiEdits/lineDiff";
 import { languageForPath } from "@/apps/orion/lang";
 import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
 import "@/apps/orion/monacoTheme";
 import { log } from "@/lib/log";
 
 type MonacoEditor = Parameters<OnMount>[0];
+type MonacoNs = Parameters<OnMount>[1];
+type DecorationsCollection = ReturnType<MonacoEditor["createDecorationsCollection"]>;
 
 export function OrionEditor({ path }: { path: string }) {
   const buffer = useTabsStore((s) => s.fileBuffers[path]);
@@ -26,7 +30,65 @@ export function OrionEditor({ path }: { path: string }) {
   const setEditorActionRunner = useFocusStore((s) => s.setEditorActionRunner);
 
   const editorRef = useRef<MonacoEditor | null>(null);
+  const monacoRef = useRef<MonacoNs | null>(null);
+  const pendingDecosRef = useRef<DecorationsCollection | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Inline trust markers: while this file has an unreviewed agent edit,
+  // tint the changed lines green (gutter bar + soft background; magenta
+  // bar where lines were deleted). Cleared the moment the review resolves.
+  const applyPendingDecorations = () => {
+    const ed = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!ed || !monaco) return;
+    const e = usePendingEdits.getState().edits[path];
+    const hunks = e && !e.isNew ? computeHunks(e.original, e.updated) : [];
+    const decos = hunks.map((h) =>
+      h.newLines.length > 0
+        ? {
+            range: new monaco.Range(
+              h.newStart + 1,
+              1,
+              h.newStart + h.newLines.length,
+              1,
+            ),
+            options: {
+              isWholeLine: true,
+              className: "or-pending-line",
+              linesDecorationsClassName: "or-pending-gutter",
+              overviewRuler: {
+                color: "rgba(57, 255, 136, 0.55)",
+                position: monaco.editor.OverviewRulerLane.Full,
+              },
+            },
+          }
+        : {
+            range: new monaco.Range(
+              Math.max(1, h.newStart),
+              1,
+              Math.max(1, h.newStart),
+              1,
+            ),
+            options: {
+              isWholeLine: true,
+              linesDecorationsClassName: "or-pending-gutter-del",
+            },
+          },
+    );
+    pendingDecosRef.current?.clear();
+    pendingDecosRef.current = ed.createDecorationsCollection(decos);
+  };
+
+  useEffect(() => {
+    applyPendingDecorations();
+    const unsub = usePendingEdits.subscribe(applyPendingDecorations);
+    return () => {
+      unsub();
+      pendingDecosRef.current?.clear();
+      pendingDecosRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path]);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,11 +145,13 @@ export function OrionEditor({ path }: { path: string }) {
 
   const onMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
     monaco.editor.setTheme("orion-neon");
 
     editor.onDidChangeCursorPosition(reportStatus);
     reportStatus();
     tryReveal();
+    applyPendingDecorations();
 
     editor.onDidFocusEditorWidget(() => {
       reportStatus();
