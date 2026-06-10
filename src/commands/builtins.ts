@@ -42,6 +42,11 @@ async function saveFileBuffer(path: string): Promise<boolean> {
       title: path.split("/").pop() || path,
       refId: path,
     });
+    // Keep the codebase semantic index fresh (lazy — module loads on
+    // first save, debounced per path inside).
+    void import("@/features/context/codebaseIndexer").then((m) =>
+      m.scheduleCodeFileReindex(path),
+    );
     return true;
   } catch (e) {
     log.error("save failed", path, e);

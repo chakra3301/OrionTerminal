@@ -89,6 +89,21 @@ export async function embed(text: string): Promise<Float32Array | null> {
   }
 }
 
+/** Embed several strings in ONE worker round-trip (order-stable). Used by
+ * the codebase indexer where per-call message overhead would add up. */
+export async function embedBatch(
+  texts: string[],
+): Promise<(Float32Array | null)[]> {
+  if (texts.length === 0) return [];
+  try {
+    const bufs = await call({ op: "embed", texts });
+    return texts.map((_, i) => (bufs[i] ? new Float32Array(bufs[i]!) : null));
+  } catch (err) {
+    log.warn("embedBatch failed", err);
+    return texts.map(() => null);
+  }
+}
+
 /** Cosine similarity between two same-length f32 vectors. When both
  * inputs are L2-normalized (which our pipeline produces with
  * `normalize: true`), this reduces to a plain dot product. */

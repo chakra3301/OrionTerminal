@@ -232,6 +232,9 @@ async function hydrate() {
   // back to FTS5 when embeddings aren't available yet.
   void scheduleEmbeddingBackfill();
 
+  // Codebase semantic index for the active project (and on project switch).
+  scheduleCodebaseIndex();
+
   // Resume the user's last Core conversation so the panel re-opens to
   // where they left off. Lazy import keeps the Core bundle out of the
   // hydrate path until needed.
@@ -267,6 +270,29 @@ function scheduleEmbeddingBackfill(): void {
       log.warn("embedding backfill rejected", err),
     );
   }, 1500);
+}
+
+let codebaseIndexStarted = false;
+function scheduleCodebaseIndex(): void {
+  if (codebaseIndexStarted) return;
+  codebaseIndexStarted = true;
+  const kick = (p: { id: string; root_path: string } | null) => {
+    if (!p) return;
+    // Give boot + the notes backfill a head start; the indexer itself is
+    // hash-aware so repeat runs are cheap. Lazy import keeps the indexer
+    // out of the boot path entirely.
+    setTimeout(() => {
+      void import("@/features/context/codebaseIndexer").then((m) =>
+        m.indexCodebase(p.id, p.root_path),
+      );
+    }, 4000);
+  };
+  kick(useProjectStore.getState().active);
+  useProjectStore.subscribe((s, prev) => {
+    if (s.active?.id !== prev.active?.id) {
+      kick(s.active ?? null);
+    }
+  });
 }
 
 function useWindowSizePersistence() {

@@ -844,6 +844,18 @@ export type CodeChunkRow = {
   vector: Uint8Array | number[];
 };
 
+export async function getCodeFileHash(
+  projectId: string,
+  path: string,
+): Promise<string | null> {
+  const db = await getDb();
+  const rows = await db.select<Array<{ hash: string }>>(
+    "SELECT hash FROM code_embeddings WHERE project_id = $1 AND path = $2 LIMIT 1",
+    [projectId, path],
+  );
+  return rows[0]?.hash ?? null;
+}
+
 /** path → whole-file hash (any chunk row carries it). */
 export async function listCodeFileHashes(
   projectId: string,
