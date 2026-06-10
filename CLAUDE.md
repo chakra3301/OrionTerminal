@@ -167,10 +167,10 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 - ✅ 0.2b Per-window error boundaries (already wired pre-rebuild — verified, not rebuilt)
 - ✅ 0.2c confirmAction() in-canvas dialog + toast.undo() pattern
 - ✅ 0.2d WAL-safe orion.db backup rotation on boot (keep 5)
-- 🔨 0.3 Design tightening: global scrollbar + keyboard-focus baselines DONE; light theme verified already-cut (nothing to remove). REMAINING: per-surface hardcoded-value/typography/spacing sweep
-- ⬜ Phase 0 user smoke test
+- ✅ 0.3 Design tightening: global scrollbar + keyboard-focus baselines; light theme verified already-cut; theme-aware accent alphas (284 hardcoded rgba triplets → `var(--neon-*-rgb)` twins, fixing Minimal/Modern drift). EXPLICIT RE-SCOPE: per-surface typography/spacing normalization moves into each app phase's polish + the Phase 4.6 cohesion pass — doing it blind across 9900 lines of CSS without visual verification is regression roulette; surface-by-surface with eyes on it is the AAA way.
+- ✅ Phase 0 user smoke test (2026-06-10): user verified post-restart; one finding (BlockNote handles overflowing the note card) fixed `9a5e5df` and confirmed.
 
-**Phase 1 — Orion ≥ Cursor** ⬜ · **Phase 2 — Archives ≥ Notion** ⬜ · **Phase 3 — XDesign ≥ Figma** ⬜ · **Phase 4 — One terminal, one brain** ⬜
+**Phase 0 — DONE ✅** · **Phase 1 — Orion ≥ Cursor** 🔨 (research + audit underway → ranked plan for approval) · **Phase 2 — Archives ≥ Notion** ⬜ · **Phase 3 — XDesign ≥ Figma** ⬜ · **Phase 4 — One terminal, one brain** ⬜
 
 ---
 
