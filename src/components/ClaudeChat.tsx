@@ -109,8 +109,8 @@ function MessagePills({ pills }: { pills: ClaudeChatPill[] }) {
   );
 }
 
-/** The `@token` under the caret, if any. */
-function detectAtToken(value: string, caret: number): { at: number; query: string } | null {
+/** The `@token` under the caret, if any. Exported for tests. */
+export function detectAtToken(value: string, caret: number): { at: number; query: string } | null {
   const upto = value.slice(0, caret);
   const at = upto.lastIndexOf("@");
   if (at === -1) return null;
