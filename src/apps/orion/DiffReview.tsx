@@ -31,12 +31,15 @@ export function OrionDiffReview({ path }: { path: string }) {
   const idx = Math.min(hunkIdx, Math.max(0, hunks.length - 1));
   const stats = useMemo(() => hunkStats(hunks), [hunks]);
 
-  // Keep the diff view centered on the active hunk.
+  // Keep the diff view on the active hunk. Reset horizontal scroll too —
+  // a long-line file left scrolled sideways clips every other line.
   useEffect(() => {
     const h = hunks[idx];
     if (!h || !diffRef.current) return;
     const line = h.newLines.length > 0 ? h.newStart + 1 : Math.max(1, h.newStart);
-    diffRef.current.getModifiedEditor().revealLineInCenter(line);
+    const modified = diffRef.current.getModifiedEditor();
+    modified.revealLineInCenterIfOutsideViewport(line);
+    modified.setScrollLeft(0);
   }, [idx, hunks]);
 
   if (!edit) {
@@ -90,21 +93,22 @@ export function OrionDiffReview({ path }: { path: string }) {
             >
               <ChevronDown size={13} />
             </button>
+            <span className="or-diff-hunknav-sep" />
             <button
               type="button"
-              className="or-diff-btn reject sm"
-              title="Revert just this change"
+              className="or-diff-iconbtn revert"
+              title="Revert this change"
               onClick={() => void rejectHunk(path, idx)}
             >
-              <X size={12} /> Hunk
+              <X size={13} />
             </button>
             <button
               type="button"
-              className="or-diff-btn accept sm"
-              title="Keep just this change"
+              className="or-diff-iconbtn keep"
+              title="Keep this change"
               onClick={() => acceptHunk(path, idx)}
             >
-              <Check size={12} /> Hunk
+              <Check size={13} />
             </button>
           </div>
         )}
@@ -149,6 +153,22 @@ export function OrionDiffReview({ path }: { path: string }) {
             scrollBeyondLastLine: false,
             renderOverviewRuler: false,
             renderLineHighlight: "none",
+            // Readability: show only changed regions (+context) with
+            // expandable collapsed bars between; wrap long lines so
+            // nothing clips off-screen; no sticky scope header floating
+            // over the diff.
+            hideUnchangedRegions: {
+              enabled: true,
+              revealLineCount: 5,
+              contextLineCount: 4,
+              minimumLineCount: 6,
+            },
+            wordWrap: "on",
+            stickyScroll: { enabled: false },
+            lineNumbersMinChars: 3,
+            folding: false,
+            glyphMargin: false,
+            diffAlgorithm: "advanced",
           }}
         />
       </div>

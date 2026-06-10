@@ -47,6 +47,18 @@ export function ensureOrionTheme(): Promise<void> {
         "scrollbarSlider.background": "#ffffff14",
         "scrollbarSlider.hoverBackground": "#ffffff29",
         "scrollbarSlider.activeBackground": "#ffffff3d",
+        // Diff review — brand green/magenta instead of Monaco's muddy
+        // defaults (hex literals: Monaco can't read CSS vars).
+        "diffEditor.insertedLineBackground": "#39ff8812",
+        "diffEditor.insertedTextBackground": "#39ff8824",
+        "diffEditor.removedLineBackground": "#ff3ea510",
+        "diffEditor.removedTextBackground": "#ff3ea522",
+        "diffEditorGutter.insertedLineBackground": "#39ff881c",
+        "diffEditorGutter.removedLineBackground": "#ff3ea51a",
+        "diffEditor.diagonalFill": "#ffffff08",
+        "diffEditor.unchangedRegionBackground": "#0a1015",
+        "diffEditor.unchangedRegionForeground": "#9ab0a8",
+        "editorStickyScroll.background": "#060a0f",
       },
     });
   });

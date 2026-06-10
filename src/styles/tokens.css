@@ -2914,7 +2914,6 @@ summary:focus-visible,
   background: rgba(var(--neon-magenta-rgb), 0.06);
 }
 .or-diff-btn.reject:hover { background: rgba(var(--neon-magenta-rgb), 0.14); }
-.or-diff-btn.sm { padding: 3px 8px; font-size: 10.5px; }
 .or-diff-stats { display: flex; gap: 6px; font-size: 11px; }
 .or-diff-stats em { font-style: normal; }
 .or-diff-stats .add { color: var(--neon-green); }
@@ -2949,6 +2948,22 @@ summary:focus-visible,
   cursor: pointer;
 }
 .or-diff-iconbtn:hover { color: var(--t-primary); background: rgba(255, 255, 255, 0.06); }
+.or-diff-iconbtn.keep { color: rgba(var(--neon-green-rgb), 0.75); }
+.or-diff-iconbtn.keep:hover {
+  color: var(--neon-green);
+  background: rgba(var(--neon-green-rgb), 0.12);
+}
+.or-diff-iconbtn.revert { color: rgba(var(--neon-magenta-rgb), 0.75); }
+.or-diff-iconbtn.revert:hover {
+  color: var(--neon-magenta);
+  background: rgba(var(--neon-magenta-rgb), 0.12);
+}
+.or-diff-hunknav-sep {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 2px;
+}
 .or-diff-body { flex: 1; min-height: 0; }
 
 .or-changes {
