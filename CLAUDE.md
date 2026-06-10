@@ -141,7 +141,6 @@ Correctness / risk:
 Rough edges:
 - **Voice mic in `tauri dev`** — only works in the bundled .app (parent-process owns the mic grant in dev).
 - **Wake word robustness** — VAD thresholds untuned; Whisper-tiny isn't a purpose-built wake model, so false triggers / misses possible. Revisit with Porcupine if annoying.
-- **Light theme** — wired but most surfaces are dark-tuned.
 - **MCP server headers** — single header pair only (covers Authorization); multi-header / env-var editing not exposed.
 
 Nice-to-have:
@@ -161,14 +160,14 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 - Release target: unsigned personal .app/.dmg (no signing/notarization).
 
 **Phase 0 — Foundation** 🔨
-- ⬜ 0.1a Tier 2 perf: blur reduction (17 `backdrop-filter` selectors) + "reduce transparency" setting
-- ⬜ 0.1b Tier 3 perf: embeddings → Web Worker (indexing off the main thread)
-- ⬜ 0.1c Tier 3 perf: main-chunk audit/split (854KB index) + re-verify Tier 1
-- ⬜ 0.2a Toast/notification queue primitive
-- ⬜ 0.2b Per-window error boundaries
-- ⬜ 0.2c Confirm-or-undo primitive
-- ⬜ 0.2d DB backup rotation on boot (Rust)
-- ⬜ 0.3 Design tightening pass + light-theme removal
+- ✅ 0.1a Tier 2 perf: heavy blur radii cut (40/28/24px → 12-16px) + "Reduce transparency" setting (+ OS accessibility media query)
+- ✅ 0.1b Tier 3 perf: embeddings → Web Worker (model load + inference off the main thread)
+- ✅ 0.1c Tier 3 perf: ROSIE lazy-mounted → main chunk 858KB → 513KB; Tier 1 verified intact
+- ✅ 0.2a Toast/notification queue (toastStore + ToastHost; history ring feeds Phase-4 notification center)
+- ✅ 0.2b Per-window error boundaries (already wired pre-rebuild — verified, not rebuilt)
+- ✅ 0.2c confirmAction() in-canvas dialog + toast.undo() pattern
+- ✅ 0.2d WAL-safe orion.db backup rotation on boot (keep 5)
+- 🔨 0.3 Design tightening: global scrollbar + keyboard-focus baselines DONE; light theme verified already-cut (nothing to remove). REMAINING: per-surface hardcoded-value/typography/spacing sweep
 - ⬜ Phase 0 user smoke test
 
 **Phase 1 — Orion ≥ Cursor** ⬜ · **Phase 2 — Archives ≥ Notion** ⬜ · **Phase 3 — XDesign ≥ Figma** ⬜ · **Phase 4 — One terminal, one brain** ⬜
@@ -200,6 +199,13 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-10 — AAA Rebuild session 1: decisions locked, Phase 0 ~90% shipped
+- **Master brief started** (see "AAA Rebuild tracker" above). First-session decisions locked: autocomplete = Haiku 4.5 via Messages API ✅, LSP servers + geometry lib both approved ✅, light theme = cut (verified already gone — 3 dark themes, nothing left to remove), release = unsigned .app/.dmg. Committed the outstanding 06-09 work first (`cf2174b`).
+- **0.2 Resilience** — `toastStore` (capped visible stack + FIFO queue + dedupe keys + 50-entry history ring for the future notification center; errors sticky; `toast.undo()` do-then-undo helper; 8 tests) + `ToastHost` (bottom-right, kind-colored, hover-pauses, reduced-motion). `confirmAction()` in-canvas confirm (danger variant) replaces the native Tauri dialog in FileTree delete; FileTree rename/delete failures + boot-hydrate failure now toast instead of console-only. Per-window error boundaries were **already wired** (App root + every window + ROSIE + Companion) — verified, not redone. **DB backups**: `db_backup.rs` rotates a snapshot into `<app-config>/backups/` (keep 5) on every boot via SQLite's online backup API (WAL-safe vs the iOS helper's out-of-band writes), synchronously in `setup()` so it lands pre-migration; 4 Rust tests (9 total).
+- **0.1 Perf** — Tier 2: heavy backdrop blurs cut 40/28/24px → 12–16px (ROSIE panel is rgba .88 — visual delta nil); `html.ot-reduce-glass` kills all backdrop-filters (Settings → Appearance switch, persisted `reduce_glass`) and the OS "Reduce transparency" preference is honored via media query. Tier 3: embeddings model+inference moved into a dedicated **Web Worker** (`embeddingsWorker.ts`; same `embed`/`warm` API, transferable vectors, self-healing respawn; transformersEnv stays for main-thread Whisper). **ROSIE UI lazy-mounted** (it dragged react-markdown+highlight.js into boot): main chunk **858KB → 513KB** (gzip 267→162KB); mounts on first open, stays mounted (drafts survive close), idle-prefetched at +3s. Tier 1 verified still intact.
+- **0.3 partial** — global scrollbar baseline (slim thumb everywhere, not just `.scroll`) + global keyboard `:focus-visible` ring on buttons/links/role-controls (was: 3 controls in the whole app). Remaining: per-surface hardcoded-value/typography/spacing sweep → next session, then the Phase 0 smoke test.
+- ⚠️ Needs a **`tauri dev` restart** (Rust: db_backup module + rusqlite `backup` feature). Frontend slices hot-reload. tsc / **107 frontend tests** (was 99) / cargo (9 tests) / vite build all green. Five commits: `97f5f70` toasts+confirm, `448de93` db backup, `9c56bea` blur, `41d6a16` worker, `fc044b0` rosie-lazy, `75727f1` baselines.
 
 ### 2026-06-09 — Orion → Cursor parity, Phase 2a: agent edits as in-editor Accept/Reject diffs
 - **The Cursor "agent" centerpiece:** the Orion chat agent's file edits now apply to disk AND surface in the editor as a **reviewable diff with Accept / Reject**, instead of silently writing and forcing a manual reload.
