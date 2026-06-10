@@ -24,6 +24,13 @@
   --neon-magenta: #d6a8bf;
   --neon-violet: #b3a8d6;
 
+  /* rgba() triplet twins of the accents above */
+  --neon-green-rgb: 142, 211, 176;
+  --neon-cyan-rgb: 155, 199, 214;
+  --neon-yellow-rgb: 214, 207, 155;
+  --neon-magenta-rgb: 214, 168, 191;
+  --neon-violet-rgb: 179, 168, 214;
+
   --t-primary: #eceeed;
   --t-secondary: #a3aaa7;
   --t-tertiary: #6b726f;
@@ -65,6 +72,13 @@
   --neon-yellow: #fbbf24;
   --neon-magenta: #f472b6;
   --neon-violet: #a78bfa;
+
+  /* rgba() triplet twins of the accents above */
+  --neon-green-rgb: 74, 222, 128;
+  --neon-cyan-rgb: 56, 189, 248;
+  --neon-yellow-rgb: 251, 191, 36;
+  --neon-magenta-rgb: 244, 114, 182;
+  --neon-violet-rgb: 167, 139, 250;
 
   --t-primary: #e8ecf4;
   --t-secondary: #9aa3b8;
