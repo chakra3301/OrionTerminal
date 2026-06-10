@@ -173,7 +173,7 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 **Phase 0 — DONE ✅**
 
 **Phase 1 — Orion ≥ Cursor** 🔨 — ranked plan APPROVED 2026-06-10 (research: [docs/research/cursor-2026.md](docs/research/cursor-2026.md)). Strategy: editor-first (Hermes owns swarms), beat Cursor on trust (context pills, never-silent writes) + integration (@archives-notes).
-- 🔨 1.1 AI editing core (~3 sessions): ✅ P2b per-hunk accept/reject + inline decorations + hunk bar (2026-06-10) · ✅ P2c in-editor streaming ⌘K + follow-ups + ⌥↵ ask mode (2026-06-10) · ✅ P2d @-context picker (file/folder/problems/terminal/git-diff/archives-note) + context pills (2026-06-10) · ⬜ P2e codebase index on the embeddings worker (function/class chunks, gitignore-aware, incremental)
+- ✅ 1.1 AI editing core — COMPLETE 2026-06-10: P2b per-hunk accept/reject + inline decorations · P2c in-editor streaming ⌘K + follow-ups + ⌥↵ ask · P2d @-context picker + context pills · P2e codebase semantic index (migration 0018, decl-aware chunker, hash-incremental, worker-embedded; auto-injects into chat with pills + ⌘K related-code)
 - ⬜ 1.2 Tab autocomplete (~2): Haiku 4.5 ghost text <300ms p50, accept full/word, recent-edit+diagnostics context; stretch: edit-diffs, next-edit jump
 - ⬜ 1.3 Navigation/feel (~1): ⌘P frecency file picker · ⌘⇧O symbols · breadcrumbs · split-editor command · cross-file go-to-def; stretch: terminal ⌘K
 - ⬜ 1.4 Git (~2): gutter markers · tree status colors · stage/commit/push UI · AI commit messages (claude_oneshot) · branch switcher · blame — via git binary, no new crate
@@ -210,6 +210,14 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-10 — AAA Rebuild (cont.): P2e — codebase semantic index → item 1.1 (AI editing core) COMPLETE
+- **Storage (migration 0018)**: `code_embeddings` (project_id, path, chunk_idx, start/end_line, whole-FILE hash repeated per chunk, vector BLOB; PK project+path+idx). db.ts helpers: list/replace/delete per file + `getCodeFileHash`. Committed `46708c9`.
+- **Chunker** (`codeChunker.ts`, pure, 9 tests): declaration-regex boundaries (TS/JS/Rust/Py/Go/Swift/C/CSS/md headings), 12-min/40-target/70-max lines, contiguous 1-based ranges, minified detection (avg line >300 chars), `chunkEmbedText` prefixes rel-path+lines (retrieval boost). `1ffa75f`.
+- **Indexer** (`codebaseIndexer.ts`): full sweep on project open/switch (4s deferred, lazy import, single-flight + queued re-run) — extension whitelist, 200KB cap, hash short-circuit, **batched worker embeds** (new `embedBatch`, 8/round-trip), deleted-file cleanup; per-file reindex on save (1.5s debounce, hooked in `saveFileBuffer`). `searchCodebase` = cosine over an in-memory per-project cache invalidated on writes; `useCodebaseIndex` status store. `bd2ee74`.
+- **Chat auto-inject**: when no @file/@folder pinned, up to 3 chunks (score ≥ 0.32, msg ≥ 12 chars) resolve to FRESH file slices and attach with **`code` pills** (Braces icon) — auto-context is never silent. `236e356`.
+- **⌘K related code**: edit submits gather ≤2 cross-file snippets (same-file excluded) → new `extraContext` on the ctx payload → Rust renders a "RELATED CODE (read-only)" prompt section; stale-guard if cancelled mid-search. `7b7606b`.
+- ⚠️ Needs a **full `tauri dev` restart** (migration 0018 + Rust inline_edit change). tsc / **135 tests** (126→135) / cargo (9) / vite build green. **Phase 1 item 1.1 = DONE; next: 1.2 Tab autocomplete.**
 
 ### 2026-06-10 — AAA Rebuild (cont.): P2d — @-context picker + context pills in the Orix47 rail
 - **Type `@` in the Orion chat input** → caret-aware picker (fuzzy via fuse, ↑↓/Enter/Tab/Esc, mouse) over six providers (`src/features/context/contextProviders.ts`): **@file** (24k cap) · **@folder** (recursive listing, 200 entries) · **@problems** (live diagnosticsStore, severity-tagged) · **@terminal** (last 120 scrollback lines — new `liveTerminals` registry + `getRecentTerminalOutput()` in ptyTerminal.ts) · **@working-diff** (new Rust **`git_working_diff`**: `git status --short` + `diff HEAD`, zero-commit fallback to plain `diff`, 64k cap — groundwork for Phase 1.4) · **@archives-note** (fuzzy over titles+plaintext — the cross-app advantage). Project file tree cached 30s.
