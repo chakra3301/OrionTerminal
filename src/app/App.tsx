@@ -99,6 +99,7 @@ async function hydrate() {
     preview,
     xdesignDoc,
     modelPrefs,
+    reduceGlass,
   ] = await Promise.all([
     getAppState<{ sidebar: number; main: number; right: number }>("panel_sizes"),
     getAppState<boolean>("sidebar_open"),
@@ -123,9 +124,11 @@ async function hydrate() {
         }
     >("xdesign.doc"),
     getAppState<Record<string, string>>("models"),
+    getAppState<boolean>("reduce_glass"),
   ]);
 
   useThemeStore.getState().hydrate(theme ?? null);
+  useThemeStore.getState().hydrateGlass(reduceGlass);
   if (wallpaper) useWallpaperStore.getState().hydrate(wallpaper);
   if (preview) usePreviewStore.getState().hydrate(preview);
   if (xdesignDoc) useXDesign.getState().hydrate(xdesignDoc);

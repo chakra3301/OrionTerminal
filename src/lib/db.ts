@@ -38,7 +38,8 @@ export type AppStateKey =
   | "voice.listenMode"
   | "mcp.servers"
   | "models"
-  | "widget.monitor";
+  | "widget.monitor"
+  | "reduce_glass";
 
 export async function getAppState<T = unknown>(
   key: AppStateKey,

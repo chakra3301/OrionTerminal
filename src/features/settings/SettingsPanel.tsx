@@ -247,6 +247,8 @@ function APIKeySection() {
 function ThemeSection() {
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.set);
+  const reduceGlass = useThemeStore((s) => s.reduceGlass);
+  const setReduceGlass = useThemeStore((s) => s.setReduceGlass);
 
   return (
     <>
@@ -276,6 +278,24 @@ function ThemeSection() {
             </span>
           </button>
         ))}
+      </div>
+      <div className="ot-settings-toggle">
+        <div className="ot-settings-toggle-meta">
+          <div className="ot-settings-toggle-name">Reduce transparency</div>
+          <div className="ot-settings-toggle-blurb">
+            Turns off the glass blur behind panels. Noticeably lighter on the
+            GPU — try this if dragging or scrolling ever stutters with several
+            windows open.
+          </div>
+        </div>
+        <button
+          type="button"
+          className={`ot-switch${reduceGlass ? " on" : ""}`}
+          role="switch"
+          aria-checked={reduceGlass}
+          aria-label="Reduce transparency"
+          onClick={() => setReduceGlass(!reduceGlass)}
+        />
       </div>
     </>
   );

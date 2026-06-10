@@ -677,8 +677,8 @@
   background: rgba(6, 10, 15, 0.88);
   border: 1px solid rgba(0, 224, 255, 0.18);
   border-radius: var(--r-lg);
-  backdrop-filter: blur(40px) saturate(1.2);
-  -webkit-backdrop-filter: blur(40px) saturate(1.2);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
   box-shadow:
     0 40px 100px -20px rgba(0, 0, 0, 0.7),
     0 0 28px -8px rgba(0, 224, 255, 0.35),
@@ -1221,8 +1221,8 @@
   background: rgba(6, 10, 15, 0.82);
   border: 1px solid rgba(0, 224, 255, 0.28);
   border-radius: var(--r-pill);
-  backdrop-filter: blur(24px) saturate(1.2);
-  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
   box-shadow:
     0 18px 44px -16px rgba(0, 0, 0, 0.6),
     0 0 18px -6px rgba(0, 224, 255, 0.4);
@@ -1334,8 +1334,8 @@
   background: rgba(6, 10, 15, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--r-lg);
-  backdrop-filter: blur(28px) saturate(1.15);
-  -webkit-backdrop-filter: blur(28px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
   box-shadow:
     0 30px 80px -20px rgba(0, 0, 0, 0.55),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -6138,8 +6138,8 @@
   background: rgba(10, 10, 15, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(40px) saturate(1.2);
-  -webkit-backdrop-filter: blur(40px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
   overflow: visible;
   min-height: 360px;
 }
@@ -7673,8 +7673,8 @@
   box-shadow:
     0 30px 80px -20px rgba(0, 0, 0, 0.75),
     0 0 36px -10px rgba(var(--xd-accent-rgb), 0.45);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   z-index: 25;
   overflow: hidden;
   animation: xd-claude-in 200ms cubic-bezier(0.2, 0, 0, 1) both;
@@ -8751,8 +8751,8 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-window);
-  backdrop-filter: blur(20px) saturate(1.2);
-  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
   padding: 5px;
   z-index: 6000;
   display: flex;
@@ -9663,8 +9663,8 @@
   background: rgba(6, 10, 15, 0.86);
   border: 1px solid var(--glass-border-bright);
   border-radius: var(--r-lg);
-  backdrop-filter: blur(28px) saturate(1.3);
-  -webkit-backdrop-filter: blur(28px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
   box-shadow:
     var(--shadow-window),
     0 0 24px -8px rgba(0, 224, 255, 0.28),
@@ -9775,9 +9775,112 @@
   border: 1px solid var(--glass-border-bright);
   border-radius: var(--r-pill);
   color: var(--neon-cyan);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow: var(--shadow-window), 0 0 18px -6px rgba(0, 224, 255, 0.3);
   cursor: pointer;
 }
 .ot-mon-pill:hover { color: var(--t-primary); border-color: var(--neon-cyan); }
+
+/* ─────────────────────────────────────────────────────────────
+   Reduce transparency — backdrop blur is the single biggest idle
+   GPU cost (Tier 2 perf). Killed wholesale when the Settings
+   toggle sets html.ot-reduce-glass, or when the OS accessibility
+   "Reduce transparency" preference is on. The two big reading
+   surfaces get near-opaque backgrounds so legibility doesn't
+   depend on the missing blur.
+   ───────────────────────────────────────────────────────────── */
+html.ot-reduce-glass *,
+html.ot-reduce-glass *::before,
+html.ot-reduce-glass *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html.ot-reduce-glass .ot-rosie-panel {
+  background: rgba(6, 10, 15, 0.97);
+}
+html.ot-reduce-glass .note-page .note-editor-body {
+  background: rgba(10, 10, 15, 0.92);
+}
+@media (prefers-reduced-transparency: reduce) {
+  *,
+  *::before,
+  *::after {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .ot-rosie-panel {
+    background: rgba(6, 10, 15, 0.97);
+  }
+  .note-page .note-editor-body {
+    background: rgba(10, 10, 15, 0.92);
+  }
+}
+
+/* Settings toggle row (shared switch pattern) */
+.ot-settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 18px;
+}
+.ot-settings-toggle-meta {
+  flex: 1;
+  min-width: 0;
+}
+.ot-settings-toggle-name {
+  font-family: var(--f-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-primary);
+}
+.ot-settings-toggle-blurb {
+  font-family: var(--f-ui);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--t-tertiary);
+  margin-top: 2px;
+}
+.ot-switch {
+  flex: none;
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: var(--r-pill);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--bg-3);
+  cursor: pointer;
+  padding: 0;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.ot-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--t-secondary);
+  transition: transform 150ms ease, background 150ms ease;
+}
+.ot-switch.on {
+  background: rgba(57, 255, 136, 0.22);
+  border-color: var(--neon-green);
+}
+.ot-switch.on::after {
+  transform: translateX(16px);
+  background: var(--neon-green);
+}
+.ot-switch:focus-visible {
+  outline: 1px solid var(--neon-cyan);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ot-switch,
+  .ot-switch::after {
+    transition: none;
+  }
+}

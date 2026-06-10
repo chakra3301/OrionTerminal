@@ -25,20 +25,36 @@ function applyToDOM(theme: ThemeName) {
   root.classList.add("dark");
 }
 
+function applyGlassToDOM(reduce: boolean) {
+  document.documentElement.classList.toggle("ot-reduce-glass", reduce);
+}
+
 type ThemeState = {
   theme: ThemeName;
+  /** "Reduce transparency" — kills all backdrop blurs (the biggest idle GPU
+   * cost). The OS-level accessibility preference applies independently via
+   * a media query; this is the in-app override. */
+  reduceGlass: boolean;
   set: (theme: ThemeName) => void;
+  setReduceGlass: (reduce: boolean) => void;
   /** Cycle to the next theme — backs the "Cycle Theme" command. */
   toggle: () => void;
   hydrate: (value: string | null | undefined) => void;
+  hydrateGlass: (value: boolean | null | undefined) => void;
 };
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
   theme: "neon",
+  reduceGlass: false,
   set: (theme) => {
     set({ theme });
     applyToDOM(theme);
     void setAppState("theme", theme);
+  },
+  setReduceGlass: (reduce) => {
+    set({ reduceGlass: reduce });
+    applyGlassToDOM(reduce);
+    void setAppState("reduce_glass", reduce);
   },
   toggle: () => {
     const order = THEMES.map((t) => t.id);
@@ -49,5 +65,10 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     const theme = normalize(value);
     set({ theme });
     applyToDOM(theme);
+  },
+  hydrateGlass: (value) => {
+    const reduce = value === true;
+    set({ reduceGlass: reduce });
+    applyGlassToDOM(reduce);
   },
 }));
