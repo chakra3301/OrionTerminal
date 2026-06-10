@@ -66,6 +66,27 @@ function waitForSize(el: HTMLElement, timeoutMs = 2000): Promise<void> {
   });
 }
 
+// Live terminals by ptyId, in attach order — lets the @-context "terminal
+// output" provider read scrollback without owning any terminal lifecycle.
+const liveTerminals = new Map<string, XTerm>();
+
+/** Last `maxLines` of the most recently attached live terminal (trailing
+ * blank lines dropped). Null when no terminal is open. */
+export function getRecentTerminalOutput(maxLines: number): string | null {
+  const term = [...liveTerminals.values()].pop();
+  if (!term) return null;
+  const buf = term.buffer.active;
+  const total = buf.length;
+  const lines: string[] = [];
+  for (let i = total - 1; i >= 0 && lines.length < maxLines; i--) {
+    const line = buf.getLine(i)?.translateToString(true) ?? "";
+    if (lines.length === 0 && line.trim() === "") continue;
+    lines.push(line);
+  }
+  if (lines.length === 0) return null;
+  return lines.reverse().join("\n");
+}
+
 /**
  * Wires an xterm instance to a pty: spawns the backend, streams data both ways,
  * and keeps the pty sized to the visible terminal. Shared by the shell terminal
@@ -189,10 +210,13 @@ export function attachPtyTerminal(opts: PtyTerminalOptions): PtyTerminalHandle {
     resizeObs.observe(opts.container);
   })().catch((e) => log.error("pty terminal init", e));
 
+  liveTerminals.set(opts.ptyId, term);
+
   return {
     term,
     dispose: () => {
       disposed = true;
+      liveTerminals.delete(opts.ptyId);
       if (resizeTimer != null) window.clearTimeout(resizeTimer);
       unlistenData?.();
       unlistenExit?.();

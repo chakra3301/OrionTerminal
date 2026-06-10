@@ -10145,3 +10145,143 @@ html.ot-reduce-glass .note-page .note-editor-body {
   font-size: 10px;
   color: rgba(var(--neon-magenta-rgb), 0.6);
 }
+
+/* ─────────────────────────────────────────────────────────────
+   @-context picker + chips + message pills (P2d)
+   ───────────────────────────────────────────────────────────── */
+.ot-claude-input { position: relative; }
+.ot-ctxpick {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 8px;
+  right: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg-1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-window);
+  padding: 4px;
+  z-index: 30;
+}
+.ot-ctxpick-empty {
+  padding: 8px 10px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  color: var(--t-tertiary);
+}
+.ot-ctxpick-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  border-radius: var(--r-sm);
+  color: var(--t-secondary);
+  font-family: var(--f-ui);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.ot-ctxpick-row.hi {
+  background: rgba(var(--neon-cyan-rgb), 0.1);
+  color: var(--t-primary);
+}
+.ot-ctxpick-row svg { flex: none; color: var(--neon-cyan); }
+.ot-ctxpick-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ot-ctxpick-detail {
+  flex: none;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  color: var(--t-faint);
+}
+.ot-ctxchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px 0;
+}
+.ot-ctxchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid rgba(var(--neon-cyan-rgb), 0.3);
+  border-radius: var(--r-pill);
+  background: rgba(var(--neon-cyan-rgb), 0.07);
+  color: var(--t-secondary);
+  font-family: var(--f-mono);
+  font-size: 10px;
+}
+.ot-ctxchip svg { flex: none; color: var(--neon-cyan); }
+.ot-ctxchip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+.ot-ctxchip-x {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--t-tertiary);
+  cursor: pointer;
+}
+.ot-ctxchip-x:hover { color: var(--neon-magenta); }
+.ot-pills { margin-top: 6px; }
+.ot-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ot-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--r-pill);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--t-tertiary);
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  cursor: pointer;
+}
+.ot-pill:hover, .ot-pill.open {
+  color: var(--t-secondary);
+  border-color: rgba(var(--neon-cyan-rgb), 0.35);
+}
+.ot-pill svg { color: var(--neon-cyan); }
+.ot-pill-label {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ot-pill-chars { color: var(--t-faint); }
+.ot-pill-preview {
+  margin: 6px 0 0;
+  padding: 8px;
+  max-height: 160px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--r-sm);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--t-tertiary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

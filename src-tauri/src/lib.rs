@@ -4,6 +4,7 @@ mod claude_cli;
 mod db_backup;
 mod fs_ops;
 mod fs_watch;
+mod git_ops;
 mod hermes;
 mod inline_edit;
 mod mcp_config;
@@ -159,6 +160,7 @@ pub fn run() {
             fs_ops::rename_path,
             fs_ops::delete_path,
             fs_ops::reveal_in_os,
+            git_ops::git_working_diff,
             mcp_config::context_snapshot_write,
             ui_bridge::ui_bridge_respond,
             api_key::api_key_set,

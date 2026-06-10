@@ -11,12 +11,22 @@ export type ToolUseBlock = {
 };
 export type ContentBlock = TextBlock | ToolUseBlock;
 
+/** Receipt for an @-context attachment — what the AI actually saw. */
+export type MessagePill = {
+  kind: string;
+  label: string;
+  chars: number;
+  truncated: boolean;
+  preview: string;
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant" | "system";
   blocks: ContentBlock[];
   createdAt: number;
   pending?: boolean;
+  pills?: MessagePill[];
 };
 
 export type Chat = {
@@ -42,7 +52,7 @@ type ChatState = {
   newChat: (projectId: string | null) => Chat;
   setActive: (chat: Chat | null) => void;
 
-  appendUserMessage: (text: string) => void;
+  appendUserMessage: (text: string, pills?: MessagePill[]) => void;
   onAssistantBlocks: (blocks: ContentBlock[]) => void;
   onToolResult: (
     toolUseId: string,
@@ -94,10 +104,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setActive: (chat) =>
     set({ active: chat, pendingAssistantId: null, running: false }),
 
-  appendUserMessage: (text) =>
+  appendUserMessage: (text, pills) =>
     set((s) => {
       if (!s.active) return s;
-      const msg = newMessage("user", [{ type: "text", text }]);
+      const msg = {
+        ...newMessage("user", [{ type: "text", text } as ContentBlock]),
+        ...(pills && pills.length > 0 ? { pills } : {}),
+      };
       return {
         active: {
           ...s.active,

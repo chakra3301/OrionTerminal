@@ -60,6 +60,9 @@ export const ipc = {
   revealInOs: (path: string): Promise<void> =>
     invoke("reveal_in_os", { path }),
 
+  gitWorkingDiff: (root: string): Promise<string> =>
+    invoke<string>("git_working_diff", { root }),
+
   apiKeySet: (key: string): Promise<void> => invoke("api_key_set", { key }),
   apiKeyClear: (): Promise<void> => invoke("api_key_clear"),
   apiKeyStatus: (): Promise<boolean> => invoke<boolean>("api_key_status"),

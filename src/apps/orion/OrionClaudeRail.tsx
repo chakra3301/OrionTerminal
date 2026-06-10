@@ -12,6 +12,13 @@ import { upsertChat } from "@/lib/db";
 import { scheduleReindex } from "@/lib/embeddingIndexer";
 import { useEffect } from "react";
 import { orionClaude } from "@/apps/orion/claude";
+import {
+  searchContextSuggestions,
+  resolveContextChips,
+  buildContextBlock,
+  toPill,
+  type ContextChip,
+} from "@/features/context/contextProviders";
 
 function blocksToText(msg: ChatMessage): string {
   return msg.blocks
@@ -81,24 +88,35 @@ export function OrionClaudeRail() {
     if (!active) return [];
     return active.messages.map((m) => ({
       id: m.id,
-      role: m.role === "assistant" ? "assistant" : "user",
+      role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
       content: blocksToText(m) || (m.pending ? "…" : ""),
       pending: m.pending,
+      pills: m.pills,
     }));
   }, [active]);
 
-  const handleSend = async (text: string) => {
+  const handleSend = async (text: string, chips?: ContextChip[]) => {
     if (!active) {
       newChat(project?.id ?? null);
     }
     const chat = useChatStore.getState().active;
     if (!chat || !project) return;
-    appendUserMessage(text);
+
+    // @-context: resolve chips to their exact content, prepend as a block,
+    // and pin pill receipts on the message so what-was-sent stays visible.
+    let prompt = text;
+    if (chips && chips.length > 0) {
+      const resolved = await resolveContextChips(chips, project.root_path);
+      prompt = `${buildContextBlock(resolved)}\n\n${text}`;
+      appendUserMessage(text, resolved.map(toPill));
+    } else {
+      appendUserMessage(text);
+    }
     setRunning(true);
     try {
       await ipc.claudeSend(
         chat.id,
-        text,
+        prompt,
         project.root_path,
         chat.sessionId,
         null,
@@ -142,6 +160,9 @@ export function OrionClaudeRail() {
       onSend={handleSend}
       onCancel={cancel}
       onNewChat={() => newChat(project?.id ?? null)}
+      contextSearch={(q) =>
+        searchContextSuggestions(q, project?.root_path ?? null)
+      }
     />
   );
 }
