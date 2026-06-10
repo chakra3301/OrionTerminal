@@ -24,6 +24,8 @@ export type InlineEditCtxPayload = {
   selectionText: string;
   contextBefore: string;
   contextAfter: string;
+  /** Cross-file snippets from the codebase semantic index. */
+  extraContext?: string;
 };
 
 export const ipc = {

@@ -28,6 +28,8 @@ pub struct InlineEditCtx {
     pub context_before: String,
     #[serde(rename = "contextAfter")]
     pub context_after: String,
+    #[serde(rename = "extraContext", default)]
+    pub extra_context: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -60,9 +62,15 @@ fn build_user_message(ctx: &InlineEditCtx, instruction: &str, ask: bool) -> Stri
     } else {
         ("SELECTION (replace this)", "INSTRUCTION")
     };
+    let related = ctx
+        .extra_context
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| format!("\n\n--- RELATED CODE (codebase search, read-only) ---\n{}", s))
+        .unwrap_or_default();
     format!(
-        "File: {}\nLanguage: {}\n\n--- CONTEXT BEFORE ---\n{}\n\n--- {} ---\n{}\n\n--- CONTEXT AFTER ---\n{}\n\n--- {} ---\n{}",
-        path, ctx.language, ctx.context_before, sel_label, ctx.selection_text, ctx.context_after, ins_label, instruction
+        "File: {}\nLanguage: {}\n\n--- CONTEXT BEFORE ---\n{}\n\n--- {} ---\n{}\n\n--- CONTEXT AFTER ---\n{}{}\n\n--- {} ---\n{}",
+        path, ctx.language, ctx.context_before, sel_label, ctx.selection_text, ctx.context_after, related, ins_label, instruction
     )
 }
 

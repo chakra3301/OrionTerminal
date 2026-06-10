@@ -4,6 +4,8 @@ import type { RefObject } from "react";
 import type { OnMount } from "@monaco-editor/react";
 import { Check, Loader2, Sparkles, StopCircle, X } from "lucide-react";
 import { useInlineEditStore } from "@/store/inlineEditStore";
+import { useProjectStore } from "@/store/projectStore";
+import { autoCodebaseContext } from "@/features/context/contextProviders";
 import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
 import { ulid } from "ulid";
@@ -156,6 +158,26 @@ export function InlineEditSession({ editorRef, monacoRef, path, mountTick }: Pro
     return true;
   };
 
+  /** Up to 2 cross-file snippets from the semantic index — the current
+   * file is excluded (its context already surrounds the selection). */
+  const gatherRelatedCode = async (instruction: string, selText: string) => {
+    try {
+      const project = useProjectStore.getState().active;
+      if (!project || !ctx?.path.startsWith(project.root_path)) return undefined;
+      const hits = await autoCodebaseContext(
+        `${instruction}\n${selText.slice(0, 400)}`,
+        project.id,
+        project.root_path,
+        3,
+      );
+      const crossFile = hits.filter((h) => h.detail !== ctx.path).slice(0, 2);
+      if (crossFile.length === 0) return undefined;
+      return crossFile.map((r) => `// ${r.label}\n${r.content}`).join("\n\n");
+    } catch {
+      return undefined; // index not ready — edit proceeds without
+    }
+  };
+
   const submit = (ask: boolean) => {
     const p = prompt.trim();
     if (!ctx || streaming || !p) return;
@@ -165,8 +187,11 @@ export function InlineEditSession({ editorRef, monacoRef, path, mountTick }: Pro
     const selText = (startedRef.current ? regionText() : null) ?? ctx.selectionText;
     useInlineEditStore.getState().startStream(id, ask ? "ask" : "edit");
     setPrompt("");
-    void ipc
-      .inlineEditRun(
+    void (async () => {
+      const extraContext = ask ? undefined : await gatherRelatedCode(p, selText);
+      // Stale-guard: the user may have cancelled while we searched.
+      if (useInlineEditStore.getState().streamId !== id) return;
+      await ipc.inlineEditRun(
         id,
         p,
         {
@@ -175,13 +200,14 @@ export function InlineEditSession({ editorRef, monacoRef, path, mountTick }: Pro
           selectionText: selText,
           contextBefore: ctx.contextBefore,
           contextAfter: ctx.contextAfter,
+          extraContext,
         },
         ask ? "ask" : "edit",
-      )
-      .catch((e) => {
-        log.error("inline edit failed", e);
-        useInlineEditStore.getState().setError(String(e));
-      });
+      );
+    })().catch((e) => {
+      log.error("inline edit failed", e);
+      useInlineEditStore.getState().setError(String(e));
+    });
   };
 
   const accept = () => {
