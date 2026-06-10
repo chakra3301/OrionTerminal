@@ -173,7 +173,7 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 **Phase 0 — DONE ✅**
 
 **Phase 1 — Orion ≥ Cursor** 🔨 — ranked plan APPROVED 2026-06-10 (research: [docs/research/cursor-2026.md](docs/research/cursor-2026.md)). Strategy: editor-first (Hermes owns swarms), beat Cursor on trust (context pills, never-silent writes) + integration (@archives-notes).
-- 🔨 1.1 AI editing core (~3 sessions): ✅ P2b per-hunk accept/reject + inline decorations + hunk bar (2026-06-10) · ⬜ P2c streaming ⌘K + follow-ups + ⌥Return quick-question · ⬜ P2d @-context picker (file/folder/problems/terminal/git-diff/archives-note) + context pills · ⬜ P2e codebase index on the embeddings worker (function/class chunks, gitignore-aware, incremental)
+- 🔨 1.1 AI editing core (~3 sessions): ✅ P2b per-hunk accept/reject + inline decorations + hunk bar (2026-06-10) · ✅ P2c in-editor streaming ⌘K + follow-ups + ⌥↵ ask mode (2026-06-10) · ⬜ P2d @-context picker (file/folder/problems/terminal/git-diff/archives-note) + context pills · ⬜ P2e codebase index on the embeddings worker (function/class chunks, gitignore-aware, incremental)
 - ⬜ 1.2 Tab autocomplete (~2): Haiku 4.5 ghost text <300ms p50, accept full/word, recent-edit+diagnostics context; stretch: edit-diffs, next-edit jump
 - ⬜ 1.3 Navigation/feel (~1): ⌘P frecency file picker · ⌘⇧O symbols · breadcrumbs · split-editor command · cross-file go-to-def; stretch: terminal ⌘K
 - ⬜ 1.4 Git (~2): gutter markers · tree status colors · stage/commit/push UI · AI commit messages (claude_oneshot) · branch switcher · blame — via git binary, no new crate
@@ -210,6 +210,16 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-10 — AAA Rebuild (cont.): P2c — ⌘K rebuilt as in-editor streaming inline edit
+- **The modal is dead.** ⌘K was a centered modal (old Tailwind tokens) that waited for the FULL CLI reply before showing a whole-file DiffEditor — despite docs claiming streaming. Now it's Cursor-grade and lives in the editor (`InlineEditSession.tsx`, rendered by Editor.tsx; old `InlineEditOverlay.tsx` deleted, App.tsx mount removed):
+  - **Floating prompt widget** (Monaco content widget, `allowEditorOverflow`) anchored at the selection; follows the region.
+  - **True token streaming**: `inline_edit.rs` adds `--include-partial-messages` + parses `stream_event` `content_block_delta`s → `inline:delta` per chunk; deltas stream INTO the buffer region live via rAF-coalesced `model.pushEditOperations` (bypasses readOnly), region tinted cyan (`.or-ke-region`), tracked by decoration. New **`inline:final`** event carries the fence-stripped authoritative text that replaces the raw accumulation before review (deltas may contain fences the model shouldn't emit).
+  - **Original preserved visibly**: the selected lines sit in a magenta **view zone** above the region (clamped 10 lines + "… N more") until resolved.
+  - **Review**: Accept ⌘↵ keeps; Reject/Esc restores baseline; closing the tab mid-session auto-rejects (unmount cleanup) so the buffer never strands half-streamed. Editor is readOnly for the targeted file during a session so user keystrokes can't race the stream.
+  - **Follow-ups**: after a result, type again — refines the CURRENT region content (baseline stays the first original for reject). **⌥↵ ask mode**: new `mode` param + ASK system prompt in Rust; answer streams into a widget bubble; **"Do it"** converts question+answer into an applied edit run.
+  - Store: `mode`/`done`/`setFinal` added; EventBridge listens `inline:final`. `ipc.inlineEditRun` gains `mode`.
+- ⚠️ Needs a **`tauri dev` restart** (Rust: inline_edit signature + new CLI flag + events). tsc / **121 tests** / cargo (9) / vite build green. Commit `0e6f2f5`.
 
 ### 2026-06-10 — AAA Rebuild (cont.): Phase 0 ✅ · Phase 1 plan approved · P2b per-hunk review shipped
 - **Phase 0 closed:** finished 0.3 with the **theme-aware accent sweep** — Minimal/Modern themes override `--neon-*` but 284 hardcoded `rgba(57,255,136,…)`-style literals stayed neon; new `--neon-*-rgb` twin tokens in :root + both theme blocks (generalizing the existing `--xd-accent-rgb` pattern; XDesign's scoped magenta override keeps its rgb twin via `--neon-magenta-rgb: var(--xd-accent-rgb)`). Identical pixels in the default theme. Stray hexes audited: theme-picker swatches + EventBridge default shape fill are correctly literal; monacoTheme/ptyTerminal can't read CSS vars (theme-following Monaco/xterm = later polish). Typography/spacing normalization EXPLICITLY re-scoped to per-app polish + Phase 4.6 (blind 9900-line CSS edits = regression roulette). User smoke test passed (one finding: BlockNote handles, fixed `9a5e5df`).
