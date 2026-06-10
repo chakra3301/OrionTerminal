@@ -6072,7 +6072,7 @@ summary:focus-visible,
   font-weight: 800;
   letter-spacing: -0.5px;
   line-height: 1.15;
-  padding: 4px 44px 14px;
+  padding: 4px 70px 14px; /* tracks body text (+26px with the bn gutter) */
   color: rgba(255, 255, 255, 0.95);
   max-width: 1180px;
   margin: 0 auto;
@@ -6083,7 +6083,7 @@ summary:focus-visible,
 .journal-meta {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 36px 44px 6px;
+  padding: 36px 70px 6px; /* tracks body text (+26px with the bn gutter) */
   font-family: inherit;
 }
 .journal-meta-date {
@@ -6171,7 +6171,7 @@ summary:focus-visible,
   width: 100%;
   max-width: 1180px;
   margin: 20px auto 40px;
-  padding: 32px 40px;
+  padding: 32px 12px; /* inline: 12 + the 54px .bn-editor gutter */
   border-radius: 20px;
   background: rgba(10, 10, 15, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -6195,7 +6195,10 @@ summary:focus-visible,
   max-width: 100% !important;
 }
 .note-page .bn-editor {
-  padding-inline: 0 !important; /* we already pad on `.note-editor-body` */
+  /* BlockNote draws the block handles (+ / drag dots) in this gutter —
+   * zeroing it pushed them outside the glass card. 54px is the library's
+   * own default; the card's inline padding shrinks to compensate. */
+  padding-inline: 54px !important;
 }
 .note-page .ProseMirror {
   width: 100%;
