@@ -84,8 +84,22 @@
 }
 
 /* ============================================================
-   Scoped scrollbar
+   Scrollbars — global baseline (Phase 0.3 tightening). Every
+   scrollable surface gets the same slim thumb instead of the
+   WebKit default; scoped overrides (Hermes, panel tabs) still
+   win on specificity. `.scroll` kept for existing call sites.
    ============================================================ */
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.16);
+}
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
 
 .scroll { overflow: auto; }
 .scroll::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -97,6 +111,30 @@
   background: rgba(255,255,255,0.16);
 }
 .scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* ============================================================
+   Keyboard focus — global baseline. Only 3 controls in the app
+   had a visible focus ring before this; keyboard-first (the AAA
+   bar) needs every control to show where focus is. :focus-visible
+   fires for keyboard nav only on buttons/links, so mouse users
+   never see it. Text entry (inputs, textareas, contenteditable)
+   is excluded — those keep their own :focus border treatments.
+   ============================================================ */
+
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[role="switch"]:focus-visible,
+[role="menuitem"]:focus-visible,
+[type="checkbox"]:focus-visible,
+[type="radio"]:focus-visible,
+[type="range"]:focus-visible {
+  outline: 1px solid var(--neon-cyan);
+  outline-offset: 2px;
+}
 
 /* ============================================================
    Wallpaper
