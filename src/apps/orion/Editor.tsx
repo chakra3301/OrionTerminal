@@ -11,6 +11,7 @@ import { usePendingEdits } from "@/store/pendingEditsStore";
 import { computeHunks } from "@/features/aiEdits/lineDiff";
 import { InlineEditSession } from "@/features/inlineEdit/InlineEditSession";
 import { recordEdit } from "@/features/autocomplete/recentEdits";
+import { Breadcrumbs } from "@/apps/orion/Breadcrumbs";
 import { languageForPath } from "@/apps/orion/lang";
 import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
 import "@/apps/orion/monacoTheme";
@@ -36,6 +37,56 @@ export function OrionEditor({ path }: { path: string }) {
   const pendingDecosRef = useRef<DecorationsCollection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mountTick, setMountTick] = useState(0);
+  const [enclosingSymbol, setEnclosingSymbol] = useState<string | null>(null);
+  const symbolTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Enclosing-symbol lookup for the breadcrumb (TS/JS only — the worker's
+  // navigation tree). Debounced off cursor moves; silent on any failure.
+  const scheduleSymbolUpdate = () => {
+    if (symbolTimer.current) clearTimeout(symbolTimer.current);
+    symbolTimer.current = setTimeout(() => {
+      symbolTimer.current = null;
+      void (async () => {
+        const monaco = monacoRef.current;
+        const ed = editorRef.current;
+        const model = ed?.getModel();
+        const pos = ed?.getPosition();
+        if (!monaco || !model || !pos) return;
+        const lang = model.getLanguageId();
+        if (lang !== "typescript" && lang !== "javascript") {
+          setEnclosingSymbol(null);
+          return;
+        }
+        try {
+          type NavNode = {
+            text: string;
+            spans: Array<{ start: number; length: number }>;
+            childItems?: NavNode[];
+          };
+          const getWorker = await monaco.languages.typescript.getTypeScriptWorker();
+          const client = await getWorker(model.uri);
+          const tree = (await client.getNavigationTree(
+            model.uri.toString(),
+          )) as NavNode | null;
+          if (!tree) return;
+          const offset = model.getOffsetAt(pos);
+          const chain: string[] = [];
+          let node: NavNode | undefined = tree;
+          while (node) {
+            const next: NavNode | undefined = node.childItems?.find((c) =>
+              c.spans.some((s) => offset >= s.start && offset <= s.start + s.length),
+            );
+            if (!next) break;
+            chain.push(next.text);
+            node = next;
+          }
+          setEnclosingSymbol(chain.length ? chain.slice(-2).join(" › ") : null);
+        } catch {
+          setEnclosingSymbol(null);
+        }
+      })();
+    }, 300);
+  };
 
   // Inline trust markers: while this file has an unreviewed agent edit,
   // tint the changed lines green (gutter bar + soft background; magenta
@@ -151,10 +202,14 @@ export function OrionEditor({ path }: { path: string }) {
     monacoRef.current = monaco;
     monaco.editor.setTheme("orion-neon");
 
-    editor.onDidChangeCursorPosition(reportStatus);
+    editor.onDidChangeCursorPosition(() => {
+      reportStatus();
+      scheduleSymbolUpdate();
+    });
     reportStatus();
     tryReveal();
     applyPendingDecorations();
+    scheduleSymbolUpdate();
     setMountTick((t) => t + 1);
 
     // ⌘→ takes the next WORD of a visible ghost suggestion (Cursor parity);
@@ -334,10 +389,18 @@ export function OrionEditor({ path }: { path: string }) {
 
   return (
     <div
-      style={{ flex: 1, minHeight: 0, position: "relative", width: "100%" }}
+      style={{
+        flex: 1,
+        minHeight: 0,
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+      }}
       onDragOver={onAssetDragOver}
       onDrop={onAssetDrop}
     >
+      <Breadcrumbs path={path} symbol={enclosingSymbol} />
+      <div style={{ flex: 1, minHeight: 0, position: "relative", width: "100%" }}>
       <Monaco
         height="100%"
         language={languageForPath(path)}
@@ -386,6 +449,7 @@ export function OrionEditor({ path }: { path: string }) {
         path={path}
         mountTick={mountTick}
       />
+      </div>
     </div>
   );
 }
