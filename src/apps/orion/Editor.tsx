@@ -156,6 +156,14 @@ export function OrionEditor({ path }: { path: string }) {
     applyPendingDecorations();
     setMountTick((t) => t + 1);
 
+    // ⌘→ takes the next WORD of a visible ghost suggestion (Cursor parity);
+    // the precondition keeps plain ⌘→ = end-of-line when no ghost is shown.
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.RightArrow,
+      () => editor.trigger("kb", "editor.action.inlineSuggest.acceptNextWord", null),
+      "inlineSuggestionVisible",
+    );
+
     editor.onDidFocusEditorWidget(() => {
       reportStatus();
       setEditorActionRunner((actionId) => {

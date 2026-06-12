@@ -39,7 +39,8 @@ export type AppStateKey =
   | "mcp.servers"
   | "models"
   | "widget.monitor"
-  | "reduce_glass";
+  | "reduce_glass"
+  | "tab_autocomplete";
 
 export async function getAppState<T = unknown>(
   key: AppStateKey,

@@ -1,5 +1,6 @@
 import { loader } from "@monaco-editor/react";
 import { useDiagnosticsStore } from "@/store/diagnosticsStore";
+import { registerTabAutocomplete } from "@/features/autocomplete/tabAutocomplete";
 
 loader.config({
   paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs" },
@@ -12,6 +13,7 @@ export function ensureOrionTheme(): Promise<void> {
   registerPromise = loader.init().then((monaco) => {
     configureTypescript(monaco);
     trackMarkers(monaco);
+    registerTabAutocomplete(monaco);
     monaco.editor.defineTheme("orion-neon", {
       base: "vs-dark",
       inherit: true,

@@ -21,6 +21,8 @@ import { useNotesStore } from "@/store/notesStore";
 import { useMoodBoardsStore } from "@/store/moodBoardsStore";
 import { useArchives } from "@/apps/archives/useArchives";
 import { useStatusStore } from "@/store/statusStore";
+import { useAutocomplete } from "@/store/autocompleteStore";
+import { toast } from "@/store/toastStore";
 import { useLinkPaletteStore } from "@/features/notes/LinkInsertPalette";
 import { getActiveNoteEditor } from "@/features/notes/editorBridge";
 import { useShell } from "@/shell/store/useShell";
@@ -371,6 +373,20 @@ export function installBuiltinCommands() {
     group: "View",
     keywords: ["help", "shortcuts", "keys", "cheatsheet"],
     run: () => useKeybindingsStore.getState().toggle(),
+  });
+
+  registry.register({
+    id: "editor.toggleTabAutocomplete",
+    label: "Toggle Tab Autocomplete",
+    keywords: ["autocomplete", "ghost", "suggestion", "completion", "ai", "tab"],
+    group: "View",
+    run: () => {
+      useAutocomplete.getState().toggle();
+      const on = useAutocomplete.getState().enabled;
+      toast.info(`Tab autocomplete ${on ? "on" : "off"}`, {
+        dedupeKey: "tab-autocomplete-toggle",
+      });
+    },
   });
 
   registry.register({

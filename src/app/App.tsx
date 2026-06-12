@@ -41,6 +41,7 @@ import { runEmbeddingBackfill } from "@/lib/embeddingIndexer";
 import { startContextSnapshotter } from "@/lib/contextSnapshot";
 import { log } from "@/lib/log";
 import { toast } from "@/store/toastStore";
+import { useAutocomplete } from "@/store/autocompleteStore";
 import { Shell } from "@/shell/Shell";
 import { useShell, type WindowState } from "@/shell/store/useShell";
 import { ensureOrionTheme } from "@/apps/orion/monacoTheme";
@@ -99,6 +100,7 @@ async function hydrate() {
     xdesignDoc,
     modelPrefs,
     reduceGlass,
+    tabAutocomplete,
   ] = await Promise.all([
     getAppState<{ sidebar: number; main: number; right: number }>("panel_sizes"),
     getAppState<boolean>("sidebar_open"),
@@ -124,10 +126,12 @@ async function hydrate() {
     >("xdesign.doc"),
     getAppState<Record<string, string>>("models"),
     getAppState<boolean>("reduce_glass"),
+    getAppState<boolean>("tab_autocomplete"),
   ]);
 
   useThemeStore.getState().hydrate(theme ?? null);
   useThemeStore.getState().hydrateGlass(reduceGlass);
+  useAutocomplete.getState().hydrate(tabAutocomplete);
   if (wallpaper) useWallpaperStore.getState().hydrate(wallpaper);
   if (preview) usePreviewStore.getState().hydrate(preview);
   if (xdesignDoc) useXDesign.getState().hydrate(xdesignDoc);

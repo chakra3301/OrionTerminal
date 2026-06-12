@@ -65,6 +65,14 @@ export const ipc = {
   gitWorkingDiff: (root: string): Promise<string> =>
     invoke<string>("git_working_diff", { root }),
 
+  autocompleteRun: (ctx: {
+    path: string;
+    language: string;
+    prefix: string;
+    suffix: string;
+    diagnostics?: string;
+  }): Promise<string> => invoke<string>("autocomplete_run", { ctx }),
+
   apiKeySet: (key: string): Promise<void> => invoke("api_key_set", { key }),
   apiKeyClear: (): Promise<void> => invoke("api_key_clear"),
   apiKeyStatus: (): Promise<boolean> => invoke<boolean>("api_key_status"),
