@@ -244,3 +244,36 @@ describe("hydrate role inference for legacy layouts", () => {
     expect(collectPanels(root).find((p) => p.id === "p-cl")!.role).toBe("claude");
   });
 });
+
+describe("splitFocusedPanel (⌘\\ split editor right)", () => {
+  beforeEach(() => {
+    useWorkspace.getState().resetLayout(defaultOrionLayout);
+  });
+
+  it("duplicates the active file tab into a new right-hand panel", () => {
+    const ws = useWorkspace.getState();
+    ws.openTab({ kind: "file", path: "/p/a.ts" }, { label: "a.ts", preferRole: "editor" });
+    const before = collectPanels(useWorkspace.getState().root).length;
+
+    useWorkspace.getState().splitFocusedPanel();
+
+    const after = collectPanels(useWorkspace.getState().root);
+    expect(after.length).toBe(before + 1);
+    const focused = useWorkspace.getState().focusedPanelId;
+    const newPanel = after.find((p) => p.id === focused)!;
+    expect(newPanel.tabs).toHaveLength(1);
+    expect(newPanel.tabs[0]?.descriptor).toEqual({ kind: "file", path: "/p/a.ts" });
+    // Duplicate tab, not a moved one — the original stays put.
+    const filePanels = after.filter((p) =>
+      p.tabs.some((t) => t.descriptor.kind === "file" && t.descriptor.path === "/p/a.ts"),
+    );
+    expect(filePanels.length).toBe(2);
+  });
+
+  it("does nothing when the active tab is not a file", () => {
+    useWorkspace.getState().openTab({ kind: "terminal" });
+    const before = collectPanels(useWorkspace.getState().root).length;
+    useWorkspace.getState().splitFocusedPanel();
+    expect(collectPanels(useWorkspace.getState().root).length).toBe(before);
+  });
+});

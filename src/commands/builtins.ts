@@ -112,7 +112,8 @@ export function installBuiltinCommands() {
   registry.register({
     id: "project.switch",
     label: "Switch Project…",
-    hotkey: "mod+shift+o",
+    // ⌘⇧O went to Go to Symbol (Cursor/VS Code muscle memory) 2026-06-13.
+    hotkey: "mod+t",
     keywords: ["project", "switch", "recent", "workspace"],
     group: "File",
     run: () => {
@@ -285,6 +286,28 @@ export function installBuiltinCommands() {
         .getState()
         .runEditorAction?.("editor.action.formatDocument");
     },
+  });
+
+  registry.register({
+    id: "editor.gotoSymbol",
+    label: "Go to Symbol in Editor…",
+    hotkey: "mod+shift+o",
+    keywords: ["symbol", "outline", "function", "jump", "navigate"],
+    group: "View",
+    when: () => !!focusedFilePath(),
+    run: () => {
+      useFocusStore.getState().runEditorAction?.("editor.action.quickOutline");
+    },
+  });
+
+  registry.register({
+    id: "view.splitEditor",
+    label: "Split Editor Right",
+    hotkey: "mod+\\",
+    keywords: ["split", "side", "pane", "column", "editor"],
+    group: "View",
+    when: () => !!focusedFilePath(),
+    run: () => useWorkspace.getState().splitFocusedPanel(),
   });
 
   registry.register({

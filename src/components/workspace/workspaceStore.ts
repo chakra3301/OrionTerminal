@@ -44,6 +44,10 @@ type WorkspaceState = {
   // panel moves
   moveTabToPanel: (tabId: string, targetPanelId: string) => void;
   dropTabOnPanel: (tabId: string, targetPanelId: string, zone: DropZone) => void;
+  /** Duplicate the focused panel's active FILE tab into a new right-hand
+   * split (⌘\). File tabs only — duplicating a terminal would double-attach
+   * its pty. */
+  splitFocusedPanel: () => void;
 
   // layout
   setSplitSizes: (splitId: string, sizes: number[]) => void;
@@ -642,6 +646,23 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   focusPanel: (panelId) => {
     set({ focusedPanelId: panelId });
     void setAppState(PERSIST_FOCUSED, panelId);
+  },
+
+  splitFocusedPanel: () => {
+    const { root, focusedPanelId } = get();
+    if (!focusedPanelId) return;
+    const panel = findPanelIn(root, focusedPanelId);
+    const active = panel?.tabs.find((t) => t.id === panel.activeTabId);
+    if (!active || active.descriptor.kind !== "file") return;
+    const dup = newTab(active.descriptor, active.label);
+    const { tree, newPanelId } = splitPanelWithTab(
+      root,
+      focusedPanelId,
+      dup,
+      "right",
+    );
+    set({ root: tree, focusedPanelId: newPanelId });
+    persistLayout(tree, newPanelId);
   },
 
   moveTabToPanel: (tabId, targetPanelId) => {
