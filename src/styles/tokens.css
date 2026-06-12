@@ -10440,3 +10440,21 @@ html.ot-reduce-glass .note-page .note-editor-body {
   border-top: 4px solid transparent;
   border-bottom: 4px solid transparent;
 }
+
+/* Git status in the file tree */
+.or-tree-item.git-modified > .or-tree-label { color: var(--neon-cyan); }
+.or-tree-item.git-added > .or-tree-label { color: var(--neon-green); }
+.or-tree-item.git-deleted > .or-tree-label {
+  color: var(--neon-magenta);
+  text-decoration: line-through;
+}
+.or-tree-git {
+  margin-left: auto;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  color: var(--t-tertiary);
+  padding-right: 2px;
+}
+.or-tree-item.git-modified .or-tree-git { color: rgba(var(--neon-cyan-rgb), 0.8); }
+.or-tree-item.git-added .or-tree-git { color: rgba(var(--neon-green-rgb), 0.8); }
+.or-tree-item.git-deleted .or-tree-git { color: rgba(var(--neon-magenta-rgb), 0.8); }

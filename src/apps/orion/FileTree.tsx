@@ -16,6 +16,7 @@ import {
 import { listen } from "@tauri-apps/api/event";
 import { confirmAction } from "@/components/ConfirmModal";
 import { toast } from "@/store/toastStore";
+import { useGit, gitRelPath } from "@/store/gitStore";
 import { ipc, type TreeNode } from "@/lib/ipc";
 import { useProjectStore } from "@/store/projectStore";
 import { useTabsStore, isPathDirty } from "@/store/tabsStore";
@@ -46,6 +47,23 @@ function TreeRow({
   // Active = some panel has this file as its active tab.
   const isActive = !node.is_dir && tabIsActiveAnywhere(root, node.path);
   const dirty = !node.is_dir && isPathDirty(node.path, fileBuffers);
+  const gitState = useGit((s) => {
+    if (node.is_dir) return null;
+    const rel = gitRelPath(node.path);
+    return rel ? (s.files.get(rel) ?? null) : null;
+  });
+  // Worktree status wins visually; staged-only changes still tint.
+  const gitLetter = gitState
+    ? gitState.worktree.trim() || gitState.index.trim()
+    : "";
+  const gitClass =
+    gitLetter === "?" || gitLetter === "A"
+      ? "git-added"
+      : gitLetter === "D"
+        ? "git-deleted"
+        : gitLetter
+          ? "git-modified"
+          : "";
 
   const onClick = () => {
     if (node.is_dir) {
@@ -63,6 +81,7 @@ function TreeRow({
     open ? "open" : "",
     isActive ? "active" : "",
     dirty ? "dirty" : "",
+    gitClass,
   ]
     .filter(Boolean)
     .join(" ");
@@ -94,7 +113,10 @@ function TreeRow({
         ) : (
           <FileIcon size={12} color="var(--t-secondary)" />
         )}
-        <span>{node.name}</span>
+        <span className="or-tree-label">{node.name}</span>
+        {gitLetter && !dirty && (
+          <span className="or-tree-git">{gitLetter === "?" ? "U" : gitLetter}</span>
+        )}
         {dirty && (
           <span
             style={{
