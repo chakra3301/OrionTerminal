@@ -1,5 +1,6 @@
 mod api_key;
 mod asset;
+mod autocomplete;
 mod claude_cli;
 mod db_backup;
 mod fs_ops;
@@ -172,6 +173,7 @@ pub fn run() {
             api_key::api_key_set,
             api_key::api_key_clear,
             api_key::api_key_status,
+            autocomplete::autocomplete_run,
             inline_edit::inline_edit_run,
             inline_edit::inline_edit_cancel,
             messages_chat::messages_chat_run,
