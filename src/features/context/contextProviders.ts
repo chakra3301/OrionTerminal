@@ -86,6 +86,14 @@ function relPath(root: string, abs: string): string {
   return abs.startsWith(root) ? abs.slice(root.length).replace(/^\//, "") : abs;
 }
 
+/** Flat project file list off the shared 30s tree cache (⌘P quick-open). */
+export async function listProjectFiles(
+  root: string,
+): Promise<Array<{ path: string; rel: string }>> {
+  const { files } = await projectEntries(root);
+  return files.map((n) => ({ path: n.path, rel: relPath(root, n.path) }));
+}
+
 function chip(kind: ContextItemKind, label: string, detail?: string): ContextChip {
   return { id: ulid(), kind, label, detail };
 }

@@ -125,8 +125,8 @@ export function installBuiltinCommands() {
 
   registry.register({
     id: "file.openFile",
-    label: "Open File…",
-    keywords: ["file", "fuzzy"],
+    label: "Go to File…",
+    keywords: ["file", "fuzzy", "quick", "open", "jump"],
     hotkey: "mod+p",
     group: "File",
     when: () => {
@@ -134,7 +134,12 @@ export function installBuiltinCommands() {
       const t = focusedTab();
       return t?.descriptor.kind !== "note";
     },
-    run: () => useShell.getState().openSpotlight(),
+    run: () => {
+      // Editor-scoped frecency quick-open (Spotlight stays on ⌘K).
+      void import("@/apps/orion/QuickOpen").then((m) =>
+        m.useQuickOpen.getState().show(),
+      );
+    },
   });
 
   registry.register({

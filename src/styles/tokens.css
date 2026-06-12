@@ -10285,3 +10285,92 @@ html.ot-reduce-glass .note-page .note-editor-body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   ⌘P quick-open (Orion, editor-scoped)
+   ───────────────────────────────────────────────────────────── */
+.or-qo-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 48px;
+}
+.or-qo-card {
+  width: 520px;
+  max-width: calc(100% - 48px);
+  background: var(--bg-1);
+  border: 1px solid rgba(var(--neon-cyan-rgb), 0.25);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-window);
+  overflow: hidden;
+}
+.or-qo-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-0);
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  outline: none;
+  padding: 10px 14px;
+  color: var(--t-primary);
+  font-family: var(--f-ui);
+  font-size: 13px;
+}
+.or-qo-list {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.or-qo-empty {
+  padding: 12px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  color: var(--t-tertiary);
+}
+.or-qo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  border-radius: var(--r-sm);
+  color: var(--t-secondary);
+  font-family: var(--f-ui);
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+}
+.or-qo-row.hi {
+  background: rgba(var(--neon-cyan-rgb), 0.1);
+  color: var(--t-primary);
+}
+.or-qo-row svg { flex: none; color: var(--neon-cyan); }
+.or-qo-base { flex: none; }
+.or-qo-dir {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  font-size: 11px;
+  color: var(--t-faint);
+}
+.or-qo-open {
+  flex: none;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--neon-green);
+  border: 1px solid rgba(var(--neon-green-rgb), 0.35);
+  border-radius: var(--r-pill);
+  padding: 0 5px;
+}

@@ -27,6 +27,7 @@ import { OrionChangesPanel } from "@/apps/orion/ChangesPanel";
 import { OrionDiffReview } from "@/apps/orion/DiffReview";
 import { OrionStatusBar } from "@/apps/orion/StatusBar";
 import { OrionClaudeRail } from "@/apps/orion/OrionClaudeRail";
+import { QuickOpen } from "@/apps/orion/QuickOpen";
 import { NoteEditor } from "@/features/notes/NoteEditor";
 import { useNotesStore } from "@/store/notesStore";
 
@@ -232,6 +233,7 @@ export function OrionApp() {
     <div className="or-app">
       <Workspace registry={orionRegistry} />
       <OrionStatusBar />
+      <QuickOpen />
     </div>
   );
 }
