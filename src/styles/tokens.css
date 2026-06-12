@@ -10458,3 +10458,68 @@ html.ot-reduce-glass .note-page .note-editor-body {
 .or-tree-item.git-modified .or-tree-git { color: rgba(var(--neon-cyan-rgb), 0.8); }
 .or-tree-item.git-added .or-tree-git { color: rgba(var(--neon-green-rgb), 0.8); }
 .or-tree-item.git-deleted .or-tree-git { color: rgba(var(--neon-magenta-rgb), 0.8); }
+
+/* Source-control section of the Changes panel */
+.or-git-commitbox {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.or-git-commitbox textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-0);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--r-sm);
+  padding: 7px 9px;
+  color: var(--t-primary);
+  font-family: var(--f-ui);
+  font-size: 12px;
+  resize: none;
+  outline: none;
+}
+.or-git-commitbox textarea:focus { border-color: rgba(var(--neon-cyan-rgb), 0.5); }
+.or-git-commitrow {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  justify-content: flex-end;
+}
+.or-git-commitrow .or-diff-btn[disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+.or-git-subhead {
+  padding: 6px 12px 2px;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t-faint);
+}
+.or-git-clean {
+  padding: 8px 12px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  color: var(--t-tertiary);
+}
+.or-git-letter {
+  flex: none;
+  width: 14px;
+  text-align: center;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+.or-git-letter.k-M { color: var(--neon-cyan); }
+.or-git-letter.k-U, .or-git-letter.k-A { color: var(--neon-green); }
+.or-git-letter.k-D { color: var(--neon-magenta); }
+.or-git-letter.k-R { color: var(--neon-yellow); }
+.or-changes-dir {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: var(--t-faint);
+}
