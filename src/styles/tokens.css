@@ -2125,6 +2125,9 @@ summary:focus-visible,
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  /* Seal the IDE surface — translucent children (status bar, panel gaps)
+   * were leaking the animated wallpaper through the window glass. */
+  background: var(--bg-0);
 }
 
 .or-editor-area {
@@ -2601,8 +2604,9 @@ summary:focus-visible,
 
 .or-statusbar {
   height: 24px;
-  background: rgba(0,0,0,0.4);
-  border-top: 1px solid rgba(255,255,255,0.05);
+  /* Opaque — at 0.4 alpha the wallpaper's glyph rain ghosted through. */
+  background: var(--bg-1);
+  border-top: 1px solid rgba(255,255,255,0.07);
   padding: 0 12px;
   display: flex;
   align-items: center;
@@ -6524,7 +6528,7 @@ summary:focus-visible,
 }
 
 .ot-resize-handle {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.07);
   transition: background 0.15s ease;
 }
 .ot-resize-handle:hover,
@@ -6558,9 +6562,11 @@ summary:focus-visible,
 .ot-panel-tabs {
   display: flex;
   align-items: stretch;
-  height: 32px;
-  background: rgba(0, 0, 0, 0.25);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  height: 34px;
+  /* A real chrome rail: solid, recessed a step below the panel body, with
+   * a hairline the active tab visually breaks through (connected-tab). */
+  background: var(--bg-0);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   overflow-x: auto;
   scrollbar-width: none;
   flex-shrink: 0;
@@ -6571,13 +6577,15 @@ summary:focus-visible,
 }
 
 .ot-panel-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px 0 12px;
+  gap: 7px;
+  padding: 0 9px 0 12px;
   font-family: var(--f-mono);
   font-size: 11px;
-  color: var(--t-secondary);
+  letter-spacing: 0.01em;
+  color: var(--t-tertiary);
   border-right: 1px solid rgba(255, 255, 255, 0.04);
   cursor: pointer;
   height: 100%;
@@ -6588,12 +6596,19 @@ summary:focus-visible,
   border-bottom: 0;
   border-left: 0;
 }
-.ot-panel-tab:hover { color: var(--t-primary); background: rgba(255, 255, 255, 0.02); }
+.ot-panel-tab > svg { flex: none; color: var(--t-faint); }
+.ot-panel-tab:hover {
+  color: var(--t-secondary);
+  background: rgba(255, 255, 255, 0.03);
+}
 .ot-panel-tab.active {
   background: var(--bg-1);
   color: var(--t-primary);
-  box-shadow: inset 0 2px 0 var(--neon-cyan);
+  /* Cyan identity bar on top; the second shadow paints over the rail's
+   * bottom hairline so the active tab merges into the panel body. */
+  box-shadow: inset 0 2px 0 var(--neon-cyan), 0 1px 0 var(--bg-1);
 }
+.ot-panel-tab.active > svg { color: var(--neon-cyan); }
 .ot-panel-tab.dirty .label { color: var(--neon-yellow); }
 .ot-panel-tab .label { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
 .ot-panel-tab .dot { color: var(--neon-yellow); font-size: 12px; line-height: 1; }
@@ -6601,15 +6616,19 @@ summary:focus-visible,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border: 0;
   background: transparent;
   color: var(--t-tertiary);
   cursor: pointer;
   border-radius: 3px;
   padding: 0;
-  opacity: 0.5;
+  opacity: 0;
+}
+.ot-panel-tab:hover .x,
+.ot-panel-tab.active .x {
+  opacity: 0.55;
 }
 .ot-panel-tab .x:hover {
   background: rgba(255, 255, 255, 0.08);
@@ -10386,7 +10405,7 @@ html.ot-reduce-glass .note-page .note-editor-body {
   overflow: hidden;
   white-space: nowrap;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(3, 6, 10, 0.5);
+  background: transparent; /* sits on the panel body — one fewer layer */
   font-family: var(--f-ui);
   font-size: 11px;
 }
