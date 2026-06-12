@@ -7,6 +7,20 @@ export type TreeNode = {
   children: TreeNode[] | null;
 };
 
+export type GitFileStatus = {
+  path: string;
+  index: string;
+  worktree: string;
+};
+
+export type GitStatus = {
+  branch: string;
+  ahead: number;
+  behind: number;
+  files: GitFileStatus[];
+  is_repo: boolean;
+};
+
 export type SearchMatch = {
   line: number;
   column: number;
@@ -64,6 +78,25 @@ export const ipc = {
 
   gitWorkingDiff: (root: string): Promise<string> =>
     invoke<string>("git_working_diff", { root }),
+  gitStatus: (root: string): Promise<GitStatus> =>
+    invoke<GitStatus>("git_status", { root }),
+  gitHeadContent: (root: string, path: string): Promise<string> =>
+    invoke<string>("git_head_content", { root, path }),
+  gitStage: (root: string, paths: string[]): Promise<void> =>
+    invoke("git_stage", { root, paths }),
+  gitUnstage: (root: string, paths: string[]): Promise<void> =>
+    invoke("git_unstage", { root, paths }),
+  gitDiscard: (root: string, paths: string[]): Promise<void> =>
+    invoke("git_discard", { root, paths }),
+  gitCommit: (root: string, message: string): Promise<string> =>
+    invoke<string>("git_commit", { root, message }),
+  gitPush: (root: string): Promise<string> => invoke<string>("git_push", { root }),
+  gitBranches: (root: string): Promise<{ current: string; branches: string[] }> =>
+    invoke("git_branches", { root }),
+  gitCheckout: (root: string, branch: string): Promise<string> =>
+    invoke<string>("git_checkout", { root, branch }),
+  gitFileDiff: (root: string, path: string): Promise<string> =>
+    invoke<string>("git_file_diff", { root, path }),
 
   autocompleteRun: (ctx: {
     path: string;

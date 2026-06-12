@@ -42,6 +42,7 @@ import { startContextSnapshotter } from "@/lib/contextSnapshot";
 import { log } from "@/lib/log";
 import { toast } from "@/store/toastStore";
 import { useAutocomplete } from "@/store/autocompleteStore";
+import { startGitWatch } from "@/store/gitStore";
 import { Shell } from "@/shell/Shell";
 import { useShell, type WindowState } from "@/shell/store/useShell";
 import { ensureOrionTheme } from "@/apps/orion/monacoTheme";
@@ -261,6 +262,9 @@ async function hydrate() {
   // shell/project/workspace/archives stores so any UI change refreshes
   // the file the MCP server's `orion_get_context` tool reads from.
   startContextSnapshotter();
+
+  // Live git status (branch, dirty files) for the active project.
+  startGitWatch();
 }
 
 let backfillStarted = false;

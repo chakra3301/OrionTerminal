@@ -10418,3 +10418,25 @@ html.ot-reduce-glass .note-page .note-editor-body {
   font-family: var(--f-mono);
   font-size: 10.5px;
 }
+
+/* Git gutter markers (HEAD vs buffer) */
+.or-git-add {
+  border-left: 3px solid rgba(var(--neon-green-rgb), 0.65);
+  margin-left: 4px;
+}
+.or-git-mod {
+  border-left: 3px solid rgba(var(--neon-cyan-rgb), 0.6);
+  margin-left: 4px;
+}
+.or-git-del {
+  position: relative;
+}
+.or-git-del::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  bottom: -3px;
+  border-left: 6px solid rgba(var(--neon-magenta-rgb), 0.8);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}

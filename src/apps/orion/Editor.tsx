@@ -8,6 +8,8 @@ import { useAssetsStore } from "@/store/assetsStore";
 import { useEditorStatusStore } from "@/store/editorStatusStore";
 import { useEditorNavStore } from "@/store/editorNavStore";
 import { usePendingEdits } from "@/store/pendingEditsStore";
+import { useGit, gitRelPath } from "@/store/gitStore";
+import { useProjectStore } from "@/store/projectStore";
 import { computeHunks } from "@/features/aiEdits/lineDiff";
 import { InlineEditSession } from "@/features/inlineEdit/InlineEditSession";
 import { recordEdit } from "@/features/autocomplete/recentEdits";
@@ -145,6 +147,94 @@ export function OrionEditor({ path }: { path: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
 
+  // ── Git gutter markers: HEAD vs buffer via the same Myers diff that
+  // powers AI-edit review. Suppressed while a pending AI review owns the
+  // file (those markers ARE the diff). Throttled on keystrokes.
+  const gitDecosRef = useRef<DecorationsCollection | null>(null);
+  const gitHeadRef = useRef<{ rel: string; content: string } | null>(null);
+  const gitThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const applyGitDecorations = () => {
+    const ed = editorRef.current;
+    const monaco = monacoRef.current;
+    const model = ed?.getModel();
+    if (!ed || !monaco || !model) return;
+    if (usePendingEdits.getState().edits[path]) {
+      gitDecosRef.current?.clear();
+      return;
+    }
+    const head = gitHeadRef.current;
+    if (!head) {
+      gitDecosRef.current?.clear();
+      return;
+    }
+    const hunks = computeHunks(head.content, model.getValue());
+    const decos = hunks.map((h) => {
+      if (h.newLines.length === 0) {
+        return {
+          range: new monaco.Range(Math.max(1, h.newStart), 1, Math.max(1, h.newStart), 1),
+          options: { isWholeLine: true, linesDecorationsClassName: "or-git-del" },
+        };
+      }
+      const cls = h.origLines.length === 0 ? "or-git-add" : "or-git-mod";
+      return {
+        range: new monaco.Range(h.newStart + 1, 1, h.newStart + h.newLines.length, 1),
+        options: { isWholeLine: true, linesDecorationsClassName: cls },
+      };
+    });
+    gitDecosRef.current?.clear();
+    gitDecosRef.current = ed.createDecorationsCollection(decos);
+  };
+
+  const scheduleGitDecorations = () => {
+    if (gitThrottleRef.current) return;
+    gitThrottleRef.current = setTimeout(() => {
+      gitThrottleRef.current = null;
+      applyGitDecorations();
+    }, 400);
+  };
+
+  useEffect(() => {
+    const rel = gitRelPath(path);
+    if (!rel) return;
+    let cancelled = false;
+    const fetchHead = () => {
+      const root = useProjectStore.getState().active?.root_path;
+      if (!root || !useGit.getState().isRepo) {
+        gitHeadRef.current = null;
+        applyGitDecorations();
+        return;
+      }
+      ipc
+        .gitHeadContent(root, rel)
+        .then((content) => {
+          if (cancelled) return;
+          gitHeadRef.current = { rel, content };
+          applyGitDecorations();
+        })
+        .catch(() => {
+          gitHeadRef.current = null;
+        });
+    };
+    fetchHead();
+    // Status changes (commits, checkouts, external edits) move HEAD.
+    const unsub = useGit.subscribe((s, prev) => {
+      if (s.files !== prev.files || s.branch !== prev.branch) fetchHead();
+    });
+    return () => {
+      cancelled = true;
+      unsub();
+      gitHeadRef.current = null;
+      gitDecosRef.current?.clear();
+      gitDecosRef.current = null;
+      if (gitThrottleRef.current) {
+        clearTimeout(gitThrottleRef.current);
+        gitThrottleRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path]);
+
   useEffect(() => {
     let cancelled = false;
     if (buffer?.loaded) return;
@@ -221,10 +311,12 @@ export function OrionEditor({ path }: { path: string }) {
       "inlineSuggestionVisible",
     );
 
-    // Feed the recent-edit ring (autocomplete's ripple-edit context).
+    // Feed the recent-edit ring (autocomplete's ripple-edit context) and
+    // keep git gutter markers tracking the live buffer.
     editor.onDidChangeModelContent((e) => {
       const first = e.changes[0];
       if (first) recordEdit(path, first.range.startLineNumber);
+      scheduleGitDecorations();
     });
 
     // ⌘F12 — project-wide definition jump (F12 stays Monaco's own,
