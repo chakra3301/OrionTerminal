@@ -175,7 +175,7 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 **Phase 1 — Orion ≥ Cursor** 🔨 — ranked plan APPROVED 2026-06-10 (research: [docs/research/cursor-2026.md](docs/research/cursor-2026.md)). Strategy: editor-first (Hermes owns swarms), beat Cursor on trust (context pills, never-silent writes) + integration (@archives-notes).
 - ✅ 1.1 AI editing core — COMPLETE 2026-06-10: P2b per-hunk accept/reject + inline decorations · P2c in-editor streaming ⌘K + follow-ups + ⌥↵ ask · P2d @-context picker + context pills · P2e codebase semantic index (migration 0018, decl-aware chunker, hash-incremental, worker-embedded; auto-injects into chat with pills + ⌘K related-code)
 - ✅ 1.2 Tab autocomplete — core shipped 2026-06-13: Haiku 4.5 ghost text (Messages API, single-flight, keep-alive), 180ms debounce + LRU, diagnostics + recent-edit-ring context, Tab/⌘→ accept, toggle command + persisted flag. DEFERRED (explicit): diff-style edit suggestions + next-edit jump → revisit after 1.6 (need richer signals); latency p50 unmeasured until user runs it
-- ⬜ 1.3 Navigation/feel (~1): ⌘P frecency file picker · ⌘⇧O symbols · breadcrumbs · split-editor command · cross-file go-to-def; stretch: terminal ⌘K
+- ✅ 1.3 Navigation/feel — shipped 2026-06-13: ⌘P frecency quick-open (editor-scoped; Spotlight stays ⌘K) · ⌘⇧O Go to Symbol (quickOutline; **Switch Project moved ⌘⇧O→⌘T**) · ⌘\ split editor right (file tabs only) · breadcrumbs + enclosing TS symbol · ⌘F12 project-wide go-to-def (import resolution + declaration search; real LSP in 1.6). DEFERRED: terminal ⌘K (stretch) → with 1.6
 - ⬜ 1.4 Git (~2): gutter markers · tree status colors · stage/commit/push UI · AI commit messages (claude_oneshot) · branch switcher · blame — via git binary, no new crate
 - ⬜ 1.5 Checkpoints + whole-turn review (~1-2): auto-snapshot before agent turns, restore that never destroys history, consolidated per-turn review
 - ⬜ 1.6 Real LSP (~3): ts-language-server/pyright/rust-analyzer via Rust stdio, semantic diagnostics, cross-file refs/rename/actions, graceful degradation
@@ -210,6 +210,14 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-13 — AAA Rebuild (cont.): 1.3 navigation/feel pass — all five items
+- **⌘P quick-open** (`QuickOpen.tsx`, mounted in OrionApp; `file.openFile` repurposed from its old open-Spotlight redirect — Spotlight stays ⌘K): fuzzy over the shared 30s-cached project file list + **frecency blend** (open tabs +0.3, pick-count, recency decay; in-memory — warms in a minute of use). Empty query = your working set; "open" badge on open files; ↑↓/Enter/Esc.
+- **⌘⇧O Go to Symbol** → Monaco `quickOutline` via the focusStore action runner. ⚠️ **Keybinding change: Switch Project moved ⌘⇧O → ⌘T** (Cursor/VS Code symbol muscle-memory wins; ⌘/ overlay self-documents).
+- **⌘\ Split Editor Right**: new `splitFocusedPanel` store action duplicates the active FILE tab into a right split (terminals refuse — duped pty would double-attach). 2 store tests (137 total).
+- **Breadcrumbs** (`Breadcrumbs.tsx` above every editor): project-relative segments + deepest **enclosing symbol chain** (TS/JS worker `getNavigationTree`, 300ms debounce off cursor moves, silent failure).
+- **⌘F12 project-wide go-to-def** (`projectGotoDef.ts`) until real LSP (1.6): cursor-on-import resolves `./ ../ @/` specs (extension+index probing) and opens the file; otherwise native literal search across declaration patterns (TS/JS/Rust/Py), export-first, current line excluded → openTab + editorNav reveal; miss = quiet toast. Monaco's F12 keeps same-file defs.
+- All frontend — **hot-reloads, no restart** (the 1.2 restart covers the day's Rust). tsc / **137 tests** / build green, exit-code-gated. Commits `32a3534`, `db7a8fd`, `183a43f`, `13f20cf`. DEFERRED: terminal ⌘K stretch → 1.6. **Next: 1.4 git integration.**
 
 ### 2026-06-13 — AAA Rebuild: 1.2 Tab autocomplete shipped (Haiku ghost text)
 - **The locked-decision Messages-API surface**: new `autocomplete.rs` — Haiku 4.5 (`claude-haiku-4-5-20251001`), non-streaming single shot, shared keep-alive reqwest client, 5s timeout, temp 0, 200 max tokens, **single-flight** (a newer request `Notify`-aborts the older server-side), fence-strip preserving leading indentation (3 tests). No API key → returns "" quietly (feature simply absent until a key is set in Settings).
