@@ -12,6 +12,7 @@ import { computeHunks } from "@/features/aiEdits/lineDiff";
 import { InlineEditSession } from "@/features/inlineEdit/InlineEditSession";
 import { recordEdit } from "@/features/autocomplete/recentEdits";
 import { Breadcrumbs } from "@/apps/orion/Breadcrumbs";
+import { gotoProjectDefinition } from "@/apps/orion/projectGotoDef";
 import { languageForPath } from "@/apps/orion/lang";
 import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
 import "@/apps/orion/monacoTheme";
@@ -224,6 +225,12 @@ export function OrionEditor({ path }: { path: string }) {
     editor.onDidChangeModelContent((e) => {
       const first = e.changes[0];
       if (first) recordEdit(path, first.range.startLineNumber);
+    });
+
+    // ⌘F12 — project-wide definition jump (F12 stays Monaco's own,
+    // which covers same-file/open-model definitions until LSP).
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.F12, () => {
+      void gotoProjectDefinition(editor, path);
     });
 
     editor.onDidFocusEditorWidget(() => {
