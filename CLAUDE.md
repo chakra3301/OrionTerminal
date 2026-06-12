@@ -176,7 +176,7 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 - ✅ 1.1 AI editing core — COMPLETE 2026-06-10: P2b per-hunk accept/reject + inline decorations · P2c in-editor streaming ⌘K + follow-ups + ⌥↵ ask · P2d @-context picker + context pills · P2e codebase semantic index (migration 0018, decl-aware chunker, hash-incremental, worker-embedded; auto-injects into chat with pills + ⌘K related-code)
 - ✅ 1.2 Tab autocomplete — core shipped 2026-06-13: Haiku 4.5 ghost text (Messages API, single-flight, keep-alive), 180ms debounce + LRU, diagnostics + recent-edit-ring context, Tab/⌘→ accept, toggle command + persisted flag. DEFERRED (explicit): diff-style edit suggestions + next-edit jump → revisit after 1.6 (need richer signals); latency p50 unmeasured until user runs it
 - ✅ 1.3 Navigation/feel — shipped 2026-06-13: ⌘P frecency quick-open (editor-scoped; Spotlight stays ⌘K) · ⌘⇧O Go to Symbol (quickOutline; **Switch Project moved ⌘⇧O→⌘T**) · ⌘\ split editor right (file tabs only) · breadcrumbs + enclosing TS symbol · ⌘F12 project-wide go-to-def (import resolution + declaration search; real LSP in 1.6). DEFERRED: terminal ⌘K (stretch) → with 1.6
-- ⬜ 1.4 Git (~2): gutter markers · tree status colors · stage/commit/push UI · AI commit messages (claude_oneshot) · branch switcher · blame — via git binary, no new crate
+- ✅ 1.4 Git — core shipped 2026-06-13: structured status plumbing · live gutter markers (HEAD vs buffer on the P2b Myers engine) · tree status colors+letters · Changes panel = real source control (stage/unstage/discard/commit/push + AI commit messages via claude_oneshot) · status-bar branch switcher with checkout menu. DEFERRED (explicit): inline blame → rides with 1.5
 - ⬜ 1.5 Checkpoints + whole-turn review (~1-2): auto-snapshot before agent turns, restore that never destroys history, consolidated per-turn review
 - ⬜ 1.6 Real LSP (~3): ts-language-server/pyright/rust-analyzer via Rust stdio, semantic diagnostics, cross-file refs/rename/actions, graceful degradation
 - CUT from Phase 1 (explicit): cloud agents/Slack control, in-editor browser + Design Mode, separate Plan Mode, Bugbot-style PR review, voice agent control, RL autocomplete tuning.
@@ -210,6 +210,15 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-13 — AAA Rebuild (cont.): 1.4 git integration — the whole core loop
+- **Plumbing** (`git_ops.rs` + ipc): structured `git_status` (porcelain v1 + branch/ahead/behind, renames + C-quoted paths handled, non-repo safe) · `git_head_content` (gutter baseline; empty for new files) · stage/unstage/discard · commit · **async push** (spawn_blocking — network never blocks an invoke) · branches/checkout · per-file diff. unquote unit-tested (13 cargo). `1d45e3b`
+- **gitStore**: debounced single-flight refresh wired to project switches, **fileTreeRefresh bumps** (the Rust fs watcher → terminal git ops and external edits auto-refresh), window focus, and explicit post-action refreshes. `268dcac`
+- **Editor gutter markers**: HEAD vs live buffer through the SAME Myers engine as AI review (400ms keystroke throttle) — green bar added, cyan modified, magenta wedge at deletions; suppressed while a pending AI review owns the file (those markers ARE the diff). `268dcac`
+- **File tree**: status colors + letter badges (U/M/D/A/R; worktree letter wins; unsaved-dot beats badge). `20c8328`
+- **Changes panel = AI edits + Source control** (`3c1c385`): commit box with **AI message** (claude_oneshot over the working diff, conventional-commit prompt), Commit (staged-only, disabled-empty), Push (+ahead count), Stage all, staged/unstaged lists with per-file stage/unstage + confirm-gated discard, color-coded letters, rows open the file. All failures toast; everything refreshes status.
+- **Status bar**: real **branch chip** (branch ↑ahead ↓behind ·dirty) with a checkout dropdown (ContextMenu); project chip icon → FolderGit2 to stop the two reading as one. `0d77139`
+- DEFERRED explicitly: inline blame → with 1.5. ⚠️ Needs a **`tauri dev` restart** (Rust: 11 new git commands). tsc / **137 tests** / cargo (13) / build green. **Phase 1: 1.1-1.4 ✅ — next 1.5 checkpoints + whole-turn review.**
 
 ### 2026-06-13 — AAA Rebuild (cont.): 1.3 navigation/feel pass — all five items
 - **⌘P quick-open** (`QuickOpen.tsx`, mounted in OrionApp; `file.openFile` repurposed from its old open-Spotlight redirect — Spotlight stays ⌘K): fuzzy over the shared 30s-cached project file list + **frecency blend** (open tabs +0.3, pick-count, recency decay; in-memory — warms in a minute of use). Empty query = your working set; "open" badge on open files; ↑↓/Enter/Esc.
