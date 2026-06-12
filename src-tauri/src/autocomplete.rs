@@ -34,6 +34,8 @@ pub struct AutocompleteCtx {
     pub suffix: String,
     #[serde(default)]
     pub diagnostics: Option<String>,
+    #[serde(rename = "recentEdits", default)]
+    pub recent_edits: Option<String>,
 }
 
 /// Strip one surrounding ``` fence if the model disobeyed. Leading
@@ -76,9 +78,15 @@ pub async fn autocomplete_run(ctx: AutocompleteCtx) -> Result<String, String> {
         .filter(|s| !s.trim().is_empty())
         .map(|d| format!("Nearby diagnostics:\n{}\n\n", d))
         .unwrap_or_default();
+    let recent = ctx
+        .recent_edits
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .map(|r| format!("{}\n\n", r))
+        .unwrap_or_default();
     let user = format!(
-        "File: {}\nLanguage: {}\n\n{}--- BEFORE CURSOR ---\n{}<CURSOR>\n--- AFTER CURSOR ---\n{}",
-        ctx.path, ctx.language, diag, ctx.prefix, ctx.suffix
+        "File: {}\nLanguage: {}\n\n{}{}--- BEFORE CURSOR ---\n{}<CURSOR>\n--- AFTER CURSOR ---\n{}",
+        ctx.path, ctx.language, recent, diag, ctx.prefix, ctx.suffix
     );
 
     let body = serde_json::json!({

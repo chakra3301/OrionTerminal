@@ -10,6 +10,7 @@ import { useEditorNavStore } from "@/store/editorNavStore";
 import { usePendingEdits } from "@/store/pendingEditsStore";
 import { computeHunks } from "@/features/aiEdits/lineDiff";
 import { InlineEditSession } from "@/features/inlineEdit/InlineEditSession";
+import { recordEdit } from "@/features/autocomplete/recentEdits";
 import { languageForPath } from "@/apps/orion/lang";
 import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
 import "@/apps/orion/monacoTheme";
@@ -163,6 +164,12 @@ export function OrionEditor({ path }: { path: string }) {
       () => editor.trigger("kb", "editor.action.inlineSuggest.acceptNextWord", null),
       "inlineSuggestionVisible",
     );
+
+    // Feed the recent-edit ring (autocomplete's ripple-edit context).
+    editor.onDidChangeModelContent((e) => {
+      const first = e.changes[0];
+      if (first) recordEdit(path, first.range.startLineNumber);
+    });
 
     editor.onDidFocusEditorWidget(() => {
       reportStatus();

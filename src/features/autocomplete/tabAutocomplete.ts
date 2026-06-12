@@ -8,6 +8,7 @@ import type {
 import { ipc } from "@/lib/ipc";
 import { useAutocomplete } from "@/store/autocompleteStore";
 import { useDiagnosticsStore } from "@/store/diagnosticsStore";
+import { recentEditContext } from "@/features/autocomplete/recentEdits";
 import { log } from "@/lib/log";
 
 type MonacoNs = Parameters<OnMount>[1];
@@ -99,6 +100,7 @@ export function registerTabAutocomplete(monaco: MonacoNs): void {
           prefix: trimmedPrefix,
           suffix: trimmedSuffix,
           diagnostics: diagnostics || undefined,
+          recentEdits: recentEditContext(path),
         });
       } catch (e) {
         // Errors stay quiet at the ghost layer (a failing autocomplete

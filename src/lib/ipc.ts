@@ -71,6 +71,7 @@ export const ipc = {
     prefix: string;
     suffix: string;
     diagnostics?: string;
+    recentEdits?: string;
   }): Promise<string> => invoke<string>("autocomplete_run", { ctx }),
 
   apiKeySet: (key: string): Promise<void> => invoke("api_key_set", { key }),
