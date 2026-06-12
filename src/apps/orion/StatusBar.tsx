@@ -1,4 +1,4 @@
-import { GitBranch } from "lucide-react";
+import { GitBranch, FolderGit2, Check } from "lucide-react";
 import { useTabsStore, isFileTabDirty } from "@/store/tabsStore";
 import { useProjectStore } from "@/store/projectStore";
 import { useNotesStore } from "@/store/notesStore";
@@ -7,6 +7,10 @@ import { useDiagnosticsStore } from "@/store/diagnosticsStore";
 import { useEditorStatusStore } from "@/store/editorStatusStore";
 import { usePendingEdits } from "@/store/pendingEditsStore";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
+import { useGit } from "@/store/gitStore";
+import { useContextMenu, type MenuItem } from "@/components/ContextMenu";
+import { ipc } from "@/lib/ipc";
+import { toast } from "@/store/toastStore";
 import type { LayoutNode, Tab } from "@/components/workspace/types";
 
 function activeTabInFocused(
@@ -59,12 +63,66 @@ export function OrionStatusBar() {
   const openChanges = () =>
     useWorkspace.getState().openTab({ kind: "changes" });
 
+  const isRepo = useGit((s) => s.isRepo);
+  const branch = useGit((s) => s.branch);
+  const ahead = useGit((s) => s.ahead);
+  const behind = useGit((s) => s.behind);
+  const gitDirty = useGit((s) => s.files.size);
+  const { openFromButton, menu } = useContextMenu();
+
+  const openBranchMenu = (el: HTMLElement) => {
+    const root = project?.root_path;
+    if (!root) return;
+    void ipc
+      .gitBranches(root)
+      .then(({ current, branches }) => {
+        const items: MenuItem[] = branches.map((b) => ({
+          label: b,
+          icon: b === current ? <Check size={12} /> : <GitBranch size={12} />,
+          disabled: b === current,
+          onClick: () => {
+            void ipc
+              .gitCheckout(root, b)
+              .then(() => toast.success(`Switched to ${b}`))
+              .catch((e) =>
+                toast.error("Checkout failed", {
+                  body: e instanceof Error ? e.message : String(e),
+                }),
+              )
+              .finally(() => useGit.getState().refresh());
+          },
+        }));
+        openFromButton(el, items);
+      })
+      .catch((e) =>
+        toast.error("Couldn't list branches", {
+          body: e instanceof Error ? e.message : String(e),
+        }),
+      );
+  };
+
   return (
     <div className="or-statusbar">
       <span className="branch">
-        <GitBranch size={10} />
+        <FolderGit2 size={10} />
         <span>{project?.name ?? "no project"}</span>
       </span>
+      {isRepo && branch && (
+        <button
+          type="button"
+          className="or-status-btn"
+          title="Switch branch"
+          onClick={(e) => openBranchMenu(e.currentTarget)}
+        >
+          <span className="item" style={{ color: "var(--neon-green)" }}>
+            <GitBranch size={10} /> {branch}
+            {ahead > 0 && ` ↑${ahead}`}
+            {behind > 0 && ` ↓${behind}`}
+            {gitDirty > 0 && ` ·${gitDirty}`}
+          </span>
+        </button>
+      )}
+      {menu}
       <button
         type="button"
         className="or-status-btn"
