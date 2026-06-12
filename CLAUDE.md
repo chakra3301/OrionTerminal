@@ -174,7 +174,7 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 
 **Phase 1 — Orion ≥ Cursor** 🔨 — ranked plan APPROVED 2026-06-10 (research: [docs/research/cursor-2026.md](docs/research/cursor-2026.md)). Strategy: editor-first (Hermes owns swarms), beat Cursor on trust (context pills, never-silent writes) + integration (@archives-notes).
 - ✅ 1.1 AI editing core — COMPLETE 2026-06-10: P2b per-hunk accept/reject + inline decorations · P2c in-editor streaming ⌘K + follow-ups + ⌥↵ ask · P2d @-context picker + context pills · P2e codebase semantic index (migration 0018, decl-aware chunker, hash-incremental, worker-embedded; auto-injects into chat with pills + ⌘K related-code)
-- ⬜ 1.2 Tab autocomplete (~2): Haiku 4.5 ghost text <300ms p50, accept full/word, recent-edit+diagnostics context; stretch: edit-diffs, next-edit jump
+- ✅ 1.2 Tab autocomplete — core shipped 2026-06-13: Haiku 4.5 ghost text (Messages API, single-flight, keep-alive), 180ms debounce + LRU, diagnostics + recent-edit-ring context, Tab/⌘→ accept, toggle command + persisted flag. DEFERRED (explicit): diff-style edit suggestions + next-edit jump → revisit after 1.6 (need richer signals); latency p50 unmeasured until user runs it
 - ⬜ 1.3 Navigation/feel (~1): ⌘P frecency file picker · ⌘⇧O symbols · breadcrumbs · split-editor command · cross-file go-to-def; stretch: terminal ⌘K
 - ⬜ 1.4 Git (~2): gutter markers · tree status colors · stage/commit/push UI · AI commit messages (claude_oneshot) · branch switcher · blame — via git binary, no new crate
 - ⬜ 1.5 Checkpoints + whole-turn review (~1-2): auto-snapshot before agent turns, restore that never destroys history, consolidated per-turn review
@@ -210,6 +210,13 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-13 — AAA Rebuild: 1.2 Tab autocomplete shipped (Haiku ghost text)
+- **The locked-decision Messages-API surface**: new `autocomplete.rs` — Haiku 4.5 (`claude-haiku-4-5-20251001`), non-streaming single shot, shared keep-alive reqwest client, 5s timeout, temp 0, 200 max tokens, **single-flight** (a newer request `Notify`-aborts the older server-side), fence-strip preserving leading indentation (3 tests). No API key → returns "" quietly (feature simply absent until a key is set in Settings).
+- **Monaco wiring** (`tabAutocomplete.ts`, registered in the loader-init hook): `InlineCompletionsProvider` on `"*"` — 180ms in-provider debounce (Monaco cancels superseded tokens), **64-entry LRU** keyed on prefix/suffix tails (backspace-retype = instant ghost), nearby diagnostics (±20 lines, ≤5) ride along, latency telemetry in `useAutocomplete` store. **Tab** accepts all (native); **⌘→ accepts next word** via `addCommand` gated on `inlineSuggestionVisible` (plain ⌘→ stays end-of-line). "Toggle Tab Autocomplete" command (toast feedback) + persisted `tab_autocomplete` app_state, hydrated at boot. Provider errors are quiet+logged — a failing completion must never interrupt typing.
+- **Recent-edit ring** (`recentEdits.ts`): per-editor `onDidChangeModelContent` feeds a 20-slot ring (1s same-line collapse); completions carry the last 4 distinct edit sites + a ±6-line snippet around the newest edit in a DIFFERENT file — the research-validated ripple-edit signal.
+- **Process note:** caught a broken-build commit slipping through (`| grep` masked tsc's exit code) — amended; builds now gate on the real exit code.
+- DEFERRED explicitly: diff-style edit suggestions + next-edit-jump (stretch) → after 1.6. ⚠️ Needs a **`tauri dev` restart** (new Rust module/command). tsc / **135 tests** / cargo (**12**) / build green. Commits `858d001`, `6bfabdd`, `83abd95`.
 
 ### 2026-06-10 — AAA Rebuild (cont.): P2e — codebase semantic index → item 1.1 (AI editing core) COMPLETE
 - **Storage (migration 0018)**: `code_embeddings` (project_id, path, chunk_idx, start/end_line, whole-FILE hash repeated per chunk, vector BLOB; PK project+path+idx). db.ts helpers: list/replace/delete per file + `getCodeFileHash`. Committed `46708c9`.
