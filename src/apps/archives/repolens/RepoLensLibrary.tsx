@@ -8,6 +8,7 @@ export function RepoLensLibrary() {
   const loadLibrary = useRepoLens((s) => s.loadLibrary);
   const openFromLibrary = useRepoLens((s) => s.openFromLibrary);
   const removeFromLibrary = useRepoLens((s) => s.removeFromLibrary);
+  const openCombinator = useRepoLens((s) => s.openCombinator);
 
   useEffect(() => {
     void loadLibrary();
@@ -34,6 +35,16 @@ export function RepoLensLibrary() {
       <div className="rl-lib-head">
         <span className="t">Library</span>
         <span className="n">{library.length} scanned</span>
+        {library.length >= 2 && (
+          <button
+            className="rl-btn rl-btn--mini"
+            style={{ marginLeft: "auto" }}
+            onClick={openCombinator}
+            title="Fuse 2-3 repos into a new project idea"
+          >
+            ⚗ Combinator
+          </button>
+        )}
       </div>
       <div className="rl-lib-grid">
         {library.map((row) => {

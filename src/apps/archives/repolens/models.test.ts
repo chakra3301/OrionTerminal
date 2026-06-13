@@ -22,6 +22,7 @@ describe("models", () => {
       "synergies",
       "versus",
       "lens",
+      "combinator",
       "retag",
     ]);
   });

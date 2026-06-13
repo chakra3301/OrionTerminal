@@ -4,11 +4,13 @@ import { useRepoLens } from "./useRepoLens";
 import { RepoLensReport } from "./RepoLensReport";
 import { RepoLensPickers } from "./RepoLensPickers";
 import { RepoLensLibrary } from "./RepoLensLibrary";
+import { RepoLensCombinator } from "./RepoLensCombinator";
 import { RepoLensScanTray } from "./RepoLensScanTray";
 import { resolveInput } from "./fetch";
 
 export function RepoLensView() {
   const { input, setInput, current, error, scan, closeReport } = useRepoLens();
+  const combinatorOpen = useRepoLens((s) => s.combinatorOpen);
   const hit = resolveInput(input);
 
   useEffect(() => {
@@ -45,7 +47,15 @@ export function RepoLensView() {
 
       {error && <div className="rl-error">{error}</div>}
 
-      <div className="rl-body">{current ? <RepoLensReport a={current} /> : <RepoLensLibrary />}</div>
+      <div className="rl-body">
+        {current ? (
+          <RepoLensReport a={current} />
+        ) : combinatorOpen ? (
+          <RepoLensCombinator />
+        ) : (
+          <RepoLensLibrary />
+        )}
+      </div>
     </div>
   );
 }

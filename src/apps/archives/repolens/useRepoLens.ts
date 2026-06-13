@@ -24,6 +24,7 @@ import {
   parseTags,
 } from "./lenses";
 import { buildFrameworkPrompt, parseFramework } from "./frameworks";
+import { buildCombinatorPrompt, parseCombinator, type CombinatorResult } from "./combinator";
 import { getAppState, setAppState } from "@/lib/db";
 import { saveScan, listScans, getScan, deleteScan, updateLenses, type ScanRow } from "./repolensDb";
 import { log } from "@/lib/log";
@@ -58,7 +59,16 @@ function asRepoData(a: RepoAnalysis): RepoData {
   };
 }
 
-type RunningPart = null | "core" | "deepdive" | "sktpg" | "synergies" | "versus" | "lens" | "retag";
+type RunningPart =
+  | null
+  | "core"
+  | "deepdive"
+  | "sktpg"
+  | "synergies"
+  | "versus"
+  | "lens"
+  | "retag"
+  | "combinator";
 
 type State = {
   input: string;
@@ -81,6 +91,13 @@ type State = {
   runVersus: (target: { platform: Platform; repoId: string }) => Promise<void>;
   runFramework: (key: string) => Promise<void>;
   retag: (repoId: string) => Promise<void>;
+  /** Combinator surface (fuse repos into a new project idea). */
+  combinatorOpen: boolean;
+  combinatorResult: CombinatorResult | null;
+  combinatorInputs: string[];
+  openCombinator: () => void;
+  closeCombinator: () => void;
+  runCombinator: (repoIds: string[]) => Promise<void>;
   library: ScanRow[];
   loadLibrary: () => Promise<void>;
   openFromLibrary: (repoId: string) => Promise<void>;
@@ -123,7 +140,7 @@ export const useRepoLens = create<State>((set, get) => ({
     const saved = await getAppState<{ model?: RepoLensModelConfig; tone?: string }>("repolens");
     if (saved) set({ model: saved.model ?? defaultModelConfig(), tone: saved.tone ?? "neutral" });
   },
-  closeReport: () => set({ current: null, error: null }),
+  closeReport: () => set({ current: null, error: null, combinatorOpen: false }),
 
   runDeepDive: async () => {
     const cur = get().current;
@@ -292,11 +309,37 @@ export const useRepoLens = create<State>((set, get) => ({
     }
   },
 
+  combinatorOpen: false,
+  combinatorResult: null,
+  combinatorInputs: [],
+  openCombinator: () => set({ combinatorOpen: true, current: null }),
+  closeCombinator: () => set({ combinatorOpen: false }),
+  runCombinator: async (repoIds) => {
+    if (repoIds.length < 2) return;
+    const rows = get()
+      .library.filter((r) => repoIds.includes(r.repo_id))
+      .map((r) => ({
+        repoId: r.repo_id,
+        capabilities: r.analysis.capabilities,
+        eli5: r.analysis.eli5,
+      }));
+    if (rows.length < 2) return;
+    set({ running: "combinator", error: null, combinatorResult: null, combinatorInputs: repoIds });
+    try {
+      const raw = await enqueueClaude(get().model, "combinator", buildCombinatorPrompt(rows));
+      const result = parseCombinator(raw, repoIds);
+      set({ combinatorResult: result, running: null });
+    } catch (e) {
+      log.error("repolens combinator failed", e);
+      set({ running: null, error: e instanceof Error ? e.message : String(e) });
+    }
+  },
+
   library: [],
   loadLibrary: async () => set({ library: await listScans(100) }),
   openFromLibrary: async (repoId) => {
     const row = await getScan(repoId);
-    if (row) set({ current: row.analysis, lenses: row.lenses, error: null });
+    if (row) set({ current: row.analysis, lenses: row.lenses, error: null, combinatorOpen: false });
   },
   removeFromLibrary: async (repoId) => {
     await deleteScan(repoId);
