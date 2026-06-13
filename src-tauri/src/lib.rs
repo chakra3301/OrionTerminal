@@ -136,6 +136,12 @@ pub fn run() {
             sql: include_str!("../migrations/0019_checkpoints.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 20,
+            description: "database layer: collection property schema + values + saved views",
+            sql: include_str!("../migrations/0020_database_views.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
