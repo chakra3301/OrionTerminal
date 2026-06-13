@@ -3,6 +3,7 @@ import { deriveFit } from "./verdict";
 import { toMarkdown, slugify } from "./export";
 import { useRepoLens } from "./useRepoLens";
 import { DeepDivePanel } from "./lens/DeepDivePanel";
+import { SktpgPanel } from "./lens/SktpgPanel";
 
 function downloadMarkdown(a: RepoAnalysis) {
   const blob = new Blob([toMarkdown(a)], { type: "text/markdown" });
@@ -68,6 +69,7 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
   const lenses = useRepoLens((s) => s.lenses);
   const running = useRepoLens((s) => s.running);
   const runDeepDive = useRepoLens((s) => s.runDeepDive);
+  const runSktpg = useRepoLens((s) => s.runSktpg);
   return (
     <div>
       <div className="rl-section">
@@ -91,8 +93,12 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
         <button className="rl-btn" disabled={running !== null} onClick={() => void runDeepDive()}>
           {running === "deepdive" ? "Running Deep Dive…" : lenses.deepdive ? "Re-run Deep Dive" : "Deep Dive"}
         </button>
+        <button className="rl-btn" disabled={running !== null} onClick={() => void runSktpg()}>
+          {running === "sktpg" ? "Running SKTPG…" : lenses.sktpg ? "Re-run SKTPG" : "SKTPG"}
+        </button>
       </div>
       {lenses.deepdive && <DeepDivePanel d={lenses.deepdive} />}
+      {lenses.sktpg && <SktpgPanel s={lenses.sktpg} />}
 
       <Para title="ELI5" body={a.eli5} />
       <Bullets title="Analogies" items={a.analogies} />

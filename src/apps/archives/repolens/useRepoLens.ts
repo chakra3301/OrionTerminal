@@ -12,6 +12,8 @@ import {
   parseLineage,
   buildFeynmanPrompt,
   parseFeynman,
+  buildSktpgPrompt,
+  parseSktpg,
 } from "./lenses";
 import { getAppState, setAppState } from "@/lib/db";
 import { saveScan, listScans, getScan, deleteScan, updateLenses, type ScanRow } from "./repolensDb";
@@ -50,6 +52,7 @@ type State = {
   setTone: (t: string) => void;
   hydratePrefs: () => Promise<void>;
   runDeepDive: () => Promise<void>;
+  runSktpg: () => Promise<void>;
   library: ScanRow[];
   loadLibrary: () => Promise<void>;
   openFromLibrary: (repoId: string) => Promise<void>;
@@ -112,6 +115,26 @@ export const useRepoLens = create<State>((set, get) => ({
       await updateLenses(cur.repoId, lenses);
     } catch (e) {
       log.error("repolens deep dive failed", e);
+      set({ running: null, error: e instanceof Error ? e.message : String(e) });
+    }
+  },
+
+  runSktpg: async () => {
+    const cur = get().current;
+    if (!cur?.repoId) return;
+    set({ running: "sktpg", error: null });
+    try {
+      const source = await fetchSource(cur.repoId);
+      const raw = await enqueueClaude(
+        get().model,
+        "sktpg",
+        withTone(get().tone, buildSktpgPrompt(asRepoData(cur), source)),
+      );
+      const lenses: Lenses = { ...get().lenses, sktpg: parseSktpg(raw) };
+      set({ lenses, running: null });
+      await updateLenses(cur.repoId, lenses);
+    } catch (e) {
+      log.error("repolens sktpg failed", e);
       set({ running: null, error: e instanceof Error ? e.message : String(e) });
     }
   },

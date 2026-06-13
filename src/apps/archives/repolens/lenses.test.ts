@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseAtoms, parseLineage, parseFeynman } from "./lenses";
+import { parseAtoms, parseLineage, parseFeynman, parseSktpg } from "./lenses";
 
 describe("deepdive parsers", () => {
   it("parseAtoms fills ids + defaults", () => {
@@ -25,5 +25,18 @@ describe("deepdive parsers", () => {
   });
   it("salvages fenced JSON", () => {
     expect(parseAtoms("```json\n{\"atoms\":[]}\n```").atoms).toEqual([]);
+  });
+});
+
+describe("sktpg parser", () => {
+  it("clamps score 0-100 + derives band", () => {
+    const r = parseSktpg(JSON.stringify({ score: { value: 250 }, thesis: { becoming: "x" } }));
+    expect(r.score.value).toBe(100);
+    expect(r.score.band).toBe("Urgent");
+    expect(r.thesis.becoming).toBe("x");
+  });
+  it("defaults evidence to Unknown", () => {
+    const r = parseSktpg(JSON.stringify({ base_rate: { evidence: "bogus" } }));
+    expect(r.base_rate.evidence).toBe("Unknown");
   });
 });
