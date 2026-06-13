@@ -6,6 +6,7 @@ import { parseClaudeResponse } from "./parser";
 import { enqueueClaude } from "./claude";
 import { defaultModelConfig } from "./models";
 import { getAppState, setAppState } from "@/lib/db";
+import { saveScan, listScans, getScan, deleteScan, type ScanRow } from "./repolensDb";
 import { log } from "@/lib/log";
 import type { RepoAnalysis, RepoLensModelConfig } from "./types";
 
@@ -23,6 +24,10 @@ type State = {
   setPartModel: (part: string, id: string) => void;
   setTone: (t: string) => void;
   hydratePrefs: () => Promise<void>;
+  library: ScanRow[];
+  loadLibrary: () => Promise<void>;
+  openFromLibrary: (repoId: string) => Promise<void>;
+  removeFromLibrary: (repoId: string) => Promise<void>;
   scan: (input: string) => Promise<void>;
   closeReport: () => void;
 };
@@ -55,6 +60,17 @@ export const useRepoLens = create<State>((set, get) => ({
   },
   closeReport: () => set({ current: null, error: null }),
 
+  library: [],
+  loadLibrary: async () => set({ library: await listScans(100) }),
+  openFromLibrary: async (repoId) => {
+    const row = await getScan(repoId);
+    if (row) set({ current: row.analysis, error: null });
+  },
+  removeFromLibrary: async (repoId) => {
+    await deleteScan(repoId);
+    await get().loadLibrary();
+  },
+
   scan: async (input) => {
     set({ running: "core", error: null });
     try {
@@ -71,6 +87,14 @@ export const useRepoLens = create<State>((set, get) => ({
       analysis.description = repo.description;
       analysis.languages = repo.languages;
       set({ current: analysis, running: null });
+      await saveScan({
+        repo_id: repo.repo_id,
+        platform: repo.platform,
+        model: get().model.default_model,
+        tone: get().tone,
+        analysis,
+      });
+      await get().loadLibrary();
     } catch (e) {
       log.error("repolens scan failed", e);
       set({ running: null, error: e instanceof Error ? e.message : String(e) });

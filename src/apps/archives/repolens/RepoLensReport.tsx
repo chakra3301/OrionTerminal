@@ -1,5 +1,16 @@
 import type { RepoAnalysis, Health } from "./types";
 import { deriveFit } from "./verdict";
+import { toMarkdown, slugify } from "./export";
+
+function downloadMarkdown(a: RepoAnalysis) {
+  const blob = new Blob([toMarkdown(a)], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${slugify(a.repoId || "repo")}.md`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 function Para({ title, body }: { title: string; body?: string }) {
   if (!body) return null;
@@ -60,6 +71,13 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
           <span className={`rl-chip rl-verdict-${fit.level}`}>
             {fit.label} · {fit.why}
           </span>
+          <button
+            className="rl-btn"
+            style={{ marginLeft: "auto", fontSize: 12, padding: "4px 8px" }}
+            onClick={() => downloadMarkdown(a)}
+          >
+            Export .md
+          </button>
         </div>
         {a.bottom_line && <p style={{ marginTop: 8 }}>{a.bottom_line}</p>}
       </div>

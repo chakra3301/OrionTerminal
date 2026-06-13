@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useRepoLens } from "./useRepoLens";
 import { RepoLensReport } from "./RepoLensReport";
 import { RepoLensPickers } from "./RepoLensPickers";
+import { RepoLensLibrary } from "./RepoLensLibrary";
 import { resolveInput } from "./fetch";
 
 export function RepoLensView() {
@@ -41,15 +42,7 @@ export function RepoLensView() {
         {running === "core" && !current && (
           <div className="rl-spinner">Scanning {hit?.repoId}… (this takes a few seconds)</div>
         )}
-        {current ? (
-          <RepoLensReport a={current} />
-        ) : (
-          !running && (
-            <p style={{ color: "var(--t-tertiary)" }}>
-              Paste a repository above and hit Scan to get an adoption briefing.
-            </p>
-          )
-        )}
+        {current ? <RepoLensReport a={current} /> : !running && <RepoLensLibrary />}
       </div>
     </div>
   );
