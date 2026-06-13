@@ -11567,6 +11567,16 @@ html.ot-reduce-glass .note-page .note-editor-body {
 .rl-fw-val .rl-list { margin-top: 4px; }
 .rl-fw-val .rl-kv { margin-top: 4px; }
 
+/* ── connections ego-graph ── */
+.rl-ego { width: 100%; height: auto; max-height: 340px; display: block; margin-top: 4px; }
+.rl-ego-center { fill: rgba(var(--repolens-green-rgb), 0.18); stroke: var(--repolens-green); stroke-width: 1.5; }
+.rl-ego-clabel { fill: var(--t-primary); font: 600 9px var(--f-mono); text-anchor: middle; dominant-baseline: middle; }
+.rl-ego-node { cursor: pointer; }
+.rl-ego-node circle { fill: var(--bg-3); stroke: var(--glass-border); stroke-width: 1; transition: stroke 0.15s, fill 0.15s; }
+.rl-ego-node:hover circle { stroke: var(--neon-cyan); fill: var(--bg-2); }
+.rl-ego-node text { fill: var(--t-secondary); font: 8px var(--f-mono); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.rl-ego-node:hover text { fill: var(--t-primary); }
+
 /* ── lens panels ── */
 .rl-lens-panel { border-left: 2px solid rgba(var(--rl-rgb), 0.5); }
 .rl-lens-panel .sub-h { margin: 16px 0 8px; font: 600 12px/1 var(--f-mono); letter-spacing: 0.04em; color: var(--t-secondary); }

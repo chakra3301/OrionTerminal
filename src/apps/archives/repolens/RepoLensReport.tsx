@@ -10,6 +10,7 @@ import { SktpgPanel } from "./lens/SktpgPanel";
 import { SynergiesPanel } from "./lens/SynergiesPanel";
 import { VersusPanel } from "./lens/VersusPanel";
 import { FrameworkPanel } from "./lens/FrameworkPanel";
+import { ConnectionsPanel } from "./lens/ConnectionsPanel";
 
 const LANG_COLORS = [
   "var(--repolens-green)",
@@ -73,6 +74,7 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
   const repoId = a.repoId ?? "";
   const [versusOpen, setVersusOpen] = useState(false);
   const [frameworksOpen, setFrameworksOpen] = useState(false);
+  const [showConn, setShowConn] = useState(false);
   const [vsInput, setVsInput] = useState("");
   const vsHit = resolveInput(vsInput);
   const vsCandidates = library.filter((r) => r.repo_id !== repoId);
@@ -188,6 +190,12 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
             }}
           >
             {running === "lens" ? `Running ${frameworkLabel(activeFramework ?? "")}…` : "Frameworks ▾"}
+          </button>
+          <button
+            className={`rl-btn rl-lens-btn${showConn ? " has" : ""}`}
+            onClick={() => setShowConn((o) => !o)}
+          >
+            Connections
           </button>
         </div>
         <button className="rl-btn" onClick={() => downloadMarkdown(a)}>
@@ -492,6 +500,7 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
       )}
 
       {/* ── deeper analysis (lens results) ── */}
+      {showConn && <ConnectionsPanel a={a} />}
       {lenses.deepdive && <DeepDivePanel d={lenses.deepdive} />}
       {lenses.sktpg && <SktpgPanel s={lenses.sktpg} />}
       {lenses.synergies && <SynergiesPanel s={lenses.synergies} />}
