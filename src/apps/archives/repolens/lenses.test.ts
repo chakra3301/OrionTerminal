@@ -8,6 +8,8 @@ import {
   parseSynergies,
   buildVersusPrompt,
   parseVersus,
+  buildTagPrompt,
+  parseTags,
 } from "./lenses";
 import type { RepoData } from "./types";
 
@@ -98,5 +100,19 @@ describe("versus", () => {
     expect(v.summary_a).toBe("A");
     expect(v.dimensions[0]!.winner).toBe("tie");
     expect(v.verdict).toBe("pick A");
+  });
+});
+
+describe("retag", () => {
+  it("builds a tag prompt from analysis metadata", () => {
+    const p = buildTagPrompt({ repoId: "a/b", category: "DB", eli5: "a database" });
+    expect(p).toContain("a/b");
+    expect(p).toContain("capabilities");
+  });
+  it("parses + clamps capabilities to the taxonomy", () => {
+    expect(parseTags('{"capabilities":["RAG","bogus","embeddings"]}')).toEqual(["rag", "embeddings"]);
+  });
+  it("returns [] on junk", () => {
+    expect(parseTags("no json")).toEqual([]);
   });
 });

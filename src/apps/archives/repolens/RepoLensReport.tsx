@@ -67,6 +67,7 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
   const runVersus = useRepoLens((s) => s.runVersus);
   const runFramework = useRepoLens((s) => s.runFramework);
   const activeFramework = useRepoLens((s) => s.activeFramework);
+  const retag = useRepoLens((s) => s.retag);
   const library = useRepoLens((s) => s.library);
 
   const repoId = a.repoId ?? "";
@@ -443,8 +444,19 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
         </Card>
       )}
 
-      {(a.capabilities?.length > 0 || a.tags?.length > 0) && (
-        <Card title="Capabilities & tags">
+      <section className="rl-card">
+        <div className="rl-card-head">
+          <Eyebrow>Capabilities &amp; tags</Eyebrow>
+          <button
+            className="rl-btn rl-btn--mini"
+            disabled={running !== null}
+            onClick={() => void retag(repoId)}
+            title="Re-tag capabilities from the controlled taxonomy"
+          >
+            {running === "retag" ? "Re-tagging…" : "↻ Re-tag"}
+          </button>
+        </div>
+        {a.capabilities?.length > 0 || a.tags?.length > 0 ? (
           <div className="rl-pills">
             {a.capabilities.map((c) => (
               <span key={`c-${c}`} className="rl-pill rl-pill--cap">
@@ -457,8 +469,12 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
               </span>
             ))}
           </div>
-        </Card>
-      )}
+        ) : (
+          <p className="rl-prose" style={{ color: "var(--t-tertiary)", fontSize: 13 }}>
+            No capability tags yet — hit Re-tag.
+          </p>
+        )}
+      </section>
 
       {a.highlights?.length > 0 && (
         <Card title="Highlights">

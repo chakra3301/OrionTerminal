@@ -2,6 +2,7 @@
 // synergies.js. Source fetching (the file tree + key files) is done in Rust
 // (repolens_fetch_source); these builders take the already-fetched RepoSource.
 
+import { TAXONOMY, normalizeCapabilities } from "./taxonomy";
 import type { RepoData, RepoSource, DeepDive, Sktpg, Synergies, Versus } from "./types";
 
 /** Extract the first JSON object from a model response (tolerates code fences). */
@@ -371,4 +372,37 @@ export function parseVersus(rawText: string): Omit<Versus, "target"> {
     pick_b_when: arr(d.pick_b_when).map(String),
     verdict: d.verdict || "",
   };
+}
+
+// ─── Re-tag (backfill capability tags from the controlled taxonomy) ─────────
+
+export function buildTagPrompt(meta: {
+  repoId?: string;
+  category?: string;
+  eli5?: string;
+  compare_hooks?: string;
+}): string {
+  const tagList = Object.values(TAXONOMY).flat().join(", ");
+  return `Tag what this software project DOES with 2–5 capability labels chosen ONLY from this list (use the closest fits, "other" if none apply): ${tagList}.
+
+Project: ${meta.repoId || ""}
+Category: ${meta.category || "—"}
+What it is: ${meta.eli5 || meta.compare_hooks || "—"}
+
+Return ONLY a JSON object, no prose: { "capabilities": ["tag", "tag"] }`;
+}
+
+export function parseTags(rawText: string): string[] {
+  const text = String(rawText).trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  const start = text.indexOf("{"),
+    end = text.lastIndexOf("}");
+  let data: any = {};
+  if (start !== -1 && end !== -1) {
+    try {
+      data = JSON.parse(text.slice(start, end + 1));
+    } catch {
+      data = {};
+    }
+  }
+  return normalizeCapabilities(data.capabilities);
 }

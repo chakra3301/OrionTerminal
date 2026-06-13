@@ -20,6 +20,8 @@ import {
   parseSynergies,
   buildVersusPrompt,
   parseVersus,
+  buildTagPrompt,
+  parseTags,
 } from "./lenses";
 import { buildFrameworkPrompt, parseFramework } from "./frameworks";
 import { getAppState, setAppState } from "@/lib/db";
@@ -56,7 +58,7 @@ function asRepoData(a: RepoAnalysis): RepoData {
   };
 }
 
-type RunningPart = null | "core" | "deepdive" | "sktpg" | "synergies" | "versus" | "lens";
+type RunningPart = null | "core" | "deepdive" | "sktpg" | "synergies" | "versus" | "lens" | "retag";
 
 type State = {
   input: string;
@@ -78,6 +80,7 @@ type State = {
   runSynergies: () => Promise<void>;
   runVersus: (target: { platform: Platform; repoId: string }) => Promise<void>;
   runFramework: (key: string) => Promise<void>;
+  retag: (repoId: string) => Promise<void>;
   library: ScanRow[];
   loadLibrary: () => Promise<void>;
   openFromLibrary: (repoId: string) => Promise<void>;
@@ -244,6 +247,48 @@ export const useRepoLens = create<State>((set, get) => ({
     } catch (e) {
       log.error("repolens framework lens failed", e);
       set({ running: null, activeFramework: null, error: e instanceof Error ? e.message : String(e) });
+    }
+  },
+
+  retag: async (repoId) => {
+    const cur = get().current;
+    const fromCur = cur?.repoId === repoId ? cur : null;
+    const seed = fromCur ?? get().library.find((r) => r.repo_id === repoId)?.analysis;
+    if (!seed) return;
+    set({ running: "retag", error: null });
+    try {
+      const raw = await enqueueClaude(
+        get().model,
+        "retag",
+        buildTagPrompt({
+          repoId,
+          category: seed.category,
+          eli5: seed.eli5,
+          compare_hooks: seed.compare_hooks,
+        }),
+      );
+      const capabilities = parseTags(raw);
+      if (capabilities.length === 0) {
+        set({ running: null });
+        return;
+      }
+      if (fromCur) set({ current: { ...fromCur, capabilities } });
+      const row = await getScan(repoId);
+      if (row) {
+        await saveScan({
+          repo_id: repoId,
+          platform: row.platform,
+          model: row.model,
+          tone: row.tone,
+          analysis: { ...row.analysis, capabilities },
+          lenses: row.lenses,
+        });
+      }
+      set({ running: null });
+      await get().loadLibrary();
+    } catch (e) {
+      log.error("repolens retag failed", e);
+      set({ running: null, error: e instanceof Error ? e.message : String(e) });
     }
   },
 
