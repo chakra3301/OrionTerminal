@@ -14,6 +14,8 @@ import {
   parseFeynman,
   buildSktpgPrompt,
   parseSktpg,
+  buildSynergiesPrompt,
+  parseSynergies,
 } from "./lenses";
 import { getAppState, setAppState } from "@/lib/db";
 import { saveScan, listScans, getScan, deleteScan, updateLenses, type ScanRow } from "./repolensDb";
@@ -53,6 +55,7 @@ type State = {
   hydratePrefs: () => Promise<void>;
   runDeepDive: () => Promise<void>;
   runSktpg: () => Promise<void>;
+  runSynergies: () => Promise<void>;
   library: ScanRow[];
   loadLibrary: () => Promise<void>;
   openFromLibrary: (repoId: string) => Promise<void>;
@@ -135,6 +138,36 @@ export const useRepoLens = create<State>((set, get) => ({
       await updateLenses(cur.repoId, lenses);
     } catch (e) {
       log.error("repolens sktpg failed", e);
+      set({ running: null, error: e instanceof Error ? e.message : String(e) });
+    }
+  },
+
+  runSynergies: async () => {
+    const cur = get().current;
+    if (!cur?.repoId) return;
+    set({ running: "synergies", error: null });
+    try {
+      const candidates = get()
+        .library.filter((r) => r.repo_id !== cur.repoId)
+        .slice(0, 30)
+        .map((r) => ({ repoId: r.repo_id, category: r.analysis.category, eli5: r.analysis.eli5 }));
+      const target = {
+        repoId: cur.repoId,
+        eli5: cur.eli5,
+        description: cur.description,
+        category: cur.category,
+        language: cur.language,
+      };
+      const raw = await enqueueClaude(
+        get().model,
+        "synergies",
+        withTone(get().tone, buildSynergiesPrompt(target, candidates)),
+      );
+      const lenses: Lenses = { ...get().lenses, synergies: parseSynergies(raw) };
+      set({ lenses, running: null });
+      await updateLenses(cur.repoId, lenses);
+    } catch (e) {
+      log.error("repolens synergies failed", e);
       set({ running: null, error: e instanceof Error ? e.message : String(e) });
     }
   },

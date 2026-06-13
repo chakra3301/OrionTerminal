@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { parseAtoms, parseLineage, parseFeynman, parseSktpg } from "./lenses";
+import {
+  parseAtoms,
+  parseLineage,
+  parseFeynman,
+  parseSktpg,
+  buildSynergiesPrompt,
+  parseSynergies,
+} from "./lenses";
 
 describe("deepdive parsers", () => {
   it("parseAtoms fills ids + defaults", () => {
@@ -38,5 +45,23 @@ describe("sktpg parser", () => {
   it("defaults evidence to Unknown", () => {
     const r = parseSktpg(JSON.stringify({ base_rate: { evidence: "bogus" } }));
     expect(r.base_rate.evidence).toBe("Unknown");
+  });
+});
+
+describe("synergies", () => {
+  it("builds a prompt listing candidates", () => {
+    const p = buildSynergiesPrompt(
+      { repoId: "a/b", eli5: "x", category: "DB", language: "Rust" },
+      [{ repoId: "c/d", category: "UI", eli5: "ui" }],
+    );
+    expect(p).toContain("a/b");
+    expect(p).toContain("c/d");
+  });
+  it("parses synergies array", () => {
+    const r = parseSynergies(
+      JSON.stringify({ synergies: [{ repoId: "x/y", category: "C", synergy: "S", in_library: true }] }),
+    );
+    expect(r.synergies[0]!.repoId).toBe("x/y");
+    expect(r.synergies[0]!.in_library).toBe(true);
   });
 });

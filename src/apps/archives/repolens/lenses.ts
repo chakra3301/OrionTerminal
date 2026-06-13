@@ -2,7 +2,7 @@
 // synergies.js. Source fetching (the file tree + key files) is done in Rust
 // (repolens_fetch_source); these builders take the already-fetched RepoSource.
 
-import type { RepoData, RepoSource, DeepDive, Sktpg } from "./types";
+import type { RepoData, RepoSource, DeepDive, Sktpg, Synergies } from "./types";
 
 /** Extract the first JSON object from a model response (tolerates code fences). */
 export function extractJsonObject(rawText: string): any {
@@ -278,4 +278,50 @@ export function parseSktpg(rawText: string): Sktpg {
   };
 }
 
-// (Synergies appended in a later phase.)
+// ─── Synergies (complementary repos, grounded in the saved library) ─────────
+
+type SynergyTarget = {
+  repoId: string;
+  eli5?: string;
+  description?: string;
+  category?: string;
+  language?: string;
+};
+type SynergyCandidate = { repoId: string; category?: string; eli5?: string };
+
+export function buildSynergiesPrompt(repoData: SynergyTarget, candidates: SynergyCandidate[]): string {
+  const lib = candidates.length
+    ? candidates.map((c) => `- ${c.repoId}${c.category ? ` (${c.category})` : ""}: ${c.eli5 || ""}`).join("\n")
+    : "(the user has not saved many repos yet)";
+
+  return `Find COMPLEMENTARY repositories that work WELL TOGETHER with ${repoData.repoId} — tools you'd reach for ALONGSIDE it, not alternatives that replace it.
+
+Target repo: ${repoData.repoId}
+What it is: ${repoData.eli5 || repoData.description || "—"}
+Category: ${repoData.category || "?"} · Language: ${repoData.language || "?"}
+
+Repos already in the user's saved library (prefer these where they genuinely pair):
+${lib}
+
+Identify 4–8 synergies. For each: the repo (use a library repoId when it fits, otherwise suggest a well-known complementary tool), its role/category, how it pairs with the target (the synergy — what the combination unlocks), and whether it's already in the user's library.
+
+Return ONLY valid JSON, no markdown fences:
+{
+  "synergies": [
+    { "repoId": "owner/name or tool name", "category": "e.g. State management", "synergy": "How they pair and what the combo unlocks.", "in_library": true }
+  ]
+}`;
+}
+
+export function parseSynergies(rawText: string): Synergies {
+  const arr = (v: any) => (Array.isArray(v) ? v : []);
+  const d = extractJsonObject(rawText);
+  return {
+    synergies: arr(d.synergies).map((s: any) => ({
+      repoId: s.repoId || "",
+      category: s.category || "",
+      synergy: s.synergy || "",
+      in_library: s.in_library === true,
+    })),
+  };
+}
