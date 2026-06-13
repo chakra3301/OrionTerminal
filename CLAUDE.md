@@ -187,7 +187,7 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 - ✅ 2.1 Capture & ritual — shipped 2026-06-13: quick-capture overlay ⌘⇧N → auto-created Inbox collection (↵/⌘↵/⇧↵) · daily-note ⌘⇧D (date-keyed find-or-create journal entry) · 4 note templates (⌘K "New from Template…") with {{date}}/{{weekday}}/{{time}}/etc. expansion. Capture-speed moat = Notion's #1 weakness.
 - ✅ 2.2 AI-native Archives — shipped 2026-06-13: note auto-tagging (settle-triggered, zero-tag-only) · "Ask your Archive" RAG ⌘⇧A (hybrid-search retrieval → cited answer, clickable citations jump to source) · inline editor AI (toolbar ✨AI: improve/fix/shorter/longer/summarize on selection; /continue-writing + /summarize-note slash items). All subscription CLI (no per-token cost). Beats Notion's weakest+paywalled Q&A; matches its inline AI.
 - ✅ 2.3 Database views — COMPLETE 2026-06-13: 2.3a data model (migration 0020) · 2.3b table view (editable typed cells, 8 property types) · 2.3c board (drag-grouped by select/status) / gallery / calendar (date-placed, month nav) views + add-view menu · 2.3d filters (chips) + sorts across all views. A collection IS a Notion-class database. ~20 tests across the slices.
-- ⬜ 2.4 Linking & graph (~1-2): [[wikilink]] autocomplete in BlockNote · backlinks panel · unlinked mentions · in-app orion:// deep links (fix the gate bug)
+- ✅ 2.4 Linking & graph — shipped 2026-06-13: `[[`wikilink autocomplete (BlockNote `[` SuggestionMenuController → inserts orion://note link) · backlinks panel on every note editor (Links-to-this-page + Unlinked-mentions, live from in-memory notes) · `setNoteNavigator` routes orion://note clicks within Archives by kind (fixes the audit's unreachable-in-app gap). noteLinks helpers (extractNoteLinks/computeBacklinks) 6 tests.
 - ⬜ 2.5 Editor power (~1-2): callouts · toggles · highlighted code · columns · better md paste · PDF export (custom BlockNote blocks)
 - CUT (explicit): formulas/rollups/relations depth · timeline/chart/feed/map/form views · synced blocks · web clipper / cross-app AI connectors · multiplayer.
 
@@ -220,6 +220,12 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-13 — AAA Rebuild: Phase 2.4 linking & knowledge graph (was MISSING)
+- **`[[`wikilink autocomplete**: second BlockNote `SuggestionMenuController` on `[` in `NoteEditorAi` — type `[[query`, pick a note, inserts an `orion://note/<id>` link (BlockNote strips the trigger `[` + query incl. the second `[`). Fuzzy by title, excludes self.
+- **Backlinks panel** (`BacklinksPanel`, in every NoteEditor footer): "Links to this page" (notes that orion://note-link this one) + "Unlinked mentions" (notes whose plaintext contains the title but don't link it) — computed live from the in-memory note set via pure `noteLinks.ts` (`extractNoteLinks` walks blocks+children; `computeBacklinks` splits linked vs unlinked, self-excluded, 3-char title floor; 6 tests). Collapsible; click navigates.
+- **In-app navigation fix** (audit gap: orion:// links were unreachable inside Archives): new `setNoteNavigator()` in orionProtocol; ArchivesApp registers a router that sends orion://note clicks to the right Archives view by note kind (journal/project/note) instead of opening an Orion workspace tab. Orion's own note tabs keep the workspace path (navigator unset there).
+- Frontend-only, hot-reloads. tsc / **212 tests** (206→212) / build green. Commits `c8f918b`, `dfbaee8`. **Phase 2: 2.1✅ 2.2✅ 2.3✅ 2.4✅ — only 2.5 editor power remains.**
 
 ### 2026-06-13 — AAA Rebuild: Phase 2.3a+b — database layer + table view (the #1 structural gap)
 - **Model = a collection IS a database** (Notion's model). **Migration 0020** (additive): `collection_properties` (typed schema), `note_property_values` (EAV cells), `collection_views` (saved view configs). `propertyTypes.ts` — pure codec/format/compare/filter for 8 types (text/number/select/multi_select/status/date/checkbox/url), **12 tests**. `databaseDb.ts` CRUD + `databaseStore` (optimistic mirror of one open database). **GOTCHA logged: a store method named `valueOf` collides with `Object.prototype.valueOf` and silently poisons the entire zustand state type** (every `set` errors with a misleading message) — renamed to `valueAt`. `89c48db`
