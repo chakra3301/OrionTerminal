@@ -35,6 +35,7 @@ import { ArchivesProjects } from "@/apps/archives/Projects";
 import { ArchivesMedia } from "@/apps/archives/Media";
 import { ArchivesMood } from "@/apps/archives/Mood";
 import { ArchivesChats } from "@/apps/archives/Chats";
+import { ArchivesDatabase } from "@/apps/archives/database/ArchivesDatabase";
 import { ArchivesFavorites } from "@/apps/archives/Favorites";
 import { ArchivesToolbar } from "@/apps/archives/Toolbar";
 import { AssetPreviewModal } from "@/apps/archives/AssetPreviewModal";
@@ -312,6 +313,7 @@ export function ArchivesApp() {
               {view === "media" && <ArchivesMedia />}
               {view === "favorites" && <ArchivesFavorites />}
               {view === "chats" && <ArchivesChats />}
+              {view === "database" && <ArchivesDatabase />}
             </div>
           </main>
         </Panel>

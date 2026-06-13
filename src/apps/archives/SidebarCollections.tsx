@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, X as XIcon, Trash2, Check } from "lucide-react";
+import { Plus, X as XIcon, Trash2, Check, Table2 } from "lucide-react";
 import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
 import {
   useCollectionsStore,
@@ -222,6 +222,17 @@ function CollectionRow({
         </button>
       )}
       <div className="ar-collection-actions">
+        <button
+          type="button"
+          className="ar-collection-action"
+          onClick={(e) => {
+            e.stopPropagation();
+            useArchives.getState().openDatabase(collection.id);
+          }}
+          title="Open as database"
+        >
+          <Table2 size={10} />
+        </button>
         <button
           type="button"
           className="ar-collection-action danger"

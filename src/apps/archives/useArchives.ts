@@ -8,7 +8,8 @@ export type ArchivesView =
   | "mood"
   | "media"
   | "favorites"
-  | "chats";
+  | "chats"
+  | "database";
 
 type ArchivesState = {
   view: ArchivesView;
@@ -32,6 +33,9 @@ type ArchivesState = {
   /** Sidebar-driven filter for Projects/Notes/Journal views. */
   selectedCollectionId: string | null;
   setSelectedCollectionId: (id: string | null) => void;
+  /** Collection being viewed AS a database (table/board/…). */
+  databaseCollectionId: string | null;
+  openDatabase: (collectionId: string) => void;
   /** Sidebar-driven tag filter. Tag name (lowercase), not id. */
   selectedTag: string | null;
   setSelectedTag: (tag: string | null) => void;
@@ -56,6 +60,8 @@ type ArchivesState = {
 export const useArchives = create<ArchivesState>((set) => ({
   view: "today",
   setView: (view) => set({ view }),
+  databaseCollectionId: null,
+  openDatabase: (collectionId) => set({ databaseCollectionId: collectionId, view: "database" }),
   selectedNoteId: null,
   setSelectedNoteId: (selectedNoteId) => set({ selectedNoteId }),
   previewingAssetId: null,
