@@ -8,10 +8,21 @@ import { useEditorStatusStore } from "@/store/editorStatusStore";
 import { usePendingEdits } from "@/store/pendingEditsStore";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
 import { useGit } from "@/store/gitStore";
+import { useLspStatus } from "@/features/lsp/lspManager";
 import { useContextMenu, type MenuItem } from "@/components/ContextMenu";
 import { ipc } from "@/lib/ipc";
 import { toast } from "@/store/toastStore";
 import type { LayoutNode, Tab } from "@/components/workspace/types";
+
+function LspIndicator() {
+  const lspServers = useLspStatus((s) => s.servers);
+  if (lspServers.length === 0) return null;
+  return (
+    <span className="item" style={{ color: "var(--neon-violet)" }} title="Language servers running">
+      ⚙ {lspServers.join(" ")}
+    </span>
+  );
+}
 
 function activeTabInFocused(
   root: LayoutNode,
@@ -180,6 +191,7 @@ export function OrionStatusBar() {
         </span>
       )}
       {isFile && es.language && <span className="item">{es.language}</span>}
+      <LspIndicator />
       <span className="item">{extension}</span>
       <span className="item">UTF-8</span>
       <span className="item cyan">⌘K claude</span>
