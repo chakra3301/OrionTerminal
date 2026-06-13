@@ -14,6 +14,7 @@ import {
   Film,
   MessageSquare,
   Star,
+  ScanSearch,
 } from "lucide-react";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { archivesClaude } from "@/apps/archives/claude";
@@ -37,6 +38,7 @@ import { ArchivesMedia } from "@/apps/archives/Media";
 import { ArchivesMood } from "@/apps/archives/Mood";
 import { ArchivesChats } from "@/apps/archives/Chats";
 import { ArchivesDatabase } from "@/apps/archives/database/ArchivesDatabase";
+import { RepoLensView } from "@/apps/archives/repolens/RepoLensView";
 import { ArchivesFavorites } from "@/apps/archives/Favorites";
 import { ArchivesToolbar } from "@/apps/archives/Toolbar";
 import { AssetPreviewModal } from "@/apps/archives/AssetPreviewModal";
@@ -54,6 +56,7 @@ const LIBRARY: NavItem[] = [
   { key: "today", label: "Today", Icon: Sun },
   { key: "journal", label: "Journal", Icon: BookOpen },
   { key: "projects", label: "Projects", Icon: FolderKanban },
+  { key: "repolens", label: "RepoLens", Icon: ScanSearch },
   { key: "notes", label: "Notes", Icon: StickyNote },
   { key: "mood", label: "Mood Boards", Icon: Image },
   { key: "media", label: "Media", Icon: Film },
@@ -337,6 +340,7 @@ export function ArchivesApp() {
               {view === "favorites" && <ArchivesFavorites />}
               {view === "chats" && <ArchivesChats />}
               {view === "database" && <ArchivesDatabase />}
+              {view === "repolens" && <RepoLensView />}
             </div>
           </main>
         </Panel>
