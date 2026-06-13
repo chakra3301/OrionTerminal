@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { shapeToRing, booleanShapes } from "./booleanOps";
+import {
+  shapeToRing,
+  booleanShapes,
+  localToWorld,
+  worldToUnit,
+} from "./booleanOps";
 import type { Shape } from "./store";
 
 const rect = (over: Partial<Shape> & { id: string }): Shape =>
@@ -59,6 +64,31 @@ describe("shapeToRing", () => {
       expect(px).toBeLessThanOrEqual(100.001);
       expect(py).toBeGreaterThanOrEqual(-0.001);
       expect(py).toBeLessThanOrEqual(50.001);
+    }
+  });
+});
+
+describe("worldToUnit", () => {
+  const cases: Array<Partial<Shape>> = [
+    { x: 10, y: 20, w: 100, h: 50 },
+    { x: 0, y: 0, w: 80, h: 80, rotation: 37 },
+    { x: 5, y: 5, w: 60, h: 40, flipX: true },
+    { x: 5, y: 5, w: 60, h: 40, flipY: true, rotation: -22 },
+  ];
+  it("round-trips localToWorld for arbitrary unit points", () => {
+    for (const over of cases) {
+      const s = rect({ id: "s", ...over });
+      for (const [ux, uy] of [
+        [0.25, 0.75],
+        [0, 0],
+        [1, 1],
+        [0.5, 0.1],
+      ]) {
+        const [wx, wy] = localToWorld(ux! * s.w, uy! * s.h, s);
+        const back = worldToUnit(wx, wy, s);
+        expect(back.x).toBeCloseTo(ux!, 6);
+        expect(back.y).toBeCloseTo(uy!, 6);
+      }
     }
   });
 });

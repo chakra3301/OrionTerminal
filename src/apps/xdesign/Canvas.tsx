@@ -21,6 +21,7 @@ import {
   type PathPoint,
 } from "@/apps/xdesign/store";
 import { XDesignImagePicker } from "@/apps/xdesign/ImagePicker";
+import { localToWorld, worldToUnit } from "@/apps/xdesign/booleanOps";
 import { computeAutoLayout, type LayoutOverrides } from "@/apps/xdesign/autoLayout";
 import { setExportSvgRef } from "@/apps/xdesign/exportXD";
 import type { Asset } from "@/store/assetsStore";
@@ -81,6 +82,12 @@ type DragOp =
       current: { x: number; y: number };
       additive: boolean;
       baseSelection: Set<string>;
+    }
+  | {
+      kind: "anchor";
+      pathId: string;
+      index: number;
+      part: "point" | "cpIn" | "cpOut";
     };
 
 const HANDLE_CURSORS: Record<ResizeHandle, string> = {
@@ -238,6 +245,8 @@ export function XDesignCanvas() {
   }, []);
   const [draft, setDraft] = useState<DraftRect | null>(null);
   const [drag, setDrag] = useState<DragOp | null>(null);
+  /** Path currently in anchor-edit mode (double-click a path to enter). */
+  const [editPathId, setEditPathId] = useState<string | null>(null);
 
   // Auto-layout overrides — Map<shapeId, {x,y,w,h}> for every shape whose
   // position/size is being driven by a parent frame's flow.
@@ -629,6 +638,10 @@ export function XDesignCanvas() {
           setTool("select");
           return;
         }
+        if (editPathId) {
+          setEditPathId(null);
+          return;
+        }
         clearSelection();
         if (tool !== "select") setTool("select");
       } else if (e.key === "Delete" || e.key === "Backspace") {
@@ -691,8 +704,13 @@ export function XDesignCanvas() {
     undo,
     ungroup,
     zoomAt,
+    editPathId,
   ]);
 
+  // Leaving the select tool drops anchor-edit mode.
+  useEffect(() => {
+    if (tool !== "select" && editPathId) setEditPathId(null);
+  }, [tool, editPathId]);
 
   /** Screen-space coords inside the SVG (not viewport-adjusted). */
   const toScreenPoint = useCallback(
@@ -775,6 +793,8 @@ export function XDesignCanvas() {
       // shape's own handler take it.
       return;
     }
+    // Clicking empty canvas exits path-edit mode.
+    if (editPathId) setEditPathId(null);
     const p = toSvgPoint(e);
     if (tool === "select") {
       // Start a marquee. If shift isn't held, the existing selection is
@@ -967,6 +987,29 @@ export function XDesignCanvas() {
             h: Math.max(MIN_DIM, rel.relH * newBbox.h),
           };
         });
+      } else if (drag?.kind === "anchor") {
+        const sh = shapes.find((s) => s.id === drag.pathId);
+        if (sh && sh.kind === "path") {
+          const u = worldToUnit(p.x, p.y, sh);
+          const points = sh.points.map((pt, i) => {
+            if (i !== drag.index) return pt;
+            if (drag.part === "point") {
+              // Carry the anchor's bezier handles by the same delta so the
+              // curve shape is preserved as the vertex moves.
+              const dxu = u.x - pt.x;
+              const dyu = u.y - pt.y;
+              const np: PathPoint = { ...pt, x: u.x, y: u.y };
+              if (pt.cpInX !== undefined) np.cpInX = pt.cpInX + dxu;
+              if (pt.cpInY !== undefined) np.cpInY = pt.cpInY + dyu;
+              if (pt.cpOutX !== undefined) np.cpOutX = pt.cpOutX + dxu;
+              if (pt.cpOutY !== undefined) np.cpOutY = pt.cpOutY + dyu;
+              return np;
+            }
+            if (drag.part === "cpIn") return { ...pt, cpInX: u.x, cpInY: u.y };
+            return { ...pt, cpOutX: u.x, cpOutY: u.y };
+          });
+          updateShape(drag.pathId, { points } as ShapePatch);
+        }
       } else if (drag?.kind === "marquee") {
         setDrag({ ...drag, current: p });
       }
@@ -1132,6 +1175,14 @@ export function XDesignCanvas() {
     e.stopPropagation();
     const deep = e.metaKey || e.ctrlKey || e.detail >= 2;
     const targetId = resolveSelectTarget(shape, deep);
+    // Double-click a path → enter anchor-edit mode instead of deep-select.
+    const targetShape = shapes.find((s) => s.id === targetId);
+    if (e.detail >= 2 && targetShape?.kind === "path") {
+      select(targetId);
+      setEditPathId(targetId);
+      return;
+    }
+    if (editPathId && editPathId !== targetId) setEditPathId(null);
     const isSel = selection.has(targetId);
     if (e.shiftKey) {
       toggleInSelection(targetId);
@@ -1216,6 +1267,23 @@ export function XDesignCanvas() {
     pushHistory();
     setDrag({ kind: "resize", handle, start: p, startBbox, startShapes });
   };
+
+  const startAnchorDrag = (
+    e: RMouseEvent,
+    index: number,
+    part: "point" | "cpIn" | "cpOut",
+  ) => {
+    e.stopPropagation();
+    if (!editPathId) return;
+    pushHistory();
+    setDrag({ kind: "anchor", pathId: editPathId, index, part });
+  };
+
+  const editPath = useMemo(() => {
+    if (!editPathId) return null;
+    const s = shapes.find((sh) => sh.id === editPathId);
+    return s && s.kind === "path" ? s : null;
+  }, [editPathId, shapes]);
 
   const selectionBounds = useMemo(() => {
     if (selection.size === 0) return null;
@@ -1517,18 +1585,25 @@ export function XDesignCanvas() {
             pointerEvents="none"
           />
         )}
-        {tool === "select" && selectionBounds && (
+        {tool === "select" && !editPath && selectionBounds && (
           <ResizeHandles
             bbox={selectionBounds}
             viewport={viewport}
             onHandleMouseDown={onHandleMouseDown}
           />
         )}
-        {tool === "select" && rotHandleShape && (
+        {tool === "select" && !editPath && rotHandleShape && (
           <RotationHandle
             shape={rotHandleShape}
             viewport={viewport}
             onMouseDown={startRotate}
+          />
+        )}
+        {tool === "select" && editPath && (
+          <PathEditOverlay
+            shape={editPath}
+            viewport={viewport}
+            onAnchorDown={startAnchorDrag}
           />
         )}
         {marquee && (
@@ -1745,6 +1820,106 @@ function ResizeHandles({
             style={{ cursor: HANDLE_CURSORS[handle] }}
             onMouseDown={(e) => onHandleMouseDown(e, handle)}
           />
+        );
+      })}
+    </g>
+  );
+}
+
+function PathEditOverlay({
+  shape,
+  viewport,
+  onAnchorDown,
+}: {
+  shape: Shape & { kind: "path" };
+  viewport: { x: number; y: number; zoom: number };
+  onAnchorDown: (
+    e: RMouseEvent,
+    index: number,
+    part: "point" | "cpIn" | "cpOut",
+  ) => void;
+}) {
+  const tx = (x: number) => x * viewport.zoom + viewport.x;
+  const ty = (y: number) => y * viewport.zoom + viewport.y;
+  // Unit point → screen via the same transform the path renders under.
+  const screen = (ux: number, uy: number) => {
+    const [wx, wy] = localToWorld(ux * shape.w, uy * shape.h, shape);
+    return { x: tx(wx), y: ty(wy) };
+  };
+  return (
+    <g>
+      {shape.points.map((p, i) => {
+        const a = screen(p.x, p.y);
+        const cpIn =
+          p.cpInX !== undefined && p.cpInY !== undefined
+            ? screen(p.cpInX, p.cpInY)
+            : null;
+        const cpOut =
+          p.cpOutX !== undefined && p.cpOutY !== undefined
+            ? screen(p.cpOutX, p.cpOutY)
+            : null;
+        return (
+          <g key={i}>
+            {cpIn && (
+              <>
+                <line
+                  x1={a.x}
+                  y1={a.y}
+                  x2={cpIn.x}
+                  y2={cpIn.y}
+                  stroke="var(--neon-magenta)"
+                  strokeWidth={1}
+                  opacity={0.6}
+                  pointerEvents="none"
+                />
+                <circle
+                  cx={cpIn.x}
+                  cy={cpIn.y}
+                  r={4}
+                  fill="var(--bg-0)"
+                  stroke="var(--neon-magenta)"
+                  strokeWidth={1.5}
+                  style={{ cursor: "move" }}
+                  onMouseDown={(e) => onAnchorDown(e, i, "cpIn")}
+                />
+              </>
+            )}
+            {cpOut && (
+              <>
+                <line
+                  x1={a.x}
+                  y1={a.y}
+                  x2={cpOut.x}
+                  y2={cpOut.y}
+                  stroke="var(--neon-magenta)"
+                  strokeWidth={1}
+                  opacity={0.6}
+                  pointerEvents="none"
+                />
+                <circle
+                  cx={cpOut.x}
+                  cy={cpOut.y}
+                  r={4}
+                  fill="var(--bg-0)"
+                  stroke="var(--neon-magenta)"
+                  strokeWidth={1.5}
+                  style={{ cursor: "move" }}
+                  onMouseDown={(e) => onAnchorDown(e, i, "cpOut")}
+                />
+              </>
+            )}
+            <rect
+              x={a.x - HANDLE_SIZE / 2}
+              y={a.y - HANDLE_SIZE / 2}
+              width={HANDLE_SIZE}
+              height={HANDLE_SIZE}
+              fill="var(--neon-magenta)"
+              stroke="var(--bg-0)"
+              strokeWidth={1.5}
+              style={{ cursor: "move" }}
+              onMouseDown={(e) => onAnchorDown(e, i, "point")}
+            />
+          </g>
         );
       })}
     </g>

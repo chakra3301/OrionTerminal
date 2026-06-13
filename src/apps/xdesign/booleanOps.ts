@@ -22,7 +22,7 @@ function rotate(px: number, py: number, cx: number, cy: number, deg: number): Pt
 
 /** Map a point in the shape's local bbox space (px in [0..w], py in [0..h])
  * to absolute document coords, honoring flip + rotation. */
-function localToWorld(lx: number, ly: number, s: Shape): Pt {
+export function localToWorld(lx: number, ly: number, s: Shape): Pt {
   let ux = lx;
   let uy = ly;
   if (s.flipX) ux = s.w - ux;
@@ -32,6 +32,20 @@ function localToWorld(lx: number, ly: number, s: Shape): Pt {
   const r = s.rotation ?? 0;
   if (!r) return [wx, wy];
   return rotate(wx, wy, s.x + s.w / 2, s.y + s.h / 2, r);
+}
+
+/** Inverse of localToWorld → unit space (0..1 relative to bbox). Used by
+ * the path anchor editor to turn a cursor position into a stored point. */
+export function worldToUnit(wx: number, wy: number, s: Shape): { x: number; y: number } {
+  let px = wx;
+  let py = wy;
+  const r = s.rotation ?? 0;
+  if (r) [px, py] = rotate(px, py, s.x + s.w / 2, s.y + s.h / 2, -r);
+  let lx = px - s.x;
+  let ly = py - s.y;
+  if (s.flipX) lx = s.w - lx;
+  if (s.flipY) ly = s.h - ly;
+  return { x: s.w ? lx / s.w : 0, y: s.h ? ly / s.h : 0 };
 }
 
 function cubicAt(
