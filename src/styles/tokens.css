@@ -10995,3 +10995,34 @@ html.ot-reduce-glass .note-page .note-editor-body {
 }
 .ar-db-filterchip button { background: none; border: none; color: inherit; cursor: pointer; padding: 0; display: grid; place-items: center; opacity: 0.7; }
 .ar-db-filterchip button:hover { opacity: 1; }
+
+/* Backlinks / unlinked-mentions footer on note editors */
+.ar-backlinks {
+  max-width: 1180px;
+  margin: 8px auto 40px;
+  padding: 0 70px;
+}
+.note-page .ar-backlinks { padding: 0 70px; }
+.ar-backlinks-head {
+  display: flex; align-items: center; gap: 7px;
+  background: none; border: none; cursor: pointer;
+  padding: 8px 0; color: var(--t-tertiary);
+  font-family: var(--f-mono); font-size: 10.5px; letter-spacing: 0.04em;
+  border-top: 1px solid rgba(255,255,255,0.06); width: 100%;
+}
+.ar-backlinks-head:hover { color: var(--t-secondary); }
+.ar-backlinks-head svg:nth-of-type(2) { color: var(--neon-cyan); }
+.ar-backlinks-body { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 0; }
+.ar-backlinks-label {
+  font-family: var(--f-mono); font-size: 9.5px; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--t-faint); margin-bottom: 3px;
+}
+.ar-backlinks-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 5px 8px; border-radius: var(--r-sm);
+  background: none; border: none; cursor: pointer; text-align: left;
+  color: var(--t-secondary); font-family: var(--f-ui); font-size: 12.5px;
+}
+.ar-backlinks-item:hover { background: rgba(255,255,255,0.04); color: var(--neon-cyan); }
+.ar-backlinks-item svg { color: var(--t-tertiary); flex: none; }
+.ar-backlinks-item.muted { color: var(--t-tertiary); }

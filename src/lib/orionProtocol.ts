@@ -43,11 +43,19 @@ export function formatOrionUri(ref: OrionRef): string {
   return `orion://${ref.kind}/${ref.id}`;
 }
 
+/** Optional in-app note router (Archives sets this so orion://note clicks
+ * navigate the Archives view instead of opening an Orion workspace tab). */
+let noteNavigator: ((id: string) => boolean) | null = null;
+export function setNoteNavigator(fn: ((id: string) => boolean) | null): void {
+  noteNavigator = fn;
+}
+
 export function handleOrionUri(href: string): boolean {
   const ref = parseOrionUri(href);
   if (!ref) return false;
   switch (ref.kind) {
     case "note":
+      if (noteNavigator?.(ref.id)) return true;
       useWorkspace.getState().openTab({ kind: "note", noteId: ref.id });
       return true;
     case "asset":

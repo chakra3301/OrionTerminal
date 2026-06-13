@@ -15,6 +15,7 @@ import {
   unregisterNoteEditor,
 } from "@/features/notes/editorBridge";
 import { NoteAiControllers } from "@/features/notes/NoteEditorAi";
+import { BacklinksPanel } from "@/features/notes/BacklinksPanel";
 import { log } from "@/lib/log";
 
 /** A stored asset → the BlockNote block to insert for it. */
@@ -280,6 +281,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
           initialBlocks={note.blocks}
           onFirstBackspace={focusTitle}
         />
+        <BacklinksPanel noteId={note.id} />
       </div>
     </div>
   );

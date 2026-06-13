@@ -21,6 +21,7 @@ import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { useArchives, type ArchivesView } from "@/apps/archives/useArchives";
 import { useNotesStore } from "@/store/notesStore";
+import { setNoteNavigator } from "@/lib/orionProtocol";
 import { useAssetsStore } from "@/store/assetsStore";
 import { useMoodBoardsStore } from "@/store/moodBoardsStore";
 import { listAllChats, upsertChat } from "@/lib/db";
@@ -82,6 +83,28 @@ export function ArchivesApp() {
   useEffect(() => {
     setCounts({ notes: notes.size, assets: assets.size });
   }, [notes.size, assets.size, setCounts]);
+
+  // Route orion://note clicks (from [[wikilinks]] / backlinks) within
+  // Archives by the note's kind, instead of opening an Orion workspace tab.
+  useEffect(() => {
+    setNoteNavigator((id) => {
+      const note = useNotesStore.getState().notes.get(id);
+      if (!note) return false;
+      const a = useArchives.getState();
+      if (note.kind === "journal") {
+        a.setView("journal");
+        a.setSelectedNoteId(id);
+      } else if (note.kind === "project") {
+        a.setView("projects");
+        a.setOpenProjectId(id);
+      } else {
+        a.setView("notes");
+        a.setOpenNoteId(id);
+      }
+      return true;
+    });
+    return () => setNoteNavigator(null);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
