@@ -1,14 +1,38 @@
 import { create } from "zustand";
-import { fetchRepo } from "./fetch";
+import { fetchRepo, fetchSource } from "./fetch";
 import { buildPrompt } from "./prompt";
 import { withTone } from "./tone";
 import { parseClaudeResponse } from "./parser";
 import { enqueueClaude } from "./claude";
 import { defaultModelConfig } from "./models";
+import {
+  buildAtomsPrompt,
+  parseAtoms,
+  buildLineagePrompt,
+  parseLineage,
+  buildFeynmanPrompt,
+  parseFeynman,
+} from "./lenses";
 import { getAppState, setAppState } from "@/lib/db";
-import { saveScan, listScans, getScan, deleteScan, type ScanRow } from "./repolensDb";
+import { saveScan, listScans, getScan, deleteScan, updateLenses, type ScanRow } from "./repolensDb";
 import { log } from "@/lib/log";
-import type { RepoAnalysis, RepoLensModelConfig } from "./types";
+import type { RepoAnalysis, RepoData, RepoLensModelConfig, Lenses } from "./types";
+
+/** The lens prompt builders read a few RepoData fields; rebuild that shape from
+ * a carried analysis (readme/deps aren't persisted — lenses use the file tree). */
+function asRepoData(a: RepoAnalysis): RepoData {
+  return {
+    platform: a.platform ?? "github",
+    repo_id: a.repoId ?? "",
+    description: a.description ?? "",
+    language: a.language ?? "",
+    license: a.license ?? "",
+    stars: a.stars ?? 0,
+    readme: "",
+    languages: a.languages ?? [],
+    dependencies: [],
+  };
+}
 
 type RunningPart = null | "core" | "deepdive" | "sktpg" | "synergies";
 
@@ -16,6 +40,7 @@ type State = {
   input: string;
   setInput: (s: string) => void;
   current: RepoAnalysis | null;
+  lenses: Lenses;
   running: RunningPart;
   error: string | null;
   model: RepoLensModelConfig;
@@ -24,6 +49,7 @@ type State = {
   setPartModel: (part: string, id: string) => void;
   setTone: (t: string) => void;
   hydratePrefs: () => Promise<void>;
+  runDeepDive: () => Promise<void>;
   library: ScanRow[];
   loadLibrary: () => Promise<void>;
   openFromLibrary: (repoId: string) => Promise<void>;
@@ -36,6 +62,7 @@ export const useRepoLens = create<State>((set, get) => ({
   input: "",
   setInput: (input) => set({ input }),
   current: null,
+  lenses: {},
   running: null,
   error: null,
   model: defaultModelConfig(),
@@ -60,11 +87,40 @@ export const useRepoLens = create<State>((set, get) => ({
   },
   closeReport: () => set({ current: null, error: null }),
 
+  runDeepDive: async () => {
+    const cur = get().current;
+    if (!cur?.repoId) return;
+    set({ running: "deepdive", error: null });
+    try {
+      const source = await fetchSource(cur.repoId);
+      const atomsRaw = await enqueueClaude(
+        get().model,
+        "deepdive",
+        withTone(get().tone, buildAtomsPrompt(asRepoData(cur), source, null)),
+      );
+      const atomsRes = parseAtoms(atomsRaw);
+      const lineageRaw = await enqueueClaude(get().model, "deepdive", buildLineagePrompt(atomsRes.atoms));
+      const lineage = parseLineage(lineageRaw);
+      const feynRaw = await enqueueClaude(
+        get().model,
+        "deepdive",
+        buildFeynmanPrompt(asRepoData(cur), atomsRes.atoms, lineage),
+      );
+      const feynman = parseFeynman(feynRaw);
+      const lenses: Lenses = { ...get().lenses, deepdive: { atoms: atomsRes.atoms, lineage, feynman } };
+      set({ lenses, running: null });
+      await updateLenses(cur.repoId, lenses);
+    } catch (e) {
+      log.error("repolens deep dive failed", e);
+      set({ running: null, error: e instanceof Error ? e.message : String(e) });
+    }
+  },
+
   library: [],
   loadLibrary: async () => set({ library: await listScans(100) }),
   openFromLibrary: async (repoId) => {
     const row = await getScan(repoId);
-    if (row) set({ current: row.analysis, error: null });
+    if (row) set({ current: row.analysis, lenses: row.lenses, error: null });
   },
   removeFromLibrary: async (repoId) => {
     await deleteScan(repoId);
@@ -72,7 +128,7 @@ export const useRepoLens = create<State>((set, get) => ({
   },
 
   scan: async (input) => {
-    set({ running: "core", error: null });
+    set({ running: "core", error: null, lenses: {} });
     try {
       const repo = await fetchRepo(input);
       const prompt = withTone(get().tone, buildPrompt(repo));

@@ -1,6 +1,8 @@
 import type { RepoAnalysis, Health } from "./types";
 import { deriveFit } from "./verdict";
 import { toMarkdown, slugify } from "./export";
+import { useRepoLens } from "./useRepoLens";
+import { DeepDivePanel } from "./lens/DeepDivePanel";
 
 function downloadMarkdown(a: RepoAnalysis) {
   const blob = new Blob([toMarkdown(a)], { type: "text/markdown" });
@@ -63,6 +65,9 @@ const HEALTH_BARS: (keyof Health)[] = [
 
 export function RepoLensReport({ a }: { a: RepoAnalysis }) {
   const fit = deriveFit(a);
+  const lenses = useRepoLens((s) => s.lenses);
+  const running = useRepoLens((s) => s.running);
+  const runDeepDive = useRepoLens((s) => s.runDeepDive);
   return (
     <div>
       <div className="rl-section">
@@ -81,6 +86,13 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
         </div>
         {a.bottom_line && <p style={{ marginTop: 8 }}>{a.bottom_line}</p>}
       </div>
+
+      <div className="rl-lens-rail">
+        <button className="rl-btn" disabled={running !== null} onClick={() => void runDeepDive()}>
+          {running === "deepdive" ? "Running Deep Dive…" : lenses.deepdive ? "Re-run Deep Dive" : "Deep Dive"}
+        </button>
+      </div>
+      {lenses.deepdive && <DeepDivePanel d={lenses.deepdive} />}
 
       <Para title="ELI5" body={a.eli5} />
       <Bullets title="Analogies" items={a.analogies} />
