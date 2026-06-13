@@ -8,6 +8,7 @@ mod fs_watch;
 mod git_ops;
 mod hermes;
 mod inline_edit;
+mod lsp;
 mod mcp_config;
 pub mod mcp_server;
 mod messages_chat;
@@ -185,6 +186,10 @@ pub fn run() {
             git_ops::git_checkout,
             git_ops::git_file_diff,
             git_ops::git_blame_line,
+            lsp::lsp_probe,
+            lsp::lsp_start,
+            lsp::lsp_send,
+            lsp::lsp_stop,
             mcp_config::context_snapshot_write,
             ui_bridge::ui_bridge_respond,
             api_key::api_key_set,
