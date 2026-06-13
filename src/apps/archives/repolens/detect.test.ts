@@ -17,6 +17,16 @@ describe("detectPlatform", () => {
   it("bare owner/repo assumed github", () => {
     expect(detectPlatform("facebook/react")).toEqual({ platform: "github", repoId: "facebook/react" });
   });
+  it("strips a trailing .git from clone URLs and bare ids", () => {
+    expect(detectPlatform("https://github.com/addyosmani/agent-skills.git")).toEqual({
+      platform: "github",
+      repoId: "addyosmani/agent-skills",
+    });
+    expect(detectPlatform("addyosmani/agent-skills.git")).toEqual({
+      platform: "github",
+      repoId: "addyosmani/agent-skills",
+    });
+  });
   it("npm package", () => {
     expect(detectPlatform("https://www.npmjs.com/package/zustand")).toEqual({
       platform: "npm",

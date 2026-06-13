@@ -11,9 +11,12 @@ export function detectPlatform(
   const raw = input.trim();
   if (!raw) return null;
 
+  // Strip a trailing ".git" (clone URLs) and trailing slashes from a repo id.
+  const clean = (id: string) => id.replace(/\/+$/, "").replace(/\.git$/i, "");
+
   // Bare "owner/repo" → assume github.
   if (!/^https?:\/\//i.test(raw) && /^[\w.-]+\/[\w.-]+$/.test(raw)) {
-    return { platform: "github", repoId: raw.replace(/\/+$/, "") };
+    return { platform: "github", repoId: clean(raw) };
   }
 
   let u: URL;
@@ -25,11 +28,11 @@ export function detectPlatform(
 
   if (u.hostname === "github.com") {
     const parts = u.pathname.split("/").filter(Boolean);
-    if (parts.length >= 2) return { platform: "github", repoId: `${parts[0]}/${parts[1]}` };
+    if (parts.length >= 2) return { platform: "github", repoId: clean(`${parts[0]}/${parts[1]}`) };
   }
   if (u.hostname === "gitlab.com") {
     const parts = u.pathname.split("/").filter(Boolean);
-    if (parts.length >= 2) return { platform: "gitlab", repoId: `${parts[0]}/${parts[1]}` };
+    if (parts.length >= 2) return { platform: "gitlab", repoId: clean(`${parts[0]}/${parts[1]}`) };
   }
   if (u.hostname === "www.npmjs.com" && u.pathname.startsWith("/package/")) {
     const name = u.pathname.slice("/package/".length).split("/v/")[0];
