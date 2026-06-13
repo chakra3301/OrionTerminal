@@ -259,6 +259,48 @@ export function XDesignCanvas() {
     (id: string): Shape | undefined => displayShapes.find((s) => s.id === id),
     [displayShapes],
   );
+
+  // Viewport culling: above a threshold, only render top-level subtrees that
+  // intersect the visible doc rect (+ a generous margin so nothing pops in
+  // jarringly). Below it, render everything (the cull cost isn't worth it).
+  const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setCanvasSize({ w: el.clientWidth, h: el.clientHeight });
+    });
+    ro.observe(el);
+    setCanvasSize({ w: el.clientWidth, h: el.clientHeight });
+    return () => ro.disconnect();
+  }, []);
+
+  const CULL_THRESHOLD = 120;
+  const visibleShapes = useMemo(() => {
+    if (displayShapes.length <= CULL_THRESHOLD || canvasSize.w === 0) return displayShapes;
+    const z = viewport.zoom;
+    const margin = Math.max(canvasSize.w, canvasSize.h) / z; // ~one screen of slack
+    const vis = {
+      x: -viewport.x / z - margin,
+      y: -viewport.y / z - margin,
+      w: canvasSize.w / z + margin * 2,
+      h: canvasSize.h / z + margin * 2,
+    };
+    const intersects = (s: Shape) =>
+      s.x < vis.x + vis.w && s.x + s.w > vis.x && s.y < vis.y + vis.h && s.y + s.h > vis.y;
+    const keep = new Set<string>();
+    for (const s of displayShapes) {
+      if (s.parentId) continue; // handled with its top-level ancestor
+      const subtree = collectDescendantIds(displayShapes, s.id);
+      if (subtree.some((id) => { const d = displayShapes.find((x) => x.id === id); return d && intersects(d); })) {
+        for (const id of subtree) keep.add(id);
+      }
+    }
+    // Always keep selected shapes (their handles must render).
+    for (const id of selection) keep.add(id);
+    return displayShapes.filter((s) => keep.has(s.id));
+  }, [displayShapes, canvasSize, viewport, selection]);
+
   const [spaceDown, setSpaceDown] = useState(false);
   const [panDrag, setPanDrag] = useState<{ x: number; y: number } | null>(null);
   const [imagePicker, setImagePicker] = useState(false);
@@ -1350,7 +1392,7 @@ export function XDesignCanvas() {
               ))}
           </defs>
           {renderShapesWithClipping({
-            shapes: displayShapes,
+            shapes: visibleShapes,
             selection,
             onShapeMouseDown,
             updateShape,
