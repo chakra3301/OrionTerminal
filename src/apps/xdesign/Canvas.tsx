@@ -1941,7 +1941,7 @@ function ShapeNode({
     // Points are stored in unit space (0..1). Scale the path to (w, h) and
     // translate to (x, y) via a wrapping <g>. Stroke uses vector-effect so
     // it doesn't get squished when the bbox is non-square.
-    const d = pathToSvgD(shape.points, shape.closed);
+    const d = pathToSvgD(shape.points, shape.closed, shape.subpaths);
     return (
       <g
         onMouseDown={onMouseDown}
@@ -1957,6 +1957,7 @@ function ShapeNode({
         <path
           d={d}
           fill={shape.closed ? fillAttr : "none"}
+          fillRule={shape.fillRule}
           stroke={selectedStroke}
           strokeWidth={selectedWidth}
           vectorEffect="non-scaling-stroke"
@@ -2100,7 +2101,7 @@ function rectPathD(
     .join(" ");
 }
 
-function pathToSvgD(points: PathPoint[], closed: boolean): string {
+function subpathD(points: PathPoint[], closed: boolean): string {
   if (points.length === 0) return "";
   const cmds: string[] = [];
   cmds.push(`M ${points[0]!.x} ${points[0]!.y}`);
@@ -2125,6 +2126,21 @@ function pathToSvgD(points: PathPoint[], closed: boolean): string {
   }
   if (closed) cmds.push("Z");
   return cmds.join(" ");
+}
+
+function pathToSvgD(
+  points: PathPoint[],
+  closed: boolean,
+  subpaths?: PathPoint[][],
+): string {
+  let d = subpathD(points, closed);
+  // Extra subpaths (boolean-op holes / disjoint regions) are always closed.
+  if (subpaths)
+    for (const sp of subpaths) {
+      const extra = subpathD(sp, true);
+      if (extra) d += " " + extra;
+    }
+  return d;
 }
 
 function CheckerBackground() {

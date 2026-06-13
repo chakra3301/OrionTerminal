@@ -22,6 +22,8 @@ import {
   type Gradient,
 } from "@/apps/xdesign/store";
 import { XDesignImagePicker } from "@/apps/xdesign/ImagePicker";
+import { toast } from "@/store/toastStore";
+import type { BoolOp } from "@/apps/xdesign/booleanOps";
 
 const COLOR_PRESETS: Array<{ value: string; title: string }> = [
   { value: "transparent", title: "Transparent" },
@@ -912,6 +914,7 @@ export function XDesignInspector() {
   const updateShape = useXDesign((s) => s.updateShape);
   const pushHistory = useXDesign((s) => s.pushHistory);
   const patchMany = useXDesign((s) => s.patchMany);
+  const booleanOp = useXDesign((s) => s.booleanOp);
 
   const commit = (id: string, patch: Partial<Shape>) => {
     pushHistory();
@@ -986,6 +989,30 @@ export function XDesignInspector() {
               patchMany(ids, () => ({ opacity: Math.max(0, Math.min(1, v / 100)) }));
             }}
           />
+        </div>
+        <div className="xd-section-label">Boolean</div>
+        <div className="xd-bool-row">
+          {(
+            [
+              ["union", "Union", "merge into one shape"],
+              ["subtract", "Subtract", "remove upper shapes from the bottom one"],
+              ["intersect", "Intersect", "keep only the overlap"],
+              ["exclude", "Exclude", "keep everything except the overlap"],
+            ] as Array<[BoolOp, string, string]>
+          ).map(([op, label, hint]) => (
+            <button
+              key={op}
+              type="button"
+              className="xd-mini-btn"
+              title={`${label} — ${hint}`}
+              onClick={() => {
+                if (!booleanOp(op, ids))
+                  toast.warning(`${label} produced an empty result`);
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
     );

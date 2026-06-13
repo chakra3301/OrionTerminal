@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { ulid } from "ulid";
+import { booleanShapes, type BoolOp } from "./booleanOps";
 
 export type ToolId =
   | "select"
@@ -186,6 +187,12 @@ export type PathShape = ShapeBase & {
   kind: "path";
   points: PathPoint[];
   closed: boolean;
+  /** Additional closed subpaths (holes / disjoint regions), produced by
+   * boolean ops. Each is a list of unit-space points like `points`. When
+   * present the shape renders with even-odd fill so holes punch through. */
+  subpaths?: PathPoint[][];
+  /** SVG fill rule. Defaults to "nonzero"; boolean results use "evenodd". */
+  fillRule?: "nonzero" | "evenodd";
 };
 
 export type Shape =
@@ -282,6 +289,12 @@ type XDesignState = {
   /** For each frame in `ids`, move its descendants to the frame's parent
    * (preserving order) and delete the frame. */
   ungroup: (ids: string[]) => void;
+
+  /** Combine the given shapes (z-order: index 0 = bottom) into a single
+   * closed vector path via a boolean op. The result inherits the bottom-most
+   * shape's style and z-position; operands (and their descendants) are
+   * removed. Returns the new path's id, or null if the result is empty. */
+  booleanOp: (op: BoolOp, ids: string[]) => string | null;
 
   /** Promote a shape (typically a frame) to a main component, OR clear
    * the main flag if already set. */
@@ -752,6 +765,60 @@ export const useXDesign = create<XDesignState>((set, get) => ({
       shapes = shapes.filter((c) => !frameIds.has(c.id));
       return { shapes, selection: new Set(liftedIds) };
     });
+  },
+
+  booleanOp: (op, ids) => {
+    const cur = get();
+    // Operands in z-order (bottom-most first) — matters for subtract + style.
+    const targets = cur.shapes.filter((s) => ids.includes(s.id));
+    if (targets.length < 2) return null;
+    const result = booleanShapes(op, targets);
+    if (!result) return null;
+
+    const bottom = targets[0]!;
+    cur.pushHistory();
+    const pathId = ulid();
+    const newPath = {
+      id: pathId,
+      name: `Boolean ${cur.shapes.length + 1}`,
+      kind: "path" as const,
+      x: result.x,
+      y: result.y,
+      w: result.w,
+      h: result.h,
+      points: result.points,
+      subpaths: result.subpaths.length ? result.subpaths : undefined,
+      fillRule: "evenodd" as const,
+      closed: true,
+      fill: bottom.fill,
+      stroke: bottom.stroke,
+      strokeWidth: bottom.strokeWidth,
+      fillGradient: bottom.fillGradient,
+      opacity: bottom.opacity,
+      parentId: bottom.parentId ?? null,
+    };
+    set((s) => {
+      // Remove operands and any descendants (a selected frame takes its
+      // subtree) so nothing is orphaned with a dangling parentId.
+      const drop = new Set<string>();
+      for (const id of ids)
+        for (const d of collectDescendantIds(s.shapes, id)) drop.add(d);
+      const insertAt = Math.max(
+        ...targets.map((t) => s.shapes.findIndex((x) => x.id === t.id)),
+      );
+      const merged: Shape[] = [];
+      let inserted = false;
+      s.shapes.forEach((sh, i) => {
+        if (i === insertAt) {
+          merged.push(newPath as Shape);
+          inserted = true;
+        }
+        if (!drop.has(sh.id)) merged.push(sh);
+      });
+      if (!inserted) merged.push(newPath as Shape);
+      return { shapes: merged, selection: new Set([pathId]) };
+    });
+    return pathId;
   },
 
   toggleMainComponent: (id) => {

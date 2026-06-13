@@ -8301,6 +8301,18 @@ summary:focus-visible,
   color: var(--neon-magenta);
 }
 
+.xd-bool-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.xd-bool-row .xd-mini-btn {
+  width: auto;
+  flex: 1 1 calc(50% - 3px);
+  height: 28px;
+}
+
 .xd-layer-row.hidden .xd-layer-name,
 .xd-layer-row.hidden + .xd-layer-row .xd-layer-name { /* compound selector noise */ }
 .xd-layer-row.hidden { opacity: 0.4; }
