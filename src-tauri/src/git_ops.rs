@@ -199,6 +199,62 @@ pub fn git_file_diff(root: String, path: String) -> Result<String, String> {
     Ok(out)
 }
 
+#[derive(Serialize)]
+pub struct GitBlameLine {
+    pub author: String,
+    pub time: i64,
+    pub summary: String,
+    pub sha: String,
+}
+
+/// Porcelain blame for ONE line — feeds the subtle end-of-line annotation.
+/// None for uncommitted lines (all-zero sha) and out-of-range requests.
+#[tauri::command]
+pub fn git_blame_line(
+    root: String,
+    path: String,
+    line: u32,
+) -> Result<Option<GitBlameLine>, String> {
+    let spec = format!("{},{}", line, line);
+    let raw = match run_git(&root, &["blame", "-p", "-L", &spec, "--", &path]) {
+        Ok(s) => s,
+        // Untracked file / line past EOF / shallow history — just no blame.
+        Err(e)
+            if e.contains("no such path")
+                || e.contains("has only")
+                || e.contains("bad revision") =>
+        {
+            return Ok(None)
+        }
+        Err(e) => return Err(e),
+    };
+
+    let mut sha = String::new();
+    let mut author = String::new();
+    let mut time: i64 = 0;
+    let mut summary = String::new();
+    for l in raw.lines() {
+        if sha.is_empty() {
+            sha = l.split(' ').next().unwrap_or("").to_string();
+        } else if let Some(a) = l.strip_prefix("author ") {
+            author = a.to_string();
+        } else if let Some(t) = l.strip_prefix("author-time ") {
+            time = t.parse().unwrap_or(0);
+        } else if let Some(s) = l.strip_prefix("summary ") {
+            summary = s.to_string();
+        }
+    }
+    if sha.is_empty() || sha.chars().all(|c| c == '0') {
+        return Ok(None);
+    }
+    Ok(Some(GitBlameLine {
+        author,
+        time,
+        summary,
+        sha,
+    }))
+}
+
 /// Strip git's C-style quoting on paths with special chars.
 fn unquote(p: &str) -> String {
     if p.len() >= 2 && p.starts_with('"') && p.ends_with('"') {

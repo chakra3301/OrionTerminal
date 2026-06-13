@@ -184,6 +184,7 @@ pub fn run() {
             git_ops::git_branches,
             git_ops::git_checkout,
             git_ops::git_file_diff,
+            git_ops::git_blame_line,
             mcp_config::context_snapshot_write,
             ui_bridge::ui_bridge_respond,
             api_key::api_key_set,

@@ -24,6 +24,14 @@ type MonacoEditor = Parameters<OnMount>[0];
 type MonacoNs = Parameters<OnMount>[1];
 type DecorationsCollection = ReturnType<MonacoEditor["createDecorationsCollection"]>;
 
+function blameAge(ts: number): string {
+  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (s < 3600) return `${Math.max(1, Math.floor(s / 60))}m ago`;
+  if (s < 86_400) return `${Math.floor(s / 3600)}h ago`;
+  if (s < 31_536_000) return `${Math.floor(s / 86_400)}d ago`;
+  return `${Math.floor(s / 31_536_000)}y ago`;
+}
+
 export function OrionEditor({ path }: { path: string }) {
   const buffer = useTabsStore((s) => s.fileBuffers[path]);
   const markLoaded = useTabsStore((s) => s.markLoaded);
@@ -146,6 +154,65 @@ export function OrionEditor({ path }: { path: string }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
+
+  // ── Inline blame: a dim end-of-line annotation for the cursor line
+  // (author · age · summary), debounced; silent for uncommitted lines.
+  const blameDecoRef = useRef<DecorationsCollection | null>(null);
+  const blameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blameCacheRef = useRef<Map<string, string | null>>(new Map());
+
+  const scheduleBlame = () => {
+    if (blameTimerRef.current) clearTimeout(blameTimerRef.current);
+    blameTimerRef.current = setTimeout(() => {
+      blameTimerRef.current = null;
+      void (async () => {
+        const ed = editorRef.current;
+        const monaco = monacoRef.current;
+        const model = ed?.getModel();
+        const pos = ed?.getPosition();
+        const rel = gitRelPath(path);
+        const root = useProjectStore.getState().active?.root_path;
+        if (!ed || !monaco || !model || !pos || !rel || !root) return;
+        if (!useGit.getState().isRepo) return;
+        const lineDirty = usePendingEdits.getState().edits[path] !== undefined;
+        if (lineDirty) {
+          blameDecoRef.current?.clear();
+          return;
+        }
+        const key = `${rel}:${pos.lineNumber}:${useGit.getState().branch}`;
+        let text = blameCacheRef.current.get(key);
+        if (text === undefined) {
+          try {
+            const b = await ipc.gitBlameLine(root, rel, pos.lineNumber);
+            text = b
+              ? `  ${b.author} · ${blameAge(b.time * 1000)} · ${b.summary}`
+              : null;
+          } catch {
+            text = null;
+          }
+          blameCacheRef.current.set(key, text);
+          if (blameCacheRef.current.size > 200) {
+            const first = blameCacheRef.current.keys().next().value;
+            if (first) blameCacheRef.current.delete(first);
+          }
+        }
+        // Cursor may have moved while we awaited.
+        const now = ed.getPosition();
+        if (!now || now.lineNumber !== pos.lineNumber) return;
+        blameDecoRef.current?.clear();
+        if (!text) return;
+        const col = model.getLineMaxColumn(pos.lineNumber);
+        blameDecoRef.current = ed.createDecorationsCollection([
+          {
+            range: new monaco.Range(pos.lineNumber, col, pos.lineNumber, col),
+            options: {
+              after: { content: text, inlineClassName: "or-blame" },
+            },
+          },
+        ]);
+      })();
+    }, 600);
+  };
 
   // ── Git gutter markers: HEAD vs buffer via the same Myers diff that
   // powers AI-edit review. Suppressed while a pending AI review owns the
@@ -296,6 +363,7 @@ export function OrionEditor({ path }: { path: string }) {
     editor.onDidChangeCursorPosition(() => {
       reportStatus();
       scheduleSymbolUpdate();
+      scheduleBlame();
     });
     reportStatus();
     tryReveal();

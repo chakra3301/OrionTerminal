@@ -97,6 +97,12 @@ export const ipc = {
     invoke<string>("git_checkout", { root, branch }),
   gitFileDiff: (root: string, path: string): Promise<string> =>
     invoke<string>("git_file_diff", { root, path }),
+  gitBlameLine: (
+    root: string,
+    path: string,
+    line: number,
+  ): Promise<{ author: string; time: number; summary: string; sha: string } | null> =>
+    invoke("git_blame_line", { root, path, line }),
 
   autocompleteRun: (ctx: {
     path: string;
