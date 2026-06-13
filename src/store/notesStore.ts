@@ -198,6 +198,11 @@ export const useNotesStore = create<NotesState>((set, get) => ({
         const n = get().notes.get(id);
         return n ? `${n.title || "Untitled"}\n${n.plaintext ?? ""}` : null;
       });
+      // Auto-suggest tags once a note settles (zero-tag notes only; lazy
+      // import keeps the AI path out of the store's dependency graph).
+      void import("@/features/notes/noteAutoTag").then((m) =>
+        m.scheduleNoteAutoTag(id),
+      );
       void logActivity({
         source: "archives",
         kind: `${existing.kind || "note"}.edit`,
