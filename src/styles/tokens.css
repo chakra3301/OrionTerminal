@@ -11051,3 +11051,13 @@ html.ot-reduce-glass .note-page .note-editor-body {
   border-color: rgba(var(--neon-cyan-rgb), 0.4) !important;
 }
 .xd-export-react:hover { background: rgba(var(--neon-cyan-rgb), 0.12) !important; }
+
+/* XDesign inspector — batch (multi-select) label */
+.xd-section-label {
+  padding: 10px 12px 4px;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t-faint);
+}

@@ -911,6 +911,7 @@ export function XDesignInspector() {
   const selection = useXDesign((s) => s.selection);
   const updateShape = useXDesign((s) => s.updateShape);
   const pushHistory = useXDesign((s) => s.pushHistory);
+  const patchMany = useXDesign((s) => s.patchMany);
 
   const commit = (id: string, patch: Partial<Shape>) => {
     pushHistory();
@@ -937,22 +938,54 @@ export function XDesignInspector() {
   }
 
   if (selected.length > 1) {
-    // Bounding box for multi-selection (read-only summary for now).
     const minX = Math.min(...selected.map((s) => s.x));
     const minY = Math.min(...selected.map((s) => s.y));
     const maxX = Math.max(...selected.map((s) => s.x + s.w));
     const maxY = Math.max(...selected.map((s) => s.y + s.h));
+    const ids = selected.map((s) => s.id);
+    // Common value across the selection, or "" / undefined when mixed.
+    const commonFill = selected.every((s) => s.fill === selected[0]!.fill)
+      ? selected[0]!.fill
+      : "";
+    const commonOpacity = selected.every(
+      (s) => (s.opacity ?? 1) === (selected[0]!.opacity ?? 1),
+    )
+      ? selected[0]!.opacity ?? 1
+      : 1;
+
+    const moveBy = (dx: number, dy: number) => {
+      pushHistory();
+      patchMany(ids, (s) => ({ x: s.x + dx, y: s.y + dy }));
+    };
+
     return (
       <div className="xd-inspector scroll">
         <div className="heading">Properties</div>
-        <div className="xd-inspector-multi">
-          {selected.length} layers selected
-        </div>
+        <div className="xd-inspector-multi">{selected.length} layers selected</div>
         <div className="xd-fields">
-          <NumField label="X" value={minX} onChange={() => {}} />
-          <NumField label="Y" value={minY} onChange={() => {}} />
-          <NumField label="W" value={maxX - minX} onChange={() => {}} />
-          <NumField label="H" value={maxY - minY} onChange={() => {}} />
+          <NumField label="X" value={Math.round(minX)} onChange={(v) => moveBy(v - minX, 0)} />
+          <NumField label="Y" value={Math.round(minY)} onChange={(v) => moveBy(0, v - minY)} />
+          <NumField label="W" value={Math.round(maxX - minX)} onChange={() => {}} />
+          <NumField label="H" value={Math.round(maxY - minY)} onChange={() => {}} />
+        </div>
+        <div className="xd-section-label">Batch</div>
+        <ColorField
+          label="Fill"
+          value={commonFill || "#000000"}
+          onChange={(next) => {
+            pushHistory();
+            patchMany(ids, () => ({ fill: next }));
+          }}
+        />
+        <div className="xd-fields">
+          <NumField
+            label="Opacity %"
+            value={Math.round(commonOpacity * 100)}
+            onChange={(v) => {
+              pushHistory();
+              patchMany(ids, () => ({ opacity: Math.max(0, Math.min(1, v / 100)) }));
+            }}
+          />
         </div>
       </div>
     );
