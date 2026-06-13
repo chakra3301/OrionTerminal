@@ -196,7 +196,16 @@ pub async fn repolens_claude_call(prompt: String, model: String) -> Result<RepoL
         model
     };
     let mut cmd = Command::new("claude");
-    cmd.args(["-p", "--output-format", "json", "--model", &model]);
+    // --strict-mcp-config: RepoLens is a tool-less prompt→JSON call, so don't
+    // load the user's configured MCP servers (faster startup, no init hang).
+    cmd.args([
+        "-p",
+        "--output-format",
+        "json",
+        "--strict-mcp-config",
+        "--model",
+        &model,
+    ]);
     if let Some(home) = std::env::var_os("HOME") {
         cmd.current_dir(home);
     }
@@ -217,7 +226,17 @@ pub async fn repolens_claude_call(prompt: String, model: String) -> Result<RepoL
             .map_err(|e| e.to_string())?;
     } // stdin dropped → EOF, claude starts
 
-    let out = child.wait_with_output().await.map_err(|e| e.to_string())?;
+    // Cap the wait so a genuinely stuck CLI surfaces an error instead of an
+    // infinite spinner. On timeout the future drops `child` → kill_on_drop.
+    let out = match tokio::time::timeout(
+        std::time::Duration::from_secs(180),
+        child.wait_with_output(),
+    )
+    .await
+    {
+        Ok(r) => r.map_err(|e| e.to_string())?,
+        Err(_) => return Err("claude timed out after 180s — try again or a smaller model".into()),
+    };
     if !out.status.success() {
         return Err(format!(
             "claude exited {}: {}",

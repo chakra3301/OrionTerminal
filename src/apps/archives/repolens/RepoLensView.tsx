@@ -40,7 +40,10 @@ export function RepoLensView() {
 
       <div className="rl-body">
         {running === "core" && !current && (
-          <div className="rl-spinner">Scanning {hit?.repoId}… (this takes a few seconds)</div>
+          <div className="rl-spinner">
+            Scanning {hit?.repoId}… the full briefing usually takes ~30–90s (Claude is writing the whole
+            report). Pick the <strong>Haiku</strong> model above for faster scans, or Opus for the deepest.
+          </div>
         )}
         {current ? <RepoLensReport a={current} /> : !running && <RepoLensLibrary />}
       </div>
