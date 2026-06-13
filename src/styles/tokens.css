@@ -11044,3 +11044,10 @@ html.ot-reduce-glass .note-page .note-editor-body {
   font-size: 17px; line-height: 1.4; padding: 0; user-select: none;
 }
 .bn-callout-content { flex: 1; min-width: 0; }
+
+/* XDesign → React export button */
+.xd-export-react {
+  color: var(--neon-cyan) !important;
+  border-color: rgba(var(--neon-cyan-rgb), 0.4) !important;
+}
+.xd-export-react:hover { background: rgba(var(--neon-cyan-rgb), 0.12) !important; }

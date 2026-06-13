@@ -419,6 +419,18 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
+    id: "xdesign.exportToCode",
+    label: "XDesign: Export Selection to React",
+    keywords: ["xdesign", "export", "react", "code", "design", "component", "tsx"],
+    group: "View",
+    run: () => {
+      void import("@/apps/xdesign/exportToCode").then((m) =>
+        m.exportSelectionToCode(),
+      );
+    },
+  });
+
+  registry.register({
     id: "note.quickCapture",
     label: "Quick Capture",
     hotkey: "mod+shift+n",

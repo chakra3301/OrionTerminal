@@ -890,6 +890,18 @@ function ExportRow() {
       >
         SVG
       </button>
+      <button
+        type="button"
+        className="xd-effects-add xd-export-react"
+        onClick={() =>
+          void import("@/apps/xdesign/exportToCode").then((m) =>
+            m.exportSelectionToCode(),
+          )
+        }
+        title="Export to React + design tokens (staged edit in Orion)"
+      >
+        ⌘ React
+      </button>
     </div>
   );
 }
