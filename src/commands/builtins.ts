@@ -432,6 +432,17 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
+    id: "note.dailyNote",
+    label: "Open Today's Note",
+    hotkey: "mod+shift+d",
+    keywords: ["daily", "today", "journal", "diary", "log"],
+    group: "Notes",
+    run: () => {
+      void import("@/features/notes/dailyNote").then((m) => m.openDailyNote());
+    },
+  });
+
+  registry.register({
     id: "editor.toggleTabAutocomplete",
     label: "Toggle Tab Autocomplete",
     keywords: ["autocomplete", "ghost", "suggestion", "completion", "ai", "tab"],
