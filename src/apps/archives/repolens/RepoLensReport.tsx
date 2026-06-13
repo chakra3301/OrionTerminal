@@ -11,6 +11,13 @@ import { SynergiesPanel } from "./lens/SynergiesPanel";
 import { VersusPanel } from "./lens/VersusPanel";
 import { FrameworkPanel } from "./lens/FrameworkPanel";
 import { ConnectionsPanel } from "./lens/ConnectionsPanel";
+import { SimilarPanel } from "./lens/SimilarPanel";
+import { explainerFor } from "./help";
+
+function tip(key: string): string {
+  const e = explainerFor(key);
+  return e ? `${e.bestFor}\n\nSkip if: ${e.skipIf}\nCost: ${e.cost}` : "";
+}
 
 const LANG_COLORS = [
   "var(--repolens-green)",
@@ -75,6 +82,7 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
   const [versusOpen, setVersusOpen] = useState(false);
   const [frameworksOpen, setFrameworksOpen] = useState(false);
   const [showConn, setShowConn] = useState(false);
+  const [showSimilar, setShowSimilar] = useState(false);
   const [vsInput, setVsInput] = useState("");
   const vsHit = resolveInput(vsInput);
   const vsCandidates = library.filter((r) => r.repo_id !== repoId);
@@ -153,6 +161,7 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
           <button
             className={`rl-btn rl-lens-btn${lenses.deepdive ? " has" : ""}`}
             disabled={running !== null}
+            title={tip("deepdive")}
             onClick={() => void runDeepDive()}
           >
             {running === "deepdive" ? "Running Deep Dive…" : lenses.deepdive ? "↻ Deep Dive" : "Deep Dive"}
@@ -160,6 +169,7 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
           <button
             className={`rl-btn rl-lens-btn${lenses.sktpg ? " has" : ""}`}
             disabled={running !== null}
+            title={tip("sktpg")}
             onClick={() => void runSktpg()}
           >
             {running === "sktpg" ? "Running SKTPG…" : lenses.sktpg ? "↻ SKTPG" : "SKTPG"}
@@ -167,6 +177,7 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
           <button
             className={`rl-btn rl-lens-btn${lenses.synergies ? " has" : ""}`}
             disabled={running !== null}
+            title={tip("synergies")}
             onClick={() => void runSynergies()}
           >
             {running === "synergies" ? "Running Synergies…" : lenses.synergies ? "↻ Synergies" : "Synergies"}
@@ -174,6 +185,7 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
           <button
             className={`rl-btn rl-lens-btn${lenses.versus ? " has" : ""}${versusOpen ? " open" : ""}`}
             disabled={running !== null}
+            title={tip("versus")}
             onClick={() => {
               setVersusOpen((o) => !o);
               setFrameworksOpen(false);
@@ -193,9 +205,17 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
           </button>
           <button
             className={`rl-btn rl-lens-btn${showConn ? " has" : ""}`}
+            title={tip("connections")}
             onClick={() => setShowConn((o) => !o)}
           >
             Connections
+          </button>
+          <button
+            className={`rl-btn rl-lens-btn${showSimilar ? " has" : ""}`}
+            title={tip("similar")}
+            onClick={() => setShowSimilar((o) => !o)}
+          >
+            Similar
           </button>
         </div>
         <button className="rl-btn" onClick={() => downloadMarkdown(a)}>
@@ -501,6 +521,7 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
 
       {/* ── deeper analysis (lens results) ── */}
       {showConn && <ConnectionsPanel a={a} />}
+      {showSimilar && <SimilarPanel a={a} />}
       {lenses.deepdive && <DeepDivePanel d={lenses.deepdive} />}
       {lenses.sktpg && <SktpgPanel s={lenses.sktpg} />}
       {lenses.synergies && <SynergiesPanel s={lenses.synergies} />}

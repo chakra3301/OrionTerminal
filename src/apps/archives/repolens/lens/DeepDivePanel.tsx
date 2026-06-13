@@ -1,9 +1,12 @@
 import type { DeepDive } from "../types";
+import { LensGuide } from "./LensGuide";
+import { LineageDiagram } from "./LineageDiagram";
 
 export function DeepDivePanel({ d }: { d: DeepDive }) {
   return (
     <section className="rl-card rl-lens-panel">
       <div className="rl-eyebrow">Deep Dive</div>
+      <LensGuide k="deepdive" />
       {d.feynman.explanation && <p className="rl-prose">{d.feynman.explanation}</p>}
 
       <div className="sub-h">Atoms</div>
@@ -19,6 +22,7 @@ export function DeepDivePanel({ d }: { d: DeepDive }) {
       {d.lineage.links.length > 0 && (
         <>
           <div className="sub-h">Lineage</div>
+          <LineageDiagram d={d} />
           <ul className="rl-list">
             {d.lineage.links.map((l, i) => (
               <li key={i}>

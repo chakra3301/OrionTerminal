@@ -1,4 +1,5 @@
 import type { Sktpg } from "../types";
+import { LensGuide } from "./LensGuide";
 
 export function SktpgPanel({ s }: { s: Sktpg }) {
   return (
@@ -6,6 +7,7 @@ export function SktpgPanel({ s }: { s: Sktpg }) {
       <div className="rl-eyebrow">
         SKTPG · {s.score.value}/100 · {s.score.band}
       </div>
+      <LensGuide k="sktpg" />
 
       <ul className="rl-list">
         {s.thesis.becoming && (
