@@ -10603,3 +10603,63 @@ html.ot-reduce-glass .note-page .note-editor-body {
   color: var(--t-tertiary);
 }
 .ot-capture-foot .kbd:not(:first-child) { margin-left: 10px; }
+
+/* Template picker (New from template) */
+.ot-tpl-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 6400;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 16vh;
+  animation: ot-ctx-in 120ms ease-out;
+}
+.ot-tpl {
+  width: 460px;
+  max-width: calc(100vw - 48px);
+  background: var(--bg-1);
+  border: 1px solid rgba(var(--neon-green-rgb), 0.25);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-window);
+  padding: 6px;
+  outline: none;
+}
+.ot-tpl-head {
+  padding: 8px 12px 6px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t-tertiary);
+}
+.ot-tpl-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 9px 12px;
+  background: none;
+  border: none;
+  border-radius: var(--r-md);
+  color: var(--t-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+.ot-tpl-row.hi { background: rgba(var(--neon-green-rgb), 0.1); }
+.ot-tpl-row > svg { flex: none; color: var(--neon-green); }
+.ot-tpl-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ot-tpl-name { font-family: var(--f-ui); font-size: 13px; color: var(--t-primary); font-weight: 500; }
+.ot-tpl-blurb { font-family: var(--f-ui); font-size: 11px; color: var(--t-tertiary); }
+.ot-tpl-kind {
+  flex: none;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-faint);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--r-pill);
+  padding: 1px 7px;
+}

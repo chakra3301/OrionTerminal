@@ -432,6 +432,18 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
+    id: "note.newFromTemplate",
+    label: "New from Template…",
+    keywords: ["template", "new", "meeting", "daily", "project", "reading", "boilerplate"],
+    group: "Notes",
+    run: () => {
+      void import("@/features/notes/templates").then((m) =>
+        m.useTemplatePicker.getState().show(),
+      );
+    },
+  });
+
+  registry.register({
     id: "note.dailyNote",
     label: "Open Today's Note",
     hotkey: "mod+shift+d",
