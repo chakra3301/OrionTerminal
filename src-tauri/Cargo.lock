@@ -2927,6 +2927,7 @@ dependencies = [
 name = "orion-terminal"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "bytes",
  "futures-util",
  "keyring",

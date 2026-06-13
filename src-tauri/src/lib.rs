@@ -12,6 +12,7 @@ mod lsp;
 mod mcp_config;
 pub mod mcp_server;
 mod messages_chat;
+mod repolens;
 mod sysstats;
 mod terminal;
 mod ui_bridge;
@@ -142,6 +143,12 @@ pub fn run() {
             sql: include_str!("../migrations/0020_database_views.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 21,
+            description: "repolens: saved repo scans + on-demand lens results",
+            sql: include_str!("../migrations/0021_repolens.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
@@ -201,6 +208,12 @@ pub fn run() {
             api_key::api_key_set,
             api_key::api_key_clear,
             api_key::api_key_status,
+            api_key::github_token_set,
+            api_key::github_token_clear,
+            api_key::github_token_status,
+            repolens::repolens_claude_call,
+            repolens::repolens_fetch_repo,
+            repolens::repolens_fetch_source,
             autocomplete::autocomplete_run,
             inline_edit::inline_edit_run,
             inline_edit::inline_edit_cancel,
