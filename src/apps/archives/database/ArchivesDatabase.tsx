@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Table2, Columns3, LayoutGrid, Calendar, ArrowLeft, Plus, Settings2 } from "lucide-react";
+import { Table2, Columns3, LayoutGrid, Calendar, ArrowLeft, Plus, Settings2, ArrowUpDown, Filter as FilterIcon, X } from "lucide-react";
 import { useDatabase } from "@/store/databaseStore";
 import { useNotesStore } from "@/store/notesStore";
 import { useCollectionsStore } from "@/store/collectionsStore";
@@ -9,6 +9,8 @@ import { TableView, NewRowButton } from "./TableView";
 import { BoardView } from "./BoardView";
 import { GalleryView } from "./GalleryView";
 import { CalendarView } from "./CalendarView";
+import { shapeRows } from "@/features/database/grouping";
+import { formatValue, type Filter } from "@/features/database/propertyTypes";
 import type { ViewType } from "@/features/database/databaseDb";
 
 const VIEW_ICON: Record<ViewType, typeof Table2> = {
@@ -41,15 +43,31 @@ export function ArchivesDatabase() {
     if (collectionId && loadedFor !== collectionId) void load(collectionId);
   }, [collectionId, loadedFor, load]);
 
-  const rows = useMemo(() => {
+  const values = useDatabase((s) => s.values);
+
+  const baseRows = useMemo(() => {
     if (!collectionId) return [];
     return [...notes.values()]
       .filter((n) => n.collectionId === collectionId)
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }, [notes, collectionId]);
 
-  if (!collectionId) return null;
   const activeView = views.find((v) => v.id === activeViewId);
+
+  // Apply the active view's filters + sort (board then groups the result).
+  const rows = useMemo(() => {
+    if (!activeView) return baseRows;
+    const titleById = new Map(baseRows.map((n) => [n.id, n.title || "Untitled"]));
+    return shapeRows(baseRows, {
+      properties,
+      filters: activeView.config.filters,
+      sort: activeView.config.sort ?? null,
+      getValue: (id, pid) => values.get(id)?.get(pid) ?? "",
+      getTitle: (id) => titleById.get(id) ?? "",
+    });
+  }, [baseRows, activeView, properties, values]);
+
+  if (!collectionId) return null;
 
   const openAddView = (el: HTMLElement) => {
     const items: MenuItem[] = (["table", "board", "gallery", "calendar"] as ViewType[]).map(
@@ -64,6 +82,56 @@ export function ArchivesDatabase() {
     );
     openFromButton(el, items);
   };
+
+  const activeFilters = activeView?.config.filters ?? [];
+  const activeSort = activeView?.config.sort ?? null;
+
+  const openSort = (el: HTMLElement) => {
+    const toggle = (propertyId: string) => {
+      const cur = activeSort;
+      const dir = cur?.propertyId === propertyId && cur.dir === "asc" ? "desc" : "asc";
+      void patchActiveView({ sort: { propertyId, dir } });
+    };
+    const items: MenuItem[] = [
+      { label: "Name (title)", checked: activeSort?.propertyId === "__title__", onClick: () => toggle("__title__") },
+      ...properties.map((p) => ({
+        label: p.name + (activeSort?.propertyId === p.id ? (activeSort.dir === "asc" ? " ↑" : " ↓") : ""),
+        checked: activeSort?.propertyId === p.id,
+        onClick: () => toggle(p.id),
+      })),
+      ...(activeSort ? [{ type: "separator" } as MenuItem, { label: "Clear sort", danger: true, onClick: () => void patchActiveView({ sort: null }) } as MenuItem] : []),
+    ];
+    openFromButton(el, items);
+  };
+
+  const openFilter = (el: HTMLElement) => {
+    const addFilter = (f: Filter) => void patchActiveView({ filters: [...activeFilters, f] });
+    const items: MenuItem[] = [];
+    for (const p of properties) {
+      if (p.type === "select" || p.type === "status") {
+        for (const o of p.options) {
+          items.push({ label: `${p.name}: ${o.name}`, onClick: () => addFilter({ propertyId: p.id, op: "is", value: o.id }) });
+        }
+      } else if (p.type === "checkbox") {
+        items.push({ label: `${p.name}: checked`, onClick: () => addFilter({ propertyId: p.id, op: "checked" }) });
+      } else {
+        items.push({ label: `${p.name}: not empty`, onClick: () => addFilter({ propertyId: p.id, op: "is_not_empty" }) });
+      }
+    }
+    if (items.length === 0) items.push({ label: "Add a property first", disabled: true, onClick: () => {} });
+    openFromButton(el, items);
+  };
+
+  const filterChipLabel = (f: Filter): string => {
+    const p = properties.find((x) => x.id === f.propertyId);
+    if (!p) return "filter";
+    if (f.op === "checked") return `${p.name} ✓`;
+    if (f.op === "is_not_empty") return `${p.name} set`;
+    if (f.op === "is" && f.value) return `${p.name}: ${formatValue(p, f.value)}`;
+    return p.name;
+  };
+  const removeFilter = (idx: number) =>
+    void patchActiveView({ filters: activeFilters.filter((_, i) => i !== idx) });
 
   // Config menu: board groupBy / calendar dateProp + delete view.
   const openConfig = (el: HTMLElement) => {
@@ -131,7 +199,19 @@ export function ArchivesDatabase() {
             <Plus size={12} />
           </button>
         </div>
+        {activeFilters.map((f, i) => (
+          <span key={i} className="ar-db-filterchip">
+            {filterChipLabel(f)}
+            <button type="button" onClick={() => removeFilter(i)}><X size={9} /></button>
+          </span>
+        ))}
         <div className="ar-db-bar-spacer" />
+        <button type="button" className="ar-db-cfg" title="Filter" onClick={(e) => openFilter(e.currentTarget)}>
+          <FilterIcon size={13} />
+        </button>
+        <button type="button" className={`ar-db-cfg${activeSort ? " on" : ""}`} title="Sort" onClick={(e) => openSort(e.currentTarget)}>
+          <ArrowUpDown size={13} />
+        </button>
         {activeView && (activeView.type === "board" || activeView.type === "calendar") && (
           <button type="button" className="ar-db-cfg" title="Configure view" onClick={(e) => openConfig(e.currentTarget)}>
             <Settings2 size={13} />

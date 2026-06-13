@@ -1,4 +1,49 @@
-import type { Property, SelectOption } from "./propertyTypes";
+import {
+  matchesFilter,
+  compareValues,
+  type Property,
+  type SelectOption,
+  type Filter,
+} from "./propertyTypes";
+
+export type SortSpec = { propertyId: string; dir: "asc" | "desc" } | null;
+
+/** Filter (ALL must pass) then sort a row set by a view's config. Title is a
+ * pseudo-property id "__title__" for sorting. Pure — getValue/getTitle keep
+ * it store-free and testable. */
+export function shapeRows<T extends { id: string }>(
+  rows: T[],
+  opts: {
+    properties: Property[];
+    filters?: Filter[];
+    sort?: SortSpec;
+    getValue: (id: string, propertyId: string) => string;
+    getTitle: (id: string) => string;
+  },
+): T[] {
+  const propById = new Map(opts.properties.map((p) => [p.id, p]));
+  let out = rows;
+
+  for (const f of opts.filters ?? []) {
+    const prop = propById.get(f.propertyId);
+    if (!prop) continue;
+    out = out.filter((r) => matchesFilter(prop, opts.getValue(r.id, f.propertyId), f));
+  }
+
+  const sort = opts.sort;
+  if (sort) {
+    const dir = sort.dir === "desc" ? -1 : 1;
+    const prop = propById.get(sort.propertyId);
+    out = out.slice().sort((a, b) => {
+      if (sort.propertyId === "__title__") {
+        return dir * opts.getTitle(a.id).localeCompare(opts.getTitle(b.id));
+      }
+      if (!prop) return 0;
+      return dir * compareValues(prop, opts.getValue(a.id, prop.id), opts.getValue(b.id, prop.id));
+    });
+  }
+  return out;
+}
 
 /** Pure view-shaping helpers (board grouping, calendar grid). No store/DB so
  * they're unit-testable. `getValue(noteId)` returns the raw cell string. */

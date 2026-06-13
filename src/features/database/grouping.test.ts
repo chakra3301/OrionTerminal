@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupRows, calendarCells, dateKey, indexByDate } from "./grouping";
+import { groupRows, calendarCells, dateKey, indexByDate, shapeRows } from "./grouping";
 import type { Property } from "./propertyTypes";
 
 const status: Property = {
@@ -45,6 +45,43 @@ describe("calendarCells", () => {
     const inMonth = cells.filter((c) => c.inMonth);
     expect(inMonth).toHaveLength(30); // June has 30 days
     expect(inMonth[0]!.key).toBe("2026-06-01");
+  });
+});
+
+describe("shapeRows", () => {
+  const num: Property = { id: "n", collectionId: "c", name: "N", type: "number", options: [], position: 0 };
+  const rows = [{ id: "a" }, { id: "b" }, { id: "c" }];
+  const nums: Record<string, string> = { a: "3", b: "1", c: "2" };
+  const titles: Record<string, string> = { a: "Apple", b: "Cherry", c: "Banana" };
+  const getValue = (id: string) => nums[id] ?? "";
+  const getTitle = (id: string) => titles[id] ?? "";
+
+  it("sorts ascending by a number property", () => {
+    const out = shapeRows(rows, { properties: [num], sort: { propertyId: "n", dir: "asc" }, getValue, getTitle });
+    expect(out.map((r) => r.id)).toEqual(["b", "c", "a"]);
+  });
+
+  it("sorts descending", () => {
+    const out = shapeRows(rows, { properties: [num], sort: { propertyId: "n", dir: "desc" }, getValue, getTitle });
+    expect(out.map((r) => r.id)).toEqual(["a", "c", "b"]);
+  });
+
+  it("sorts by title pseudo-property", () => {
+    const out = shapeRows(rows, { properties: [num], sort: { propertyId: "__title__", dir: "asc" }, getValue, getTitle });
+    expect(out.map((r) => r.id)).toEqual(["a", "c", "b"]); // Apple, Banana, Cherry
+  });
+
+  it("filters by a numeric not-empty + keeps order when no sort", () => {
+    const out = shapeRows(
+      [{ id: "a" }, { id: "x" }],
+      { properties: [num], filters: [{ propertyId: "n", op: "is_not_empty" }], getValue, getTitle },
+    );
+    expect(out.map((r) => r.id)).toEqual(["a"]); // x has no value
+  });
+
+  it("returns rows unchanged with no filters/sort", () => {
+    const out = shapeRows(rows, { properties: [num], getValue, getTitle });
+    expect(out.map((r) => r.id)).toEqual(["a", "b", "c"]);
   });
 });
 
