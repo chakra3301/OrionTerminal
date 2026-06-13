@@ -10916,3 +10916,71 @@ html.ot-reduce-glass .note-page .note-editor-body {
 }
 .ar-db-chip-x { background: none; border: none; color: inherit; cursor: pointer; padding: 0; opacity: 0.6; }
 .ar-db-chip-x:hover { opacity: 1; }
+
+/* Database — add-view / config controls */
+.ar-db-addview, .ar-db-cfg {
+  display: grid; place-items: center; width: 22px; height: 22px; padding: 0;
+  background: none; border: none; border-radius: var(--r-sm);
+  color: var(--t-tertiary); cursor: pointer;
+}
+.ar-db-addview:hover, .ar-db-cfg:hover { color: var(--neon-green); background: rgba(255,255,255,0.05); }
+
+/* Database — board view */
+.ar-db-board { flex: 1; min-height: 0; display: flex; gap: 12px; padding: 14px; overflow-x: auto; align-items: flex-start; }
+.ar-db-board-empty { padding: 28px; color: var(--t-tertiary); font-size: 12.5px; }
+.ar-db-col {
+  flex: none; width: 248px; display: flex; flex-direction: column;
+  background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+  border-radius: var(--r-md); max-height: 100%;
+}
+.ar-db-col-head {
+  display: flex; align-items: center; gap: 8px; padding: 9px 11px;
+  border-bottom: 1px solid rgba(255,255,255,0.05); flex: none;
+}
+.ar-db-col-count { margin-left: auto; font-family: var(--f-mono); font-size: 10px; color: var(--t-faint); }
+.ar-db-col-body { display: flex; flex-direction: column; gap: 7px; padding: 9px; overflow-y: auto; min-height: 40px; }
+.ar-db-card {
+  background: var(--bg-2); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: var(--r-sm); padding: 9px 10px; cursor: pointer;
+}
+.ar-db-card:hover { border-color: rgba(var(--neon-green-rgb), 0.3); }
+.ar-db-card-title { font-family: var(--f-ui); font-size: 13px; color: var(--t-primary); }
+.ar-db-card-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.ar-db-card-chip {
+  font-family: var(--f-mono); font-size: 9.5px; color: var(--t-tertiary);
+  background: rgba(255,255,255,0.05); border-radius: var(--r-pill); padding: 1px 7px;
+}
+
+/* Database — gallery view */
+.ar-db-gallery {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 14px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; align-content: start;
+}
+.ar-db-tile {
+  display: flex; flex-direction: column; gap: 6px; text-align: left;
+  background: var(--bg-2); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: var(--r-md); padding: 12px; cursor: pointer; min-height: 90px;
+}
+.ar-db-tile:hover { border-color: rgba(var(--neon-green-rgb), 0.3); }
+.ar-db-tile-title { font-family: var(--f-ui); font-size: 14px; font-weight: 600; color: var(--t-primary); }
+.ar-db-tile-excerpt { font-size: 11.5px; color: var(--t-tertiary); line-height: 1.45; overflow: hidden; }
+.ar-db-tile-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; }
+
+/* Database — calendar view */
+.ar-db-cal { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ar-db-cal-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; justify-content: center; }
+.ar-db-cal-month { font-family: var(--f-ui); font-size: 14px; font-weight: 600; color: var(--t-primary); min-width: 160px; text-align: center; }
+.ar-db-cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); padding: 0 14px; }
+.ar-db-cal-weekday { font-family: var(--f-mono); font-size: 9.5px; text-transform: uppercase; color: var(--t-faint); padding: 4px 6px; }
+.ar-db-cal-grid { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(84px, 1fr); padding: 0 14px 14px; gap: 1px; background: rgba(255,255,255,0.04); }
+.ar-db-cal-cell { background: var(--bg-1); padding: 5px; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+.ar-db-cal-cell.out { background: var(--bg-0); }
+.ar-db-cal-cell.out .ar-db-cal-daynum { color: var(--t-faint); }
+.ar-db-cal-cell.today { box-shadow: inset 0 0 0 1px rgba(var(--neon-green-rgb), 0.5); }
+.ar-db-cal-daynum { font-family: var(--f-mono); font-size: 10px; color: var(--t-tertiary); }
+.ar-db-cal-item {
+  text-align: left; background: rgba(var(--neon-green-rgb), 0.12); color: var(--neon-green);
+  border: none; border-radius: 3px; padding: 2px 5px; font-family: var(--f-ui); font-size: 10.5px;
+  cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ar-db-cal-item:hover { background: rgba(var(--neon-green-rgb), 0.22); }
