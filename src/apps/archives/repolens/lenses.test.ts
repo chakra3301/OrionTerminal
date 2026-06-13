@@ -6,7 +6,10 @@ import {
   parseSktpg,
   buildSynergiesPrompt,
   parseSynergies,
+  buildVersusPrompt,
+  parseVersus,
 } from "./lenses";
+import type { RepoData } from "./types";
 
 describe("deepdive parsers", () => {
   it("parseAtoms fills ids + defaults", () => {
@@ -63,5 +66,37 @@ describe("synergies", () => {
     );
     expect(r.synergies[0]!.repoId).toBe("x/y");
     expect(r.synergies[0]!.in_library).toBe(true);
+  });
+});
+
+describe("versus", () => {
+  const r = (id: string): RepoData => ({
+    platform: "github",
+    repo_id: id,
+    description: "d",
+    language: "TS",
+    license: "MIT",
+    stars: 1,
+    readme: "readme",
+    languages: [],
+    dependencies: [],
+  });
+  it("builds a head-to-head prompt with both repos", () => {
+    const p = buildVersusPrompt(r("a/one"), r("b/two"));
+    expect(p).toContain("a/one");
+    expect(p).toContain("b/two");
+    expect(p).toContain("HEAD-TO-HEAD");
+  });
+  it("parses dimensions + clamps winner", () => {
+    const v = parseVersus(
+      JSON.stringify({
+        summary_a: "A",
+        dimensions: [{ label: "Maturity", a: "x", b: "y", winner: "bogus" }],
+        verdict: "pick A",
+      }),
+    );
+    expect(v.summary_a).toBe("A");
+    expect(v.dimensions[0]!.winner).toBe("tie");
+    expect(v.verdict).toBe("pick A");
   });
 });

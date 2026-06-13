@@ -18,6 +18,8 @@ import {
   parseSktpg,
   buildSynergiesPrompt,
   parseSynergies,
+  buildVersusPrompt,
+  parseVersus,
 } from "./lenses";
 import { getAppState, setAppState } from "@/lib/db";
 import { saveScan, listScans, getScan, deleteScan, updateLenses, type ScanRow } from "./repolensDb";
@@ -53,7 +55,7 @@ function asRepoData(a: RepoAnalysis): RepoData {
   };
 }
 
-type RunningPart = null | "core" | "deepdive" | "sktpg" | "synergies";
+type RunningPart = null | "core" | "deepdive" | "sktpg" | "synergies" | "versus";
 
 type State = {
   input: string;
@@ -71,6 +73,7 @@ type State = {
   runDeepDive: () => Promise<void>;
   runSktpg: () => Promise<void>;
   runSynergies: () => Promise<void>;
+  runVersus: (target: { platform: Platform; repoId: string }) => Promise<void>;
   library: ScanRow[];
   loadLibrary: () => Promise<void>;
   openFromLibrary: (repoId: string) => Promise<void>;
@@ -189,6 +192,30 @@ export const useRepoLens = create<State>((set, get) => ({
       await updateLenses(cur.repoId, lenses);
     } catch (e) {
       log.error("repolens synergies failed", e);
+      set({ running: null, error: e instanceof Error ? e.message : String(e) });
+    }
+  },
+
+  runVersus: async (target) => {
+    const cur = get().current;
+    if (!cur?.repoId) return;
+    set({ running: "versus", error: null });
+    try {
+      const [aData, bData] = await Promise.all([
+        ipc.repolensFetchRepo(cur.platform ?? "github", cur.repoId),
+        ipc.repolensFetchRepo(target.platform, target.repoId),
+      ]);
+      const raw = await enqueueClaude(
+        get().model,
+        "versus",
+        withTone(get().tone, buildVersusPrompt(aData, bData)),
+      );
+      const versus = { ...parseVersus(raw), target: target.repoId };
+      const lenses: Lenses = { ...get().lenses, versus };
+      set({ lenses, running: null });
+      await updateLenses(cur.repoId, lenses);
+    } catch (e) {
+      log.error("repolens versus failed", e);
       set({ running: null, error: e instanceof Error ? e.message : String(e) });
     }
   },

@@ -114,8 +114,18 @@ export type Synergies = {
   synergies: { repoId: string; category: string; synergy: string; in_library: boolean }[];
 };
 
-export type Lenses = { deepdive?: DeepDive; sktpg?: Sktpg; synergies?: Synergies };
+export type Versus = {
+  target: string; // repoId of side B (set by the store, not the parser)
+  summary_a: string;
+  summary_b: string;
+  dimensions: { label: string; a: string; b: string; winner: "a" | "b" | "tie" }[];
+  pick_a_when: string[];
+  pick_b_when: string[];
+  verdict: string;
+};
 
-export type PartId = "core" | "deepdive" | "sktpg" | "synergies";
+export type Lenses = { deepdive?: DeepDive; sktpg?: Sktpg; synergies?: Synergies; versus?: Versus };
+
+export type PartId = "core" | "deepdive" | "sktpg" | "synergies" | "versus";
 export type RepoLensModelConfig = { default_model: string; per_part: Record<string, string> };
 export type RepoLensPrefs = { model: RepoLensModelConfig; tone: string };

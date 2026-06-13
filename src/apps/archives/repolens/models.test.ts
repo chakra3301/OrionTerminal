@@ -14,7 +14,7 @@ describe("models", () => {
   it("default config uses sonnet", () => {
     expect(defaultModelConfig().default_model).toBe("claude-sonnet-4-6");
   });
-  it("PARTS covers the v1 features", () => {
-    expect(PARTS.map((p) => p.id)).toEqual(["core", "deepdive", "sktpg", "synergies"]);
+  it("PARTS covers the routable features", () => {
+    expect(PARTS.map((p) => p.id)).toEqual(["core", "deepdive", "sktpg", "synergies", "versus"]);
   });
 });

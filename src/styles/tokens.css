@@ -11476,6 +11476,64 @@ html.ot-reduce-glass .note-page .note-editor-body {
 .rl-sev-insight { color: var(--neon-cyan); }
 .rl-sev-opportunity { color: var(--repolens-green); }
 
+/* ── versus picker + comparison ── */
+.rl-vs-picker {
+  padding: 14px 16px;
+  border: 1px solid rgba(var(--rl-rgb), 0.3);
+  border-radius: var(--r-lg);
+  background: var(--bg-1);
+}
+.rl-vs-picker .row { display: flex; gap: 8px; }
+.rl-vs-picker .row .rl-url { padding-left: 12px; }
+.rl-vs-picker .rl-pill { cursor: pointer; }
+.rl-vs-picker .rl-pill:hover { color: var(--rl); border-color: rgba(var(--rl-rgb), 0.4); }
+.rl-vs-heads { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.rl-vs-head {
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  border: 1px solid var(--glass-border);
+  font: 13px/1.4 var(--f-mono);
+  color: var(--t-primary);
+}
+.rl-vs-head .who {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  text-align: center;
+  line-height: 18px;
+  border-radius: 4px;
+  font: 700 10px var(--f-mono);
+  margin-right: 6px;
+}
+.rl-vs-head.a .who { background: rgba(var(--repolens-green-rgb), 0.18); color: var(--repolens-green); }
+.rl-vs-head.b .who { background: rgba(var(--neon-cyan-rgb), 0.18); color: var(--neon-cyan); }
+.rl-vs-head .sm { margin: 6px 0 0; font: 12px/1.4 var(--f-display); color: var(--t-tertiary); }
+.rl-vs-dims {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--glass-border);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.rl-vs-row { display: grid; grid-template-columns: 116px 1fr 1fr; gap: 1px; }
+.rl-vs-row > * { background: var(--bg-1); padding: 9px 11px; font: 12px/1.45 var(--f-display); }
+.rl-vs-row .dim {
+  font: 10px/1.4 var(--f-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-tertiary);
+  background: var(--bg-2);
+}
+.rl-vs-row .side { color: var(--t-secondary); }
+.rl-vs-row .side.win {
+  color: var(--t-primary);
+  box-shadow: inset 2px 0 0 var(--repolens-green);
+  background: rgba(var(--repolens-green-rgb), 0.05);
+}
+
 /* ── lens panels ── */
 .rl-lens-panel { border-left: 2px solid rgba(var(--rl-rgb), 0.5); }
 .rl-lens-panel .sub-h { margin: 16px 0 8px; font: 600 12px/1 var(--f-mono); letter-spacing: 0.04em; color: var(--t-secondary); }

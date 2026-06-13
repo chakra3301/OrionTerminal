@@ -9,6 +9,7 @@ export const PARTS: { id: string; label: string }[] = [
   { id: "deepdive", label: "Deep Dive" },
   { id: "sktpg", label: "SKTPG" },
   { id: "synergies", label: "Synergies" },
+  { id: "versus", label: "Versus" },
 ];
 
 export const REPOLENS_MODELS = MODELS;

@@ -1,11 +1,13 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import type { RepoAnalysis, Health } from "./types";
 import { deriveFit } from "./verdict";
 import { toMarkdown, slugify } from "./export";
 import { useRepoLens } from "./useRepoLens";
+import { resolveInput } from "./fetch";
 import { DeepDivePanel } from "./lens/DeepDivePanel";
 import { SktpgPanel } from "./lens/SktpgPanel";
 import { SynergiesPanel } from "./lens/SynergiesPanel";
+import { VersusPanel } from "./lens/VersusPanel";
 
 const LANG_COLORS = [
   "var(--repolens-green)",
@@ -60,8 +62,20 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
   const runDeepDive = useRepoLens((s) => s.runDeepDive);
   const runSktpg = useRepoLens((s) => s.runSktpg);
   const runSynergies = useRepoLens((s) => s.runSynergies);
+  const runVersus = useRepoLens((s) => s.runVersus);
+  const library = useRepoLens((s) => s.library);
 
   const repoId = a.repoId ?? "";
+  const [versusOpen, setVersusOpen] = useState(false);
+  const [vsInput, setVsInput] = useState("");
+  const vsHit = resolveInput(vsInput);
+  const vsCandidates = library.filter((r) => r.repo_id !== repoId);
+
+  const startVersus = (platform: RepoAnalysis["platform"], target: string) => {
+    setVersusOpen(false);
+    setVsInput("");
+    void runVersus({ platform: platform ?? "github", repoId: target });
+  };
   const slash = repoId.lastIndexOf("/");
   const owner = slash > 0 ? repoId.slice(0, slash + 1) : "";
   const name = slash > 0 ? repoId.slice(slash + 1) : repoId;
@@ -149,11 +163,55 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
           >
             {running === "synergies" ? "Running Synergies…" : lenses.synergies ? "↻ Synergies" : "Synergies"}
           </button>
+          <button
+            className={`rl-btn rl-lens-btn${lenses.versus ? " has" : ""}${versusOpen ? " open" : ""}`}
+            disabled={running !== null}
+            onClick={() => setVersusOpen((o) => !o)}
+          >
+            {running === "versus" ? "Running Versus…" : lenses.versus ? "↻ Versus" : "Versus"}
+          </button>
         </div>
         <button className="rl-btn" onClick={() => downloadMarkdown(a)}>
           ↓ Export .md
         </button>
       </div>
+
+      {versusOpen && (
+        <div className="rl-vs-picker">
+          <div className="rl-eyebrow">Compare against</div>
+          <div className="row">
+            <input
+              className="rl-url"
+              placeholder="owner/repo or URL…"
+              value={vsInput}
+              onChange={(e) => setVsInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && vsHit) startVersus(vsHit.platform, vsHit.repoId);
+              }}
+            />
+            <button
+              className="rl-btn rl-btn--primary"
+              disabled={!vsHit}
+              onClick={() => vsHit && startVersus(vsHit.platform, vsHit.repoId)}
+            >
+              Compare
+            </button>
+          </div>
+          {vsCandidates.length > 0 && (
+            <div className="rl-pills" style={{ marginTop: 10 }}>
+              {vsCandidates.map((r) => (
+                <button
+                  key={r.repo_id}
+                  className="rl-pill"
+                  onClick={() => startVersus(r.platform, r.repo_id)}
+                >
+                  {r.repo_id}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── core body ── */}
       {a.eli5 && (
@@ -371,11 +429,12 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
       )}
 
       {/* ── deeper analysis (lens results) ── */}
-      {(lenses.deepdive || lenses.sktpg || lenses.synergies) && (
+      {(lenses.deepdive || lenses.sktpg || lenses.synergies || lenses.versus) && (
         <>
           {lenses.deepdive && <DeepDivePanel d={lenses.deepdive} />}
           {lenses.sktpg && <SktpgPanel s={lenses.sktpg} />}
           {lenses.synergies && <SynergiesPanel s={lenses.synergies} />}
+          {lenses.versus && <VersusPanel v={lenses.versus} aId={repoId} />}
         </>
       )}
     </div>
