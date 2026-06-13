@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Check,
   X,
@@ -12,7 +12,12 @@ import {
   GitCommitHorizontal,
   ArrowUp,
   Loader2,
+  History,
 } from "lucide-react";
+import {
+  useCheckpoints,
+  restoreCheckpoint,
+} from "@/features/aiEdits/checkpoints";
 import { usePendingEdits } from "@/store/pendingEditsStore";
 import {
   acceptEdit,
@@ -375,11 +380,65 @@ function GitSection() {
   );
 }
 
+function age(ts: number): string {
+  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86_400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86_400)}d ago`;
+}
+
+function CheckpointsSection() {
+  const list = useCheckpoints((s) => s.list);
+  const refresh = useCheckpoints((s) => s.refresh);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  if (list.length === 0) return null;
+
+  return (
+    <>
+      <div className="or-git-subhead">checkpoints · {list.length}</div>
+      <div className="or-changes-list">
+        {list.map((c) => (
+          <div key={c.id} className="or-changes-row or-cp-row">
+            <History size={12} color="var(--neon-violet)" />
+            <span className="or-changes-name">{c.label}</span>
+            <span className="or-changes-dir">{age(c.created_at)}</span>
+            <span className="or-changes-rowact">
+              <button
+                type="button"
+                title="Restore files to this point"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  void (async () => {
+                    const ok = await confirmAction({
+                      title: "Restore this checkpoint?",
+                      body: `${c.file_count} file${c.file_count === 1 ? "" : "s"} return to their pre-edit state. The current state is snapshotted first, so you can come back.`,
+                      confirmLabel: "Restore",
+                    });
+                    if (ok) await restoreCheckpoint(c.id, c.label);
+                  })();
+                }}
+              >
+                <Undo2 size={12} />
+              </button>
+            </span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export function OrionChangesPanel() {
   const order = usePendingEdits((s) => s.order);
   const isRepo = useGit((s) => s.isRepo);
+  const checkpointCount = useCheckpoints((s) => s.list.length);
 
-  if (order.length === 0 && !isRepo) {
+  if (order.length === 0 && !isRepo && checkpointCount === 0) {
     return (
       <div className="or-changes or-changes--empty">
         <CheckCheck size={18} color="var(--neon-green)" />
@@ -392,6 +451,7 @@ export function OrionChangesPanel() {
     <div className="or-changes">
       <AiEditsSection />
       <GitSection />
+      <CheckpointsSection />
     </div>
   );
 }

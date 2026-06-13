@@ -242,6 +242,15 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
       updated: p.updated,
       isNew: !!p.is_new,
     });
+    // Checkpoint the pre-image (first edit per file per burst) so the whole
+    // agent turn is one-click restorable even after the review is accepted.
+    void import("@/features/aiEdits/checkpoints").then((m) =>
+      m.captureForStagedEdit({
+        path: p.path!,
+        original: p.original ?? "",
+        isNew: !!p.is_new,
+      }),
+    );
     // Refresh any open buffer to the new content (clean — disk matches).
     useTabsStore.getState().markLoaded(p.path, p.updated);
     useFileTreeRefresh.getState().bump();

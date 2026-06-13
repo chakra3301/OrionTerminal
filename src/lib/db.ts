@@ -918,6 +918,89 @@ export async function deleteCodeFile(
   );
 }
 
+// ── Agent-edit checkpoints (migration 0019) ───────────────────────────────
+
+export type CheckpointRow = {
+  id: string;
+  project_id: string;
+  label: string;
+  created_at: number;
+  file_count: number;
+};
+
+export async function insertCheckpoint(
+  id: string,
+  projectId: string,
+  label: string,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "INSERT INTO checkpoints(id, project_id, label, created_at) VALUES ($1, $2, $3, $4)",
+    [id, projectId, label, Date.now()],
+  );
+}
+
+export async function setCheckpointLabel(id: string, label: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("UPDATE checkpoints SET label = $1 WHERE id = $2", [label, id]);
+}
+
+export async function addCheckpointFile(
+  checkpointId: string,
+  path: string,
+  content: string,
+  existed: boolean,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO checkpoint_files(checkpoint_id, path, content, existed)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT(checkpoint_id, path) DO NOTHING`,
+    [checkpointId, path, content, existed ? 1 : 0],
+  );
+}
+
+export async function listCheckpoints(
+  projectId: string,
+  limit = 20,
+): Promise<CheckpointRow[]> {
+  const db = await getDb();
+  return db.select<CheckpointRow[]>(
+    `SELECT c.id, c.project_id, c.label, c.created_at,
+            (SELECT COUNT(*) FROM checkpoint_files f WHERE f.checkpoint_id = c.id) AS file_count
+     FROM checkpoints c WHERE c.project_id = $1
+     ORDER BY c.created_at DESC LIMIT $2`,
+    [projectId, limit],
+  );
+}
+
+export async function getCheckpointFiles(
+  checkpointId: string,
+): Promise<Array<{ path: string; content: string; existed: number }>> {
+  const db = await getDb();
+  return db.select(
+    "SELECT path, content, existed FROM checkpoint_files WHERE checkpoint_id = $1",
+    [checkpointId],
+  );
+}
+
+export async function deleteCheckpoint(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM checkpoint_files WHERE checkpoint_id = $1", [id]);
+  await db.execute("DELETE FROM checkpoints WHERE id = $1", [id]);
+}
+
+/** Keep the newest `keep` checkpoints for a project; drop the rest. */
+export async function pruneCheckpoints(projectId: string, keep = 20): Promise<void> {
+  const db = await getDb();
+  const old = await db.select<Array<{ id: string }>>(
+    `SELECT id FROM checkpoints WHERE project_id = $1
+     ORDER BY created_at DESC LIMIT -1 OFFSET $2`,
+    [projectId, keep],
+  );
+  for (const row of old) await deleteCheckpoint(row.id);
+}
+
 export type NoteRow = {
   id: string;
   title: string;

@@ -129,6 +129,12 @@ pub fn run() {
             sql: include_str!("../migrations/0018_code_embeddings.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 19,
+            description: "agent-edit checkpoints (pre-images per turn)",
+            sql: include_str!("../migrations/0019_checkpoints.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
