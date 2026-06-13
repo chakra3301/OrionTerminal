@@ -9,7 +9,7 @@ export type LspNotificationHandler = (method: string, params: unknown) => void;
 export type LspServerRequestHandler = (
   method: string,
   params: unknown,
-) => unknown;
+) => unknown | Promise<unknown>;
 
 type Pending = {
   resolve: (v: unknown) => void;
@@ -74,10 +74,12 @@ export class LspClient {
       return;
     }
 
-    // Server-initiated request (expects a response).
+    // Server-initiated request (expects a response; handler may be async).
     if (msg.id !== undefined && msg.method !== undefined) {
-      const result = this.onServerRequest(msg.method, msg.params);
-      void this.respond(msg.id, result);
+      const id = msg.id;
+      void Promise.resolve(this.onServerRequest(msg.method, msg.params))
+        .then((result) => this.respond(id, result))
+        .catch(() => this.respond(id, null));
       return;
     }
 

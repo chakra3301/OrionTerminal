@@ -99,7 +99,7 @@ async function ensureServer(lang: string, root: string): Promise<ServerState | n
     const client = new LspClient(
       serverId,
       (method, params) => onNotification(key, method, params),
-      (method) => onServerRequest(method),
+      (method, params) => onServerRequest(method, params),
       () => {
         servers.delete(key);
         if (config.key === "typescript") setBrowserTsMuted(false);
@@ -175,10 +175,18 @@ function initializeParams(root: string) {
   };
 }
 
-function onServerRequest(method: string): unknown {
-  // We accept dynamic capability (un)registration and config pulls with the
-  // safe empty answer; everything else gets null.
+async function onServerRequest(method: string, params: unknown): Promise<unknown> {
   if (method === "workspace/configuration") return [null];
+  // Servers push edits this way after executeCommand (organize imports,
+  // command-style quick fixes) and sometimes for rename.
+  if (method === "workspace/applyEdit") {
+    const monaco = monacoRef;
+    const p = params as { edit?: import("./lspWorkspaceEdit").LspWorkspaceEdit };
+    if (!monaco || !p.edit) return { applied: false };
+    const { applyWorkspaceEdit } = await import("./lspWorkspaceEdit");
+    const n = await applyWorkspaceEdit(monaco, p.edit);
+    return { applied: n > 0 };
+  }
   return null;
 }
 
@@ -301,6 +309,7 @@ export function registerLsp(monaco: MonacoNs): void {
   for (const m of monaco.editor.getModels() as TextModel[]) wire(m);
 
   registerProviders(monaco);
+  void import("./lspFeatures").then((m) => m.registerLspFeatures(monaco));
 
   // Switching projects: tear down servers rooted in the old project.
   useProjectStore.subscribe((s, prev) => {
@@ -391,6 +400,38 @@ export async function lspDefinition(
   } catch {
     return null;
   }
+}
+
+/** Send an arbitrary LSP request for the server that owns `path`. Returns
+ * null when no server is live (callers degrade gracefully). Used by the
+ * 1.6b feature providers (completion, rename, code actions, …). */
+export async function lspRequest<T = unknown>(
+  path: string,
+  method: string,
+  params: Record<string, unknown>,
+): Promise<T | null> {
+  const monaco = monacoRef;
+  if (!monaco) return null;
+  const model = (monaco.editor.getModels() as TextModel[]).find(
+    (m) => m.uri.path === path,
+  );
+  const server = model ? serverForModel(model) : null;
+  if (!server) return null;
+  try {
+    await server.ready;
+    return (await server.client.request(method, {
+      textDocument: { uri: pathToUri(path) },
+      ...params,
+    })) as T;
+  } catch {
+    return null;
+  }
+}
+
+export { pathToUri };
+
+export function getMonaco(): MonacoNs | null {
+  return monacoRef;
 }
 
 /** True once a server owning this language is initialized — lets the browser

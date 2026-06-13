@@ -301,6 +301,21 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
+    id: "editor.organizeImports",
+    label: "Organize Imports (LSP)",
+    keywords: ["imports", "organize", "sort", "clean", "lsp"],
+    group: "View",
+    when: () => !!focusedFilePath(),
+    run: () => {
+      const path = focusedFilePath();
+      if (!path) return;
+      void import("@/features/lsp/lspFeatures").then((m) =>
+        m.lspOrganizeImports(path),
+      );
+    },
+  });
+
+  registry.register({
     id: "view.splitEditor",
     label: "Split Editor Right",
     hotkey: "mod+\\",
