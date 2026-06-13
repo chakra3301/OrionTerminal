@@ -10790,3 +10790,21 @@ html.ot-reduce-glass .note-page .note-editor-body {
   color: var(--neon-green);
 }
 .ot-ask-source-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Inline-AI button in the BlockNote formatting toolbar */
+.bn-ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  padding: 0 8px;
+  background: none;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--neon-green);
+  font-family: var(--f-ui);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bn-ai-btn:hover { background: rgba(var(--neon-green-rgb), 0.12); }

@@ -14,6 +14,7 @@ import {
   registerNoteEditor,
   unregisterNoteEditor,
 } from "@/features/notes/editorBridge";
+import { NoteAiControllers } from "@/features/notes/NoteEditorAi";
 import { log } from "@/lib/log";
 
 /** A stored asset → the BlockNote block to insert for it. */
@@ -210,7 +211,14 @@ function EditorBody({
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
-      <BlockNoteView editor={editor} theme="dark" />
+      <BlockNoteView
+        editor={editor}
+        theme="dark"
+        formattingToolbar={false}
+        slashMenu={false}
+      >
+        <NoteAiControllers editor={editor} />
+      </BlockNoteView>
       {dropping && (
         <div className="note-drop-overlay">Drop to add to this note</div>
       )}
