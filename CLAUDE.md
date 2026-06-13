@@ -196,7 +196,7 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 **Phase 3 — XDesign ≥ Figma** 🔨 — ranked plan APPROVED 2026-06-13 (research: [docs/research/figma-2026.md](docs/research/figma-2026.md)). Thesis: design→code is THE wedge — Figma's own MCP docs admit their code output is "not production-ready" (emulates CSS, absolute-positioned inline-style React, external agent that doesn't know your repo). XDesign wins: real React + Orion's own tokens as a reviewable staged edit into the repo next door, local-first, AI edits Accept/Reject-reversible. Multiplayer explicitly NOT contested. Export styling = inline styles + CSS-var tokens (locked).
 - 🔨 3.1 Design→code (the wedge): ✅ generator (designToReact.ts, frame-tree→.tsx, auto-layout→flex, token mapping, 8 tests) + ✅ export→staged edit (reuses Phase-1 pendingEdits+DiffReview; Inspector "React" btn + command). ⬜ DEFERRED 3.1c screenshot→editable-layers (own slice — vision prompt + model-quality-dependent).
 - ✅ 3.2 Canvas feel — shipped 2026-06-13: progressive selection (plain click → top-level frame; click-again drills; ⌘/double-click → exact leaf) · ⌘A select-all · editable multi-select inspector (batch move/fill/opacity) · viewport culling >120 nodes (intersect visible rect + 1-screen margin, selected always render). DEFERRED: alt-hover measurement (own slice — needs proper shape hit-testing).
-- ⬜ 3.3 Vector depth: boolean ops (union/subtract/intersect/exclude; approved geometry dep) · post-hoc path/anchor editing
+- 🔨 3.3 Vector depth: ✅ **3.3a boolean ops** (union/subtract/intersect/exclude via `polygon-clipping`; pure `booleanOps.ts` + 11 tests; PathShape gains additive `subpaths?`+`fillRule?` for holes; `store.booleanOp`; Inspector multi-select Boolean row) — `3d68d58`. ⬜ 3.3b post-hoc path/anchor editing
 - ⬜ 3.4 Layout systems: constraints (pin/center/scale) · component variants (sets+properties) · non-lossy instance overrides
 - ⬜ 3.5 Prototyping lite: hotspot links · present mode · transitions
 - CUT (explicit): vector networks · Figma Draw brush/illustration · multiplayer · variable scoping depth · WebGL renderer rewrite (cull instead) · Code-Connect mapping.
@@ -230,6 +230,16 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-13 — AAA Rebuild: Phase 3.3a — vector booleans (union/subtract/intersect/exclude)
+- **Session recovery first**: prior session (`cec3ed1e`) was lost to a Cursor restart+update. Transcripts intact on disk; nothing lost — it had shipped 3.2 (committed) and only got as far as `npm install polygon-clipping` before a rate-limit + the restart. Resumed execution from there.
+- **The wedge into vector depth.** Combine 2+ selected shapes into one closed vector path via **`polygon-clipping`** (MIT, dependency-free — the approved geometry dep).
+- **`booleanOps.ts`** (pure, 11 tests): `shapeToRing` flattens any shape to an absolute-space polygon — rect corners, 64-sample ellipse, bezier-flattened path (16/seg), bbox fallback for frame/text/image — honoring **rotation + flip**. `booleanShapes(op, shapes)` runs the op (subtract = bottom-most minus the union above it, so operands must be z-ordered bottom-first), then normalizes the `MultiPolygon` result back into ONE `PathShape` in unit space; holes / disjoint regions become extra rings.
+- **PathShape gains additive `subpaths?: PathPoint[][]` + `fillRule?`** (even-odd so holes punch through) — backward-compatible, old paths hydrate unchanged. `pathToSvgD` appends each subpath as its own `M…Z`; the `<path>` sets `fill-rule`. (Boolean results are flattened polylines — no beziers — which is standard.)
+- **`store.booleanOp(op, ids)`**: pushHistory → builds the result path inheriting the **bottom-most** shape's style (fill/stroke/gradient/opacity) + z-position + parent, removes operands **and their descendants** (no orphaned `parentId`), selects the result. One undo step.
+- **UI**: Inspector multi-select block gains a **Boolean row** (Union/Subtract/Intersect/Exclude, `.xd-bool-row`); empty results (e.g. intersect of disjoint shapes) **toast** instead of failing silently.
+- **GOTCHA**: `polygon-clipping`'s `.d.ts` declares named exports but its ESM build only has a default export — named imports pass tsc + vitest (CJS) but **break the rollup ESM build**. Fix: `import polygonClipping from "..."` then destructure.
+- Frontend-only (**hot-reloads, no restart**). tsc / **231 tests** (220→231) / build green. Commit `3d68d58`. **Next: 3.3b post-hoc path/anchor editing.**
 
 ### 2026-06-13 — AAA Rebuild: Phase 3.2 canvas feel — selection model, multi-select inspector, culling
 - All frontend (Canvas.tsx + Inspector.tsx), hot-reloads.
