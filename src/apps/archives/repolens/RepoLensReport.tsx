@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactNode } from "react";
 import type { RepoAnalysis, Health } from "./types";
 import { deriveFit } from "./verdict";
 import { toMarkdown, slugify } from "./export";
@@ -5,6 +6,21 @@ import { useRepoLens } from "./useRepoLens";
 import { DeepDivePanel } from "./lens/DeepDivePanel";
 import { SktpgPanel } from "./lens/SktpgPanel";
 import { SynergiesPanel } from "./lens/SynergiesPanel";
+
+const LANG_COLORS = [
+  "var(--repolens-green)",
+  "var(--neon-cyan)",
+  "var(--neon-violet)",
+  "var(--neon-yellow)",
+  "var(--neon-magenta)",
+];
+
+const METRICS: { key: keyof Health; label: string }[] = [
+  { key: "commit_activity", label: "commits" },
+  { key: "issue_response", label: "issues" },
+  { key: "pr_merge_rate", label: "pr merge" },
+  { key: "maintainer_count", label: "maintainers" },
+];
 
 function downloadMarkdown(a: RepoAnalysis) {
   const blob = new Blob([toMarkdown(a)], { type: "text/markdown" });
@@ -16,54 +32,26 @@ function downloadMarkdown(a: RepoAnalysis) {
   URL.revokeObjectURL(url);
 }
 
-function Para({ title, body }: { title: string; body?: string }) {
-  if (!body) return null;
-  return (
-    <div className="rl-section">
-      <h3>{title}</h3>
-      <p style={{ whiteSpace: "pre-wrap", margin: 0 }}>{body}</p>
-    </div>
-  );
+function Eyebrow({ children }: { children: ReactNode }) {
+  return <div className="rl-eyebrow">{children}</div>;
 }
 
-function Bullets({ title, items }: { title: string; items?: string[] }) {
-  if (!items?.length) return null;
+function Card({
+  title,
+  className = "",
+  children,
+}: {
+  title: string;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="rl-section">
-      <h3>{title}</h3>
-      <ul style={{ margin: 0, paddingLeft: 18 }}>
-        {items.map((x, i) => (
-          <li key={i}>{x}</li>
-        ))}
-      </ul>
-    </div>
+    <section className={`rl-card ${className}`}>
+      <Eyebrow>{title}</Eyebrow>
+      {children}
+    </section>
   );
 }
-
-function KV({ title, obj }: { title: string; obj?: Record<string, string> }) {
-  if (!obj || !Object.values(obj).some(Boolean)) return null;
-  return (
-    <div className="rl-section">
-      <h3>{title}</h3>
-      <ul style={{ margin: 0, paddingLeft: 18 }}>
-        {Object.entries(obj)
-          .filter(([, v]) => v)
-          .map(([k, v]) => (
-            <li key={k}>
-              <strong>{k.replace(/_/g, " ")}:</strong> {v}
-            </li>
-          ))}
-      </ul>
-    </div>
-  );
-}
-
-const HEALTH_BARS: (keyof Health)[] = [
-  "commit_activity",
-  "issue_response",
-  "pr_merge_rate",
-  "maintainer_count",
-];
 
 export function RepoLensReport({ a }: { a: RepoAnalysis }) {
   const fit = deriveFit(a);
@@ -72,162 +60,323 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
   const runDeepDive = useRepoLens((s) => s.runDeepDive);
   const runSktpg = useRepoLens((s) => s.runSktpg);
   const runSynergies = useRepoLens((s) => s.runSynergies);
+
+  const repoId = a.repoId ?? "";
+  const slash = repoId.lastIndexOf("/");
+  const owner = slash > 0 ? repoId.slice(0, slash + 1) : "";
+  const name = slash > 0 ? repoId.slice(slash + 1) : repoId;
+
+  const useCases = Object.values(a.use_cases ?? {}).some(Boolean);
+  const skipIf = Object.values(a.skip_if ?? {}).some(Boolean);
+
   return (
-    <div>
-      <div className="rl-section">
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <h2 style={{ margin: 0 }}>{a.repoId}</h2>
-          <span className={`rl-chip rl-verdict-${fit.level}`}>
-            {fit.label} · {fit.why}
-          </span>
+    <div className={`rl-report rl-lvl-${fit.level}`}>
+      {/* ── HERO ── */}
+      <header className="rl-hero">
+        <div className="rl-hero-main">
+          <div className="rl-hero-eyebrow">
+            {a.platform ?? "repo"} {a.category ? `· ${a.category}` : ""}
+          </div>
+          <h2 className="rl-repoid">
+            {owner && <span className="dim">{owner}</span>}
+            {name}
+          </h2>
+          <div className="rl-meta">
+            {a.language && a.language !== "Unknown" && (
+              <span className="rl-stat">◆ {a.language}</span>
+            )}
+            {a.stars ? (
+              <span className="rl-stat">
+                ★ <b>{a.stars.toLocaleString()}</b>
+              </span>
+            ) : null}
+            {a.license && a.license !== "Unknown" && <span className="rl-stat">{a.license}</span>}
+          </div>
+          {a.bottom_line && <p className="rl-lead">{a.bottom_line}</p>}
+        </div>
+
+        <div className="rl-hero-side">
+          <div className="rl-verdict-badge">
+            <span className="lvl">{fit.label}</span>
+            <span className="why">{fit.why}</span>
+          </div>
+          <div className="rl-scorecard">
+            <div className="rl-ring" style={{ "--val": a.health?.score ?? 0 } as CSSProperties}>
+              <div className="rl-ring-inner">
+                <div className="n">{a.health?.score ?? 0}</div>
+                <div className="d">HEALTH</div>
+              </div>
+            </div>
+            <div className="rl-metrics">
+              {METRICS.map((m) => {
+                const v = Number(a.health?.[m.key]) || 0;
+                return (
+                  <div className="rl-metric" key={m.key}>
+                    <span className="k">{m.label}</span>
+                    <span className="v">{v}</span>
+                    <div className="bar">
+                      <span style={{ width: `${v}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ── toolbar: lenses + export ── */}
+      <div className="rl-toolbar">
+        <div className="rl-lens-rail">
           <button
-            className="rl-btn"
-            style={{ marginLeft: "auto", fontSize: 12, padding: "4px 8px" }}
-            onClick={() => downloadMarkdown(a)}
+            className={`rl-btn rl-lens-btn${lenses.deepdive ? " has" : ""}`}
+            disabled={running !== null}
+            onClick={() => void runDeepDive()}
           >
-            Export .md
+            {running === "deepdive" ? "Running Deep Dive…" : lenses.deepdive ? "↻ Deep Dive" : "Deep Dive"}
+          </button>
+          <button
+            className={`rl-btn rl-lens-btn${lenses.sktpg ? " has" : ""}`}
+            disabled={running !== null}
+            onClick={() => void runSktpg()}
+          >
+            {running === "sktpg" ? "Running SKTPG…" : lenses.sktpg ? "↻ SKTPG" : "SKTPG"}
+          </button>
+          <button
+            className={`rl-btn rl-lens-btn${lenses.synergies ? " has" : ""}`}
+            disabled={running !== null}
+            onClick={() => void runSynergies()}
+          >
+            {running === "synergies" ? "Running Synergies…" : lenses.synergies ? "↻ Synergies" : "Synergies"}
           </button>
         </div>
-        {a.bottom_line && <p style={{ marginTop: 8 }}>{a.bottom_line}</p>}
-      </div>
-
-      <div className="rl-lens-rail">
-        <button className="rl-btn" disabled={running !== null} onClick={() => void runDeepDive()}>
-          {running === "deepdive" ? "Running Deep Dive…" : lenses.deepdive ? "Re-run Deep Dive" : "Deep Dive"}
-        </button>
-        <button className="rl-btn" disabled={running !== null} onClick={() => void runSktpg()}>
-          {running === "sktpg" ? "Running SKTPG…" : lenses.sktpg ? "Re-run SKTPG" : "SKTPG"}
-        </button>
-        <button className="rl-btn" disabled={running !== null} onClick={() => void runSynergies()}>
-          {running === "synergies" ? "Running Synergies…" : lenses.synergies ? "Re-run Synergies" : "Synergies"}
+        <button className="rl-btn" onClick={() => downloadMarkdown(a)}>
+          ↓ Export .md
         </button>
       </div>
-      {lenses.deepdive && <DeepDivePanel d={lenses.deepdive} />}
-      {lenses.sktpg && <SktpgPanel s={lenses.sktpg} />}
-      {lenses.synergies && <SynergiesPanel s={lenses.synergies} />}
 
-      <Para title="ELI5" body={a.eli5} />
-      <Bullets title="Analogies" items={a.analogies} />
-      <Para title="Technical" body={a.technical} />
-      <KV title="Use cases" obj={a.use_cases} />
-      <KV title="Skip if" obj={a.skip_if} />
-      <Para title="Enables" body={a.enables} />
-      <Bullets title="Pros" items={a.pros} />
-      <Bullets title="Cons" items={a.cons} />
+      {/* ── core body ── */}
+      {a.eli5 && (
+        <Card title="In plain English" className="rl-card--lead">
+          <p className="rl-prose rl-prose--lg">{a.eli5}</p>
+        </Card>
+      )}
 
-      {a.alternatives?.length > 0 && (
-        <div className="rl-section">
-          <h3>Alternatives</h3>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {a.alternatives.map((alt, i) => (
-              <li key={i}>
-                <strong>{alt.name}</strong> — {alt.when}
-              </li>
+      {a.analogies?.length > 0 && (
+        <Card title="Analogies">
+          <ul className="rl-list">
+            {a.analogies.map((x, i) => (
+              <li key={i}>{x}</li>
             ))}
           </ul>
+        </Card>
+      )}
+
+      {a.technical && (
+        <Card title="How it works">
+          <p className="rl-prose">{a.technical}</p>
+        </Card>
+      )}
+
+      {(useCases || skipIf) && (
+        <div className="rl-grid">
+          {useCases && (
+            <Card title="Reach for it when">
+              <div className="rl-kv">
+                {Object.entries(a.use_cases)
+                  .filter(([, v]) => v)
+                  .map(([k, v]) => (
+                    <div className="rl-kv-row" key={k}>
+                      <span className="rl-kv-key">{k.replace(/_/g, " ")}</span>
+                      <span className="rl-kv-val">{v}</span>
+                    </div>
+                  ))}
+              </div>
+            </Card>
+          )}
+          {skipIf && (
+            <Card title="Skip it when">
+              <div className="rl-kv">
+                {Object.entries(a.skip_if)
+                  .filter(([, v]) => v)
+                  .map(([k, v]) => (
+                    <div className="rl-kv-row" key={k}>
+                      <span className="rl-kv-key">{k.replace(/_/g, " ")}</span>
+                      <span className="rl-kv-val">{v}</span>
+                    </div>
+                  ))}
+              </div>
+            </Card>
+          )}
         </div>
       )}
 
-      <div className="rl-section">
-        <h3>Health — {a.health.score}/100</h3>
-        {HEALTH_BARS.map((k) => (
-          <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, margin: "4px 0" }}>
-            <span style={{ width: 130, fontSize: 12, color: "var(--t-tertiary)" }}>
-              {k.replace(/_/g, " ")}
-            </span>
-            <div className="rl-bar" style={{ flex: 1 }}>
-              <span style={{ width: `${Number(a.health[k]) || 0}%` }} />
-            </div>
-          </div>
-        ))}
-        {a.health.summary && <p style={{ marginTop: 6 }}>{a.health.summary}</p>}
-      </div>
+      {(a.pros?.length > 0 || a.cons?.length > 0) && (
+        <div className="rl-grid">
+          {a.pros?.length > 0 && (
+            <section className="rl-card rl-pc rl-pc--pro">
+              <Eyebrow>Pros</Eyebrow>
+              <ul>
+                {a.pros.map((p, i) => (
+                  <li key={i}>{p}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {a.cons?.length > 0 && (
+            <section className="rl-card rl-pc rl-pc--con">
+              <Eyebrow>Cons</Eyebrow>
+              <ul>
+                {a.cons.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
+      )}
 
-      {a.red_flags?.length > 0 && (
-        <div className="rl-section">
-          <h3>Red flags</h3>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {a.red_flags.map((f, i) => (
+      {a.enables && (
+        <Card title="What it unlocks">
+          <p className="rl-prose">{a.enables}</p>
+        </Card>
+      )}
+
+      {a.alternatives?.length > 0 && (
+        <Card title="Alternatives">
+          <ul className="rl-list">
+            {a.alternatives.map((alt, i) => (
               <li key={i}>
-                {f.severity === "ok" ? "✅" : "⚠️"} <strong>{f.title}</strong> — {f.text}
+                <b>{alt.name}</b> <span className="sub">— {alt.when}</span>
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
+      )}
+
+      {a.health?.summary && (
+        <Card title="Maintenance health">
+          <p className="rl-prose">{a.health.summary}</p>
+        </Card>
+      )}
+
+      {a.red_flags?.length > 0 && (
+        <Card title="Signals">
+          <div className="rl-flags">
+            {a.red_flags.map((f, i) => (
+              <div key={i} className={`rl-flag rl-flag--${f.severity === "ok" ? "ok" : "warn"}`}>
+                <span className="glyph">{f.severity === "ok" ? "✓" : "⚠"}</span>
+                <span className="t">
+                  <b>{f.title}</b> <span>— {f.text}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
       )}
 
       {a.start_here?.length > 0 && (
-        <div className="rl-section">
-          <h3>Start here</h3>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
+        <Card title="Start here">
+          <div className="rl-steps">
             {a.start_here.map((s, i) => (
-              <li key={i}>
-                {s.icon} <strong>{s.title}</strong> ({s.tag}) — {s.desc}
-              </li>
+              <div className="rl-step" key={i}>
+                <span className="rl-step-num">{i + 1}</span>
+                <span className="body">
+                  <b>
+                    {s.icon} {s.title}
+                  </b>
+                  {s.tag && <span className="tag">{s.tag}</span>}
+                  <br />
+                  {s.desc}
+                </span>
+              </div>
             ))}
-          </ul>
-        </div>
+          </div>
+        </Card>
       )}
 
-      {a.tech_stack?.built_with?.length || a.tech_stack?.key_dependencies?.length ? (
-        <div className="rl-section">
-          <h3>Tech stack</h3>
-          {a.tech_stack.built_with?.length > 0 && (
-            <p style={{ margin: "0 0 6px" }}>Built with: {a.tech_stack.built_with.join(", ")}</p>
+      {(a.tech_stack?.built_with?.length > 0 || a.tech_stack?.key_dependencies?.length > 0) && (
+        <Card title="Tech stack">
+          {a.languages && a.languages.length > 0 && (
+            <>
+              <div className="rl-langbar">
+                {a.languages.map((l, i) => (
+                  <span
+                    key={l.name}
+                    style={{ width: `${l.pct}%`, background: LANG_COLORS[i % LANG_COLORS.length] }}
+                  />
+                ))}
+              </div>
+              <div className="rl-lang-legend">
+                {a.languages.map((l, i) => (
+                  <span className="it" key={l.name}>
+                    <span className="dot" style={{ background: LANG_COLORS[i % LANG_COLORS.length] }} />
+                    {l.name} {l.pct}%
+                  </span>
+                ))}
+              </div>
+            </>
           )}
-          {a.languages?.length ? (
-            <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", margin: "6px 0" }}>
-              {a.languages.map((l) => (
-                <span
-                  key={l.name}
-                  title={`${l.name} ${l.pct}%`}
-                  style={{ width: `${l.pct}%`, background: "var(--repolens-green)", opacity: 0.5 + l.pct / 200 }}
-                />
+          {a.tech_stack.built_with?.length > 0 && (
+            <div className="rl-pills" style={{ marginBottom: 12 }}>
+              {a.tech_stack.built_with.map((b, i) => (
+                <span className="rl-pill" key={i}>
+                  {b}
+                </span>
               ))}
             </div>
-          ) : null}
-          {a.tech_stack.key_dependencies?.length > 0 && (
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {a.tech_stack.key_dependencies.map((d, i) => (
-                <li key={i}>
-                  <code>{d.name}</code> — {d.purpose}
-                </li>
-              ))}
-            </ul>
           )}
-        </div>
-      ) : null}
+          {a.tech_stack.key_dependencies?.length > 0 && (
+            <div className="rl-deps">
+              {a.tech_stack.key_dependencies.map((d, i) => (
+                <div className="rl-dep" key={i}>
+                  <code>{d.name}</code> {d.purpose}
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
-      {a.tags?.length || a.capabilities?.length ? (
-        <div className="rl-section">
-          <h3>Tags</h3>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      {(a.capabilities?.length > 0 || a.tags?.length > 0) && (
+        <Card title="Capabilities & tags">
+          <div className="rl-pills">
             {a.capabilities.map((c) => (
-              <span key={`c-${c}`} className="rl-chip rl-verdict-strong">
+              <span key={`c-${c}`} className="rl-pill rl-pill--cap">
                 {c}
               </span>
             ))}
             {a.tags.map((t) => (
-              <span key={`t-${t}`} className="rl-chip">
+              <span key={`t-${t}`} className="rl-pill">
                 {t}
               </span>
             ))}
           </div>
-        </div>
-      ) : null}
+        </Card>
+      )}
 
       {a.highlights?.length > 0 && (
-        <div className="rl-section">
-          <h3>Highlights</h3>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
+        <Card title="Highlights">
+          <div className="rl-hl">
             {a.highlights.map((h, i) => (
-              <li key={i}>
-                <strong>{h.text}</strong>
-                {h.why ? ` — ${h.why}` : ""}
-              </li>
+              <div className="rl-hl-item" key={i}>
+                <div className="txt">
+                  <span className={`rl-hl-sev rl-sev-${h.severity}`}>{h.severity}</span> {h.text}
+                </div>
+                {h.why && <div className="why">{h.why}</div>}
+              </div>
             ))}
-          </ul>
-        </div>
+          </div>
+        </Card>
+      )}
+
+      {/* ── deeper analysis (lens results) ── */}
+      {(lenses.deepdive || lenses.sktpg || lenses.synergies) && (
+        <>
+          {lenses.deepdive && <DeepDivePanel d={lenses.deepdive} />}
+          {lenses.sktpg && <SktpgPanel s={lenses.sktpg} />}
+          {lenses.synergies && <SynergiesPanel s={lenses.synergies} />}
+        </>
       )}
     </div>
   );

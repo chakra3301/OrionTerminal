@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { ScanSearch } from "lucide-react";
 import { useRepoLens } from "./useRepoLens";
 import { RepoLensReport } from "./RepoLensReport";
 import { RepoLensPickers } from "./RepoLensPickers";
@@ -16,22 +17,29 @@ export function RepoLensView() {
   return (
     <div className="rl-view">
       <div className="rl-scanbar">
-        <input
-          className="rl-url"
-          placeholder="Paste a GitHub/GitLab/npm/PyPI URL or owner/repo…"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && hit && !running) void scan(input);
-          }}
-        />
+        <div className="rl-scan-field">
+          <ScanSearch size={15} />
+          <input
+            className="rl-url"
+            placeholder="Paste a GitHub / GitLab / npm / PyPI URL or owner/repo…"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && hit && !running) void scan(input);
+            }}
+          />
+        </div>
         <RepoLensPickers />
-        <button className="rl-btn" disabled={!hit || running !== null} onClick={() => void scan(input)}>
+        <button
+          className="rl-btn rl-btn--primary"
+          disabled={!hit || running !== null}
+          onClick={() => void scan(input)}
+        >
           {running === "core" ? "Scanning…" : "Scan"}
         </button>
         {current && (
           <button className="rl-btn" onClick={closeReport}>
-            Library
+            ← Library
           </button>
         )}
       </div>
@@ -41,8 +49,11 @@ export function RepoLensView() {
       <div className="rl-body">
         {running === "core" && !current && (
           <div className="rl-spinner">
-            Scanning {hit?.repoId}… the full briefing usually takes ~30–90s (Claude is writing the whole
-            report). Pick the <strong>Haiku</strong> model above for faster scans, or Opus for the deepest.
+            <span>
+              Scanning <b>{hit?.repoId}</b>… the full briefing usually takes ~30–90s (Claude is writing
+              the whole report). Pick the <b>Haiku</b> model above for faster scans, or Opus for the
+              deepest.
+            </span>
           </div>
         )}
         {current ? <RepoLensReport a={current} /> : !running && <RepoLensLibrary />}

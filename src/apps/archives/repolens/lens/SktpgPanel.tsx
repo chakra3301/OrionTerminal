@@ -2,70 +2,93 @@ import type { Sktpg } from "../types";
 
 export function SktpgPanel({ s }: { s: Sktpg }) {
   return (
-    <div className="rl-section">
-      <h3>
-        SKTPG — {s.score.value}/100 · {s.score.band}
-      </h3>
-      <p>
-        <strong>Becoming:</strong> {s.thesis.becoming}
-      </p>
-      <p>
-        <strong>Forced next:</strong> {s.thesis.forced_next}
-      </p>
-      <p>
-        <strong>Opportunity:</strong> {s.thesis.opportunity}
-      </p>
-      <p>
-        <strong>Before consensus:</strong> {s.thesis.before_consensus}
-      </p>
-      <p>
-        <strong>Wrong if:</strong> {s.thesis.wrong_if}
-      </p>
+    <section className="rl-card rl-lens-panel">
+      <div className="rl-eyebrow">
+        SKTPG · {s.score.value}/100 · {s.score.band}
+      </div>
+
+      <ul className="rl-list">
+        {s.thesis.becoming && (
+          <li>
+            <b>Becoming</b> <span className="sub">— {s.thesis.becoming}</span>
+          </li>
+        )}
+        {s.thesis.forced_next && (
+          <li>
+            <b>Forced next</b> <span className="sub">— {s.thesis.forced_next}</span>
+          </li>
+        )}
+        {s.thesis.opportunity && (
+          <li>
+            <b>Opportunity</b> <span className="sub">— {s.thesis.opportunity}</span>
+          </li>
+        )}
+        {s.thesis.before_consensus && (
+          <li>
+            <b>Before consensus</b> <span className="sub">— {s.thesis.before_consensus}</span>
+          </li>
+        )}
+        {s.thesis.wrong_if && (
+          <li>
+            <b>Wrong if</b> <span className="sub">— {s.thesis.wrong_if}</span>
+          </li>
+        )}
+      </ul>
 
       {(s.forecast.base || s.forecast.bull || s.forecast.bear) && (
         <>
-          <h3 style={{ marginTop: 14 }}>Forecast</h3>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            <li>
-              <strong>Base:</strong> {s.forecast.base}
-            </li>
-            <li>
-              <strong>Bull:</strong> {s.forecast.bull}
-            </li>
-            <li>
-              <strong>Bear:</strong> {s.forecast.bear}
-            </li>
-            <li>
-              <strong>Wildcard:</strong> {s.forecast.wildcard}
-            </li>
+          <div className="sub-h">Forecast</div>
+          <ul className="rl-list">
+            {s.forecast.base && (
+              <li>
+                <b>Base</b> <span className="sub">— {s.forecast.base}</span>
+              </li>
+            )}
+            {s.forecast.bull && (
+              <li>
+                <b>Bull</b> <span className="sub">— {s.forecast.bull}</span>
+              </li>
+            )}
+            {s.forecast.bear && (
+              <li>
+                <b>Bear</b> <span className="sub">— {s.forecast.bear}</span>
+              </li>
+            )}
+            {s.forecast.wildcard && (
+              <li>
+                <b>Wildcard</b> <span className="sub">— {s.forecast.wildcard}</span>
+              </li>
+            )}
           </ul>
         </>
       )}
+
       {s.premortem.length > 0 && (
         <>
-          <h3 style={{ marginTop: 14 }}>Pre-mortem</h3>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
+          <div className="sub-h">Pre-mortem</div>
+          <ul className="rl-list">
             {s.premortem.map((p, i) => (
               <li key={i}>
-                [{p.likelihood}] {p.kill_path}
-                {p.survives ? " (survivable)" : ""}
+                <span className="sub">[{p.likelihood}]</span> {p.kill_path}
+                {p.survives ? <span className="sub"> (survivable)</span> : null}
               </li>
             ))}
           </ul>
         </>
       )}
+
       {s.actions.length > 0 && (
         <>
-          <h3 style={{ marginTop: 14 }}>Actions</h3>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
+          <div className="sub-h">Actions</div>
+          <ul className="rl-list">
             {s.actions.map((a, i) => (
               <li key={i}>
-                <strong>{a.timeframe}:</strong> {a.action} — {a.why_now}
+                <b>{a.timeframe}</b> <span className="sub">— {a.action} · {a.why_now}</span>
               </li>
             ))}
           </ul>
         </>
       )}
-    </div>
+    </section>
   );
 }

@@ -10,8 +10,7 @@ export function RepoLensPickers() {
   return (
     <>
       <select
-        className="rl-url"
-        style={{ flex: "0 0 auto", maxWidth: 160 }}
+        className="rl-select"
         value={model.default_model}
         onChange={(e) => setDefaultModel(e.target.value)}
         title="Model"
@@ -23,8 +22,7 @@ export function RepoLensPickers() {
         ))}
       </select>
       <select
-        className="rl-url"
-        style={{ flex: "0 0 auto", maxWidth: 150 }}
+        className="rl-select"
         value={tone}
         onChange={(e) => setTone(e.target.value)}
         title="Tone"
