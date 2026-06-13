@@ -177,7 +177,7 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 - ✅ 1.2 Tab autocomplete — core shipped 2026-06-13: Haiku 4.5 ghost text (Messages API, single-flight, keep-alive), 180ms debounce + LRU, diagnostics + recent-edit-ring context, Tab/⌘→ accept, toggle command + persisted flag. DEFERRED (explicit): diff-style edit suggestions + next-edit jump → revisit after 1.6 (need richer signals); latency p50 unmeasured until user runs it
 - ✅ 1.3 Navigation/feel — shipped 2026-06-13: ⌘P frecency quick-open (editor-scoped; Spotlight stays ⌘K) · ⌘⇧O Go to Symbol (quickOutline; **Switch Project moved ⌘⇧O→⌘T**) · ⌘\ split editor right (file tabs only) · breadcrumbs + enclosing TS symbol · ⌘F12 project-wide go-to-def (import resolution + declaration search; real LSP in 1.6). DEFERRED: terminal ⌘K (stretch) → with 1.6
 - ✅ 1.4 Git — core shipped 2026-06-13: structured status plumbing · live gutter markers (HEAD vs buffer on the P2b Myers engine) · tree status colors+letters · Changes panel = real source control (stage/unstage/discard/commit/push + AI commit messages via claude_oneshot) · status-bar branch switcher with checkout menu. DEFERRED (explicit): inline blame → rides with 1.5
-- ⬜ 1.5 Checkpoints + whole-turn review (~1-2): auto-snapshot before agent turns, restore that never destroys history, consolidated per-turn review
+- ✅ 1.5 Checkpoints + review + blame — shipped 2026-06-13: migration 0019 pre-image checkpoints per agent burst (close on turn end / 90s silence, prune 20), one-click restore that snapshots current state first ("before restore"), Checkpoints section in Changes panel; inline blame on the cursor line (1.4's deferred item). NOTE: "consolidated turn review" = Changes panel (all files, bulk actions) + per-file hunk tabs; a single scrolling multi-file diff doc stays a possible polish item
 - ⬜ 1.6 Real LSP (~3): ts-language-server/pyright/rust-analyzer via Rust stdio, semantic diagnostics, cross-file refs/rename/actions, graceful degradation
 - CUT from Phase 1 (explicit): cloud agents/Slack control, in-editor browser + Design Mode, separate Plan Mode, Bugbot-style PR review, voice agent control, RL autocomplete tuning.
 
@@ -210,6 +210,13 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-13 — AAA Rebuild (cont.): 1.5 checkpoints + inline blame — "fearless experimentation"
+- **Checkpoints (migration 0019)**: every staged agent edit captures its file's **pre-image at first touch per burst** (`checkpoints.ts`, hooked in EventBridge's staged_edit handler) — so the snapshot is pre-turn even when the agent edits a file five times. Bursts close on Orion chat turn end (chatStore running→false) or **90s edit silence** (covers ROSIE/other agents using the same MCP edit tools); pruned to 20/project. `aa40dec`
+- **Restore never destroys history**: restoring writes pre-images back (deletes files that didn't exist, clears stale pending reviews, refreshes tree+git+buffers) — but FIRST snapshots the current state of those same files as a "before restore" checkpoint, so restores are themselves restorable. Checkpoints section in the Changes panel (label · age · file count · confirm-gated Restore).
+- **Inline blame** (1.4's deferred item): `git_blame_line` (porcelain, single line; None for uncommitted/untracked) → dim italic end-of-line annotation `author · age · summary` on the cursor line — 600ms debounce, 200-entry branch-keyed cache, stale-cursor guard, suppressed during AI review. `860362c`
+- NOTE: "consolidated turn review" satisfied by Changes panel + per-file hunk tabs; single-document multi-file diff noted as possible polish, not silently dropped.
+- ⚠️ Needs a **full `tauri dev` restart** (migration 0019 + new blame command). tsc / **137 tests** / cargo (13) / build green. **Phase 1: 1.1–1.5 ✅ — only 1.6 real LSP remains.**
 
 ### 2026-06-13 — AAA Rebuild (cont.): 1.4 git integration — the whole core loop
 - **Plumbing** (`git_ops.rs` + ipc): structured `git_status` (porcelain v1 + branch/ahead/behind, renames + C-quoted paths handled, non-repo safe) · `git_head_content` (gutter baseline; empty for new files) · stage/unstage/discard · commit · **async push** (spawn_blocking — network never blocks an invoke) · branches/checkout · per-file diff. unquote unit-tested (13 cargo). `1d45e3b`
