@@ -183,13 +183,15 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 **🎉 PHASE 1 — Orion ≥ Cursor — COMPLETE (2026-06-13).** All six items shipped: AI editing core (P2b-e), Tab autocomplete, navigation/feel, git, checkpoints+blame, real LSP. Next: **Phase 2 — Archives ≥ Notion** (needs research + ranked plan + user approval before building).
 - CUT from Phase 1 (explicit): cloud agents/Slack control, in-editor browser + Design Mode, separate Plan Mode, Bugbot-style PR review, voice agent control, RL autocomplete tuning.
 
-**Phase 2 — Archives ≥ Notion** 🔨 — ranked plan APPROVED 2026-06-13 (research: [docs/research/notion-2026.md](docs/research/notion-2026.md)). Thesis: Notion's top complaints (capture latency, half-baked offline, weak+paywalled "ask-your-notes" AI, lossy export) are our structural moats (local SQLite, offline-default, embeddings already built). Win lane = "Notion's structure + Apple Notes capture speed + Obsidian local trust." Archives AI = subscription CLI (claude_oneshot, no per-token cost).
+**Phase 2 — Archives ≥ Notion** ✅ COMPLETE 2026-06-13 — ranked plan APPROVED 2026-06-13 (research: [docs/research/notion-2026.md](docs/research/notion-2026.md)). Thesis: Notion's top complaints (capture latency, half-baked offline, weak+paywalled "ask-your-notes" AI, lossy export) are our structural moats (local SQLite, offline-default, embeddings already built). Win lane = "Notion's structure + Apple Notes capture speed + Obsidian local trust." Archives AI = subscription CLI (claude_oneshot, no per-token cost).
 - ✅ 2.1 Capture & ritual — shipped 2026-06-13: quick-capture overlay ⌘⇧N → auto-created Inbox collection (↵/⌘↵/⇧↵) · daily-note ⌘⇧D (date-keyed find-or-create journal entry) · 4 note templates (⌘K "New from Template…") with {{date}}/{{weekday}}/{{time}}/etc. expansion. Capture-speed moat = Notion's #1 weakness.
 - ✅ 2.2 AI-native Archives — shipped 2026-06-13: note auto-tagging (settle-triggered, zero-tag-only) · "Ask your Archive" RAG ⌘⇧A (hybrid-search retrieval → cited answer, clickable citations jump to source) · inline editor AI (toolbar ✨AI: improve/fix/shorter/longer/summarize on selection; /continue-writing + /summarize-note slash items). All subscription CLI (no per-token cost). Beats Notion's weakest+paywalled Q&A; matches its inline AI.
 - ✅ 2.3 Database views — COMPLETE 2026-06-13: 2.3a data model (migration 0020) · 2.3b table view (editable typed cells, 8 property types) · 2.3c board (drag-grouped by select/status) / gallery / calendar (date-placed, month nav) views + add-view menu · 2.3d filters (chips) + sorts across all views. A collection IS a Notion-class database. ~20 tests across the slices.
 - ✅ 2.4 Linking & graph — shipped 2026-06-13: `[[`wikilink autocomplete (BlockNote `[` SuggestionMenuController → inserts orion://note link) · backlinks panel on every note editor (Links-to-this-page + Unlinked-mentions, live from in-memory notes) · `setNoteNavigator` routes orion://note clicks within Archives by kind (fixes the audit's unreachable-in-app gap). noteLinks helpers (extractNoteLinks/computeBacklinks) 6 tests.
-- ⬜ 2.5 Editor power (~1-2): callouts · toggles · highlighted code · columns · better md paste · PDF export (custom BlockNote blocks)
+- ✅ 2.5 Editor power — shipped 2026-06-13: callout custom block (createReactBlockSpec, 5 colors, schema additive) · toggles + highlighted code blocks (ALREADY in default BlockNote schema — just surfaced) · PDF export (print-to-PDF via hidden iframe + blocksToFullHTML, no dep). CUT from 2.5: columns (needs @blocknote/xl-multi-column dep — deferrable) · better md-paste (default is adequate).
 - CUT (explicit): formulas/rollups/relations depth · timeline/chart/feed/map/form views · synced blocks · web clipper / cross-app AI connectors · multiplayer.
+
+**🎉 PHASE 2 — Archives ≥ Notion — COMPLETE (2026-06-13).** 2.1 capture/ritual · 2.2 AI-native · 2.3 databases · 2.4 linking · 2.5 editor power. Next: **Phase 3 — XDesign ≥ Figma** (needs research + ranked plan + user approval).
 
 **Phase 3 — XDesign ≥ Figma** ⬜ · **Phase 4 — One terminal, one brain** ⬜
 
@@ -220,6 +222,14 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-13 — AAA Rebuild: Phase 2.5 editor power → 🎉 PHASE 2 COMPLETE
+- **Finding:** toggles (`toggleListItem`) + highlighted code blocks (`codeBlock`) + checklists/quotes/tables are ALREADY in BlockNote's default schema — reachable via the default slash menu the whole time (audit under-counted). So 2.5's real work = callout + PDF.
+- **Callout block** (`noteSchema.tsx`): `BlockNoteSchema.create({ blockSpecs: { ...defaultBlockSpecs, callout: Callout() } })` where Callout = `createReactBlockSpec` (inline content, 5 theme colors, click the emoji to cycle). `useCreateBlockNote({ schema: noteSchema })` in NoteEditor; `/Callout` slash item. **Additive** — existing notes use a subset of defaultBlockSpecs, parse unchanged. GOTCHA: createReactBlockSpec returns a `(options?) => BlockSpec` FACTORY — must call `Callout()` in the schema. `57045e9`
+- **PDF export** (`exportPdf.ts`, ⌘K "Export Note to PDF" + Archives Share menu): builds a standalone HTML doc from the note title + `editor.blocksToFullHTML` → hidden iframe → `print()`; the OS Save-as-PDF dialog finishes. Zero dep. Light print stylesheet styles callouts/code/quotes/tables. `editorBridge` handle gains `getHTML()`. `cb764fd`
+- CUT from 2.5 (explicit): columns (needs `@blocknote/xl-multi-column` dep) · better md-paste (default adequate).
+- Frontend-only, hot-reloads. tsc / **212 tests** / build green.
+- **🎉 PHASE 2 — Archives ≥ Notion — COMPLETE.** 2.1 capture · 2.2 AI · 2.3 databases · 2.4 linking · 2.5 editor. **Next: Phase 3 (XDesign ≥ Figma)** — needs web research + ranked plan + user approval before building (per protocol). NOTE: Phase 2 added migration 0020 (databases) — **a `tauri dev` restart is required** before the database views work.
 
 ### 2026-06-13 — AAA Rebuild: Phase 2.4 linking & knowledge graph (was MISSING)
 - **`[[`wikilink autocomplete**: second BlockNote `SuggestionMenuController` on `[` in `NoteEditorAi` — type `[[query`, pick a note, inserts an `orion://note/<id>` link (BlockNote strips the trigger `[` + query incl. the second `[`). Fuzzy by title, excludes self.
