@@ -104,6 +104,17 @@ export const ipc = {
   ): Promise<{ author: string; time: number; summary: string; sha: string } | null> =>
     invoke("git_blame_line", { root, path, line }),
 
+  lspProbe: (cmd: string): Promise<boolean> => invoke<boolean>("lsp_probe", { cmd }),
+  lspStart: (
+    serverId: string,
+    cmd: string,
+    args: string[],
+    root: string,
+  ): Promise<void> => invoke("lsp_start", { serverId, cmd, args, root }),
+  lspSend: (serverId: string, message: string): Promise<void> =>
+    invoke("lsp_send", { serverId, message }),
+  lspStop: (serverId: string): Promise<void> => invoke("lsp_stop", { serverId }),
+
   autocompleteRun: (ctx: {
     path: string;
     language: string;

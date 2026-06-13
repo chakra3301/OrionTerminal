@@ -23,6 +23,18 @@ export async function gotoProjectDefinition(
   const project = useProjectStore.getState().active;
   if (!model || !pos || !project) return;
 
+  // Strategy 0: a real language server, if one owns this file. Most precise.
+  try {
+    const { lspDefinition } = await import("@/features/lsp/lspManager");
+    const hit = await lspDefinition(currentPath, pos.lineNumber, pos.column);
+    if (hit) {
+      openAt(hit.path, hit.line, hit.column);
+      return;
+    }
+  } catch {
+    /* fall through to heuristics */
+  }
+
   const line = model.getLineContent(pos.lineNumber);
 
   // Strategy 1: import path under cursor.
