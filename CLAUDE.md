@@ -195,7 +195,7 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 
 **Phase 3 — XDesign ≥ Figma** 🔨 — ranked plan APPROVED 2026-06-13 (research: [docs/research/figma-2026.md](docs/research/figma-2026.md)). Thesis: design→code is THE wedge — Figma's own MCP docs admit their code output is "not production-ready" (emulates CSS, absolute-positioned inline-style React, external agent that doesn't know your repo). XDesign wins: real React + Orion's own tokens as a reviewable staged edit into the repo next door, local-first, AI edits Accept/Reject-reversible. Multiplayer explicitly NOT contested. Export styling = inline styles + CSS-var tokens (locked).
 - 🔨 3.1 Design→code (the wedge): ✅ generator (designToReact.ts, frame-tree→.tsx, auto-layout→flex, token mapping, 8 tests) + ✅ export→staged edit (reuses Phase-1 pendingEdits+DiffReview; Inspector "React" btn + command). ⬜ DEFERRED 3.1c screenshot→editable-layers (own slice — vision prompt + model-quality-dependent).
-- ⬜ 3.2 Canvas feel: double-click-into-frame · ⌘-click deep-select · select-all · alt-hover measure · multi-select inspector batch-edit · viewport culling (500+ nodes)
+- ✅ 3.2 Canvas feel — shipped 2026-06-13: progressive selection (plain click → top-level frame; click-again drills; ⌘/double-click → exact leaf) · ⌘A select-all · editable multi-select inspector (batch move/fill/opacity) · viewport culling >120 nodes (intersect visible rect + 1-screen margin, selected always render). DEFERRED: alt-hover measurement (own slice — needs proper shape hit-testing).
 - ⬜ 3.3 Vector depth: boolean ops (union/subtract/intersect/exclude; approved geometry dep) · post-hoc path/anchor editing
 - ⬜ 3.4 Layout systems: constraints (pin/center/scale) · component variants (sets+properties) · non-lossy instance overrides
 - ⬜ 3.5 Prototyping lite: hotspot links · present mode · transitions
@@ -230,6 +230,13 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-13 — AAA Rebuild: Phase 3.2 canvas feel — selection model, multi-select inspector, culling
+- All frontend (Canvas.tsx + Inspector.tsx), hot-reloads.
+- **Progressive selection** (`17bdc14`): replaced the old always-deep click. Plain click selects the TOP-LEVEL frame (frames act as units); clicking again inside an already-selected frame drills one level deeper toward the cursor (deepest-selected-ancestor walk); **⌘-click or double-click** (`e.detail >= 2`) jump to the exact leaf (deep-select / into-frame). `⌘A` selects all top-level shapes. Drag-move + shift-toggle use the resolved target.
+- **Editable multi-select inspector** (`2006682`): was read-only. Now X/Y move the whole selection (delta via patchMany, frames carry descendants), Fill swatch + Opacity batch-apply; common-value detection shows shared value or neutral default; one undo step per edit.
+- **Viewport culling** (`e400034`): >120 nodes → only top-level subtrees intersecting the visible doc rect (+1-screen margin) render; selected always render; ResizeObserver tracks canvas size. Lifts the SVG-everything ceiling toward 500+ nodes.
+- DEFERRED: alt-hover measurement (own slice — needs shape hit-testing on mousemove). tsc / **220 tests** / build green. **Next: 3.3 vector depth (booleans + path editing).**
 
 ### 2026-06-13 — AAA Rebuild: Phase 3 START — research, plan approved, 3.1 design→code (the wedge)
 - **Phase 3 (XDesign ≥ Figma) launched.** Two web-research passes ([docs/research/figma-2026.md](docs/research/figma-2026.md)) + a deep XDesign code audit. Strategic find: **Figma's design→code is its biggest, self-admitted weakness** (MCP docs literally say "not production-ready"; emulates CSS in WebGL → absolute-positioned inline-style React; Figma Make "gimmicky AND destructive"). XDesign's structural answer = real React + Orion's own tokens as a **reviewable staged edit into the repo next door** + embedded Claude + local-first + Accept/Reject reversibility. Audit: XDesign STRONGER than expected (real auto-layout, components, variables+modes, standout AI command DSL + vision rail, undo/pages) with gaps — SVG no-virtualization, no booleans/path-edit, no constraints, no variants, read-only multi-select inspector, no double-click-into-frame, **no design→code**.
