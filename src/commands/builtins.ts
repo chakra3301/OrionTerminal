@@ -419,6 +419,19 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
+    id: "note.quickCapture",
+    label: "Quick Capture",
+    hotkey: "mod+shift+n",
+    keywords: ["capture", "inbox", "jot", "note", "quick", "scratch"],
+    group: "Notes",
+    run: () => {
+      void import("@/features/notes/quickCapture").then((m) =>
+        m.useQuickCapture.getState().show(),
+      );
+    },
+  });
+
+  registry.register({
     id: "editor.toggleTabAutocomplete",
     label: "Toggle Tab Autocomplete",
     keywords: ["autocomplete", "ghost", "suggestion", "completion", "ai", "tab"],

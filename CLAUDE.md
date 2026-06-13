@@ -183,7 +183,15 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 **🎉 PHASE 1 — Orion ≥ Cursor — COMPLETE (2026-06-13).** All six items shipped: AI editing core (P2b-e), Tab autocomplete, navigation/feel, git, checkpoints+blame, real LSP. Next: **Phase 2 — Archives ≥ Notion** (needs research + ranked plan + user approval before building).
 - CUT from Phase 1 (explicit): cloud agents/Slack control, in-editor browser + Design Mode, separate Plan Mode, Bugbot-style PR review, voice agent control, RL autocomplete tuning.
 
-**Phase 2 — Archives ≥ Notion** ⬜ · **Phase 3 — XDesign ≥ Figma** ⬜ · **Phase 4 — One terminal, one brain** ⬜
+**Phase 2 — Archives ≥ Notion** 🔨 — ranked plan APPROVED 2026-06-13 (research: [docs/research/notion-2026.md](docs/research/notion-2026.md)). Thesis: Notion's top complaints (capture latency, half-baked offline, weak+paywalled "ask-your-notes" AI, lossy export) are our structural moats (local SQLite, offline-default, embeddings already built). Win lane = "Notion's structure + Apple Notes capture speed + Obsidian local trust." Archives AI = subscription CLI (claude_oneshot, no per-token cost).
+- 🔨 2.1 Capture & ritual (~1-2): global-ish quick-capture overlay → Inbox · daily-note (date-keyed, auto-open) · templates w/ {{date}}/{{time}} variables
+- ⬜ 2.2 AI-native Archives (~2): inline editor AI (rewrite/continue/summarize in place) · "Ask your Archive" RAG w/ citations to source notes · note auto-tagging (currently assets-only)
+- ⬜ 2.3 Database views (~3-4): typed properties (additive migration) → table/board/gallery/calendar over any collection/kind + filters/sorts/grouping/inline-edit/saved views (biggest build, may split)
+- ⬜ 2.4 Linking & graph (~1-2): [[wikilink]] autocomplete in BlockNote · backlinks panel · unlinked mentions · in-app orion:// deep links (fix the gate bug)
+- ⬜ 2.5 Editor power (~1-2): callouts · toggles · highlighted code · columns · better md paste · PDF export (custom BlockNote blocks)
+- CUT (explicit): formulas/rollups/relations depth · timeline/chart/feed/map/form views · synced blocks · web clipper / cross-app AI connectors · multiplayer.
+
+**Phase 3 — XDesign ≥ Figma** ⬜ · **Phase 4 — One terminal, one brain** ⬜
 
 ---
 

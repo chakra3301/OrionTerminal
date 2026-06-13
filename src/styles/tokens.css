@@ -10530,3 +10530,76 @@ html.ot-reduce-glass .note-page .note-editor-body {
   font-style: italic;
   font-size: 0.92em;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Quick capture — frictionless note overlay (⌘⇧N)
+   ───────────────────────────────────────────────────────────── */
+.ot-capture-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 6400;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 16vh;
+  animation: ot-ctx-in 120ms ease-out;
+}
+.ot-capture {
+  width: 560px;
+  max-width: calc(100vw - 48px);
+  background: var(--bg-1);
+  border: 1px solid rgba(var(--neon-green-rgb), 0.3);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-window), 0 0 30px -8px rgba(var(--neon-green-rgb), 0.35);
+  overflow: hidden;
+}
+.ot-capture-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 0;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-tertiary);
+}
+.ot-capture-spark { color: var(--neon-green); }
+.ot-capture-dest {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--neon-green);
+}
+.ot-capture-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 12px 14px 8px;
+  color: var(--t-primary);
+  font-family: var(--f-ui);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.ot-capture-input::placeholder { color: var(--t-tertiary); font-size: 13px; }
+.ot-capture-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 12px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  color: var(--t-faint);
+}
+.ot-capture-foot .kbd {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  padding: 0 4px;
+  color: var(--t-tertiary);
+}
+.ot-capture-foot .kbd:not(:first-child) { margin-left: 10px; }
