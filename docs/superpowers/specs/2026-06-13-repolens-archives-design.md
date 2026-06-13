@@ -1,8 +1,9 @@
 # RepoLens → Archives — Design Spec
 
 **Date:** 2026-06-13
-**Status:** approved-for-planning
+**Status:** approved-for-planning (approved 2026-06-13)
 **Scope of v1:** Core scan + 3 AI lenses (Deep Dive, SKTPG, Synergies). No Versus, no connections graph, no diagrams, no combinator/re-tag, no systems/ideate/prioritize framework lenses.
+**Roadmap intent:** the user eventually wants the **full RepoLens feature set** (all 24 features in the handoff). This spec is **phase 1**; the §12 out-of-scope items are deferred to later phases, not cut. Build phase 1, ship, iterate.
 
 ---
 
