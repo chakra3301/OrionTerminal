@@ -217,7 +217,7 @@ function EditorBody({
         formattingToolbar={false}
         slashMenu={false}
       >
-        <NoteAiControllers editor={editor} />
+        <NoteAiControllers editor={editor} noteId={noteId} />
       </BlockNoteView>
       {dropping && (
         <div className="note-drop-overlay">Drop to add to this note</div>

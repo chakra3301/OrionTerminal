@@ -8,9 +8,11 @@ import {
   type DefaultReactSuggestionItem,
 } from "@blocknote/react";
 import type { BlockNoteEditor } from "@blocknote/core";
-import { Sparkles, Wand2, PenLine } from "lucide-react";
+import { Sparkles, Wand2, PenLine, FileText } from "lucide-react";
 import { useContextMenu, type MenuItem } from "@/components/ContextMenu";
 import { toast } from "@/store/toastStore";
+import { useNotesStore } from "@/store/notesStore";
+import { formatOrionUri } from "@/lib/orionProtocol";
 import {
   buildSelectionPrompt,
   buildContinuePrompt,
@@ -151,9 +153,36 @@ function aiSlashItems(editor: Editor): DefaultReactSuggestionItem[] {
   ];
 }
 
-/** Drop-in controllers that add AI to a BlockNoteView. Render as children of
- * <BlockNoteView formattingToolbar={false} slashMenu={false}>. */
-export function NoteAiControllers({ editor }: { editor: Editor }) {
+/** `[[` wiki-link items — type `[[query` to link another note. BlockNote
+ * removes the trigger `[` + query on select, so the second `[` (part of the
+ * query) is stripped here and removed by the menu. */
+function wikiLinkItems(editor: Editor, query: string, excludeId: string): DefaultReactSuggestionItem[] {
+  const q = query.replace(/^\[/, "").trim().toLowerCase();
+  const notes = [...useNotesStore.getState().notes.values()]
+    .filter((n) => n.id !== excludeId && (n.title || n.plaintext).trim())
+    .map((n) => ({ id: n.id, title: n.title || "Untitled" }))
+    .filter((n) => (q ? n.title.toLowerCase().includes(q) : true))
+    .slice(0, 12);
+  return notes.map((n) => ({
+    title: n.title,
+    group: "Link a note",
+    icon: <FileText size={16} />,
+    onItemClick: () => {
+      editor.insertInlineContent([
+        {
+          type: "link",
+          href: formatOrionUri({ kind: "note", id: n.id }),
+          content: [{ type: "text", text: n.title, styles: {} }],
+        },
+        { type: "text", text: " ", styles: {} },
+      ]);
+    },
+  }));
+}
+
+/** Drop-in controllers that add AI + wiki-linking to a BlockNoteView. Render
+ * as children of <BlockNoteView formattingToolbar={false} slashMenu={false}>. */
+export function NoteAiControllers({ editor, noteId }: { editor: Editor; noteId: string }) {
   return (
     <>
       <FormattingToolbarController
@@ -179,6 +208,10 @@ export function NoteAiControllers({ editor }: { editor: Editor }) {
               )
             : all;
         }}
+      />
+      <SuggestionMenuController
+        triggerCharacter="["
+        getItems={async (query: string) => wikiLinkItems(editor, query, noteId)}
       />
     </>
   );
