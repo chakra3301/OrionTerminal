@@ -124,8 +124,15 @@ export type Versus = {
   verdict: string;
 };
 
-export type Lenses = { deepdive?: DeepDive; sktpg?: Sktpg; synergies?: Synergies; versus?: Versus };
+export type Lenses = {
+  deepdive?: DeepDive;
+  sktpg?: Sktpg;
+  synergies?: Synergies;
+  versus?: Versus;
+  /** Framework-lens results keyed by framework key (toc, triz, pareto, …). */
+  frameworks?: Record<string, Record<string, unknown>>;
+};
 
-export type PartId = "core" | "deepdive" | "sktpg" | "synergies" | "versus";
+export type PartId = "core" | "deepdive" | "sktpg" | "synergies" | "versus" | "lens";
 export type RepoLensModelConfig = { default_model: string; per_part: Record<string, string> };
 export type RepoLensPrefs = { model: RepoLensModelConfig; tone: string };

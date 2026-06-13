@@ -4,10 +4,12 @@ import { deriveFit } from "./verdict";
 import { toMarkdown, slugify } from "./export";
 import { useRepoLens } from "./useRepoLens";
 import { resolveInput } from "./fetch";
+import { FRAMEWORK_GROUPS, frameworkLabel } from "./frameworks";
 import { DeepDivePanel } from "./lens/DeepDivePanel";
 import { SktpgPanel } from "./lens/SktpgPanel";
 import { SynergiesPanel } from "./lens/SynergiesPanel";
 import { VersusPanel } from "./lens/VersusPanel";
+import { FrameworkPanel } from "./lens/FrameworkPanel";
 
 const LANG_COLORS = [
   "var(--repolens-green)",
@@ -63,10 +65,13 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
   const runSktpg = useRepoLens((s) => s.runSktpg);
   const runSynergies = useRepoLens((s) => s.runSynergies);
   const runVersus = useRepoLens((s) => s.runVersus);
+  const runFramework = useRepoLens((s) => s.runFramework);
+  const activeFramework = useRepoLens((s) => s.activeFramework);
   const library = useRepoLens((s) => s.library);
 
   const repoId = a.repoId ?? "";
   const [versusOpen, setVersusOpen] = useState(false);
+  const [frameworksOpen, setFrameworksOpen] = useState(false);
   const [vsInput, setVsInput] = useState("");
   const vsHit = resolveInput(vsInput);
   const vsCandidates = library.filter((r) => r.repo_id !== repoId);
@@ -166,9 +171,22 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
           <button
             className={`rl-btn rl-lens-btn${lenses.versus ? " has" : ""}${versusOpen ? " open" : ""}`}
             disabled={running !== null}
-            onClick={() => setVersusOpen((o) => !o)}
+            onClick={() => {
+              setVersusOpen((o) => !o);
+              setFrameworksOpen(false);
+            }}
           >
             {running === "versus" ? "Running Versus…" : lenses.versus ? "↻ Versus" : "Versus"}
+          </button>
+          <button
+            className={`rl-btn rl-lens-btn${lenses.frameworks && Object.keys(lenses.frameworks).length ? " has" : ""}${frameworksOpen ? " open" : ""}`}
+            disabled={running !== null}
+            onClick={() => {
+              setFrameworksOpen((o) => !o);
+              setVersusOpen(false);
+            }}
+          >
+            {running === "lens" ? `Running ${frameworkLabel(activeFramework ?? "")}…` : "Frameworks ▾"}
           </button>
         </div>
         <button className="rl-btn" onClick={() => downloadMarkdown(a)}>
@@ -210,6 +228,35 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {frameworksOpen && (
+        <div className="rl-fw-menu">
+          {FRAMEWORK_GROUPS.map((g) => (
+            <div className="rl-fw-group" key={g.group}>
+              <div className="rl-eyebrow">{g.label}</div>
+              {g.frameworks.map((f) => {
+                const done = !!lenses.frameworks?.[f.key];
+                return (
+                  <button
+                    key={f.key}
+                    className="rl-fw-item"
+                    onClick={() => {
+                      setFrameworksOpen(false);
+                      void runFramework(f.key);
+                    }}
+                  >
+                    <span className="lbl">
+                      {f.label}
+                      {done && <span className="done"> ✓</span>}
+                    </span>
+                    <span className="blurb">{f.blurb}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
 
@@ -429,14 +476,14 @@ export function RepoLensReport({ a }: { a: RepoAnalysis }) {
       )}
 
       {/* ── deeper analysis (lens results) ── */}
-      {(lenses.deepdive || lenses.sktpg || lenses.synergies || lenses.versus) && (
-        <>
-          {lenses.deepdive && <DeepDivePanel d={lenses.deepdive} />}
-          {lenses.sktpg && <SktpgPanel s={lenses.sktpg} />}
-          {lenses.synergies && <SynergiesPanel s={lenses.synergies} />}
-          {lenses.versus && <VersusPanel v={lenses.versus} aId={repoId} />}
-        </>
-      )}
+      {lenses.deepdive && <DeepDivePanel d={lenses.deepdive} />}
+      {lenses.sktpg && <SktpgPanel s={lenses.sktpg} />}
+      {lenses.synergies && <SynergiesPanel s={lenses.synergies} />}
+      {lenses.versus && <VersusPanel v={lenses.versus} aId={repoId} />}
+      {lenses.frameworks &&
+        Object.entries(lenses.frameworks).map(([k, data]) => (
+          <FrameworkPanel key={k} fkey={k} data={data} />
+        ))}
     </div>
   );
 }

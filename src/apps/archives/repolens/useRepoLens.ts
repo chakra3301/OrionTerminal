@@ -21,6 +21,7 @@ import {
   buildVersusPrompt,
   parseVersus,
 } from "./lenses";
+import { buildFrameworkPrompt, parseFramework } from "./frameworks";
 import { getAppState, setAppState } from "@/lib/db";
 import { saveScan, listScans, getScan, deleteScan, updateLenses, type ScanRow } from "./repolensDb";
 import { log } from "@/lib/log";
@@ -55,7 +56,7 @@ function asRepoData(a: RepoAnalysis): RepoData {
   };
 }
 
-type RunningPart = null | "core" | "deepdive" | "sktpg" | "synergies" | "versus";
+type RunningPart = null | "core" | "deepdive" | "sktpg" | "synergies" | "versus" | "lens";
 
 type State = {
   input: string;
@@ -63,6 +64,8 @@ type State = {
   current: RepoAnalysis | null;
   lenses: Lenses;
   running: RunningPart;
+  /** Which framework key is mid-run (for the menu spinner); null otherwise. */
+  activeFramework: string | null;
   error: string | null;
   model: RepoLensModelConfig;
   tone: string;
@@ -74,6 +77,7 @@ type State = {
   runSktpg: () => Promise<void>;
   runSynergies: () => Promise<void>;
   runVersus: (target: { platform: Platform; repoId: string }) => Promise<void>;
+  runFramework: (key: string) => Promise<void>;
   library: ScanRow[];
   loadLibrary: () => Promise<void>;
   openFromLibrary: (repoId: string) => Promise<void>;
@@ -94,6 +98,7 @@ export const useRepoLens = create<State>((set, get) => ({
   current: null,
   lenses: {},
   running: null,
+  activeFramework: null,
   error: null,
   model: defaultModelConfig(),
   tone: "neutral",
@@ -217,6 +222,28 @@ export const useRepoLens = create<State>((set, get) => ({
     } catch (e) {
       log.error("repolens versus failed", e);
       set({ running: null, error: e instanceof Error ? e.message : String(e) });
+    }
+  },
+
+  runFramework: async (key) => {
+    const cur = get().current;
+    if (!cur?.repoId) return;
+    set({ running: "lens", activeFramework: key, error: null });
+    try {
+      const source = await fetchSource(cur.repoId);
+      const raw = await enqueueClaude(
+        get().model,
+        "lens",
+        withTone(get().tone, buildFrameworkPrompt(key, asRepoData(cur), source)),
+      );
+      const result = parseFramework(raw);
+      const frameworks = { ...(get().lenses.frameworks ?? {}), [key]: result };
+      const lenses: Lenses = { ...get().lenses, frameworks };
+      set({ lenses, running: null, activeFramework: null });
+      await updateLenses(cur.repoId, lenses);
+    } catch (e) {
+      log.error("repolens framework lens failed", e);
+      set({ running: null, activeFramework: null, error: e instanceof Error ? e.message : String(e) });
     }
   },
 

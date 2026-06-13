@@ -10,6 +10,7 @@ export const PARTS: { id: string; label: string }[] = [
   { id: "sktpg", label: "SKTPG" },
   { id: "synergies", label: "Synergies" },
   { id: "versus", label: "Versus" },
+  { id: "lens", label: "Framework Lens" },
 ];
 
 export const REPOLENS_MODELS = MODELS;

@@ -15,6 +15,13 @@ describe("models", () => {
     expect(defaultModelConfig().default_model).toBe("claude-sonnet-4-6");
   });
   it("PARTS covers the routable features", () => {
-    expect(PARTS.map((p) => p.id)).toEqual(["core", "deepdive", "sktpg", "synergies", "versus"]);
+    expect(PARTS.map((p) => p.id)).toEqual([
+      "core",
+      "deepdive",
+      "sktpg",
+      "synergies",
+      "versus",
+      "lens",
+    ]);
   });
 });
