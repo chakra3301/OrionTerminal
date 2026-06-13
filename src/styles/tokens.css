@@ -26,6 +26,10 @@
   --neon-violet-rgb:  177, 76, 255;
   --neon-amber:   #ffb347;
 
+  /* RepoLens accent — a deeper green than Archives' neon, to set the section apart. */
+  --repolens-green:     #1fb85f;
+  --repolens-green-rgb: 31, 184, 95;
+
   /* Hermes accent — amber (Mercury/messenger). Channels exposed for rgba(). */
   --hermes-accent-rgb: 255, 179, 71;
   --hermes-accent:     rgb(var(--hermes-accent-rgb));
@@ -11073,3 +11077,29 @@ html.ot-reduce-glass .note-page .note-editor-body {
   text-transform: uppercase;
   color: var(--t-faint);
 }
+
+/* ── RepoLens (Archives section) ─────────────────────────────────────────── */
+.rl-view { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.rl-scanbar { display: flex; gap: 8px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--glass-border); flex-wrap: wrap; }
+.rl-scanbar input.rl-url,
+.rl-scanbar select.rl-url { flex: 1; min-width: 0; background: var(--bg-2); border: 1px solid var(--glass-border); border-radius: var(--r-sm); padding: 8px 10px; color: var(--t-primary); font: inherit; }
+.rl-scanbar input.rl-url:focus { outline: none; border-color: rgba(var(--repolens-green-rgb), 0.6); }
+.rl-btn { background: rgba(var(--repolens-green-rgb), 0.14); color: var(--repolens-green); border: 1px solid rgba(var(--repolens-green-rgb), 0.4); border-radius: var(--r-sm); padding: 8px 14px; font: inherit; cursor: pointer; white-space: nowrap; }
+.rl-btn:hover:not(:disabled) { background: rgba(var(--repolens-green-rgb), 0.22); }
+.rl-btn:disabled { opacity: 0.5; cursor: default; }
+.rl-body { flex: 1; min-height: 0; overflow: auto; padding: 18px; }
+.rl-error { color: var(--neon-magenta); padding: 8px 14px; font-size: 13px; }
+.rl-spinner { color: var(--repolens-green); padding: 18px; }
+.rl-section { margin: 0 0 22px; }
+.rl-section h3 { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--t-tertiary); margin: 0 0 8px; }
+.rl-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: var(--r-pill); font-size: 12px; border: 1px solid var(--glass-border); }
+.rl-verdict-strong { color: var(--repolens-green); border-color: rgba(var(--repolens-green-rgb), 0.5); }
+.rl-verdict-solid  { color: var(--neon-cyan); border-color: rgba(var(--neon-cyan-rgb), 0.5); }
+.rl-verdict-care   { color: var(--neon-yellow); border-color: rgba(var(--neon-yellow-rgb), 0.5); }
+.rl-verdict-risky  { color: var(--neon-magenta); border-color: rgba(var(--neon-magenta-rgb), 0.5); }
+.rl-bar { height: 6px; border-radius: 3px; background: var(--bg-3); overflow: hidden; }
+.rl-bar > span { display: block; height: 100%; background: var(--repolens-green); }
+.rl-lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.rl-lib-card { background: var(--bg-1); border: 1px solid var(--glass-border); border-radius: var(--r-md); padding: 14px; cursor: pointer; }
+.rl-lib-card:hover { border-color: rgba(var(--repolens-green-rgb), 0.4); }
+.rl-lens-rail { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 18px; }
