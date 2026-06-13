@@ -193,7 +193,15 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 
 **🎉 PHASE 2 — Archives ≥ Notion — COMPLETE (2026-06-13).** 2.1 capture/ritual · 2.2 AI-native · 2.3 databases · 2.4 linking · 2.5 editor power. Next: **Phase 3 — XDesign ≥ Figma** (needs research + ranked plan + user approval).
 
-**Phase 3 — XDesign ≥ Figma** ⬜ · **Phase 4 — One terminal, one brain** ⬜
+**Phase 3 — XDesign ≥ Figma** 🔨 — ranked plan APPROVED 2026-06-13 (research: [docs/research/figma-2026.md](docs/research/figma-2026.md)). Thesis: design→code is THE wedge — Figma's own MCP docs admit their code output is "not production-ready" (emulates CSS, absolute-positioned inline-style React, external agent that doesn't know your repo). XDesign wins: real React + Orion's own tokens as a reviewable staged edit into the repo next door, local-first, AI edits Accept/Reject-reversible. Multiplayer explicitly NOT contested. Export styling = inline styles + CSS-var tokens (locked).
+- 🔨 3.1 Design→code (the wedge): ✅ generator (designToReact.ts, frame-tree→.tsx, auto-layout→flex, token mapping, 8 tests) + ✅ export→staged edit (reuses Phase-1 pendingEdits+DiffReview; Inspector "React" btn + command). ⬜ DEFERRED 3.1c screenshot→editable-layers (own slice — vision prompt + model-quality-dependent).
+- ⬜ 3.2 Canvas feel: double-click-into-frame · ⌘-click deep-select · select-all · alt-hover measure · multi-select inspector batch-edit · viewport culling (500+ nodes)
+- ⬜ 3.3 Vector depth: boolean ops (union/subtract/intersect/exclude; approved geometry dep) · post-hoc path/anchor editing
+- ⬜ 3.4 Layout systems: constraints (pin/center/scale) · component variants (sets+properties) · non-lossy instance overrides
+- ⬜ 3.5 Prototyping lite: hotspot links · present mode · transitions
+- CUT (explicit): vector networks · Figma Draw brush/illustration · multiplayer · variable scoping depth · WebGL renderer rewrite (cull instead) · Code-Connect mapping.
+
+**Phase 4 — One terminal, one brain** ⬜
 
 ---
 
@@ -222,6 +230,11 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-13 — AAA Rebuild: Phase 3 START — research, plan approved, 3.1 design→code (the wedge)
+- **Phase 3 (XDesign ≥ Figma) launched.** Two web-research passes ([docs/research/figma-2026.md](docs/research/figma-2026.md)) + a deep XDesign code audit. Strategic find: **Figma's design→code is its biggest, self-admitted weakness** (MCP docs literally say "not production-ready"; emulates CSS in WebGL → absolute-positioned inline-style React; Figma Make "gimmicky AND destructive"). XDesign's structural answer = real React + Orion's own tokens as a **reviewable staged edit into the repo next door** + embedded Claude + local-first + Accept/Reject reversibility. Audit: XDesign STRONGER than expected (real auto-layout, components, variables+modes, standout AI command DSL + vision rail, undo/pages) with gaps — SVG no-virtualization, no booleans/path-edit, no constraints, no variants, read-only multi-select inspector, no double-click-into-frame, **no design→code**.
+- **Ranked plan APPROVED** (wedge first): 3.1 design→code → 3.2 canvas feel → 3.3 vector → 3.4 layout (constraints+variants) → 3.5 prototyping. Multiplayer NOT contested. Export styling = inline styles + CSS-var tokens (my recommendation, locked: zero-config, self-contained, truest shared-token story).
+- **3.1 shipped** (frontend-only, hot-reloads): **`designToReact.ts`** pure generator — frame tree → `.tsx`, auto-layout frames → flexbox, freeform children → absolute-relative-to-frame, gradients/stroke/radius/opacity/rotation/text → CSS; colors → `var(--token)` (XDesign var refs by kebab name + exact Orion-palette matches). 8 tests. **`exportToCode.ts`** — generates the selected frame's component, writes `<project>/src/components/<Name>.tsx`, stages it through the **Phase-1 pendingEdits + DiffReview Accept/Reject** flow (disk holds new file; Accept keeps, Reject deletes), opens Orion to the review. Inspector "⌘ React" button + `xdesign.exportToCode` command. No-project → clear warning. **DEFERRED 3.1c** screenshot→editable-layers (own slice). tsc / **220 tests** (212→220) / build green. Commits `05c023a`, `4c4cc6f`. **Next: 3.2 canvas feel.**
 
 ### 2026-06-13 — AAA Rebuild: Phase 2.5 editor power → 🎉 PHASE 2 COMPLETE
 - **Finding:** toggles (`toggleListItem`) + highlighted code blocks (`codeBlock`) + checklists/quotes/tables are ALREADY in BlockNote's default schema — reachable via the default slash menu the whole time (audit under-counted). So 2.5's real work = callout + PDF.
