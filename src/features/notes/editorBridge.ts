@@ -6,6 +6,8 @@
 type NoteEditorHandle = {
   insertLink: (href: string, text: string) => void;
   focus: () => void;
+  /** Full HTML of the current document (for PDF export). */
+  getHTML: () => Promise<string>;
 };
 
 const handles = new Map<string, NoteEditorHandle>();

@@ -174,6 +174,14 @@ export function ArchivesToolbar({
             log.warn("export failed", e),
           ),
       });
+      items.push({
+        label: "Export as PDF…",
+        icon: <FileDown size={13} />,
+        onClick: () =>
+          void import("@/features/notes/exportPdf").then((m) =>
+            m.exportOpenNoteToPdf(),
+          ),
+      });
       items.push({ type: "separator" });
     }
     items.push({

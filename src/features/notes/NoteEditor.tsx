@@ -116,6 +116,7 @@ function EditorBody({
         ]);
       },
       focus: () => editor.focus(),
+      getHTML: async () => editor.blocksToFullHTML(editor.document),
     });
     return () => unregisterNoteEditor(noteId);
   }, [editor, noteId]);

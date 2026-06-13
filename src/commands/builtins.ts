@@ -457,6 +457,18 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
+    id: "note.exportPdf",
+    label: "Export Note to PDF",
+    keywords: ["pdf", "export", "print", "save", "share"],
+    group: "Notes",
+    run: () => {
+      void import("@/features/notes/exportPdf").then((m) =>
+        m.exportOpenNoteToPdf(),
+      );
+    },
+  });
+
+  registry.register({
     id: "note.dailyNote",
     label: "Open Today's Note",
     hotkey: "mod+shift+d",
