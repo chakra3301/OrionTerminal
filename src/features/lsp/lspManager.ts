@@ -349,7 +349,67 @@ function registerProviders(monaco: MonacoNs): void {
         }
       },
     });
+
+    monaco.languages.registerReferenceProvider(lang, {
+      provideReferences: async (
+        model: TextModel,
+        position: Position,
+        context: { includeDeclaration: boolean },
+      ) => {
+        const server = serverForModel(model);
+        if (!server) return [];
+        try {
+          const res = (await server.client.request("textDocument/references", {
+            textDocument: { uri: pathToUri(model.uri.path) },
+            position: { line: position.lineNumber - 1, character: position.column - 1 },
+            context: { includeDeclaration: context.includeDeclaration },
+          })) as Array<{ uri: string; range: import("./lspProtocol").LspRange }> | null;
+          if (!res?.length) return [];
+          const { fromLspRange } = await import("./lspProtocol");
+          return res.map((loc) => ({
+            uri: monaco.Uri.parse(loc.uri),
+            range: fromLspRange(loc.range),
+          }));
+        } catch {
+          return [];
+        }
+      },
+    });
   }
+
+  // Route Monaco's internal navigation (peek "open", go-to-def jumps) into
+  // our tab system instead of its hidden editor service.
+  monaco.editor.registerEditorOpener?.({
+    openCodeEditor: (
+      _source: unknown,
+      resource: { path: string },
+      selectionOrPosition?: unknown,
+    ) => {
+      const path = resource.path;
+      const root = useProjectStore.getState().active?.root_path;
+      if (!root || !path.startsWith(root)) return false;
+      void (async () => {
+        const { useWorkspace } = await import("@/components/workspace/workspaceStore");
+        const { useEditorNavStore } = await import("@/store/editorNavStore");
+        useWorkspace
+          .getState()
+          .openTab(
+            { kind: "file", path },
+            { label: path.split("/").pop() || path, preferRole: "editor" },
+          );
+        const sel = selectionOrPosition as
+          | { startLineNumber: number; startColumn: number }
+          | { lineNumber: number; column: number }
+          | undefined;
+        if (sel) {
+          const line = "startLineNumber" in sel ? sel.startLineNumber : sel.lineNumber;
+          const col = "startColumn" in sel ? sel.startColumn : sel.column;
+          useEditorNavStore.getState().reveal(path, line, col);
+        }
+      })();
+      return true;
+    },
+  });
 }
 
 function hoverToMarkdown(contents: unknown): string | null {
