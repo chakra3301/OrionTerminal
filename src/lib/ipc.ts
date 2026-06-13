@@ -181,6 +181,27 @@ export const ipc = {
   ): Promise<string> =>
     invoke("claude_oneshot_with_image", { prompt, imagePath }),
 
+  // RepoLens — JSON-envelope claude call (model-parameterized), public-registry
+  // fetchers, and an optional GitHub token (keychain) for higher rate limits.
+  repolensClaudeCall: (
+    prompt: string,
+    model: string,
+  ): Promise<{ result: string; cost: number; model: string }> =>
+    invoke("repolens_claude_call", { prompt, model }),
+  repolensFetchRepo: (
+    platform: string,
+    repoId: string,
+  ): Promise<import("@/apps/archives/repolens/types").RepoData> =>
+    invoke("repolens_fetch_repo", { platform, repoId }),
+  repolensFetchSource: (
+    repoId: string,
+  ): Promise<import("@/apps/archives/repolens/types").RepoSource> =>
+    invoke("repolens_fetch_source", { repoId }),
+  githubTokenSet: (token: string): Promise<void> =>
+    invoke("github_token_set", { token }),
+  githubTokenClear: (): Promise<void> => invoke("github_token_clear"),
+  githubTokenStatus: (): Promise<boolean> => invoke("github_token_status"),
+
   // Hermes — dispatch a task's swarm of parallel claude agents. Returns the
   // number of agents launched; progress arrives via `hermes:*` events.
   hermesDispatchTask: (
