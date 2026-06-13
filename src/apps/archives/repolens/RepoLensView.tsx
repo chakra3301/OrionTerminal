@@ -1,10 +1,16 @@
+import { useEffect } from "react";
 import { useRepoLens } from "./useRepoLens";
 import { RepoLensReport } from "./RepoLensReport";
+import { RepoLensPickers } from "./RepoLensPickers";
 import { resolveInput } from "./fetch";
 
 export function RepoLensView() {
   const { input, setInput, current, running, error, scan, closeReport } = useRepoLens();
   const hit = resolveInput(input);
+
+  useEffect(() => {
+    void useRepoLens.getState().hydratePrefs();
+  }, []);
 
   return (
     <div className="rl-view">
@@ -18,6 +24,7 @@ export function RepoLensView() {
             if (e.key === "Enter" && hit && !running) void scan(input);
           }}
         />
+        <RepoLensPickers />
         <button className="rl-btn" disabled={!hit || running !== null} onClick={() => void scan(input)}>
           {running === "core" ? "Scanning…" : "Scan"}
         </button>

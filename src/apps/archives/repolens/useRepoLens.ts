@@ -5,6 +5,7 @@ import { withTone } from "./tone";
 import { parseClaudeResponse } from "./parser";
 import { enqueueClaude } from "./claude";
 import { defaultModelConfig } from "./models";
+import { getAppState, setAppState } from "@/lib/db";
 import { log } from "@/lib/log";
 import type { RepoAnalysis, RepoLensModelConfig } from "./types";
 
@@ -19,7 +20,9 @@ type State = {
   model: RepoLensModelConfig;
   tone: string;
   setDefaultModel: (id: string) => void;
+  setPartModel: (part: string, id: string) => void;
   setTone: (t: string) => void;
+  hydratePrefs: () => Promise<void>;
   scan: (input: string) => Promise<void>;
   closeReport: () => void;
 };
@@ -32,8 +35,24 @@ export const useRepoLens = create<State>((set, get) => ({
   error: null,
   model: defaultModelConfig(),
   tone: "neutral",
-  setDefaultModel: (id) => set((s) => ({ model: { ...s.model, default_model: id } })),
-  setTone: (tone) => set({ tone }),
+  setDefaultModel: (id) => {
+    const model = { ...get().model, default_model: id };
+    set({ model });
+    void setAppState("repolens", { model, tone: get().tone });
+  },
+  setPartModel: (part, id) => {
+    const model = { ...get().model, per_part: { ...get().model.per_part, [part]: id } };
+    set({ model });
+    void setAppState("repolens", { model, tone: get().tone });
+  },
+  setTone: (tone) => {
+    set({ tone });
+    void setAppState("repolens", { model: get().model, tone });
+  },
+  hydratePrefs: async () => {
+    const saved = await getAppState<{ model?: RepoLensModelConfig; tone?: string }>("repolens");
+    if (saved) set({ model: saved.model ?? defaultModelConfig(), tone: saved.tone ?? "neutral" });
+  },
   closeReport: () => set({ current: null, error: null }),
 
   scan: async (input) => {

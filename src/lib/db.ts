@@ -40,7 +40,8 @@ export type AppStateKey =
   | "models"
   | "widget.monitor"
   | "reduce_glass"
-  | "tab_autocomplete";
+  | "tab_autocomplete"
+  | "repolens";
 
 export async function getAppState<T = unknown>(
   key: AppStateKey,
