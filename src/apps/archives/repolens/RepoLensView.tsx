@@ -4,10 +4,11 @@ import { useRepoLens } from "./useRepoLens";
 import { RepoLensReport } from "./RepoLensReport";
 import { RepoLensPickers } from "./RepoLensPickers";
 import { RepoLensLibrary } from "./RepoLensLibrary";
+import { RepoLensScanTray } from "./RepoLensScanTray";
 import { resolveInput } from "./fetch";
 
 export function RepoLensView() {
-  const { input, setInput, current, running, error, scan, closeReport } = useRepoLens();
+  const { input, setInput, current, error, scan, closeReport } = useRepoLens();
   const hit = resolveInput(input);
 
   useEffect(() => {
@@ -25,17 +26,13 @@ export function RepoLensView() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && hit && !running) void scan(input);
+              if (e.key === "Enter" && hit) scan(input);
             }}
           />
         </div>
         <RepoLensPickers />
-        <button
-          className="rl-btn rl-btn--primary"
-          disabled={!hit || running !== null}
-          onClick={() => void scan(input)}
-        >
-          {running === "core" ? "Scanning…" : "Scan"}
+        <button className="rl-btn rl-btn--primary" disabled={!hit} onClick={() => scan(input)}>
+          Scan
         </button>
         {current && (
           <button className="rl-btn" onClick={closeReport}>
@@ -44,20 +41,11 @@ export function RepoLensView() {
         )}
       </div>
 
+      <RepoLensScanTray />
+
       {error && <div className="rl-error">{error}</div>}
 
-      <div className="rl-body">
-        {running === "core" && !current && (
-          <div className="rl-spinner">
-            <span>
-              Scanning <b>{hit?.repoId}</b>… the full briefing usually takes ~30–90s (Claude is writing
-              the whole report). Pick the <b>Haiku</b> model above for faster scans, or Opus for the
-              deepest.
-            </span>
-          </div>
-        )}
-        {current ? <RepoLensReport a={current} /> : !running && <RepoLensLibrary />}
-      </div>
+      <div className="rl-body">{current ? <RepoLensReport a={current} /> : <RepoLensLibrary />}</div>
     </div>
   );
 }

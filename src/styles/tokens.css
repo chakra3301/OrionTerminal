@@ -11209,6 +11209,47 @@ html.ot-reduce-glass .note-page .note-editor-body {
 }
 @keyframes rl-pulse { 0%,100% { opacity: 0.35; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.15); } }
 
+/* ── scan tray (live multi-scan queue under the bar) ── */
+.rl-tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--bg-0);
+}
+.rl-scan-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 300px;
+  padding: 6px 10px;
+  border-radius: var(--r-pill);
+  background: var(--bg-2);
+  border: 1px solid var(--glass-border);
+  font: 11px/1 var(--f-mono);
+  color: var(--t-secondary);
+}
+.rl-scan-chip .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--t-tertiary); }
+.rl-scan-chip .id { color: var(--t-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rl-scan-chip .st { color: var(--t-tertiary); }
+.rl-scan-chip .x { background: none; border: none; color: var(--t-tertiary); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 0 0 2px; }
+.rl-scan-chip .x:hover { color: var(--t-primary); }
+.rl-scan-running { border-color: rgba(var(--repolens-green-rgb), 0.4); }
+.rl-scan-running .dot { background: var(--repolens-green); box-shadow: 0 0 8px var(--repolens-green); animation: rl-pulse 1.1s ease-in-out infinite; }
+.rl-scan-running .st { color: var(--repolens-green); }
+.rl-scan-queued .dot { background: var(--neon-yellow); opacity: 0.6; }
+.rl-scan-done { cursor: pointer; border-color: rgba(var(--repolens-green-rgb), 0.35); }
+.rl-scan-done .dot { background: var(--repolens-green); }
+.rl-scan-done .st { color: var(--repolens-green); }
+.rl-scan-done:hover { background: var(--bg-3); }
+.rl-scan-error { border-color: rgba(var(--neon-magenta-rgb), 0.4); }
+.rl-scan-error .dot { background: var(--neon-magenta); }
+.rl-scan-error .st { color: var(--neon-magenta); }
+.rl-tray-clear { background: none; border: none; color: var(--t-tertiary); font: 11px/1 var(--f-mono); cursor: pointer; padding: 4px 6px; }
+.rl-tray-clear:hover { color: var(--t-secondary); }
+
 /* ── section eyebrow + card ── */
 .rl-eyebrow {
   display: flex;

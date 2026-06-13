@@ -1,10 +1,12 @@
 import { create } from "zustand";
-import { fetchRepo, fetchSource } from "./fetch";
+import { fetchSource } from "./fetch";
+import { detectPlatform } from "./detect";
 import { buildPrompt } from "./prompt";
 import { withTone } from "./tone";
 import { parseClaudeResponse } from "./parser";
 import { enqueueClaude } from "./claude";
-import { defaultModelConfig } from "./models";
+import { defaultModelConfig, modelFor } from "./models";
+import { ipc } from "@/lib/ipc";
 import {
   buildAtomsPrompt,
   parseAtoms,
@@ -20,7 +22,20 @@ import {
 import { getAppState, setAppState } from "@/lib/db";
 import { saveScan, listScans, getScan, deleteScan, updateLenses, type ScanRow } from "./repolensDb";
 import { log } from "@/lib/log";
-import type { RepoAnalysis, RepoData, RepoLensModelConfig, Lenses } from "./types";
+import type { RepoAnalysis, RepoData, RepoLensModelConfig, Lenses, Platform } from "./types";
+
+/** Up to this many scans hit Claude concurrently; extras queue. */
+const MAX_CONCURRENT_SCANS = 3;
+let jobSeq = 0;
+
+export type ScanStatus = "queued" | "running" | "done" | "error";
+export type ScanJob = {
+  id: string;
+  repoId: string;
+  platform: Platform;
+  status: ScanStatus;
+  error?: string;
+};
 
 /** The lens prompt builders read a few RepoData fields; rebuild that shape from
  * a carried analysis (readme/deps aren't persisted — lenses use the file tree). */
@@ -60,7 +75,13 @@ type State = {
   loadLibrary: () => Promise<void>;
   openFromLibrary: (repoId: string) => Promise<void>;
   removeFromLibrary: (repoId: string) => Promise<void>;
-  scan: (input: string) => Promise<void>;
+  /** Live scan queue — multiple repos scan concurrently (capped). */
+  jobs: ScanJob[];
+  scan: (input: string) => void;
+  dismissJob: (id: string) => void;
+  clearDoneJobs: () => void;
+  pumpScans: () => void;
+  runScanJob: (id: string) => Promise<void>;
   closeReport: () => void;
 };
 
@@ -183,14 +204,54 @@ export const useRepoLens = create<State>((set, get) => ({
     await get().loadLibrary();
   },
 
-  scan: async (input) => {
-    set({ running: "core", error: null, lenses: {} });
+  jobs: [],
+
+  scan: (input) => {
+    const hit = detectPlatform(input);
+    if (!hit) {
+      set({ error: "Not a recognized repo URL or owner/repo" });
+      return;
+    }
+    set({ input: "", error: null });
+    const jobs = get().jobs;
+    // Already queued/running for this repo? Don't double-add.
+    if (jobs.some((j) => j.repoId === hit.repoId && (j.status === "queued" || j.status === "running"))) {
+      return;
+    }
+    // Drop a prior finished chip for the same repo, then enqueue fresh.
+    const kept = jobs.filter((j) => j.repoId !== hit.repoId);
+    const job: ScanJob = { id: `job-${jobSeq++}`, repoId: hit.repoId, platform: hit.platform, status: "queued" };
+    set({ jobs: [...kept, job] });
+    get().pumpScans();
+  },
+
+  dismissJob: (id) => set({ jobs: get().jobs.filter((j) => j.id !== id) }),
+  clearDoneJobs: () =>
+    set({ jobs: get().jobs.filter((j) => j.status === "queued" || j.status === "running") }),
+
+  pumpScans: () => {
+    const jobs = get().jobs;
+    let slots = MAX_CONCURRENT_SCANS - jobs.filter((j) => j.status === "running").length;
+    for (const j of jobs) {
+      if (slots <= 0) break;
+      if (j.status === "queued") {
+        slots--;
+        void get().runScanJob(j.id);
+      }
+    }
+  },
+
+  runScanJob: async (id) => {
+    const patch = (partial: Partial<ScanJob>) =>
+      set({ jobs: get().jobs.map((j) => (j.id === id ? { ...j, ...partial } : j)) });
+    const job = get().jobs.find((j) => j.id === id);
+    if (!job || job.status !== "queued") return;
+    patch({ status: "running", error: undefined });
     try {
-      const repo = await fetchRepo(input);
+      const repo = await ipc.repolensFetchRepo(job.platform, job.repoId);
       const prompt = withTone(get().tone, buildPrompt(repo));
-      const raw = await enqueueClaude(get().model, "core", prompt);
-      const analysis = parseClaudeResponse(raw);
-      // Carry repo metadata for rendering/export.
+      const reply = await ipc.repolensClaudeCall(prompt, modelFor(get().model, "core"));
+      const analysis = parseClaudeResponse(reply.result);
       analysis.repoId = repo.repo_id;
       analysis.platform = repo.platform;
       analysis.language = repo.language;
@@ -198,7 +259,6 @@ export const useRepoLens = create<State>((set, get) => ({
       analysis.stars = repo.stars;
       analysis.description = repo.description;
       analysis.languages = repo.languages;
-      set({ current: analysis, running: null });
       await saveScan({
         repo_id: repo.repo_id,
         platform: repo.platform,
@@ -206,10 +266,18 @@ export const useRepoLens = create<State>((set, get) => ({
         tone: get().tone,
         analysis,
       });
+      patch({ status: "done" });
       await get().loadLibrary();
+      // Lone scan with nothing else in flight + no report open → auto-open it.
+      const others = get().jobs.filter((j) => j.id !== id && (j.status === "queued" || j.status === "running"));
+      if (!get().current && others.length === 0) {
+        await get().openFromLibrary(job.repoId);
+      }
     } catch (e) {
       log.error("repolens scan failed", e);
-      set({ running: null, error: e instanceof Error ? e.message : String(e) });
+      patch({ status: "error", error: e instanceof Error ? e.message : String(e) });
+    } finally {
+      get().pumpScans();
     }
   },
 }));
