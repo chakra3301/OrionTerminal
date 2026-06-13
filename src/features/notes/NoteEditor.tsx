@@ -16,6 +16,7 @@ import {
 } from "@/features/notes/editorBridge";
 import { NoteAiControllers } from "@/features/notes/NoteEditorAi";
 import { BacklinksPanel } from "@/features/notes/BacklinksPanel";
+import { noteSchema } from "@/features/notes/noteSchema";
 import { log } from "@/lib/log";
 
 /** A stored asset → the BlockNote block to insert for it. */
@@ -87,7 +88,7 @@ function EditorBody({
     return undefined;
   }, [initialBlocks]);
 
-  const editor = useCreateBlockNote({ initialContent });
+  const editor = useCreateBlockNote({ schema: noteSchema, initialContent });
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 

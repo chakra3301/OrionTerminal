@@ -8,7 +8,7 @@ import {
   type DefaultReactSuggestionItem,
 } from "@blocknote/react";
 import type { BlockNoteEditor } from "@blocknote/core";
-import { Sparkles, Wand2, PenLine, FileText } from "lucide-react";
+import { Sparkles, Wand2, PenLine, FileText, Lightbulb } from "lucide-react";
 import { useContextMenu, type MenuItem } from "@/components/ContextMenu";
 import { toast } from "@/store/toastStore";
 import { useNotesStore } from "@/store/notesStore";
@@ -84,6 +84,21 @@ function AiToolbarButton({ editor }: { editor: Editor }) {
 /** Slash-menu AI items: continue writing, summarize note. */
 function aiSlashItems(editor: Editor): DefaultReactSuggestionItem[] {
   return [
+    {
+      title: "Callout",
+      subtext: "Highlighted box (click emoji to recolor)",
+      aliases: ["callout", "note", "info", "tip", "box"],
+      group: "Basic blocks",
+      icon: <Lightbulb size={16} />,
+      onItemClick: () => {
+        const pos = editor.getTextCursorPosition();
+        editor.insertBlocks(
+          [{ type: "callout", content: [] }],
+          pos.block.id,
+          "after",
+        );
+      },
+    },
     {
       title: "Continue writing",
       subtext: "Let AI extend from here",
