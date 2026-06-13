@@ -450,6 +450,16 @@ export function XDesignCanvas() {
         resetViewport();
         return;
       }
+      // Select all (⌘A) — top-level shapes (children come along via frames).
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === "a" || e.key === "A")) {
+        e.preventDefault();
+        const top = useXDesign
+          .getState()
+          .shapes.filter((s) => !s.parentId && !s.hidden && !s.locked)
+          .map((s) => s.id);
+        if (top.length) selectMany(top);
+        return;
+      }
       // Grid snap toggle: ⇧⌘ G
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "g" || e.key === "G")) {
         e.preventDefault();
@@ -1046,20 +1056,48 @@ export function XDesignCanvas() {
   ]);
 
   // ── Per-shape mousedown (select + start move) ────────────
+  // Clicked shape → its ancestor chain [clicked … topFrame] (cycle-guarded).
+  const ancestorChain = (shape: Shape): string[] => {
+    const chain: string[] = [];
+    const seen = new Set<string>();
+    let cur: Shape | undefined = shape;
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      chain.push(cur.id);
+      cur = cur.parentId ? shapes.find((s) => s.id === cur!.parentId) : undefined;
+    }
+    return chain;
+  };
+
+  /** Figma-style progressive selection: a plain click selects the TOP-LEVEL
+   * frame (so frames feel like units); clicking again inside an already-
+   * selected frame drills one level deeper toward the cursor. ⌘/double-click
+   * jump straight to the exact leaf. */
+  const resolveSelectTarget = (shape: Shape, deep: boolean): string => {
+    if (deep) return shape.id;
+    const chain = ancestorChain(shape);
+    for (let i = chain.length - 1; i >= 0; i--) {
+      if (selection.has(chain[i]!)) return chain[Math.max(0, i - 1)]!;
+    }
+    return chain[chain.length - 1]!; // nothing selected yet → top-level
+  };
+
   const onShapeMouseDown = (e: RMouseEvent, shape: Shape) => {
     if (tool !== "select") return;
     // Locked or hidden shapes are pass-through: the click reaches the
     // canvas background (marquee/deselect) instead of selecting them.
     if (shape.locked || shape.hidden) return;
     e.stopPropagation();
-    const isSel = selection.has(shape.id);
+    const deep = e.metaKey || e.ctrlKey || e.detail >= 2;
+    const targetId = resolveSelectTarget(shape, deep);
+    const isSel = selection.has(targetId);
     if (e.shiftKey) {
-      toggleInSelection(shape.id);
+      toggleInSelection(targetId);
       return;
     }
-    if (!isSel) select(shape.id);
+    if (!isSel) select(targetId);
     const p = toSvgPoint(e);
-    const liveIds = isSel ? Array.from(selection) : [shape.id];
+    const liveIds = isSel ? Array.from(selection) : [targetId];
     // Expand the moving set with frame descendants so dragging a frame
     // brings everything inside with it.
     const fullSet = new Set<string>();
