@@ -432,6 +432,19 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
+    id: "note.askArchive",
+    label: "Ask your Archive",
+    hotkey: "mod+shift+a",
+    keywords: ["ask", "search", "rag", "question", "find", "recall", "ai"],
+    group: "Notes",
+    run: () => {
+      void import("@/features/notes/askArchive").then((m) =>
+        m.useAskArchive.getState().show(),
+      );
+    },
+  });
+
+  registry.register({
     id: "note.newFromTemplate",
     label: "New from Template…",
     keywords: ["template", "new", "meeting", "daily", "project", "reading", "boilerplate"],

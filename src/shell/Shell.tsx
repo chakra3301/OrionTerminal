@@ -11,6 +11,7 @@ import { ConfirmModalHost } from "@/components/ConfirmModal";
 import { ToastHost } from "@/components/ToastHost";
 import { QuickCaptureHost } from "@/apps/archives/QuickCapture";
 import { TemplatePickerHost } from "@/apps/archives/TemplatePicker";
+import { AskArchiveHost } from "@/apps/archives/AskArchive";
 import { WelcomeOverlay } from "@/shell/WelcomeOverlay";
 import { WakeFlash } from "@/shell/WakeFlash";
 import { RosieTaskChip } from "@/shell/RosieTaskChip";
@@ -133,6 +134,7 @@ export function Shell() {
       <ToastHost />
       <QuickCaptureHost />
       <TemplatePickerHost />
+      <AskArchiveHost />
       <MonitorWidget />
       <ErrorBoundary label="R.O.S.I.E" compact>
         <RosieMount />
