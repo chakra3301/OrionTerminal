@@ -5,6 +5,7 @@ import { parseUrl, isTerminal } from "./websiteRip";
 import { toast } from "@/store/toastStore";
 import { useProjectStore } from "@/store/projectStore";
 import { useShell } from "@/shell/store/useShell";
+import { useWorkspace } from "@/components/workspace/workspaceStore";
 
 type WebsiteEvent = {
   id: string;
@@ -74,6 +75,35 @@ export const useRepoLensWebsites = create<State>((set, get) => ({
     if (!row) return;
     await useProjectStore.getState().openProjectAtPath(row.project_path);
     useShell.getState().openApp("orion");
+    // Replace whatever was open with a clean view of the clone, then land on
+    // its entry file. The per-project workspace swap (App.tsx
+    // `useProjectScopedLayout`) hydrates the new project's layout asynchronously
+    // after a DB read, so we defer past it, then explicitly reset to a fresh
+    // layout (guaranteeing the previous project's tabs are gone) and open the
+    // first entry file that exists.
+    setTimeout(() => {
+      void (async () => {
+        const { defaultOrionLayout } = await import(
+          "@/components/workspace/workspaceStore"
+        );
+        useWorkspace.getState().resetLayout(defaultOrionLayout);
+        const candidates = [
+          `${row.project_path}/src/app/page.tsx`,
+          `${row.project_path}/README.md`,
+          `${row.project_path}/package.json`,
+        ];
+        for (const path of candidates) {
+          const exists = await ipc.pathExists(path).catch(() => false);
+          if (exists) {
+            useWorkspace.getState().openTab(
+              { kind: "file", path },
+              { label: path.split("/").pop() ?? "page.tsx", preferRole: "editor" },
+            );
+            return;
+          }
+        }
+      })();
+    }, 300);
     toast.info("Run `npm run dev` in the terminal to preview the clone.");
   },
 
