@@ -8,6 +8,7 @@ import {
   type OverrideMap,
 } from "./overrides";
 import { resolveVariant } from "./variants";
+import type { ProtoLink } from "./prototype";
 
 export type ToolId =
   | "select"
@@ -140,6 +141,9 @@ export type ShapeBase = {
   /** On an instance of a variant set: the currently-selected property combo.
    * Resolving it picks which member main the instance mirrors. */
   variantSelection?: Record<string, string>;
+  /** Prototype hotspot — in present mode, clicking this shape navigates to a
+   * target screen (or back). Top-level frames are the screens. */
+  prototype?: ProtoLink;
   /** Frame this shape belongs to. null = top-level. Children share the
    * frame's coordinate space at the world level (we don't apply nested
    * transforms yet) — moving the frame just moves descendants together. */
