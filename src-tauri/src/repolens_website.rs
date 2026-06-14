@@ -71,17 +71,29 @@ fn parse_node_major(version_output: &str) -> Option<u32> {
     v.split('.').next()?.parse::<u32>().ok()
 }
 
+fn is_image(name: &str) -> bool {
+    Path::new(name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| IMAGE_EXTS.contains(&e.to_lowercase().as_str()))
+        .unwrap_or(false)
+}
+
 fn pick_thumbnail(file_names: &[String]) -> Option<String> {
-    file_names
+    file_names.iter().find(|n| is_image(n)).cloned()
+}
+
+/// From `(filename, mtime_millis)` pairs, pick the earliest-saved image whose
+/// name is NOT in `initial` (the scaffold-shipped images, e.g. the placeholder
+/// `comparison.png`). The first screenshot the agent saves is the recon shot of
+/// the target site, so earliest-mtime is the right thumbnail. Ties break by name
+/// for determinism.
+fn earliest_new_image(entries: &[(String, u128)], initial: &HashSet<String>) -> Option<String> {
+    entries
         .iter()
-        .find(|n| {
-            Path::new(n.as_str())
-                .extension()
-                .and_then(|e| e.to_str())
-                .map(|e| IMAGE_EXTS.contains(&e.to_lowercase().as_str()))
-                .unwrap_or(false)
-        })
-        .cloned()
+        .filter(|(name, _)| is_image(name) && !initial.contains(name))
+        .min_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(&b.0)))
+        .map(|(name, _)| name.clone())
 }
 
 fn ulid_like() -> String {
@@ -712,18 +724,38 @@ fn fail(app: &AppHandle, id: &str, msg: &str) {
 fn spawn_thumbnail_watcher(app: AppHandle, id: String, project: PathBuf) {
     tauri::async_runtime::spawn(async move {
         let refs = project.join("docs").join("design-references");
+        // The scaffold ships placeholder images here (e.g. `comparison.png`);
+        // snapshot them up front so we only ever pick a screenshot the agent
+        // actually saved for this site.
+        let initial: HashSet<String> = std::fs::read_dir(&refs)
+            .map(|rd| {
+                rd.filter_map(|e| e.ok())
+                    .map(|e| e.file_name().to_string_lossy().into_owned())
+                    .filter(|n| is_image(n))
+                    .collect()
+            })
+            .unwrap_or_default();
         for _ in 0..900 {
             // up to ~30 min at 2s
             if RIPS.lock().get(&id).is_none() {
                 return; // rip ended
             }
             if let Ok(rd) = std::fs::read_dir(&refs) {
-                let mut names: Vec<String> = rd
+                let entries: Vec<(String, u128)> = rd
                     .filter_map(|e| e.ok())
-                    .map(|e| e.file_name().to_string_lossy().into_owned())
+                    .map(|e| {
+                        let name = e.file_name().to_string_lossy().into_owned();
+                        let mtime = e
+                            .metadata()
+                            .and_then(|m| m.modified())
+                            .ok()
+                            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                            .map(|d| d.as_millis())
+                            .unwrap_or(0);
+                        (name, mtime)
+                    })
                     .collect();
-                names.sort();
-                if let Some(img) = pick_thumbnail(&names) {
+                if let Some(img) = earliest_new_image(&entries, &initial) {
                     let full = refs.join(&img).to_string_lossy().into_owned();
                     if let Ok(conn) = open_conn(&app) {
                         let _ = conn.execute(
@@ -839,5 +871,28 @@ mod tests {
         ];
         assert_eq!(pick_thumbnail(&files), Some("hero-desktop.png".to_string()));
         assert_eq!(pick_thumbnail(&["only.md".to_string()]), None);
+    }
+
+    #[test]
+    fn earliest_new_image_skips_scaffold_and_picks_first_real_screenshot() {
+        let initial: HashSet<String> =
+            ["comparison.png".to_string(), ".gitkeep".to_string()]
+                .into_iter()
+                .collect();
+        // (name, mtime) — comparison.png exists from t=0 (scaffold) and must be
+        // ignored; among the agent's screenshots the earliest-saved one wins.
+        let entries = vec![
+            ("comparison.png".to_string(), 100u128),
+            ("clone-desktop.png".to_string(), 400),
+            ("home-desktop.png".to_string(), 300),
+            ("notes.md".to_string(), 350),
+        ];
+        assert_eq!(
+            earliest_new_image(&entries, &initial),
+            Some("home-desktop.png".to_string())
+        );
+        // No new images yet (only the scaffold placeholder) → None.
+        let only_scaffold = vec![("comparison.png".to_string(), 100u128)];
+        assert_eq!(earliest_new_image(&only_scaffold, &initial), None);
     }
 }

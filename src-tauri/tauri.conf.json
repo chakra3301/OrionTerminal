@@ -27,7 +27,9 @@
           "$APPDATA/assets/**",
           "$APPDATA/com.lucaorion.orion-terminal/assets/**",
           "$APPDATA/wallpapers/**",
-          "$APPDATA/com.lucaorion.orion-terminal/wallpapers/**"
+          "$APPDATA/com.lucaorion.orion-terminal/wallpapers/**",
+          "$APPDATA/repolens/**",
+          "$APPDATA/com.lucaorion.orion-terminal/repolens/**"
         ]
       }
     }
