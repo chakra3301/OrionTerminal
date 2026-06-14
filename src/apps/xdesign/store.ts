@@ -304,6 +304,9 @@ type XDesignState = {
    * multi-selected). The caller is responsible for computing per-shape
    * deltas if needed; this just maps the function over the targets. */
   patchMany: (ids: string[], fn: (s: Shape) => ShapePatch) => void;
+  /** Append a pre-built batch of shapes in a single undo step (used by the
+   * Claude composer). Optionally selects `selectId`. */
+  addShapesBatch: (shapes: Shape[], selectId?: string) => void;
   deleteShapes: (ids: string[]) => void;
 
   select: (id: string | null) => void;
@@ -691,6 +694,15 @@ export const useXDesign = create<XDesignState>((set, get) => ({
         ),
       };
     }),
+
+  addShapesBatch: (shapes, selectId) => {
+    if (shapes.length === 0) return;
+    get().pushHistory();
+    set((s) => ({
+      shapes: [...s.shapes, ...shapes],
+      selection: selectId ? new Set([selectId]) : s.selection,
+    }));
+  },
 
   deleteShapes: (ids) => {
     get().pushHistory();
