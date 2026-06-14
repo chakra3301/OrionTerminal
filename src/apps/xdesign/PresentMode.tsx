@@ -101,8 +101,7 @@ export function PresentMode() {
   return (
     <div className="xd-present" ref={stageRef}>
       <div
-        key={navSeq}
-        className={`xd-present-screen xd-present-anim-${transition}`}
+        className="xd-present-screen"
         style={{
           left: fit.offsetX,
           top: fit.offsetY,
@@ -112,27 +111,31 @@ export function PresentMode() {
           transformOrigin: "top left",
         }}
       >
-        {svg && (
-          <div
-            className="xd-present-svg"
-            dangerouslySetInnerHTML={{ __html: svg }}
-          />
-        )}
-        {hotspots.map((h) => (
-          <button
-            key={h.id}
-            type="button"
-            className="xd-present-hotspot"
-            style={{
-              left: h.x - screen.x,
-              top: h.y - screen.y,
-              width: h.w,
-              height: h.h,
-            }}
-            onClick={() => onHotspot(h.prototype!)}
-            title={h.prototype!.action === "back" ? "Back" : "Navigate"}
-          />
-        ))}
+        {/* Inner wrapper carries the transition animation so it composes with
+         * (rather than clobbers) the outer fit `scale`. Re-keyed per nav. */}
+        <div key={navSeq} className={`xd-present-anim xd-present-anim-${transition}`}>
+          {svg && (
+            <div
+              className="xd-present-svg"
+              dangerouslySetInnerHTML={{ __html: svg }}
+            />
+          )}
+          {hotspots.map((h) => (
+            <button
+              key={h.id}
+              type="button"
+              className="xd-present-hotspot"
+              style={{
+                left: h.x - screen.x,
+                top: h.y - screen.y,
+                width: h.w,
+                height: h.h,
+              }}
+              onClick={() => onHotspot(h.prototype!)}
+              title={h.prototype!.action === "back" ? "Back" : "Navigate"}
+            />
+          ))}
+        </div>
       </div>
       <div className="xd-present-bar">
         {history.length > 0 && (

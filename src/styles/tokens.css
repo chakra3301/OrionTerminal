@@ -7979,17 +7979,31 @@ summary:focus-visible,
   color: var(--t-secondary);
   font-size: 14px;
 }
-/* transitions (3.5d) */
+/* transitions (3.5d) — applied to the inner wrapper so they compose with the
+ * outer fit `scale` instead of overriding it. */
+.xd-present-anim {
+  position: absolute;
+  inset: 0;
+}
 @keyframes xd-present-dissolve {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 @keyframes xd-present-slide {
-  from { transform: var(--xd-present-scale) translateX(40px); opacity: 0; }
-  to { transform: var(--xd-present-scale) translateX(0); opacity: 1; }
+  from { transform: translateX(48px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 .xd-present-anim-dissolve {
   animation: xd-present-dissolve 0.22s ease;
+}
+.xd-present-anim-slide {
+  animation: xd-present-slide 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .xd-present-anim-dissolve,
+  .xd-present-anim-slide {
+    animation: none;
+  }
 }
 
 .xd-alignbar {
