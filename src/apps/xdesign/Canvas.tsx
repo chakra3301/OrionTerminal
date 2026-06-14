@@ -28,8 +28,12 @@ import { setExportSvgRef } from "@/apps/xdesign/exportXD";
 import type { Asset } from "@/store/assetsStore";
 
 const MIN_DIM = 4;
-const DEFAULT_FILL = "rgba(255, 62, 165, 0.18)";
-const DEFAULT_STROKE = "rgba(255, 62, 165, 0.75)";
+// New shapes default to Figma's neutral gray fill with no stroke.
+const DEFAULT_FILL = "#d9d9d9";
+const DEFAULT_STROKE = "transparent";
+// Draft (rubber-band) preview while drawing — blue tool affordance.
+const DRAFT_FILL = "rgba(13, 153, 255, 0.08)";
+const DRAFT_STROKE = "#0d99ff";
 const TEXT_DEFAULT_W = 220;
 const TEXT_DEFAULT_H = 36;
 const HANDLE_SIZE = 8;
@@ -1521,8 +1525,8 @@ export function XDesignCanvas() {
               width={Math.abs(draft.w)}
               height={Math.abs(draft.h)}
               rx={6}
-              fill={DEFAULT_FILL}
-              stroke={DEFAULT_STROKE}
+              fill={DRAFT_FILL}
+              stroke={DRAFT_STROKE}
               strokeWidth={1.5 / viewport.zoom}
               strokeDasharray={`${4 / viewport.zoom} ${3 / viewport.zoom}`}
               pointerEvents="none"
@@ -1561,7 +1565,7 @@ export function XDesignCanvas() {
                         y1={p.y}
                         x2={p.cpInX}
                         y2={p.cpInY}
-                        stroke="rgba(255, 62, 165, 0.55)"
+                        stroke="rgba(13, 153, 255, 0.55)"
                         strokeWidth={1 / viewport.zoom}
                       />
                       <circle
@@ -1579,7 +1583,7 @@ export function XDesignCanvas() {
                         y1={p.y}
                         x2={p.cpOutX}
                         y2={p.cpOutY}
-                        stroke="rgba(255, 62, 165, 0.55)"
+                        stroke="rgba(13, 153, 255, 0.55)"
                         strokeWidth={1 / viewport.zoom}
                       />
                       <circle
@@ -1612,8 +1616,8 @@ export function XDesignCanvas() {
               cy={draft.y + draft.h / 2}
               rx={Math.abs(draft.w) / 2}
               ry={Math.abs(draft.h) / 2}
-              fill={DEFAULT_FILL}
-              stroke={DEFAULT_STROKE}
+              fill={DRAFT_FILL}
+              stroke={DRAFT_STROKE}
               strokeWidth={1.5 / viewport.zoom}
               strokeDasharray={`${4 / viewport.zoom} ${3 / viewport.zoom}`}
               pointerEvents="none"
@@ -1628,8 +1632,7 @@ export function XDesignCanvas() {
             height={ts(selectionBounds.h) + 4}
             fill="none"
             stroke="var(--neon-cyan)"
-            strokeWidth={1}
-            strokeDasharray="3 3"
+            strokeWidth={1.5}
             pointerEvents="none"
           />
         )}
@@ -1660,10 +1663,9 @@ export function XDesignCanvas() {
             y={marquee.y}
             width={marquee.w}
             height={marquee.h}
-            fill="rgba(0, 224, 255, 0.08)"
+            fill="rgba(13, 153, 255, 0.10)"
             stroke="var(--neon-cyan)"
             strokeWidth={1}
-            strokeDasharray="3 2"
             pointerEvents="none"
           />
         )}
@@ -1673,7 +1675,7 @@ export function XDesignCanvas() {
             y1={0}
             x2={tx(guides.v)}
             y2={10000}
-            stroke="var(--neon-magenta)"
+            stroke="#f24822"
             strokeWidth={1}
             pointerEvents="none"
           />
@@ -1684,7 +1686,7 @@ export function XDesignCanvas() {
             y1={ty(guides.h)}
             x2={10000}
             y2={ty(guides.h)}
-            stroke="var(--neon-magenta)"
+            stroke="#f24822"
             strokeWidth={1}
             pointerEvents="none"
           />
@@ -1862,9 +1864,9 @@ function ResizeHandles({
             y={cy - HANDLE_SIZE / 2}
             width={HANDLE_SIZE}
             height={HANDLE_SIZE}
-            fill="var(--bg-0)"
+            fill="#ffffff"
             stroke="var(--neon-cyan)"
-            strokeWidth={1.5}
+            strokeWidth={1}
             style={{ cursor: HANDLE_CURSORS[handle] }}
             onMouseDown={(e) => onHandleMouseDown(e, handle)}
           />
