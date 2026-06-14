@@ -203,7 +203,11 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 
 **🎉 PHASE 3 — XDesign ≥ Figma — COMPLETE (2026-06-14).** 3.1 design→code · 3.2 canvas feel · 3.3 vector depth · 3.4 layout systems · 3.5 prototyping lite. (Deferred within phase: 3.1c screenshot→layers · 3.2 alt-hover measurement — both noted as own-slice follow-ups.) Next: **Phase 4 — One terminal, one brain**.
 
-**Phase 4 — One terminal, one brain** 🔨 — per protocol this phase needs its own research + audit + ranked plan + user approval before building (the Phase 1/2/3 gate). NO kickoff brief exists yet; the one-line scope below is the seed.
+**Phase 4 — One terminal, one brain** 🔨 — no kickoff brief existed; audit (2026-06-14) found the cross-app *plumbing* already largely built (ROSIE MCP reach across all 4 apps + terminal + activity_log; `activity_log` shared memory; `toastStore` history ring tagged "Phase 4"). So Phase 4 = cohesion + surfacing. User approved direction ("what do u suggest" → notification center first, then memory, then ROSIE; cohesion last + user-driven).
+- ✅ 4.1 Notification center — menubar Bell + unread badge + dropdown panel over the toastStore history ring (every app's toasts in one place); pure `unreadCount` + `lastReadAt`/`markAllRead` (3 tests). `37f8f0c`
+- ✅ 4.2 Unified cross-app memory — `activity_log` surfaced as a "Recent" section in Spotlight (⌘K), shown by default + fuzzy-searchable; click jumps back (Orion edits reopen the file, others surface the app). `82e4e92`
+- ✅ 4.3 ROSIE awareness — "Catch me up on my day" chip in ROSIE's empty state → on-demand cross-app summary via her existing `orion_recent_activity` tool (respects the locked no-always-inject decision; zero per-turn cost). `567fc48`
+- ⬜ 4.6 Cohesion pass (per-surface typography/spacing/radii normalization) — DEFERRED, needs **user-driven visual verification** (agent can't run Tauri; tracker flags it as "regression roulette" done blind). Best done surface-by-surface with the user watching.
 
 ---
 
@@ -232,6 +236,15 @@ The "AAA REBUILD · MASTER BRIEF" (started 2026-06-10) drives a multi-session re
 ---
 
 ## Session log
+
+### 2026-06-14 — AAA Rebuild: Phase 4 START — one terminal, one brain (notification center · cross-app memory · ROSIE awareness)
+- **No kickoff brief existed for Phase 4.** Audited the cohesion surfaces and found the cross-app *plumbing* already built (ROSIE has MCP reach across all 4 apps + terminal + `activity_log`; `activity_log` is a shared ambient memory; `toastStore` keeps a history ring explicitly tagged "Phase 4"). So Phase 4 is mostly **surfacing + cohesion**. Presented the audit + a ranked plan to the user; they said "what do u suggest" → I led with the notification center (lowest-risk, in-code groundwork), then memory, then ROSIE, deferring the cohesion pass.
+- **4.1 Notification center** (`37f8f0c`): menubar **Bell** + green unread badge + dropdown panel over the toastStore history ring — every app's toasts (saves, agent results, ROSIE, errors) land in one place; kind-colored dots, relative age, Clear all; opening marks read. Pure `unreadCount` + `lastReadAt`/`markAllRead` (3 tests).
+- **4.2 Cross-app memory in Spotlight** (`82e4e92`): `recentActivity()` (the `activity_log` all 4 apps write) now surfaces as a **"Recent"** section in ⌘K — shown by default, fuzzy-searchable; clicking jumps back (Orion file edits reopen the file, other sources surface their app). Turns the per-app feed into one navigable terminal-wide memory.
+- **4.3 ROSIE "Catch me up"** (`567fc48`): a chip in R.O.S.I.E's empty state asks her to summarize recent cross-app activity (via her existing `orion_recent_activity` MCP tool) + suggest a next step — **on-demand only**, respecting the locked 2026-06-07 "no always-inject digest" decision (zero per-turn token cost).
+- All frontend-only → **hot-reloads, no restart**. tsc / **354 tests** / build green per slice. UI human-unverified (agent can't run Tauri).
+- **Remaining: 4.6 cohesion pass** (typography/spacing/radii normalization across surfaces) — intentionally **left for a user-driven session**: agent can't run Tauri to verify, and the tracker rightly flags blind 9900-line CSS edits as regression roulette. Recommend doing it surface-by-surface with eyes on it.
+- Smoke test: trigger a toast (save a note / run an agent) → click the menubar 🔔 to see it in history · ⌘K with no query → "Recent" section lists cross-app activity, click one to jump back · open R.O.S.I.E → "Catch me up on my day" → she summarizes your recent work.
 
 ### 2026-06-14 — AAA Rebuild: Phase 3.5 prototyping lite → 🎉 PHASE 3 COMPLETE
 - **Pre-approved** (inside the 2026-06-13 Phase-3 ranked plan). 4 green TDD slices, committed; all frontend → **hot-reloads, no restart**.
