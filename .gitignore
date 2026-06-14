@@ -12,6 +12,19 @@ dist
 dist-ssr
 *.local
 
+# Secrets & local runtime data
+.env
+.env.*
+*.db
+*.sqlite
+*.sqlite3
+backups/
+orion-data-backup*/
+
+# Local tool state
+.claude/
+.cursor/
+
 # Rust / Tauri build output (11GB+ — never commit)
 src-tauri/target
 

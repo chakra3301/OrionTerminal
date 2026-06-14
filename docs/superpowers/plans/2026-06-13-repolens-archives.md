@@ -4,7 +4,7 @@
 
 **Goal:** Add a **RepoLens** section to the Archives app — paste a GitHub/GitLab/npm/PyPI repo, get an AI "should I adopt this?" briefing (core scan) plus on-demand Deep Dive / SKTPG / Synergies lenses, with per-feature model + tone switching, a saved library, and Markdown export.
 
-**Architecture:** Pure logic ports from the friend's JS (`/Users/lucaorion/Downloads/repolens-main`) to TypeScript (testable Vitest units). Rust stays thin: one `claude -p --output-format json` subprocess command + two `reqwest` fetchers + a keychain GitHub-token. Persistence is one SQLite table (migration 0021). UI is a new `repolens` Archives view (darker-green accent).
+**Architecture:** Pure logic ports from the friend's JS (`~/Downloads/repolens-main`) to TypeScript (testable Vitest units). Rust stays thin: one `claude -p --output-format json` subprocess command + two `reqwest` fetchers + a keychain GitHub-token. Persistence is one SQLite table (migration 0021). UI is a new `repolens` Archives view (darker-green accent).
 
 **Tech Stack:** Tauri 2 + React 19 + TypeScript + Zustand (frontend), Rust + tokio + reqwest + keyring + tauri-plugin-sql (backend), Vitest (tests). Source of truth for prompts/parsers: `repolens-main`.
 

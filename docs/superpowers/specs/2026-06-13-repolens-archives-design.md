@@ -10,7 +10,7 @@
 ## 0. What this is
 
 RepoLens is a GitHub/GitLab/npm/PyPI repo scanner (originally a Chrome extension at
-`/Users/lucaorion/Downloads/repolens-main`). It explains any repo via an LLM:
+`~/Downloads/repolens-main`). It explains any repo via an LLM:
 a "should I adopt this?" briefing plus optional deeper "lenses". We are bringing it
 into Orion Terminal as **a new section inside the Archives app**, called **RepoLens**,
 sitting in the sidebar Library list alongside Today / Journal / Projects / Notes / etc.
