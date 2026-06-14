@@ -25,6 +25,7 @@ import { XDesignImagePicker } from "@/apps/xdesign/ImagePicker";
 import { toast } from "@/store/toastStore";
 import type { BoolOp } from "@/apps/xdesign/booleanOps";
 import type { ConstraintH, ConstraintV } from "@/apps/xdesign/constraints";
+import { findInstanceRoot } from "@/apps/xdesign/overrides";
 
 const COLOR_PRESETS: Array<{ value: string; title: string }> = [
   { value: "transparent", title: "Transparent" },
@@ -1508,12 +1509,18 @@ function ComponentSection({ shape }: { shape: Shape }) {
   const createInstance = useXDesign((s) => s.createInstance);
   const syncFromMain = useXDesign((s) => s.syncFromMain);
   const detachInstance = useXDesign((s) => s.detachInstance);
+  const resetInstanceOverrides = useXDesign((s) => s.resetInstanceOverrides);
   const shapes = useXDesign((s) => s.shapes);
   const isMain = !!shape.isMain;
   const linkedId = shape.linkedMainId;
   const mainExists = linkedId
     ? shapes.some((s) => s.id === linkedId && s.isMain)
     : false;
+  // Overrides live on the instance ROOT — resolve it even when a descendant
+  // is selected so Reset is reachable from anywhere in the instance.
+  const instRoot = linkedId ? findInstanceRoot(shapes, shape.id) : null;
+  const hasOverrides =
+    !!instRoot?.overrides && Object.keys(instRoot.overrides).length > 0;
   return (
     <Section title="Component" defaultOpen={isMain || !!linkedId}>
       <div className="xd-fields">
@@ -1564,6 +1571,18 @@ function ComponentSection({ shape }: { shape: Shape }) {
             >
               Detach
             </button>
+            {hasOverrides && instRoot && (
+              <button
+                type="button"
+                className="xd-mini-btn"
+                style={{ width: "auto", padding: "0 8px" }}
+                onClick={() => resetInstanceOverrides(instRoot.id)}
+                disabled={!mainExists}
+                title="Discard local edits and re-sync this instance to main"
+              >
+                Reset overrides
+              </button>
+            )}
           </div>
         </>
       )}

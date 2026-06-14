@@ -2,7 +2,11 @@ import { create } from "zustand";
 import { ulid } from "ulid";
 import { booleanShapes, type BoolOp } from "./booleanOps";
 import type { ConstraintH, ConstraintV } from "./constraints";
-import type { OverrideMap } from "./overrides";
+import {
+  applyOverrides,
+  captureOverride,
+  type OverrideMap,
+} from "./overrides";
 
 export type ToolId =
   | "select"
@@ -318,10 +322,12 @@ type XDesignState = {
    * Placed at `at` if given, else offset to the right of the main. Returns
    * the new instance root id. */
   createInstance: (mainId: string, at?: { x: number; y: number }) => string | null;
-  /** Re-clone an instance from its current main, preserving the
-   * instance's stored position. All descendant overrides are lost (this
-   * is the simple sync model — no per-property override tracking yet). */
+  /** Re-clone an instance from its current main, preserving the instance's
+   * stored position AND its recorded per-node overrides (main wins for
+   * non-overridden props; the override wins for props the user touched). */
   syncFromMain: (instanceId: string) => void;
+  /** Drop all of an instance's overrides and re-sync it to match main. */
+  resetInstanceOverrides: (instanceId: string) => void;
   /** Clear linkedMainId on the instance and all its descendants. The
    * resulting shapes are independent of the main. */
   detachInstance: (instanceId: string) => void;
@@ -612,6 +618,11 @@ export const useXDesign = create<XDesignState>((set, get) => ({
   updateShape: (id, patch) =>
     set((s) => {
       const target = s.shapes.find((sh) => sh.id === id);
+      // If the target is an instance node, record the edit as an override on
+      // the instance root so a later syncFromMain doesn't wipe it.
+      const cap = target?.linkedMainId
+        ? captureOverride(s.shapes, id, patch as Record<string, unknown>)
+        : null;
       // Moving a shape's x/y carries its descendants by the same delta —
       // frames take their contents with them. Positions are absolute, so a
       // flat patch would otherwise leave children behind (this matches the
@@ -619,23 +630,27 @@ export const useXDesign = create<XDesignState>((set, get) => ({
       // position patches don't cascade.
       const dx = target && patch.x !== undefined ? patch.x - target.x : 0;
       const dy = target && patch.y !== undefined ? patch.y - target.y : 0;
+      let next: Shape[];
       if (target && (dx !== 0 || dy !== 0)) {
         const descendants = new Set(collectDescendantIds(s.shapes, id));
         descendants.delete(id);
-        return {
-          shapes: s.shapes.map((sh) => {
-            if (sh.id === id) return { ...sh, ...patch } as Shape;
-            if (descendants.has(sh.id))
-              return { ...sh, x: sh.x + dx, y: sh.y + dy } as Shape;
-            return sh;
-          }),
-        };
-      }
-      return {
-        shapes: s.shapes.map((sh) =>
+        next = s.shapes.map((sh) => {
+          if (sh.id === id) return { ...sh, ...patch } as Shape;
+          if (descendants.has(sh.id))
+            return { ...sh, x: sh.x + dx, y: sh.y + dy } as Shape;
+          return sh;
+        });
+      } else {
+        next = s.shapes.map((sh) =>
           sh.id === id ? ({ ...sh, ...patch } as Shape) : sh,
-        ),
-      };
+        );
+      }
+      if (cap) {
+        next = next.map((sh) =>
+          sh.id === cap.rootId ? ({ ...sh, overrides: cap.overrides } as Shape) : sh,
+        );
+      }
+      return { shapes: next };
     }),
 
   patchMany: (ids, fn) =>
@@ -876,6 +891,8 @@ export const useXDesign = create<XDesignState>((set, get) => ({
         isMain: false,
         // Link the entire subtree to the main so sync/detach work.
         linkedMainId: mainId,
+        // Remember the exact main node this clone mirrors (stable override key).
+        linkedNodeId: s.id,
       };
     });
     const newRootId = idMap.get(mainId)!;
@@ -890,37 +907,23 @@ export const useXDesign = create<XDesignState>((set, get) => ({
     const cur = get();
     const inst = cur.shapes.find((s) => s.id === instanceId);
     if (!inst || !inst.linkedMainId) return;
-    const main = cur.shapes.find((s) => s.id === inst.linkedMainId);
-    if (!main) return;
+    if (!cur.shapes.some((s) => s.id === inst.linkedMainId)) return;
     cur.pushHistory();
-    // Drop every shape currently in the instance subtree.
-    const oldSubtreeIds = new Set(collectDescendantIds(cur.shapes, instanceId));
-    // Re-clone from main with fresh ids, preserving instance root's position.
-    const mainSubtree = cur.shapes.filter((s) =>
-      collectDescendantIds(cur.shapes, main.id).includes(s.id),
-    );
-    const idMap = new Map<string, string>();
-    for (const s of mainSubtree) idMap.set(s.id, ulid());
-    // Pin instance root id stable so external selection still points to it.
-    idMap.set(main.id, instanceId);
-    const dx = inst.x - main.x;
-    const dy = inst.y - main.y;
-    const fresh: Shape[] = mainSubtree.map((s) => {
-      const newId = idMap.get(s.id)!;
-      const newParent = s.parentId ? idMap.get(s.parentId) ?? null : null;
-      return {
-        ...s,
-        id: newId,
-        x: s.x + dx,
-        y: s.y + dy,
-        parentId: newParent,
-        isMain: false,
-        linkedMainId: main.id,
-      };
-    });
+    set((s) => ({ shapes: recloneInstance(s.shapes, instanceId) }));
+  },
+
+  resetInstanceOverrides: (instanceId) => {
+    const cur = get();
+    const inst = cur.shapes.find((s) => s.id === instanceId);
+    if (!inst || !inst.linkedMainId) return;
+    if (!cur.shapes.some((s) => s.id === inst.linkedMainId)) return;
+    cur.pushHistory();
     set((s) => {
-      const kept = s.shapes.filter((sh) => !oldSubtreeIds.has(sh.id));
-      return { shapes: [...kept, ...fresh] };
+      // Clear the root's overrides, then re-clone so it matches main exactly.
+      const cleared = s.shapes.map((sh) =>
+        sh.id === instanceId ? ({ ...sh, overrides: undefined } as Shape) : sh,
+      );
+      return { shapes: recloneInstance(cleared, instanceId) };
     });
   },
 
@@ -930,7 +933,14 @@ export const useXDesign = create<XDesignState>((set, get) => ({
       const subtreeIds = new Set(collectDescendantIds(s.shapes, instanceId));
       return {
         shapes: s.shapes.map((sh) =>
-          subtreeIds.has(sh.id) ? ({ ...sh, linkedMainId: undefined } as Shape) : sh,
+          subtreeIds.has(sh.id)
+            ? ({
+                ...sh,
+                linkedMainId: undefined,
+                linkedNodeId: undefined,
+                overrides: undefined,
+              } as Shape)
+            : sh,
         ),
       };
     });
@@ -1141,6 +1151,52 @@ export const useXDesign = create<XDesignState>((set, get) => ({
 
 export function shapeIdsSorted(shapes: Shape[]): string[] {
   return shapes.map((s) => s.id);
+}
+
+/** Re-clone an instance's subtree from its current main, preserving the
+ * instance root's position + overrides. Pure: returns the next shapes array.
+ * Each fresh node is stamped with its source main id (`linkedNodeId`) and has
+ * the matching override patch merged on; the root keeps the override map. */
+export function recloneInstance(shapes: Shape[], instanceId: string): Shape[] {
+  const inst = shapes.find((s) => s.id === instanceId);
+  if (!inst || !inst.linkedMainId) return shapes;
+  const main = shapes.find((s) => s.id === inst.linkedMainId);
+  if (!main) return shapes;
+
+  const oldSubtreeIds = new Set(collectDescendantIds(shapes, instanceId));
+  const mainSubtreeIds = collectDescendantIds(shapes, main.id);
+  const mainSubtree = shapes.filter((s) => mainSubtreeIds.includes(s.id));
+
+  const idMap = new Map<string, string>();
+  for (const s of mainSubtree) idMap.set(s.id, ulid());
+  // Pin the instance root id stable so external selection still points to it.
+  idMap.set(main.id, instanceId);
+
+  const dx = inst.x - main.x;
+  const dy = inst.y - main.y;
+  const rootPos = { x: inst.x, y: inst.y };
+  const overrides = inst.overrides;
+
+  const fresh: Shape[] = mainSubtree.map((s) => {
+    const newId = idMap.get(s.id)!;
+    const newParent = s.parentId ? idMap.get(s.parentId) ?? null : null;
+    const base = {
+      ...s,
+      id: newId,
+      x: s.x + dx,
+      y: s.y + dy,
+      parentId: newParent,
+      isMain: false,
+      linkedMainId: main.id,
+      linkedNodeId: s.id,
+    } as Shape;
+    const withOv = applyOverrides(base, s.id, rootPos, overrides) as Shape;
+    // The root carries the override map forward for the next sync.
+    return newId === instanceId ? ({ ...withOv, overrides } as Shape) : withOv;
+  });
+
+  const kept = shapes.filter((sh) => !oldSubtreeIds.has(sh.id));
+  return [...kept, ...fresh];
 }
 
 /** Resolve a stored value that may be a `var:<id>` reference into the live
