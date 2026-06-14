@@ -77,6 +77,12 @@ export function enqueueToast(s: ToastQueueState, t: Toast): ToastQueueState {
   return { ...s, queued: [...s.queued, t], history };
 }
 
+/** Number of history entries newer than the last time the user opened the
+ * notification center. Drives the menubar bell badge. */
+export function unreadCount(history: Toast[], lastReadAt: number): number {
+  return history.reduce((n, t) => (t.createdAt > lastReadAt ? n + 1 : n), 0);
+}
+
 export function removeToast(s: ToastQueueState, id: string): ToastQueueState {
   let visible = s.visible.filter((t) => t.id !== id);
   let queued = s.queued.filter((t) => t.id !== id);
@@ -89,12 +95,16 @@ export function removeToast(s: ToastQueueState, id: string): ToastQueueState {
 }
 
 type ToastStore = ToastQueueState & {
+  /** When the user last opened the notification center (epoch ms). */
+  lastReadAt: number;
   push: (input: ToastInput) => string;
   dismiss: (id: string) => void;
   /** Hover pauses auto-dismiss; leaving re-arms the full duration. */
   pause: (id: string) => void;
   resume: (id: string) => void;
   clearHistory: () => void;
+  /** Mark every notification as seen (zeroes the bell badge). */
+  markAllRead: () => void;
 };
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -122,6 +132,7 @@ export const useToasts = create<ToastStore>((set, get) => ({
   visible: [],
   queued: [],
   history: [],
+  lastReadAt: 0,
 
   push: (input) => {
     const t: Toast = {
@@ -155,7 +166,9 @@ export const useToasts = create<ToastStore>((set, get) => ({
     );
   },
 
-  clearHistory: () => set({ history: [] }),
+  clearHistory: () => set({ history: [], lastReadAt: Date.now() }),
+
+  markAllRead: () => set({ lastReadAt: Date.now() }),
 }));
 
 type ToastOpts = Omit<ToastInput, "kind" | "title">;

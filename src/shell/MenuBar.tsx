@@ -4,6 +4,7 @@ import { useClock } from "@/shell/useClock";
 import { useVoice } from "@/store/voiceStore";
 import { useContextMenu } from "@/components/ContextMenu";
 import { buildMenu, appMenu } from "@/shell/menus";
+import { NotificationCenter } from "@/shell/NotificationCenter";
 
 // Twelve bars driven by CSS animations. Heights/delays are pseudo-random
 // (hand-picked) so each bar moves on its own beat — gives the impression of
@@ -170,6 +171,7 @@ export function MenuBar() {
       <div className="ot-menubar-spacer" />
       <div className="ot-menubar-status">
         <VoiceIndicator />
+        <NotificationCenter />
         <span className="pill">
           <span className="pill-dot" />
           CLAUDE • ONLINE

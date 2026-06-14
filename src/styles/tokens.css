@@ -9253,6 +9253,140 @@ summary:focus-visible,
 /* ─────────────────────────────────────────────────────────────
    Toasts — bottom-right notification stack (ToastHost)
    ───────────────────────────────────────────────────────────── */
+/* ---- Notification center (menubar bell + panel, Phase 4.1) ---- */
+.ot-notif {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.ot-notif-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 20px;
+  border-radius: var(--r-sm);
+  background: transparent;
+  border: 0;
+  color: var(--t-secondary);
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.ot-notif-bell:hover {
+  color: var(--t-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+.ot-notif-bell.has-unread {
+  color: var(--neon-green);
+}
+.ot-notif-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: #04110a;
+  background: var(--neon-green);
+  border-radius: var(--r-pill);
+  box-shadow: 0 0 8px -1px rgba(var(--neon-green-rgb), 0.7);
+}
+.ot-notif-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 2900;
+  width: 320px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(8, 12, 16, 0.96);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-window, 0 24px 64px -16px rgba(0, 0, 0, 0.7));
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+}
+.ot-notif-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t-tertiary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.ot-notif-clear {
+  background: transparent;
+  border: 0;
+  color: var(--t-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.ot-notif-clear:hover {
+  color: var(--neon-green);
+}
+.ot-notif-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--t-tertiary);
+  font-size: 13px;
+}
+.ot-notif-list {
+  overflow-y: auto;
+}
+.ot-notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.ot-notif-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--neon-cyan);
+}
+.ot-notif-item.success .ot-notif-dot { background: var(--neon-green); }
+.ot-notif-item.warning .ot-notif-dot { background: var(--neon-yellow); }
+.ot-notif-item.error .ot-notif-dot { background: var(--neon-magenta); }
+.ot-notif-main {
+  flex: 1;
+  min-width: 0;
+}
+.ot-notif-title {
+  font-size: 13px;
+  color: var(--t-primary);
+  line-height: 1.3;
+}
+.ot-notif-body {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--t-secondary);
+  line-height: 1.35;
+  word-break: break-word;
+}
+.ot-notif-time {
+  flex: none;
+  font-size: 10.5px;
+  color: var(--t-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
 .ot-toasts {
   position: fixed;
   right: 16px;

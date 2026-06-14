@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   enqueueToast,
   removeToast,
+  unreadCount,
   MAX_VISIBLE,
   MAX_HISTORY,
   type Toast,
@@ -28,6 +29,24 @@ function fill(n: number): ToastQueueState {
   for (let i = 0; i < n; i++) s = enqueueToast(s, mkToast());
   return s;
 }
+
+describe("unreadCount", () => {
+  it("counts history entries newer than lastReadAt", () => {
+    const history = [
+      mkToast({ createdAt: 30 }),
+      mkToast({ createdAt: 20 }),
+      mkToast({ createdAt: 10 }),
+    ];
+    expect(unreadCount(history, 15)).toBe(2); // 30 and 20
+  });
+  it("is zero when everything has been seen", () => {
+    const history = [mkToast({ createdAt: 5 }), mkToast({ createdAt: 3 })];
+    expect(unreadCount(history, 10)).toBe(0);
+  });
+  it("counts all when never read", () => {
+    expect(unreadCount(fill(3).history, 0)).toBe(3);
+  });
+});
 
 describe("enqueueToast", () => {
   it("shows toasts directly until the visible cap", () => {
