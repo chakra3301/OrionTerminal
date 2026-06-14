@@ -431,6 +431,16 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
+    id: "xdesign.present",
+    label: "XDesign: Present Prototype",
+    keywords: ["xdesign", "present", "play", "prototype", "preview", "demo", "flow"],
+    group: "View",
+    run: () => {
+      void import("@/apps/xdesign/XDesignApp").then((m) => m.startPresent());
+    },
+  });
+
+  registry.register({
     id: "note.quickCapture",
     label: "Quick Capture",
     hotkey: "mod+shift+n",

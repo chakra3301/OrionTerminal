@@ -1,15 +1,28 @@
 import { useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { Play } from "lucide-react";
 import { XDesignToolRail } from "@/apps/xdesign/ToolRail";
 import { XDesignLayersPanel } from "@/apps/xdesign/LayersPanel";
 import { XDesignCanvas } from "@/apps/xdesign/Canvas";
 import { XDesignInspector } from "@/apps/xdesign/Inspector";
 import { XDesignClaudeRail } from "@/apps/xdesign/XDesignClaudeRail";
 import { XDesignAlignBar } from "@/apps/xdesign/AlignBar";
+import { PresentMode } from "@/apps/xdesign/PresentMode";
+import { usePresentMode } from "@/apps/xdesign/presentStore";
+import { initialScreen, topLevelFrames } from "@/apps/xdesign/prototype";
 import { useFileDropZone } from "@/lib/fileDrop";
 import { useAssetsStore } from "@/store/assetsStore";
 import { useXDesign } from "@/apps/xdesign/store";
 import { log } from "@/lib/log";
+
+/** Enter present mode on the selected top-level frame, else the first screen. */
+export function startPresent(): void {
+  const { shapes, selection } = useXDesign.getState();
+  const selFrame = [...selection]
+    .map((id) => shapes.find((s) => s.id === id))
+    .find((s) => s && s.kind === "frame" && !s.parentId);
+  usePresentMode.getState().enter(selFrame?.id ?? initialScreen(shapes));
+}
 
 const IMG_EXT = new Set([
   "png", "jpg", "jpeg", "gif", "webp", "svg", "heic", "heif", "bmp", "avif",
@@ -89,6 +102,7 @@ async function handleImageDrop(paths: string[]): Promise<void> {
 export function XDesignApp() {
   const stageRef = useRef<HTMLDivElement>(null);
   const [dropOver, setDropOver] = useState(false);
+  const hasFrames = useXDesign((s) => topLevelFrames(s.shapes).length > 0);
 
   useFileDropZone(stageRef, "xdesign-canvas", (e) => {
     if (e.type === "enter") setDropOver(true);
@@ -110,6 +124,17 @@ export function XDesignApp() {
         <XDesignAlignBar />
         <XDesignCanvas />
         <XDesignClaudeRail />
+        {hasFrames && (
+          <button
+            type="button"
+            className="xd-present-launch"
+            onClick={startPresent}
+            title="Present prototype"
+          >
+            <Play size={13} />
+          </button>
+        )}
+        <PresentMode />
       </div>
       <XDesignInspector />
     </div>

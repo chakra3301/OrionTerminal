@@ -7865,6 +7865,133 @@ summary:focus-visible,
    XDesign — Alignment toolbar (contextual, top of canvas)
    ============================================================ */
 
+/* ---- XDesign present mode (prototyping lite) ---- */
+.xd-present-launch {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-pill);
+  background: rgba(var(--xd-accent-rgb), 0.18);
+  border: 1px solid rgba(var(--xd-accent-rgb), 0.45);
+  color: var(--xd-accent, var(--neon-magenta));
+  cursor: pointer;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+.xd-present-launch:hover {
+  background: rgba(var(--xd-accent-rgb), 0.32);
+  transform: scale(1.06);
+}
+.xd-present {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  background: #050309;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.xd-present-screen {
+  position: absolute;
+  overflow: hidden;
+  box-shadow: 0 30px 90px -20px rgba(0, 0, 0, 0.8);
+}
+.xd-present-svg,
+.xd-present-svg svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.xd-present-hotspot {
+  position: absolute;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  outline: 2px solid transparent;
+  transition: background 0.1s ease, outline-color 0.1s ease;
+}
+.xd-present-hotspot:hover {
+  background: rgba(var(--xd-accent-rgb), 0.16);
+  outline-color: rgba(var(--xd-accent-rgb), 0.7);
+}
+.xd-present-bar {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 210;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: rgba(8, 5, 12, 0.85);
+  border: 1px solid rgba(var(--xd-accent-rgb), 0.3);
+  border-radius: var(--r-pill);
+  color: var(--t-secondary);
+  font-size: 12px;
+  backdrop-filter: blur(8px);
+}
+.xd-present-barbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-pill);
+  background: transparent;
+  border: 0;
+  color: var(--t-secondary);
+  cursor: pointer;
+}
+.xd-present-barbtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--t-primary);
+}
+.xd-present-name {
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.04em;
+  color: var(--t-primary);
+}
+.xd-present-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 210;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.06);
+  border: 0;
+  color: var(--t-secondary);
+  cursor: pointer;
+}
+.xd-present-empty {
+  color: var(--t-secondary);
+  font-size: 14px;
+}
+/* transitions (3.5d) */
+@keyframes xd-present-dissolve {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes xd-present-slide {
+  from { transform: var(--xd-present-scale) translateX(40px); opacity: 0; }
+  to { transform: var(--xd-present-scale) translateX(0); opacity: 1; }
+}
+.xd-present-anim-dissolve {
+  animation: xd-present-dissolve 0.22s ease;
+}
+
 .xd-alignbar {
   position: absolute;
   top: 12px;
