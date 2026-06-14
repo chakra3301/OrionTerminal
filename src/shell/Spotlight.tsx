@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Fuse from "fuse.js";
-import { Search, Sparkles, Archive as ArchiveIcon, Folder } from "lucide-react";
+import { Search, Sparkles, Archive as ArchiveIcon, Folder, Clock } from "lucide-react";
 import { useShell, APP_NAMES, type AppId } from "@/shell/store/useShell";
 import { registry, type Command } from "@/commands/registry";
 import { useProjectStore } from "@/store/projectStore";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
 import { ipc, type TreeNode } from "@/lib/ipc";
-import { type SearchHit } from "@/lib/db";
+import { type SearchHit, recentActivity, type ActivityEntry } from "@/lib/db";
 import { searchHybrid } from "@/lib/searchHybrid";
 import { routeToSearchHit } from "@/apps/archives/searchNav";
 import { log } from "@/lib/log";
@@ -18,7 +18,8 @@ type SpotlightKind =
   | "chat"
   | "note"
   | "archive"
-  | "project";
+  | "project"
+  | "activity";
 
 type SpotlightEntry = {
   kind: SpotlightKind;
@@ -87,6 +88,24 @@ export function Spotlight() {
     if (open) void loadRecents();
   }, [open, loadRecents]);
 
+  // Cross-app activity feed (the shared terminal memory). Pulled on open so
+  // "what was I just doing" is one ⌘K away.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    recentActivity({ limit: 16 })
+      .then((rows) => {
+        if (!cancelled) setActivity(rows);
+      })
+      .catch((e) => {
+        log.warn("spotlight activity load failed", e);
+        if (!cancelled) setActivity([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
   const allCommands = useCommandSnapshot();
   const commands = useMemo(
     () => allCommands.filter((c) => (c.when ? c.when() : true)),
@@ -97,6 +116,7 @@ export function Spotlight() {
   const [selected, setSelected] = useState(0);
   const [files, setFiles] = useState<string[]>([]);
   const [archiveHits, setArchiveHits] = useState<SearchHit[]>([]);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -224,6 +244,31 @@ export function Spotlight() {
       },
     }));
 
+    const activityEntries: SpotlightEntry[] = activity.map((a) => ({
+      kind: "activity",
+      id: `activity:${a.id}`,
+      label: a.title,
+      hint: `${APP_NAMES[a.source as AppId] ?? a.source} · ${a.summary || a.kind}`,
+      appId: a.source as AppId,
+      run: () => {
+        close();
+        // Best-effort jump: Orion file edits reopen the file; everything else
+        // surfaces the source app where the user left off.
+        if (
+          a.source === "orion" &&
+          a.ref_id &&
+          /[\\/]/.test(a.ref_id) &&
+          project
+        ) {
+          openTab(
+            { kind: "file", path: a.ref_id },
+            { label: a.ref_id.split(/[\\/]/).pop() ?? a.ref_id, preferRole: "editor" },
+          );
+        }
+        openApp(a.source as AppId);
+      },
+    }));
+
     // Recent projects: skip the currently-active one (no-op switch anyway).
     const projectEntries: SpotlightEntry[] = recents
       .filter((p) => p.id !== project?.id)
@@ -240,7 +285,14 @@ export function Spotlight() {
       }));
 
     if (isCommandsOnly) return cmds;
-    return [...apps, ...projectEntries, ...archiveEntries, ...cmds, ...fileEntries];
+    return [
+      ...apps,
+      ...projectEntries,
+      ...archiveEntries,
+      ...activityEntries,
+      ...cmds,
+      ...fileEntries,
+    ];
   }, [
     commands,
     files,
@@ -252,6 +304,7 @@ export function Spotlight() {
     switchToProject,
     isCommandsOnly,
     archiveHits,
+    activity,
   ]);
 
   const visible: SpotlightEntry[] = useMemo(() => {
@@ -261,11 +314,12 @@ export function Spotlight() {
       // few recent files.
       const apps = entries.filter((e) => e.kind === "app");
       const projects = entries.filter((e) => e.kind === "project").slice(0, 5);
+      const recent = entries.filter((e) => e.kind === "activity").slice(0, 6);
       const cmds = entries
         .filter((e) => e.kind === "command")
         .slice(0, 6);
       const fileSlice = entries.filter((e) => e.kind === "file").slice(0, 6);
-      return [...apps, ...projects, ...cmds, ...fileSlice];
+      return [...apps, ...recent, ...projects, ...cmds, ...fileSlice];
     }
     // Archive hits keep their FTS-rank ordering (already scored on the DB
     // side); we mix them with Fuse-ranked everything-else.
@@ -312,6 +366,8 @@ export function Spotlight() {
         return "Notes";
       case "archive":
         return "Archive";
+      case "activity":
+        return "Recent";
     }
   };
 
@@ -407,6 +463,8 @@ export function Spotlight() {
                         <ArchiveIcon size={11} color="var(--neon-green)" />
                       ) : entry.kind === "project" ? (
                         <Folder size={11} color="var(--neon-cyan)" />
+                      ) : entry.kind === "activity" ? (
+                        <Clock size={11} color="var(--neon-violet)" />
                       ) : (
                         <Search size={11} />
                       )}
