@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { ulid } from "ulid";
 import { booleanShapes, type BoolOp } from "./booleanOps";
+import type { ConstraintH, ConstraintV } from "./constraints";
 
 export type ToolId =
   | "select"
@@ -102,6 +103,11 @@ export type ShapeBase = {
   /** Opt out of auto-layout flow — child is positioned absolutely inside
    * the frame using its stored x/y. */
   layoutPositioning?: "auto" | "absolute";
+  /** Resize constraints — how this child reflows when its parent frame
+   * (with no auto-layout) resizes. Unset = left/top (Figma default). Only
+   * meaningful when the shape has a parent frame. */
+  constraintH?: ConstraintH;
+  constraintV?: ConstraintV;
   /** Marks this shape as a main component (the source-of-truth template).
    * Other shapes can link to it via `linkedMainId`. Currently only frames
    * are typically made main, but the field lives on the base so any kind
