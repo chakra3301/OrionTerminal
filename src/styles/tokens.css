@@ -6447,20 +6447,51 @@ summary:focus-visible,
   min-height: 0;
   min-width: 0;
   overflow: auto;
-  /* Remap the magenta accent to XDesign's soft grey for everything inside
-     the app (selection handles, Claude rail, layer markers, inspector).
-     No XDesign surface portals out of this subtree, so the cascade reaches
-     all of them; the hardcoded rgba() literals below were converted to
-     --xd-accent-rgb separately. */
+
+  /* ── Figma-dark scoped theme ─────────────────────────────────────────
+     XDesign renders entirely inside this subtree, so a local token scope
+     re-themes every surface (panels, canvas, selection, Claude rail,
+     inspector). Neutral graphite + a single blue accent — practical and
+     high-contrast, cohesive with Orion's dark shell. */
+  --xd-bg:       #1e1e1e;   /* canvas base */
+  --xd-panel:    #2c2c2c;   /* tool rail · layers · inspector (opaque) */
+  --xd-raised:   #383838;   /* inputs · raised controls */
+  --xd-hover:    rgba(255, 255, 255, 0.07);
+  --xd-border:   #454545;   /* dividers */
+  --xd-text:     #e6e6e6;   /* primary */
+  --xd-text-2:   #b3b3b3;   /* labels / secondary */
+  --xd-text-3:   #8a8a8a;   /* tertiary / hover-reveal */
+  --xd-accent:     #0d99ff; /* Figma blue — selection · active · primary */
+  --xd-accent-rgb: 13, 153, 255;
+  --xd-font: -apple-system, system-ui, "SF Pro Text", "Segoe UI", sans-serif;
+  font-family: var(--xd-font);
+
+  /* Remap the globals the XDesign surfaces (and inherited components like the
+     Claude rail + the selection/handle SVG) read, so they recolor for free.
+     Selection chrome uses --neon-cyan; pen/guides/markers use --neon-magenta —
+     both collapse to the one blue accent. */
   --neon-magenta: var(--xd-accent);
   --neon-magenta-rgb: var(--xd-accent-rgb);
-  --shadow-glow-magenta: 0 0 24px -4px rgba(var(--xd-accent-rgb), 0.5);
+  --neon-cyan: var(--xd-accent);
+  --neon-cyan-rgb: var(--xd-accent-rgb);
+  --shadow-glow-magenta: 0 0 20px -6px rgba(var(--xd-accent-rgb), 0.45);
+  --shadow-glow-cyan: 0 0 20px -6px rgba(var(--xd-accent-rgb), 0.45);
+
+  --bg-0: var(--xd-bg);
+  --bg-1: var(--xd-panel);
+  --bg-2: var(--xd-raised);
+  --bg-3: #404040;
+
+  --t-primary: var(--xd-text);
+  --t-secondary: var(--xd-text-2);
+  --t-tertiary: var(--xd-text-3);
+  --t-faint: #6f6f6f;
 }
 .xd-toolrail {
-  width: 52px;
+  width: 48px;
   flex-shrink: 0;
-  border-right: 1px solid rgba(255,255,255,0.05);
-  background: rgba(0,0,0,0.25);
+  border-right: 1px solid var(--xd-border);
+  background: var(--xd-panel);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -6486,20 +6517,21 @@ summary:focus-visible,
 }
 
 .xd-layers {
-  width: 240px;
+  width: 232px;
   flex-shrink: 0;
-  border-right: 1px solid rgba(255,255,255,0.05);
-  padding: 14px;
-  background: rgba(0,0,0,0.18);
+  border-right: 1px solid var(--xd-border);
+  padding: 8px;
+  background: var(--xd-panel);
   overflow-y: auto;
 }
 .xd-layers .heading {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--t-tertiary);
-  margin-bottom: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--xd-text-2);
+  margin-bottom: 8px;
+  padding: 4px 6px 0;
 }
 .xd-layer-row {
   padding: 6px 8px;
@@ -6525,19 +6557,19 @@ summary:focus-visible,
 }
 
 .xd-inspector {
-  width: 240px;
+  width: 232px;
   flex-shrink: 0;
-  border-left: 1px solid rgba(255,255,255,0.05);
-  padding: 14px;
-  background: rgba(0,0,0,0.18);
+  border-left: 1px solid var(--xd-border);
+  padding: 10px 12px;
+  background: var(--xd-panel);
   overflow-y: auto;
 }
 .xd-inspector .heading {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--t-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--xd-text-2);
   margin-bottom: 10px;
 }
 
@@ -7577,16 +7609,15 @@ summary:focus-visible,
   position: absolute;
   bottom: 10px;
   left: 12px;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: var(--r-pill);
-  background: rgba(3, 6, 10, 0.7);
-  border: 1px solid rgba(255,255,255,0.06);
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: var(--t-tertiary);
+  background: var(--xd-panel);
+  border: 1px solid var(--xd-border);
+  font-size: 11px;
+  letter-spacing: 0;
+  color: var(--xd-text-3);
   pointer-events: none;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 /* Inspector fields */
@@ -7602,12 +7633,12 @@ summary:focus-visible,
   letter-spacing: 0.1em;
 }
 .xd-inspector-multi {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--neon-cyan);
-  padding: 4px 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--xd-text-2);
+  padding: 2px 0 10px;
 }
 .xd-field {
   display: flex;
@@ -7616,29 +7647,28 @@ summary:focus-visible,
   margin-bottom: 8px;
 }
 .xd-field > span {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--t-tertiary);
-  width: 64px;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--xd-text-2);
+  width: 56px;
   flex-shrink: 0;
 }
 .xd-field input {
   flex: 1;
   min-width: 0;
-  background: var(--bg-2);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: var(--xd-raised);
+  border: 1px solid transparent;
   border-radius: var(--r-sm);
   padding: 5px 8px;
-  color: var(--t-primary);
-  font-family: var(--f-display);
+  color: var(--xd-text);
+  font-family: var(--xd-font);
   font-size: 12px;
   outline: none;
 }
 .xd-field input:focus {
-  border-color: rgba(var(--xd-accent-rgb),0.45);
-  box-shadow: 0 0 0 1px rgba(var(--xd-accent-rgb),0.25);
+  border-color: var(--xd-accent);
+  box-shadow: 0 0 0 1px rgba(var(--xd-accent-rgb), 0.45);
 }
 .xd-num {
   flex: 1;
