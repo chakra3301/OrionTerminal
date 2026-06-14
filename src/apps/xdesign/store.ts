@@ -7,6 +7,7 @@ import {
   captureOverride,
   type OverrideMap,
 } from "./overrides";
+import { resolveVariant } from "./variants";
 
 export type ToolId =
   | "select"
@@ -337,6 +338,18 @@ type XDesignState = {
   syncFromMain: (instanceId: string) => void;
   /** Drop all of an instance's overrides and re-sync it to match main. */
   resetInstanceOverrides: (instanceId: string) => void;
+
+  /** Mark / unmark a frame as a variant set (its main children = variants). */
+  toggleVariantSet: (id: string) => void;
+  /** Set a main component's variant property values (within a variant set). */
+  setVariantProps: (id: string, props: Record<string, string>) => void;
+  /** Pick a variant combination for an instance: resolves the matching member
+   * main, re-points the instance to it, and re-clones (position + overrides
+   * preserved). No-op if the instance doesn't belong to a variant set. */
+  setVariantSelection: (
+    instanceId: string,
+    selection: Record<string, string>,
+  ) => void;
   /** Clear linkedMainId on the instance and all its descendants. The
    * resulting shapes are independent of the main. */
   detachInstance: (instanceId: string) => void;
@@ -890,7 +903,7 @@ export const useXDesign = create<XDesignState>((set, get) => ({
       // Re-parent: if parent is in the cloned set, use mapped id;
       //            else parent is the document root.
       const newParent = s.parentId ? idMap.get(s.parentId) ?? null : null;
-      return {
+      const node = {
         ...s,
         id: newId,
         x: s.x + dx,
@@ -902,7 +915,18 @@ export const useXDesign = create<XDesignState>((set, get) => ({
         linkedMainId: mainId,
         // Remember the exact main node this clone mirrors (stable override key).
         linkedNodeId: s.id,
-      };
+      } as Shape;
+      // Instancing a variant member: the root tracks the chosen combo via
+      // variantSelection and never carries the member's variantProps marker.
+      if (s.id === mainId) {
+        return {
+          ...node,
+          variantProps: undefined,
+          isVariantSet: undefined,
+          variantSelection: main.variantProps,
+        } as Shape;
+      }
+      return node;
     });
     const newRootId = idMap.get(mainId)!;
     set((s) => ({
@@ -933,6 +957,56 @@ export const useXDesign = create<XDesignState>((set, get) => ({
         sh.id === instanceId ? ({ ...sh, overrides: undefined } as Shape) : sh,
       );
       return { shapes: recloneInstance(cleared, instanceId) };
+    });
+  },
+
+  toggleVariantSet: (id) => {
+    get().pushHistory();
+    set((s) => ({
+      shapes: s.shapes.map((sh) =>
+        sh.id === id ? ({ ...sh, isVariantSet: !sh.isVariantSet } as Shape) : sh,
+      ),
+    }));
+  },
+
+  setVariantProps: (id, props) => {
+    get().pushHistory();
+    set((s) => ({
+      shapes: s.shapes.map((sh) =>
+        sh.id === id ? ({ ...sh, variantProps: props } as Shape) : sh,
+      ),
+    }));
+  },
+
+  setVariantSelection: (instanceId, selection) => {
+    const cur = get();
+    const inst = cur.shapes.find((s) => s.id === instanceId);
+    if (!inst || !inst.linkedMainId) return;
+    const curMain = cur.shapes.find((s) => s.id === inst.linkedMainId);
+    if (!curMain) return;
+    const setFrame = curMain.parentId
+      ? cur.shapes.find((s) => s.id === curMain.parentId)
+      : undefined;
+    if (!setFrame || !setFrame.isVariantSet) return;
+    const members = cur.shapes.filter(
+      (s) => s.parentId === setFrame.id && s.isMain,
+    );
+    const memberId = resolveVariant(
+      members.map((m) => ({ id: m.id, variantProps: m.variantProps })),
+      selection,
+    );
+    if (!memberId) return;
+    cur.pushHistory();
+    set((s) => {
+      // Re-point the instance to the resolved member + record the selection,
+      // then re-clone from that member (recloneInstance keeps the selection
+      // and preserves position + overrides).
+      const repointed = s.shapes.map((sh) =>
+        sh.id === instanceId
+          ? ({ ...sh, linkedMainId: memberId, variantSelection: selection } as Shape)
+          : sh,
+      );
+      return { shapes: recloneInstance(repointed, instanceId) };
     });
   },
 
@@ -1200,8 +1274,17 @@ export function recloneInstance(shapes: Shape[], instanceId: string): Shape[] {
       linkedNodeId: s.id,
     } as Shape;
     const withOv = applyOverrides(base, s.id, rootPos, overrides) as Shape;
-    // The root carries the override map forward for the next sync.
-    return newId === instanceId ? ({ ...withOv, overrides } as Shape) : withOv;
+    // The root carries the override map + variant selection forward, and never
+    // inherits the member main's variantProps / isVariantSet markers.
+    return newId === instanceId
+      ? ({
+          ...withOv,
+          overrides,
+          variantProps: undefined,
+          isVariantSet: undefined,
+          variantSelection: inst.variantSelection,
+        } as Shape)
+      : withOv;
   });
 
   const kept = shapes.filter((sh) => !oldSubtreeIds.has(sh.id));

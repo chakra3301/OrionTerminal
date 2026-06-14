@@ -26,6 +26,7 @@ import { toast } from "@/store/toastStore";
 import type { BoolOp } from "@/apps/xdesign/booleanOps";
 import type { ConstraintH, ConstraintV } from "@/apps/xdesign/constraints";
 import { findInstanceRoot } from "@/apps/xdesign/overrides";
+import { variantProperties, defaultSelection } from "@/apps/xdesign/variants";
 
 const COLOR_PRESETS: Array<{ value: string; title: string }> = [
   { value: "transparent", title: "Transparent" },
@@ -1510,8 +1511,12 @@ function ComponentSection({ shape }: { shape: Shape }) {
   const syncFromMain = useXDesign((s) => s.syncFromMain);
   const detachInstance = useXDesign((s) => s.detachInstance);
   const resetInstanceOverrides = useXDesign((s) => s.resetInstanceOverrides);
+  const toggleVariantSet = useXDesign((s) => s.toggleVariantSet);
+  const setVariantProps = useXDesign((s) => s.setVariantProps);
+  const setVariantSelection = useXDesign((s) => s.setVariantSelection);
   const shapes = useXDesign((s) => s.shapes);
   const isMain = !!shape.isMain;
+  const isFrame = shape.kind === "frame";
   const linkedId = shape.linkedMainId;
   const mainExists = linkedId
     ? shapes.some((s) => s.id === linkedId && s.isMain)
@@ -1521,6 +1526,30 @@ function ComponentSection({ shape }: { shape: Shape }) {
   const instRoot = linkedId ? findInstanceRoot(shapes, shape.id) : null;
   const hasOverrides =
     !!instRoot?.overrides && Object.keys(instRoot.overrides).length > 0;
+
+  // Variant wiring: the set frame this main/instance belongs to + its members.
+  const memberMain = linkedId ? shapes.find((s) => s.id === linkedId) : undefined;
+  const setFrame = isMain
+    ? shape.parentId
+      ? shapes.find((s) => s.id === shape.parentId && s.isVariantSet)
+      : undefined
+    : memberMain?.parentId
+      ? shapes.find((s) => s.id === memberMain.parentId && s.isVariantSet)
+      : undefined;
+  const members = setFrame
+    ? shapes.filter((s) => s.parentId === setFrame.id && s.isMain)
+    : [];
+  const variantProps = variantProperties(
+    members.map((m) => ({ id: m.id, variantProps: m.variantProps })),
+  );
+  const inSet = !!setFrame && members.length > 0;
+  // The instance dropdown swaps via the instance ROOT (selection lives there).
+  const memberList = members.map((m) => ({ id: m.id, variantProps: m.variantProps }));
+  const selection: Record<string, string> =
+    inSet && instRoot
+      ? instRoot.variantSelection ?? defaultSelection(memberList)
+      : {};
+
   return (
     <Section title="Component" defaultOpen={isMain || !!linkedId}>
       <div className="xd-fields">
@@ -1532,6 +1561,17 @@ function ComponentSection({ shape }: { shape: Shape }) {
         >
           {isMain ? "✓ Main" : "Mark as main"}
         </button>
+        {isFrame && (
+          <button
+            type="button"
+            className={`xd-mini-btn${shape.isVariantSet ? " active" : ""}`}
+            style={{ width: "auto", padding: "0 8px" }}
+            onClick={() => toggleVariantSet(shape.id)}
+            title="Treat this frame as a variant set (its main children are the variants)"
+          >
+            {shape.isVariantSet ? "✓ Variant set" : "Variant set"}
+          </button>
+        )}
         {isMain && (
           <button
             type="button"
@@ -1544,6 +1584,12 @@ function ComponentSection({ shape }: { shape: Shape }) {
           </button>
         )}
       </div>
+      {isMain && setFrame && (
+        <VariantPropsEditor
+          value={shape.variantProps ?? {}}
+          onChange={(props) => setVariantProps(shape.id, props)}
+        />
+      )}
       {linkedId && (
         <>
           <div className="xd-effect-row-head">
@@ -1551,6 +1597,30 @@ function ComponentSection({ shape }: { shape: Shape }) {
               {mainExists ? "Linked instance" : "Broken link"}
             </span>
           </div>
+          {inSet && instRoot && (
+            <div className="xd-fields" style={{ flexWrap: "wrap" }}>
+              {Object.entries(variantProps).map(([name, values]) => (
+                <label className="xd-field" key={name}>
+                  <span>{name}</span>
+                  <select
+                    value={selection[name] ?? values[0]}
+                    onChange={(e) =>
+                      setVariantSelection(instRoot.id, {
+                        ...selection,
+                        [name]: e.target.value,
+                      })
+                    }
+                  >
+                    {values.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          )}
           <div className="xd-fields">
             <button
               type="button"
@@ -1587,6 +1657,52 @@ function ComponentSection({ shape }: { shape: Shape }) {
         </>
       )}
     </Section>
+  );
+}
+
+function serializeVariantProps(props: Record<string, string>): string {
+  return Object.entries(props)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(", ");
+}
+function parseVariantProps(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const part of text.split(",")) {
+    const eq = part.indexOf("=");
+    if (eq < 0) continue;
+    const key = part.slice(0, eq).trim();
+    const val = part.slice(eq + 1).trim();
+    if (key && val) out[key] = val;
+  }
+  return out;
+}
+
+/** Free-text `Name=value, Name=value` editor for a variant member's props. */
+function VariantPropsEditor({
+  value,
+  onChange,
+}: {
+  value: Record<string, string>;
+  onChange: (props: Record<string, string>) => void;
+}) {
+  const [draft, setDraft] = useState(() => serializeVariantProps(value));
+  useEffect(() => {
+    setDraft(serializeVariantProps(value));
+  }, [value]);
+  return (
+    <label className="xd-field">
+      <span>Variant props</span>
+      <input
+        type="text"
+        value={draft}
+        placeholder="State=hover, Size=lg"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => onChange(parseVariantProps(draft))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+      />
+    </label>
   );
 }
 
