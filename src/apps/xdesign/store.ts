@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { ulid } from "ulid";
 import { booleanShapes, type BoolOp } from "./booleanOps";
 import type { ConstraintH, ConstraintV } from "./constraints";
+import type { OverrideMap } from "./overrides";
 
 export type ToolId =
   | "select"
@@ -117,6 +118,14 @@ export type ShapeBase = {
    * this id. "Sync from main" recreates the instance subtree from main;
    * "detach" clears this on the shape and all its descendants. */
   linkedMainId?: string;
+  /** The specific MAIN-descendant id this instance node was cloned from.
+   * Stable across re-clones, so it's the durable key for per-node overrides. */
+  linkedNodeId?: string;
+  /** Per-instance override patches, stored on the instance ROOT only, keyed by
+   * the main-descendant id (`linkedNodeId`). Visual/size/text props are
+   * absolute; x/y are offsets from the instance root. Re-applied by
+   * `syncFromMain` so local edits survive a sync. */
+  overrides?: OverrideMap;
   /** Frame this shape belongs to. null = top-level. Children share the
    * frame's coordinate space at the world level (we don't apply nested
    * transforms yet) — moving the frame just moves descendants together. */
