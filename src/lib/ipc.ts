@@ -219,6 +219,20 @@ export const ipc = {
   hermesStopAgent: (agentId: string): Promise<void> =>
     invoke("hermes_stop_agent", { agentId }),
 
+  // RepoLens website rip — kick off a rip (returns the rip id); progress
+  // arrives via events. Cancel/continue/delete operate on the rip id.
+  repolensWebsiteRip: (
+    url: string,
+    model: string | null = null,
+  ): Promise<string> =>
+    invoke<string>("repolens_website_rip", { url, model }),
+  repolensWebsiteCancel: (id: string): Promise<void> =>
+    invoke("repolens_website_cancel", { id }),
+  repolensWebsiteContinue: (id: string): Promise<void> =>
+    invoke("repolens_website_continue", { id }),
+  repolensWebsiteDelete: (id: string): Promise<void> =>
+    invoke("repolens_website_delete", { id }),
+
   terminalOpen: (
     ptyId: string,
     cwd: string,
