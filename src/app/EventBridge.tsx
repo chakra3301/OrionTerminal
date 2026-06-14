@@ -23,6 +23,7 @@ import {
   isOrionHermesWriteTool,
 } from "@/lib/orionToolMatch";
 import { useHermes, type HermesStatus, type HermesColumn } from "@/store/hermesStore";
+import { useRepoLensWebsites } from "@/apps/archives/repolens/useRepoLensWebsites";
 import { log } from "@/lib/log";
 
 /** UI actions the MCP server can request via the local TCP bridge. Each
@@ -635,6 +636,19 @@ export function EventBridge() {
         useHermes.getState().applyTask(e.payload);
       },
     ).then((u) => unlisteners.push(u));
+
+    // RepoLens website rip — the engine streams the rip's status/phase + log
+    // deltas + thumbnail path; mirror it into the store for the live progress UI.
+    listen<{
+      id: string;
+      status: import("../apps/archives/repolens/repolensWebsitesDb").WebsiteStatus;
+      phase: string;
+      logDelta?: string;
+      thumbnailPath?: string;
+      sessionId?: string | null;
+    }>("repolens:website", (e) => {
+      useRepoLensWebsites.getState().applyEvent(e.payload);
+    }).then((u) => unlisteners.push(u));
 
     // UI-action bridge: out-of-process MCP server → main app via TCP →
     // Tauri event → here. Lets agents drive UI-state changes (open_app,
