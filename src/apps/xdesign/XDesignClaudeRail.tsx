@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, X } from "lucide-react";
+import { Sparkles, X, Wand2 } from "lucide-react";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
 import { useDraggable } from "@/shell/useDraggable";
@@ -9,12 +9,15 @@ import { scheduleReindex } from "@/lib/embeddingIndexer";
 import { ipc } from "@/lib/ipc";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { log } from "@/lib/log";
-import { xdesignClaude } from "@/apps/xdesign/claude";
+import { xdesignClaude, COMPOSER_PROMPT } from "@/apps/xdesign/claude";
 import {
   parseCanvasCommands,
   runCanvasCommands,
   stripCanvasCommands,
 } from "@/apps/xdesign/claudeCommands";
+import { parseDesignPlan, stripDesignPlan } from "@/apps/xdesign/designPlan";
+import { ingestDesignPlan } from "@/apps/xdesign/ingestDesignPlan";
+import { promptText } from "@/components/PromptModal";
 import { computeExportBounds, renderPngBytes } from "@/apps/xdesign/exportXD";
 
 // With the vision loop attaching a render every turn, Claude can SEE all the
@@ -109,6 +112,14 @@ export function XDesignClaudeRail() {
     if (!last || last.role !== "assistant" || last.pending) return;
     if (executedRef.current.has(last.id)) return;
     executedRef.current.add(last.id);
+    // A composer reply (one ```xd-design block) ingests as a whole design;
+    // otherwise fall through to the low-level canvas-command path.
+    const plan = parseDesignPlan(last.content);
+    if (plan) {
+      ingestDesignPlan(plan);
+      log.info("xdesign claude: ingested design plan");
+      return;
+    }
     const cmds = parseCanvasCommands(last.content);
     if (cmds.length === 0) return;
     const { applied } = runCanvasCommands(cmds);
@@ -212,8 +223,10 @@ export function XDesignClaudeRail() {
     }
   };
 
-  const handleSend = async (text: string) => {
-    appendUser("xdesign", text);
+  // `visibleText` shows in the transcript; `sentText` is what Claude receives.
+  // They differ for the composer (short brief shown, full prompt sent).
+  const sendTurn = async (visibleText: string, sentText: string) => {
+    appendUser("xdesign", visibleText);
     const chatId = thread.threadId;
     registerStream(chatId, "xdesign");
     beginAssistant("xdesign", chatId);
@@ -229,8 +242,8 @@ export function XDesignClaudeRail() {
         ? "\n\nThe attached image is a render of the CURRENT canvas. Read it to judge layout, spacing, alignment, color, contrast, and overlap before deciding what to change."
         : "";
       const prompt = isFirstTurn
-        ? `${xdesignClaude.systemPrompt}\n\n${note}${visionNote}\n\n---\n\n${text}`
-        : `${note}${visionNote}\n\n---\n\n${text}`;
+        ? `${xdesignClaude.systemPrompt}\n\n${note}${visionNote}\n\n---\n\n${sentText}`
+        : `${note}${visionNote}\n\n---\n\n${sentText}`;
       // Pass the snapshot path through to claude_send, which attaches it as a
       // real stream-json image block (NOT an `@path` mention — those get
       // dropped on --resume turns). Null path → plain text-only send.
@@ -249,6 +262,26 @@ export function XDesignClaudeRail() {
     }
   };
 
+  const handleSend = (text: string) => sendTurn(text, text);
+
+  // ✦ Generate — compose a full design from a brief. Shows a short brief in the
+  // transcript but sends the composer prompt; the reply's xd-design block is
+  // ingested by the effect above.
+  const handleGenerate = async () => {
+    const brief = await promptText({
+      title: "Generate a design",
+      label: "Describe what to design — Claude builds it as editable layers.",
+      placeholder: "a pricing page for a dev tool, dark & bold",
+      confirmLabel: "Generate",
+    });
+    if (brief === null) return;
+    const b = brief.trim() || "a clean, modern landing page";
+    await sendTurn(
+      `✦ Generate a design — ${b}`,
+      `${COMPOSER_PROMPT}\n\n---\n\nBRIEF: ${b}`,
+    );
+  };
+
   const handleCancel = () => {
     void ipc.claudeCancel(thread.threadId);
   };
@@ -257,7 +290,9 @@ export function XDesignClaudeRail() {
     id: m.id,
     role: m.role,
     content:
-      m.role === "assistant" ? stripCanvasCommands(m.content) : m.content,
+      m.role === "assistant"
+        ? stripDesignPlan(stripCanvasCommands(m.content))
+        : m.content,
     pending: m.pending,
   }));
 
@@ -297,6 +332,17 @@ export function XDesignClaudeRail() {
         <Sparkles size={12} color="var(--xd-accent)" />
         <span className="title">{xdesignClaude.name}</span>
         <div style={{ flex: 1 }} />
+        <button
+          type="button"
+          className="xd-rail-generate"
+          data-no-drag
+          onClick={handleGenerate}
+          disabled={thread.running}
+          title="Generate a full design from a brief"
+        >
+          <Wand2 size={12} />
+          <span>Generate</span>
+        </button>
         <button
           type="button"
           className="icon-btn"

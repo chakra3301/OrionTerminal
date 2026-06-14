@@ -7870,6 +7870,27 @@ summary:focus-visible,
   user-select: none;
 }
 .xd-claude-rail-head .title { color: var(--neon-magenta); }
+.xd-rail-generate {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: var(--r-pill);
+  background: rgba(var(--xd-accent-rgb), 0.16);
+  border: 1px solid rgba(var(--xd-accent-rgb), 0.4);
+  color: var(--xd-accent);
+  font-family: var(--xd-font);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.xd-rail-generate:hover:not(:disabled) {
+  background: rgba(var(--xd-accent-rgb), 0.28);
+}
+.xd-rail-generate:disabled { opacity: 0.5; cursor: default; }
 
 .xd-claude-rail-body {
   flex: 1;
