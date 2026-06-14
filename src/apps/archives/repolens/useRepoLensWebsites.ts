@@ -86,9 +86,14 @@ export const useRepoLensWebsites = create<State>((set, get) => ({
       }
       const cur = s.rips[i];
       if (!cur) return s;
+      // Never downgrade a finished rip back to an active state: a late
+      // thumbnail emit (which carries status "running") can arrive in the ms
+      // after the run already marked the rip done/error/cancelled.
+      const status =
+        isTerminal(cur.status) && !isTerminal(e.status) ? cur.status : e.status;
       const next: WebsiteRipRow = {
         ...cur,
-        status: e.status,
+        status,
         phase: e.phase || cur.phase,
         log: e.logDelta ? `${cur.log}${e.logDelta}\n` : cur.log,
         thumbnail_path: e.thumbnailPath ?? cur.thumbnail_path,
