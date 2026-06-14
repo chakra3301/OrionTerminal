@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { Send, StopCircle, X, RotateCw, Wrench, Check, AlertCircle, Brain, ChevronDown, ChevronRight, Volume2, VolumeX } from "lucide-react";
+import { Send, StopCircle, X, RotateCw, Wrench, Check, AlertCircle, Brain, ChevronDown, ChevronRight, Volume2, VolumeX, Clock } from "lucide-react";
 import {
   useRosie,
   currentActivity,
@@ -336,6 +336,18 @@ export function Rosie() {
                 <span>“switch to the Orion Terminal project”</span>
                 <span>“make a journal entry for today”</span>
               </div>
+              <button
+                type="button"
+                className="ot-rosie-catchup"
+                disabled={running}
+                onClick={() =>
+                  void send(
+                    "Catch me up — using your recent-activity tool, briefly summarize what I've been working on across Orion, Archives, XDesign and Hermes, then suggest one useful next step.",
+                  )
+                }
+              >
+                <Clock size={12} /> Catch me up on my day
+              </button>
             </div>
           )}
           {visibleMessages.map((m) => (

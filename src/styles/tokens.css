@@ -848,6 +848,27 @@ summary:focus-visible,
   padding: 3px 8px;
   letter-spacing: 0.02em;
 }
+.ot-rosie-catchup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--neon-green);
+  background: rgba(var(--neon-green-rgb), 0.1);
+  border: 1px solid rgba(var(--neon-green-rgb), 0.35);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.ot-rosie-catchup:hover:not(:disabled) {
+  background: rgba(var(--neon-green-rgb), 0.2);
+}
+.ot-rosie-catchup:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 
 .ot-rosie-msg {
   display: flex;
