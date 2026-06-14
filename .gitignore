@@ -24,6 +24,9 @@ orion-data-backup*/
 # Local tool state
 .claude/
 .cursor/
+# but keep the vendored website-cloner scaffold's bundled agent files
+!resources/website-cloner-scaffold/.claude/
+!resources/website-cloner-scaffold/.cursor/
 
 # Rust / Tauri build output (11GB+ — never commit)
 src-tauri/target

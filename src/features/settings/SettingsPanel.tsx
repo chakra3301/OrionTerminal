@@ -894,6 +894,10 @@ function AboutSection() {
         BlockNote, xterm.js, Zustand. Migrations are append-only — never edit
         a prior one.
       </p>
+      <p className="ot-settings-help">
+        Website Ripper scaffold © JCodesMore (MIT) —
+        github.com/JCodesMore/ai-website-cloner-template
+      </p>
     </>
   );
 }
