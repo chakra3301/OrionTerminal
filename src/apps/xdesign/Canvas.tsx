@@ -2240,10 +2240,9 @@ function ShapeNode({
           y={shape.y - 4}
           width={shape.w + 8}
           height={shape.h + 8}
-          fill="rgba(0,224,255,0.04)"
+          fill="none"
           stroke="var(--neon-cyan)"
-          strokeWidth={1}
-          strokeDasharray="3 3"
+          strokeWidth={1.5}
           pointerEvents="none"
         />
       )}
