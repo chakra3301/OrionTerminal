@@ -130,6 +130,15 @@ export type ShapeBase = {
    * absolute; x/y are offsets from the instance root. Re-applied by
    * `syncFromMain` so local edits survive a sync. */
   overrides?: OverrideMap;
+  /** Marks a frame as a variant SET — its child main components are the
+   * variants, each tagged with `variantProps`. */
+  isVariantSet?: boolean;
+  /** On a main component inside a variant set: this variant's property values
+   * (e.g. { State: "hover", Size: "lg" }). */
+  variantProps?: Record<string, string>;
+  /** On an instance of a variant set: the currently-selected property combo.
+   * Resolving it picks which member main the instance mirrors. */
+  variantSelection?: Record<string, string>;
   /** Frame this shape belongs to. null = top-level. Children share the
    * frame's coordinate space at the world level (we don't apply nested
    * transforms yet) — moving the frame just moves descendants together. */
