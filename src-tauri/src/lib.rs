@@ -149,6 +149,12 @@ pub fn run() {
             sql: include_str!("../migrations/0021_repolens.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 22,
+            description: "repolens: website rips (clone pipeline runs + thumbnails)",
+            sql: include_str!("../migrations/0022_repolens_websites.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
