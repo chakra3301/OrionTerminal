@@ -13,6 +13,7 @@ mod mcp_config;
 pub mod mcp_server;
 mod messages_chat;
 mod repolens;
+mod repolens_website;
 mod sysstats;
 mod terminal;
 mod ui_bridge;
@@ -169,6 +170,7 @@ pub fn run() {
             // Synchronous on purpose: the snapshot must land before the
             // frontend opens the DB and migrations run.
             db_backup::run(app.handle());
+            repolens_website::reconcile_on_boot(&app.handle());
             let handle = app.handle().clone();
             // Spawn the localhost UI bridge so out-of-process MCP servers
             // can reach the running app to drive UI-state actions
@@ -220,6 +222,10 @@ pub fn run() {
             repolens::repolens_claude_call,
             repolens::repolens_fetch_repo,
             repolens::repolens_fetch_source,
+            repolens_website::repolens_website_rip,
+            repolens_website::repolens_website_cancel,
+            repolens_website::repolens_website_continue,
+            repolens_website::repolens_website_delete,
             autocomplete::autocomplete_run,
             inline_edit::inline_edit_run,
             inline_edit::inline_edit_cancel,
