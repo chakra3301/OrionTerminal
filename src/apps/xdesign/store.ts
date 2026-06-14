@@ -343,6 +343,9 @@ type XDesignState = {
   /** Drop all of an instance's overrides and re-sync it to match main. */
   resetInstanceOverrides: (instanceId: string) => void;
 
+  /** Set or clear a shape's prototype hotspot link. */
+  setPrototype: (id: string, link: ProtoLink | undefined) => void;
+
   /** Mark / unmark a frame as a variant set (its main children = variants). */
   toggleVariantSet: (id: string) => void;
   /** Set a main component's variant property values (within a variant set). */
@@ -962,6 +965,15 @@ export const useXDesign = create<XDesignState>((set, get) => ({
       );
       return { shapes: recloneInstance(cleared, instanceId) };
     });
+  },
+
+  setPrototype: (id, link) => {
+    get().pushHistory();
+    set((s) => ({
+      shapes: s.shapes.map((sh) =>
+        sh.id === id ? ({ ...sh, prototype: link } as Shape) : sh,
+      ),
+    }));
   },
 
   toggleVariantSet: (id) => {

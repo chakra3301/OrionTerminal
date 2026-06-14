@@ -27,6 +27,12 @@ import type { BoolOp } from "@/apps/xdesign/booleanOps";
 import type { ConstraintH, ConstraintV } from "@/apps/xdesign/constraints";
 import { findInstanceRoot } from "@/apps/xdesign/overrides";
 import { variantProperties, defaultSelection } from "@/apps/xdesign/variants";
+import {
+  topLevelFrames,
+  topLevelFrameAncestor,
+  type ProtoLink,
+  type ProtoTransition,
+} from "@/apps/xdesign/prototype";
 
 const COLOR_PRESETS: Array<{ value: string; title: string }> = [
   { value: "transparent", title: "Transparent" },
@@ -1360,6 +1366,8 @@ export function XDesignInspector() {
 
       <ComponentSection shape={sh} />
 
+      <PrototypeSection shape={sh} />
+
       <Section title="Export" defaultOpen={false}>
         <ExportRow />
       </Section>
@@ -1654,6 +1662,101 @@ function ComponentSection({ shape }: { shape: Shape }) {
               </button>
             )}
           </div>
+        </>
+      )}
+    </Section>
+  );
+}
+
+const TRANSITIONS: { value: ProtoTransition; label: string }[] = [
+  { value: "instant", label: "Instant" },
+  { value: "dissolve", label: "Dissolve" },
+  { value: "slide", label: "Slide" },
+];
+
+/** Configure a shape's prototype hotspot: navigate to a screen (or back), with
+ * a transition. Screens are the top-level frames. */
+function PrototypeSection({ shape }: { shape: Shape }) {
+  const setPrototype = useXDesign((s) => s.setPrototype);
+  const shapes = useXDesign((s) => s.shapes);
+  const link = shape.prototype;
+  const frames = topLevelFrames(shapes);
+  // Don't offer the shape's own screen as a navigate target.
+  const ownScreen = topLevelFrameAncestor(shapes, shape.id)?.id;
+  const targets = frames.filter((f) => f.id !== ownScreen);
+
+  const update = (patch: Partial<ProtoLink>) =>
+    setPrototype(shape.id, { ...(link ?? { trigger: "click", action: "navigate" }), ...patch });
+
+  return (
+    <Section title="Prototype" defaultOpen={!!link}>
+      {!link ? (
+        <button
+          type="button"
+          className="xd-mini-btn"
+          style={{ width: "auto", padding: "0 8px" }}
+          onClick={() =>
+            setPrototype(shape.id, {
+              trigger: "click",
+              action: "navigate",
+              target: targets[0]?.id,
+              transition: "instant",
+            })
+          }
+          title="Make this shape a clickable hotspot in present mode"
+        >
+          + Add interaction
+        </button>
+      ) : (
+        <>
+          <label className="xd-field">
+            <span>On click</span>
+            <select
+              value={link.action}
+              onChange={(e) => update({ action: e.target.value as ProtoLink["action"] })}
+            >
+              <option value="navigate">Navigate to…</option>
+              <option value="back">Back</option>
+            </select>
+          </label>
+          {link.action === "navigate" && (
+            <label className="xd-field">
+              <span>Screen</span>
+              <select
+                value={link.target ?? ""}
+                onChange={(e) => update({ target: e.target.value })}
+              >
+                {targets.length === 0 && <option value="">(no other frames)</option>}
+                {targets.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label className="xd-field">
+            <span>Animate</span>
+            <select
+              value={link.transition ?? "instant"}
+              onChange={(e) => update({ transition: e.target.value as ProtoTransition })}
+            >
+              {TRANSITIONS.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="xd-mini-btn"
+            style={{ width: "auto", padding: "0 8px" }}
+            onClick={() => setPrototype(shape.id, undefined)}
+            title="Remove this hotspot"
+          >
+            Remove
+          </button>
         </>
       )}
     </Section>
