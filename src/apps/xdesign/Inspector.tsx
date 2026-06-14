@@ -248,7 +248,7 @@ function Section({
         className="xd-section-head"
         onClick={() => setOpen((o) => !o)}
       >
-        {open ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         <span>{title}</span>
         <div className="xd-section-spacer" />
         {right && <span onClick={(e) => e.stopPropagation()}>{right}</span>}
