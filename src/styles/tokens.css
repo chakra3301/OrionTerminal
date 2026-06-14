@@ -6509,11 +6509,11 @@ summary:focus-visible,
   background: none;
   border: 1px solid transparent;
 }
-.xd-tool:hover { color: var(--t-primary); border-color: rgba(255,255,255,0.06); }
+.xd-tool:hover { color: var(--xd-text); background: var(--xd-hover); border-color: transparent; }
 .xd-tool.active {
-  background: rgba(var(--xd-accent-rgb),0.08);
-  border-color: rgba(var(--xd-accent-rgb),0.3);
-  color: var(--neon-magenta);
+  background: rgba(var(--xd-accent-rgb), 0.16);
+  border-color: transparent;
+  color: var(--xd-accent);
 }
 
 .xd-layers {
@@ -7551,13 +7551,13 @@ summary:focus-visible,
   background: transparent;
 }
 .xd-layer-row:hover {
-  background: rgba(var(--xd-accent-rgb),0.04);
-  color: var(--t-primary);
+  background: var(--xd-hover);
+  color: var(--xd-text);
 }
 .xd-layer-row.active {
-  background: rgba(var(--xd-accent-rgb),0.10);
-  border-color: rgba(var(--xd-accent-rgb),0.35);
-  color: var(--neon-magenta);
+  background: rgba(var(--xd-accent-rgb), 0.20);
+  border-color: transparent;
+  color: var(--xd-text);
 }
 .xd-layer-name {
   flex: 1;
@@ -8477,24 +8477,44 @@ summary:focus-visible,
   place-items: center;
   width: 26px;
   height: 26px;
-  background: var(--bg-2);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: var(--xd-raised);
+  border: 1px solid var(--xd-border);
   border-radius: var(--r-sm);
-  color: var(--t-secondary);
+  color: var(--xd-text-2);
   cursor: pointer;
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
+  font-family: var(--xd-font);
+  font-size: 11px;
+  letter-spacing: 0;
   padding: 0 8px;
 }
 .xd-mini-btn:hover {
-  color: var(--t-primary);
-  border-color: rgba(var(--xd-accent-rgb), 0.4);
+  color: var(--xd-text);
+  background: #424242;
 }
 .xd-mini-btn.active {
-  background: rgba(var(--xd-accent-rgb), 0.10);
-  border-color: rgba(var(--xd-accent-rgb), 0.4);
-  color: var(--neon-magenta);
+  background: var(--xd-accent);
+  border-color: var(--xd-accent);
+  color: #ffffff;
+}
+
+/* Native selects (constraints / variants / prototype dropdowns) */
+.xd-shell select {
+  background: var(--xd-raised);
+  border: 1px solid var(--xd-border);
+  border-radius: var(--r-sm);
+  color: var(--xd-text);
+  font-family: var(--xd-font);
+  font-size: 12px;
+  padding: 4px 6px;
+  outline: none;
+  cursor: pointer;
+}
+.xd-shell select:focus {
+  border-color: var(--xd-accent);
+}
+.xd-shell select option {
+  background: var(--xd-panel);
+  color: var(--xd-text);
 }
 
 .xd-bool-row {
