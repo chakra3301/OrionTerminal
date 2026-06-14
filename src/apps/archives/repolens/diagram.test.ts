@@ -24,8 +24,11 @@ describe("diagram", () => {
   it("returns null when no valid links", () => {
     expect(lineageLayout(atoms, [])).toBeNull();
   });
-  it("loopLayout places a cycle on a circle, null when < 2", () => {
-    expect(loopLayout(["X", "Y", "Z"])!.pts.length).toBe(3);
+  it("loopLayout places a cycle on a circle with arc edges, null when < 2", () => {
+    const l = loopLayout(["X", "Y", "Z"])!;
+    expect(l.pts.length).toBe(3);
+    expect(l.arcs.length).toBe(3);
+    expect(l.arcs[0]!.d).toMatch(/^M.*A78,78/); // SVG arc along the circle
     expect(loopLayout(["only"])).toBeNull();
   });
 });

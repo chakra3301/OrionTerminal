@@ -11582,17 +11582,36 @@ html.ot-reduce-glass .note-page .note-editor-body {
 
 /* ── SVG diagrams (lineage DAG + feedback loops) ── */
 .rl-diagram { width: 100%; height: auto; max-width: 100%; display: block; margin: 8px 0; overflow: visible; }
-.dg-node { fill: var(--bg-3); stroke: rgba(var(--rl-rgb), 0.45); stroke-width: 1; }
-.dg-node-text { fill: var(--t-primary); font: 10px var(--f-mono); }
-.dg-edge { fill: none; stroke: var(--repolens-green); stroke-opacity: 0.55; stroke-width: 1.5; }
+
+/* lineage nodes */
+.dg-node-g { cursor: pointer; transition: opacity 0.18s; }
+.dg-node-g.dim { opacity: 0.3; }
+.dg-node { fill: var(--bg-3); stroke: rgba(var(--rl-rgb), 0.4); stroke-width: 1; transition: fill 0.18s, stroke 0.18s, filter 0.18s; }
+.dg-node.dg-root { stroke: var(--repolens-green); stroke-width: 1.5; }
+.dg-node.dg-leaf { stroke: var(--neon-cyan); stroke-width: 1.5; }
+.dg-node-g.hot .dg-node { fill: var(--bg-2); stroke: var(--repolens-green); stroke-width: 1.6; filter: drop-shadow(0 0 6px rgba(var(--repolens-green-rgb), 0.5)); }
+.dg-node-text { fill: var(--t-primary); font: 10px var(--f-mono); pointer-events: none; }
+
+/* lineage edges */
+.dg-edge { fill: none; stroke: var(--repolens-green); stroke-opacity: 0.5; stroke-width: 1.5; transition: stroke-opacity 0.18s, stroke-width 0.18s; }
 .dg-arrowhead { fill: var(--repolens-green); }
-.dg-edge.dg-rein { stroke: var(--neon-magenta); stroke-opacity: 0.7; }
-.dg-edge.dg-bal { stroke: var(--neon-cyan); stroke-opacity: 0.7; }
+.rl-lineage.hovering .dg-edge:not(.hot) { stroke-opacity: 0.12; }
+.dg-edge.hot { stroke-opacity: 0.95; stroke-width: 2.25; }
+
+/* feedback loops */
+.dg-arc { stroke-linecap: round; }
+.dg-edge.dg-rein { stroke: var(--neon-magenta); stroke-opacity: 0.75; }
+.dg-edge.dg-bal { stroke: var(--neon-cyan); stroke-opacity: 0.75; }
 .dg-arrowhead.dg-rein { fill: var(--neon-magenta); }
 .dg-arrowhead.dg-bal { fill: var(--neon-cyan); }
+.dg-loop-node { transition: opacity 0.15s; }
+.dg-dot { transition: r 0.15s; }
 .dg-dot.dg-rein { fill: var(--neon-magenta); }
 .dg-dot.dg-bal { fill: var(--neon-cyan); }
-.dg-loop-text { fill: var(--t-secondary); font: 9px var(--f-mono); }
+.dg-loop-node:hover .dg-dot { r: 7; }
+.dg-loop-text { fill: var(--t-secondary); font: 9px var(--f-mono); transition: fill 0.15s; }
+.dg-loop-node:hover .dg-loop-text { fill: var(--t-primary); }
+
 .rl-loops { display: flex; flex-direction: column; gap: 14px; }
 .rl-loop { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .rl-loop-meta { flex: 1 1 200px; font: 13px/1.4 var(--f-display); color: var(--t-secondary); }

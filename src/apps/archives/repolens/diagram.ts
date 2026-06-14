@@ -19,7 +19,7 @@ export type LineageLayout = {
   width: number;
   height: number;
   nodes: { id: string; name: string; x: number; y: number }[];
-  edges: { x1: number; y1: number; x2: number; y2: number; mx: number }[];
+  edges: { from: string; to: string; x1: number; y1: number; x2: number; y2: number; mx: number }[];
 };
 
 export function lineageLayout(
@@ -71,7 +71,7 @@ export function lineageLayout(
       y1 = a.y + NODE_H / 2,
       x2 = b.x,
       y2 = b.y + NODE_H / 2;
-    return { x1, y1, x2, y2, mx: (x1 + x2) / 2 };
+    return { from: l.from, to: l.to, x1, y1, x2, y2, mx: (x1 + x2) / 2 };
   });
   const nodes = ids.map((id) => ({ id, name: nameById[id] ?? id, x: pos[id]!.x, y: pos[id]!.y }));
 
@@ -79,8 +79,10 @@ export function lineageLayout(
 }
 
 export type LoopLayout = {
+  r: number;
   pts: { x: number; y: number; label: string }[];
-  edges: { x1: number; y1: number; x2: number; y2: number }[];
+  /** Arc segments tracing the circle from each node to the next (clockwise). */
+  arcs: { d: string }[];
 };
 
 export function loopLayout(cycle: string[]): LoopLayout | null {
@@ -93,9 +95,10 @@ export function loopLayout(cycle: string[]): LoopLayout | null {
     const ang = -Math.PI / 2 + (i * 2 * Math.PI) / nodes.length;
     return { x: +(cx + R * Math.cos(ang)).toFixed(1), y: +(cy + R * Math.sin(ang)).toFixed(1), label };
   });
-  const edges = pts.map((p, i) => {
+  const arcs = pts.map((p, i) => {
     const q = pts[(i + 1) % pts.length]!;
-    return { x1: p.x, y1: p.y, x2: q.x, y2: q.y };
+    // short clockwise arc along the circle (large-arc=0, sweep=1)
+    return { d: `M${p.x},${p.y} A${R},${R} 0 0,1 ${q.x},${q.y}` };
   });
-  return { pts, edges };
+  return { r: R, pts, arcs };
 }
