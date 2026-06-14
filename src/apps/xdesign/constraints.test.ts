@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { applyConstraints, type ConstrainedChild } from "./constraints";
+import {
+  applyConstraints,
+  reflowConstraints,
+  type ConstrainedChild,
+  type ConstraintNode,
+} from "./constraints";
 
 type Box = { x: number; y: number; w: number; h: number };
 
@@ -196,5 +201,90 @@ describe("applyConstraints — both axes at once", () => {
       oldFrame,
     );
     expect(r).toEqual({ x: 20, y: 20, w: 40, h: 30 });
+  });
+});
+
+describe("reflowConstraints", () => {
+  const node = (over: Partial<ConstraintNode> & { id: string }): ConstraintNode => ({
+    x: 0,
+    y: 0,
+    w: 10,
+    h: 10,
+    kind: "rect",
+    parentId: null,
+    ...over,
+  });
+
+  it("reflows direct children of a resized frame by their own constraints", () => {
+    const oldBox: Box = { x: 0, y: 0, w: 100, h: 100 };
+    const newBox: Box = { x: 0, y: 0, w: 200, h: 100 };
+    const nodes: ConstraintNode[] = [
+      node({ id: "frame", kind: "frame", x: 0, y: 0, w: 100, h: 100 }),
+      node({ id: "left", parentId: "frame", x: 10, y: 10, w: 20, h: 20, constraintH: "left" }),
+      node({ id: "right", parentId: "frame", x: 70, y: 10, w: 20, h: 20, constraintH: "right" }),
+    ];
+    const childStarts = new Map<string, Box>([
+      ["left", { x: 10, y: 10, w: 20, h: 20 }],
+      ["right", { x: 70, y: 10, w: 20, h: 20 }],
+    ]);
+    const out = reflowConstraints("frame", oldBox, newBox, childStarts, nodes);
+    const byId = new Map(out.map((o) => [o.id, o.box]));
+    // left pinned → x stays 10. right gap = 100-(70+20)=10 → x = 200-10-20=170.
+    expect(byId.get("left")!.x).toBe(10);
+    expect(byId.get("right")!.x).toBe(170);
+  });
+
+  it("recurses into nested non-auto-layout child frames", () => {
+    const oldBox: Box = { x: 0, y: 0, w: 100, h: 100 };
+    const newBox: Box = { x: 0, y: 0, w: 200, h: 100 };
+    const nodes: ConstraintNode[] = [
+      node({ id: "outer", kind: "frame", x: 0, y: 0, w: 100, h: 100 }),
+      // inner frame stretches with the outer (left-right)
+      node({ id: "inner", kind: "frame", parentId: "outer", x: 10, y: 10, w: 80, h: 80, constraintH: "left-right" }),
+      // C pinned right within inner
+      node({ id: "c", parentId: "inner", x: 60, y: 20, w: 10, h: 10, constraintH: "right" }),
+    ];
+    const childStarts = new Map<string, Box>([
+      ["inner", { x: 10, y: 10, w: 80, h: 80 }],
+      ["c", { x: 60, y: 20, w: 10, h: 10 }],
+    ]);
+    const out = reflowConstraints("outer", oldBox, newBox, childStarts, nodes);
+    const byId = new Map(out.map((o) => [o.id, o.box]));
+    // inner: left gap 10, right gap 10 → w = 200-20 = 180, x stays 10. inner new box = (10,10,180,80).
+    expect(byId.get("inner")).toMatchObject({ x: 10, w: 180 });
+    // c right within inner: old inner (10,10,80,80) right=90, gap = 90-(60+10)=20.
+    // new inner right = 10+180 = 190 → c.x = 190-20-10 = 160.
+    expect(byId.get("c")!.x).toBe(160);
+  });
+
+  it("stops recursion at an auto-layout child frame (its interior is laid out elsewhere)", () => {
+    const oldBox: Box = { x: 0, y: 0, w: 100, h: 100 };
+    const newBox: Box = { x: 0, y: 0, w: 200, h: 100 };
+    const nodes: ConstraintNode[] = [
+      node({ id: "outer", kind: "frame", x: 0, y: 0, w: 100, h: 100 }),
+      node({ id: "al", kind: "frame", layoutMode: "horizontal", parentId: "outer", x: 10, y: 10, w: 80, h: 80, constraintH: "left-right" }),
+      node({ id: "c", parentId: "al", x: 20, y: 20, w: 10, h: 10, constraintH: "right" }),
+    ];
+    const childStarts = new Map<string, Box>([
+      ["al", { x: 10, y: 10, w: 80, h: 80 }],
+      ["c", { x: 20, y: 20, w: 10, h: 10 }],
+    ]);
+    const out = reflowConstraints("outer", oldBox, newBox, childStarts, nodes);
+    const ids = out.map((o) => o.id);
+    expect(ids).toContain("al");
+    expect(ids).not.toContain("c");
+  });
+
+  it("clamps reflowed sizes to minDim", () => {
+    const oldBox: Box = { x: 0, y: 0, w: 100, h: 100 };
+    const newBox: Box = { x: 0, y: 0, w: 20, h: 100 };
+    const nodes: ConstraintNode[] = [
+      node({ id: "frame", kind: "frame", x: 0, y: 0, w: 100, h: 100 }),
+      // left-right: w = 20 - 10 - 70 = -60 → clamp to minDim.
+      node({ id: "wide", parentId: "frame", x: 10, y: 10, w: 20, h: 20, constraintH: "left-right" }),
+    ];
+    const childStarts = new Map<string, Box>([["wide", { x: 10, y: 10, w: 20, h: 20 }]]);
+    const out = reflowConstraints("frame", oldBox, newBox, childStarts, nodes, 4);
+    expect(out[0]!.box.w).toBe(4);
   });
 });

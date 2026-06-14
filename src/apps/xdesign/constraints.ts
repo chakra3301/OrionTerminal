@@ -98,6 +98,61 @@ function solveAxis(
   }
 }
 
+/** Minimal node shape `reflowConstraints` needs. `Shape` satisfies this
+ * structurally, so the store's shapes pass through without a conversion. */
+export type ConstraintNode = Box & {
+  id: string;
+  parentId?: string | null;
+  kind: string;
+  layoutMode?: "none" | "horizontal" | "vertical";
+  constraintH?: ConstraintH;
+  constraintV?: ConstraintV;
+};
+
+const isAutoLayoutFrame = (n: ConstraintNode): boolean =>
+  n.kind === "frame" &&
+  (n.layoutMode === "horizontal" || n.layoutMode === "vertical");
+
+/** Replay layout constraints for every descendant of a resized non-auto-layout
+ * frame. `childStarts` holds each descendant's box captured at drag start; we
+ * recompute from those (never the live, already-moved values) so a drag never
+ * compounds. Recurses into nested non-auto-layout child frames; auto-layout
+ * frames stop the recursion (their interiors are positioned by the auto-layout
+ * engine at render). Returns a flat list of {id, box} patches. */
+export function reflowConstraints(
+  frameId: string,
+  oldBox: Box,
+  newBox: Box,
+  childStarts: Map<string, Box>,
+  nodes: ConstraintNode[],
+  minDim = 1,
+): Array<{ id: string; box: Box }> {
+  const out: Array<{ id: string; box: Box }> = [];
+  for (const c of nodes) {
+    if ((c.parentId ?? null) !== frameId) continue;
+    const cStart = childStarts.get(c.id);
+    if (!cStart) continue;
+    const nb = applyConstraints(
+      { ...cStart, constraintH: c.constraintH, constraintV: c.constraintV },
+      oldBox,
+      newBox,
+    );
+    const box: Box = {
+      x: nb.x,
+      y: nb.y,
+      w: Math.max(minDim, nb.w),
+      h: Math.max(minDim, nb.h),
+    };
+    out.push({ id: c.id, box });
+    if (c.kind === "frame" && !isAutoLayoutFrame(c)) {
+      // Recurse with the UNCLAMPED constraint result so nested gaps stay
+      // accurate even when the clamp nudged the rendered size.
+      out.push(...reflowConstraints(c.id, cStart, nb, childStarts, nodes, minDim));
+    }
+  }
+  return out;
+}
+
 /** Reflow a freeform child of a frame when that frame resizes from
  * `oldFrame` to `newFrame`. H and V are solved independently. */
 export function applyConstraints(

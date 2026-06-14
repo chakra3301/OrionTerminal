@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import {
   Plus,
   X,
@@ -24,6 +24,7 @@ import {
 import { XDesignImagePicker } from "@/apps/xdesign/ImagePicker";
 import { toast } from "@/store/toastStore";
 import type { BoolOp } from "@/apps/xdesign/booleanOps";
+import type { ConstraintH, ConstraintV } from "@/apps/xdesign/constraints";
 
 const COLOR_PRESETS: Array<{ value: string; title: string }> = [
   { value: "transparent", title: "Transparent" },
@@ -1025,6 +1026,16 @@ export function XDesignInspector() {
     isFrame &&
     sh.layoutMode !== undefined &&
     sh.layoutMode !== "none";
+  // Constraints only matter when the parent is a frame WITHOUT auto-layout
+  // (auto-layout parents drive children via layout sizing, not constraints).
+  const parent = sh.parentId
+    ? shapes.find((s) => s.id === sh.parentId)
+    : undefined;
+  const showConstraints =
+    !!parent &&
+    parent.kind === "frame" &&
+    parent.layoutMode !== "horizontal" &&
+    parent.layoutMode !== "vertical";
 
   return (
     <div className="xd-inspector scroll">
@@ -1084,6 +1095,15 @@ export function XDesignInspector() {
           />
         </div>
       </Section>
+
+      {showConstraints && (
+        <Section title="Constraints" defaultOpen={false}>
+          <ConstraintsSection
+            shape={sh}
+            onChange={(patch) => commit(sh.id, patch as Partial<Shape>)}
+          />
+        </Section>
+      )}
 
       <Section title="Appearance">
         <div className="xd-fields">
@@ -1341,6 +1361,144 @@ export function XDesignInspector() {
       <Section title="Export" defaultOpen={false}>
         <ExportRow />
       </Section>
+    </div>
+  );
+}
+
+const H_CONSTRAINT_OPTIONS: { value: ConstraintH; label: string }[] = [
+  { value: "left", label: "Left" },
+  { value: "right", label: "Right" },
+  { value: "left-right", label: "Left & right" },
+  { value: "center", label: "Center" },
+  { value: "scale", label: "Scale" },
+];
+const V_CONSTRAINT_OPTIONS: { value: ConstraintV; label: string }[] = [
+  { value: "top", label: "Top" },
+  { value: "bottom", label: "Bottom" },
+  { value: "top-bottom", label: "Top & bottom" },
+  { value: "center", label: "Center" },
+  { value: "scale", label: "Scale" },
+];
+
+function hSides(c: ConstraintH): { s: boolean; e: boolean } {
+  if (c === "left") return { s: true, e: false };
+  if (c === "right") return { s: false, e: true };
+  if (c === "left-right") return { s: true, e: true };
+  return { s: false, e: false }; // center / scale render unpinned
+}
+function vSides(c: ConstraintV): { s: boolean; e: boolean } {
+  if (c === "top") return { s: true, e: false };
+  if (c === "bottom") return { s: false, e: true };
+  if (c === "top-bottom") return { s: true, e: true };
+  return { s: false, e: false };
+}
+const hFromSides = (s: boolean, e: boolean): ConstraintH =>
+  s && e ? "left-right" : s ? "left" : e ? "right" : "center";
+const vFromSides = (s: boolean, e: boolean): ConstraintV =>
+  s && e ? "top-bottom" : s ? "top" : e ? "bottom" : "center";
+
+/** Figma-style pin box + dropdowns for resize constraints. Both controls read
+ * and write the same shape fields, so they can never drift. */
+function ConstraintsSection({
+  shape,
+  onChange,
+}: {
+  shape: Shape;
+  onChange: (patch: { constraintH?: ConstraintH; constraintV?: ConstraintV }) => void;
+}) {
+  const ch = shape.constraintH ?? "left";
+  const cv = shape.constraintV ?? "top";
+  const h = hSides(ch);
+  const v = vSides(cv);
+  const accent = "var(--xd-accent, var(--neon-magenta, #ff3ea5))";
+  const faint = "var(--glass-border, rgba(255,255,255,0.18))";
+  const strut = (active: boolean, scale: boolean): CSSProperties => ({
+    stroke: active ? accent : faint,
+    strokeWidth: active ? 2.5 : 1.5,
+    strokeDasharray: scale ? "3 2" : undefined,
+  });
+  const toggleLeft = () => onChange({ constraintH: hFromSides(!h.s, h.e) });
+  const toggleRight = () => onChange({ constraintH: hFromSides(h.s, !h.e) });
+  const toggleTop = () => onChange({ constraintV: vFromSides(!v.s, v.e) });
+  const toggleBottom = () => onChange({ constraintV: vFromSides(v.s, !v.e) });
+  const hScale = ch === "scale";
+  const vScale = cv === "scale";
+
+  return (
+    <div className="xd-constraints">
+      <svg
+        width={72}
+        height={72}
+        viewBox="0 0 72 72"
+        style={{ display: "block", margin: "0 auto 8px" }}
+      >
+        <rect
+          x={8}
+          y={8}
+          width={56}
+          height={56}
+          rx={3}
+          fill="none"
+          stroke={faint}
+          strokeWidth={1}
+        />
+        {/* struts */}
+        <line x1={36} y1={8} x2={36} y2={28} style={strut(v.s, vScale)} />
+        <line x1={36} y1={44} x2={36} y2={64} style={strut(v.e, vScale)} />
+        <line x1={8} y1={36} x2={28} y2={36} style={strut(h.s, hScale)} />
+        <line x1={44} y1={36} x2={64} y2={36} style={strut(h.e, hScale)} />
+        <rect
+          x={28}
+          y={28}
+          width={16}
+          height={16}
+          rx={2}
+          fill="rgba(255,255,255,0.06)"
+          stroke={faint}
+          strokeWidth={1}
+        />
+        {/* invisible hit targets */}
+        <rect x={28} y={4} width={16} height={22} fill="transparent" cursor="pointer" onClick={toggleTop}>
+          <title>Pin top</title>
+        </rect>
+        <rect x={28} y={46} width={16} height={22} fill="transparent" cursor="pointer" onClick={toggleBottom}>
+          <title>Pin bottom</title>
+        </rect>
+        <rect x={4} y={28} width={22} height={16} fill="transparent" cursor="pointer" onClick={toggleLeft}>
+          <title>Pin left</title>
+        </rect>
+        <rect x={46} y={28} width={22} height={16} fill="transparent" cursor="pointer" onClick={toggleRight}>
+          <title>Pin right</title>
+        </rect>
+      </svg>
+      <div className="xd-fields">
+        <label className="xd-field">
+          <span>Horizontal</span>
+          <select
+            value={ch}
+            onChange={(e) => onChange({ constraintH: e.target.value as ConstraintH })}
+          >
+            {H_CONSTRAINT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="xd-field">
+          <span>Vertical</span>
+          <select
+            value={cv}
+            onChange={(e) => onChange({ constraintV: e.target.value as ConstraintV })}
+          >
+            {V_CONSTRAINT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
     </div>
   );
 }

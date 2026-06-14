@@ -23,6 +23,7 @@ import {
 import { XDesignImagePicker } from "@/apps/xdesign/ImagePicker";
 import { localToWorld, worldToUnit } from "@/apps/xdesign/booleanOps";
 import { computeAutoLayout, type LayoutOverrides } from "@/apps/xdesign/autoLayout";
+import { reflowConstraints, type Box } from "@/apps/xdesign/constraints";
 import { setExportSvgRef } from "@/apps/xdesign/exportXD";
 import type { Asset } from "@/store/assetsStore";
 
@@ -75,6 +76,10 @@ type DragOp =
         string,
         { relX: number; relY: number; relW: number; relH: number }
       >;
+      /** Start boxes of every descendant of a selected non-auto-layout frame,
+       * keyed by id. Replayed through `applyConstraints` each frame so the
+       * children reflow as the frame resizes (stateless — no compounding). */
+      childStarts: Map<string, { x: number; y: number; w: number; h: number }>;
     }
   | {
       kind: "marquee";
@@ -987,6 +992,37 @@ export function XDesignCanvas() {
             h: Math.max(MIN_DIM, rel.relH * newBbox.h),
           };
         });
+        // Reflow the descendants of any selected non-auto-layout frame against
+        // its old→new box. Replayed from drag-start boxes so it never compounds.
+        if (drag.childStarts.size > 0) {
+          const reflow: Array<{ id: string; box: Box }> = [];
+          for (const id of ids) {
+            const sh = shapes.find((s) => s.id === id);
+            if (!sh || sh.kind !== "frame") continue;
+            if (sh.layoutMode === "horizontal" || sh.layoutMode === "vertical")
+              continue;
+            const rel = drag.startShapes.get(id)!;
+            const oldBox: Box = {
+              x: drag.startBbox.x + rel.relX * drag.startBbox.w,
+              y: drag.startBbox.y + rel.relY * drag.startBbox.h,
+              w: rel.relW * drag.startBbox.w,
+              h: rel.relH * drag.startBbox.h,
+            };
+            const newBox: Box = {
+              x: newBbox.x + rel.relX * newBbox.w,
+              y: newBbox.y + rel.relY * newBbox.h,
+              w: rel.relW * newBbox.w,
+              h: rel.relH * newBbox.h,
+            };
+            reflow.push(
+              ...reflowConstraints(id, oldBox, newBox, drag.childStarts, shapes, MIN_DIM),
+            );
+          }
+          if (reflow.length > 0) {
+            const byId = new Map(reflow.map((r) => [r.id, r.box]));
+            patchMany(Array.from(byId.keys()), (sh) => byId.get(sh.id) ?? {});
+          }
+        }
       } else if (drag?.kind === "anchor") {
         const sh = shapes.find((s) => s.id === drag.pathId);
         if (sh && sh.kind === "path") {
@@ -1263,9 +1299,21 @@ export function XDesignCanvas() {
         relH: s.h / bh,
       });
     }
+    // Snapshot the start boxes of every descendant of a selected non-auto-layout
+    // frame so they can reflow via `applyConstraints` as the frame resizes.
+    const childStarts = new Map<string, Box>();
+    for (const s of selectedShapes) {
+      if (s.kind !== "frame") continue;
+      if (s.layoutMode === "horizontal" || s.layoutMode === "vertical") continue;
+      for (const id of collectDescendantIds(shapes, s.id)) {
+        if (id === s.id) continue;
+        const d = shapes.find((sh) => sh.id === id);
+        if (d) childStarts.set(id, { x: d.x, y: d.y, w: d.w, h: d.h });
+      }
+    }
     const p = toSvgPoint(e);
     pushHistory();
-    setDrag({ kind: "resize", handle, start: p, startBbox, startShapes });
+    setDrag({ kind: "resize", handle, start: p, startBbox, startShapes, childStarts });
   };
 
   const startAnchorDrag = (
