@@ -25,6 +25,21 @@ use crate::claude_cli::{augmented_path, OPUS_MODEL};
 const MAX_TURNS: &str = "50";
 const IMAGE_EXTS: [&str; 4] = ["png", "webp", "jpg", "jpeg"];
 
+const DESIGN_PROMPT: &str = "You are a senior design systems analyst. Reverse-engineer the design system of this website from the attached original-site screenshots and the extracted CSS/DOM artifacts below.\n\n\
+Return ONLY one fenced ```json code block, with no prose before or after, matching this TypeScript type exactly:\n\n\
+type DesignSpec = {\n\
+  title: string;            // site/design name\n\
+  aesthetic: string;        // one-line vibe\n\
+  designLanguage: string;   // 1 paragraph: mood, references, overall feel\n\
+  colors: { name: string; role: string; hex: string; ramp?: string[] }[];\n\
+  typography: { role: string; family: string; fallback?: string; sizePx?: number; weight?: number; sample?: string; usage?: string }[];\n\
+  spacing: { scale: number[]; notes?: string };\n\
+  components: { name: string; description: string; preview?: { kind: \"button\"|\"input\"|\"badge\"|\"card\"|\"other\"; fillHex?: string; textHex?: string; radiusPx?: number } }[];\n\
+  motion: string; responsive: string; imagery: string; voice: string; rebuildNotes: string;\n\
+};\n\n\
+Colors: extract the real palette as hex from the CSS/screenshots; group into named roles; include ramps where the site uses shades. Typography: identify each font family actually used and its roles/sizes/weights. Components: inventory the distinctive UI components with their styling, and fill `preview` with real hex/radius hints where you can. Be specific and exact — no placeholders.\n\
+If a field is unknown, use a short honest string or an empty array — never invent.\n";
+
 /// Live rip subprocesses keyed by rip id, for cancellation.
 static RIPS: Lazy<Mutex<HashMap<String, Arc<Notify>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -94,6 +109,63 @@ fn earliest_new_image(entries: &[(String, u128)], initial: &HashSet<String>) -> 
         .filter(|(name, _)| is_image(name) && !initial.contains(name))
         .min_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(&b.0)))
         .map(|(name, _)| name.clone())
+}
+
+/// Pick up to `cap` recon screenshots to attach for design analysis. Prefer
+/// names containing `desktop`, then `mobile`, then any other image — always
+/// excluding scaffold/generated shots (`clone-*`, `comparison`). Operates on
+/// bare file names; deterministic ordering.
+fn pick_design_screenshots(file_names: &[String], cap: usize) -> Vec<String> {
+    let eligible = |n: &str| {
+        let lower = n.to_lowercase();
+        is_image(n) && !lower.starts_with("clone-") && !lower.contains("comparison")
+    };
+    let mut desktop: Vec<String> = file_names
+        .iter()
+        .filter(|n| eligible(n) && n.to_lowercase().contains("desktop"))
+        .cloned()
+        .collect();
+    let mut mobile: Vec<String> = file_names
+        .iter()
+        .filter(|n| eligible(n) && n.to_lowercase().contains("mobile"))
+        .cloned()
+        .collect();
+    let mut other: Vec<String> = file_names
+        .iter()
+        .filter(|n| {
+            eligible(n)
+                && !n.to_lowercase().contains("desktop")
+                && !n.to_lowercase().contains("mobile")
+        })
+        .cloned()
+        .collect();
+    desktop.sort();
+    mobile.sort();
+    other.sort();
+    let mut out = Vec::new();
+    for group in [desktop, mobile, other] {
+        for name in group {
+            if out.len() >= cap {
+                return out;
+            }
+            if !out.contains(&name) {
+                out.push(name);
+            }
+        }
+    }
+    out
+}
+
+/// Read a file fail-soft, capped to `cap` chars (char-boundary safe). Returns a
+/// labeled block, or empty string if the file is missing/unreadable/empty.
+fn read_capped(path: &Path, label: &str, cap: usize) -> String {
+    match std::fs::read_to_string(path) {
+        Ok(s) if !s.trim().is_empty() => {
+            let body: String = s.chars().take(cap).collect();
+            format!("\n\n===== {label} =====\n{body}")
+        }
+        _ => String::new(),
+    }
 }
 
 fn ulid_like() -> String {
@@ -817,6 +889,119 @@ pub async fn repolens_website_continue(app: AppHandle, id: String) -> Result<(),
 }
 
 #[tauri::command]
+pub async fn repolens_website_extract_design(
+    app: AppHandle,
+    id: String,
+    model: Option<String>,
+) -> Result<String, String> {
+    use tokio::io::AsyncWriteExt;
+
+    // 1. Resolve project_path.
+    let project = {
+        let conn = open_conn(&app)?;
+        let p: String = conn
+            .query_row(
+                "SELECT project_path FROM repolens_websites WHERE id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        PathBuf::from(p)
+    };
+    let model = model
+        .filter(|m| !m.is_empty())
+        .unwrap_or_else(|| OPUS_MODEL.to_string());
+
+    // 2. Gather artifacts (fail-soft, size-capped per file; ~80k total budget).
+    let docs = project.join("docs");
+    let research = docs.join("research");
+    let mut artifacts = String::new();
+    artifacts.push_str(&read_capped(&research.join("style.css"), "ORIGINAL SITE CSS (style.css)", 24_000));
+    artifacts.push_str(&read_capped(&research.join("dom-structure.json"), "DOM STRUCTURE", 12_000));
+    artifacts.push_str(&read_capped(&research.join("global-ui-structure.json"), "GLOBAL UI STRUCTURE", 12_000));
+    artifacts.push_str(&read_capped(&project.join("src").join("app").join("globals.css"), "GENERATED TOKENS (globals.css)", 12_000));
+    artifacts.push_str(&read_capped(&research.join("BEHAVIORS.md"), "BEHAVIORS", 8_000));
+    artifacts.push_str(&read_capped(&research.join("PAGE_TOPOLOGY.md"), "PAGE TOPOLOGY", 4_000));
+    artifacts.push_str(&read_capped(&research.join("source.html"), "SOURCE HTML (head excerpt)", 6_000));
+
+    // 3. Pick up to 2 recon screenshots.
+    let refs_dir = docs.join("design-references");
+    let names: Vec<String> = std::fs::read_dir(&refs_dir)
+        .map(|rd| {
+            rd.filter_map(|e| e.ok())
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .collect()
+        })
+        .unwrap_or_default();
+    let shots = pick_design_screenshots(&names, 2);
+
+    // 4. Build the prompt; append @<abs path> per screenshot (CLI reads inline).
+    let mut prompt = format!("{DESIGN_PROMPT}{artifacts}");
+    for shot in &shots {
+        let abs = refs_dir.join(shot);
+        prompt.push_str(&format!("\n\n@{}", abs.to_string_lossy()));
+    }
+
+    // 5. Call claude (json envelope, subscription auth) — mirrors repolens.rs.
+    let mut cmd = Command::new("claude");
+    cmd.args(["-p", "--output-format", "json", "--strict-mcp-config", "--model", &model]);
+    cmd.current_dir(&project);
+    cmd.env("PATH", augmented_path());
+    cmd.env_remove("ANTHROPIC_API_KEY");
+    cmd.env_remove("ANTHROPIC_AUTH_TOKEN");
+    cmd.stdin(Stdio::piped());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+    cmd.kill_on_drop(true);
+
+    let mut child = cmd.spawn().map_err(|e| format!("spawn claude: {e}"))?;
+    {
+        let mut stdin = child.stdin.take().ok_or("no stdin")?;
+        stdin.write_all(prompt.as_bytes()).await.map_err(|e| e.to_string())?;
+    }
+    let out = match tokio::time::timeout(Duration::from_secs(180), child.wait_with_output()).await {
+        Ok(r) => r.map_err(|e| e.to_string())?,
+        Err(_) => return Err("claude timed out after 180s — try again or a smaller model".into()),
+    };
+    if !out.status.success() {
+        return Err(format!(
+            "claude exited {}: {}",
+            out.status,
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    let env: Value = serde_json::from_slice(&out.stdout).map_err(|e| format!("bad claude envelope: {e}"))?;
+    let is_error = env.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false);
+    let bad_subtype = env
+        .get("subtype")
+        .and_then(|v| v.as_str())
+        .map(|s| s != "success")
+        .unwrap_or(false);
+    if is_error || bad_subtype {
+        return Err(format!(
+            "claude returned error: {}",
+            env.get("result").and_then(|v| v.as_str()).unwrap_or("unknown")
+        ));
+    }
+    let result = env
+        .get("result")
+        .and_then(|v| v.as_str())
+        .ok_or("no .result in claude envelope")?
+        .to_string();
+
+    // 6. Persist.
+    {
+        let conn = open_conn(&app)?;
+        conn.execute(
+            "UPDATE repolens_websites SET design_json = ?2, design_at = ?3, updated_at = ?3 WHERE id = ?1",
+            params![id, result, now_ms()],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(result)
+}
+
+#[tauri::command]
 pub async fn repolens_website_delete(app: AppHandle, id: String) -> Result<(), String> {
     if let Some(n) = RIPS.lock().remove(&id) {
         n.notify_waiters();
@@ -894,5 +1079,28 @@ mod tests {
         // No new images yet (only the scaffold placeholder) → None.
         let only_scaffold = vec![("comparison.png".to_string(), 100u128)];
         assert_eq!(earliest_new_image(&only_scaffold, &initial), None);
+    }
+
+    #[test]
+    fn design_screenshots_prefer_desktop_then_mobile_and_exclude_clone() {
+        let imgs = vec![
+            "comparison.png".to_string(),
+            "clone-desktop.png".to_string(),
+            "home-mobile.png".to_string(),
+            "home-desktop.png".to_string(),
+            "notes.md".to_string(),
+        ];
+        assert_eq!(
+            pick_design_screenshots(&imgs, 2),
+            vec!["home-desktop.png".to_string(), "home-mobile.png".to_string()]
+        );
+        let plain = vec!["comparison.png".to_string(), "screenshot.png".to_string()];
+        assert_eq!(pick_design_screenshots(&plain, 2), vec!["screenshot.png".to_string()]);
+        let many = vec![
+            "a-desktop.png".to_string(),
+            "b-desktop.png".to_string(),
+            "c-desktop.png".to_string(),
+        ];
+        assert_eq!(pick_design_screenshots(&many, 2).len(), 2);
     }
 }

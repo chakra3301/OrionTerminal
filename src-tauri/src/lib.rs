@@ -232,6 +232,7 @@ pub fn run() {
             repolens_website::repolens_website_cancel,
             repolens_website::repolens_website_continue,
             repolens_website::repolens_website_delete,
+            repolens_website::repolens_website_extract_design,
             autocomplete::autocomplete_run,
             inline_edit::inline_edit_run,
             inline_edit::inline_edit_cancel,
