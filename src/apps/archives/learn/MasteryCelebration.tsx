@@ -1,6 +1,6 @@
 // src/apps/archives/learn/MasteryCelebration.tsx
 import { useLearn } from "./useLearn";
-import MasteryBadge from "./MasteryBadge";
+import { MasteryBadge } from "./MasteryBadge";
 import type { Figure } from "./figure";
 
 export function MasteryCelebration() {

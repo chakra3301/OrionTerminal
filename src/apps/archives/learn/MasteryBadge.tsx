@@ -22,7 +22,7 @@ const STAR_FULL = "120,28 138,92 202,74 156,120 202,166 138,148 120,212 102,148 
 // Small 8-point star for medallion (30,30 space)
 const STAR_SMALL = "30,7 34.5,23 50.5,18.5 39,30 50.5,41.5 34.5,37 30,53 25.5,37 9.5,41.5 21,30 9.5,18.5 25.5,23";
 
-export default function MasteryBadge({
+export function MasteryBadge({
   topicTitle,
   outline,
   masteredCount,
