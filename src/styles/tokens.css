@@ -12225,3 +12225,54 @@ html.ot-reduce-glass .note-page .note-editor-body {
 @media (prefers-reduced-motion: reduce) {
   .rl-web-card:hover { transform: none; }
 }
+
+/* ── RepoLens Design MDs ─────────────────────────────────────────────── */
+.rl-tabs--sub { margin-bottom: 12px; }
+.rl-dm-age { font-size: 11px; color: var(--t-tertiary); }
+.rl-dm-marker {
+  left: 8px; right: auto;
+  display: inline-flex; align-items: center;
+  color: var(--repolens-green);
+  border-color: rgba(var(--repolens-green-rgb), 0.5);
+}
+.rl-dm-extract-btn { margin-top: 6px; font-size: 11px; padding: 3px 8px; }
+
+.rl-dm-board { display: flex; flex-direction: column; gap: 16px; padding-bottom: 40px; }
+.rl-dm-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.rl-dm-actions { display: flex; gap: 8px; }
+.rl-dm-actions .rl-btn { display: inline-flex; align-items: center; gap: 5px; }
+
+.rl-dm-hero { display: flex; gap: 18px; align-items: center; }
+.rl-dm-hero-thumb { width: 160px; height: 100px; object-fit: cover; border-radius: var(--r-md); border: 1px solid var(--glass-border); }
+.rl-dm-title { font-size: 26px; margin: 4px 0; color: var(--t-primary); }
+.rl-dm-aesthetic { color: var(--t-secondary); font-style: italic; }
+
+.rl-dm-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.rl-dm-swatch { display: flex; flex-direction: column; gap: 3px; }
+.rl-dm-swatch-chip { height: 64px; border-radius: var(--r-md); border: 1px solid var(--glass-border); }
+.rl-dm-swatch-name { font-weight: 600; color: var(--t-primary); font-size: 13px; }
+.rl-dm-swatch-hex { font-family: var(--font-mono, monospace); font-size: 12px; color: var(--repolens-green); }
+.rl-dm-swatch-role { font-size: 11px; color: var(--t-tertiary); }
+.rl-dm-ramp { display: flex; gap: 0; margin-top: 4px; border-radius: var(--r-sm); overflow: hidden; }
+.rl-dm-ramp-chip { flex: 1; height: 16px; }
+
+.rl-dm-specimens { display: flex; flex-direction: column; gap: 16px; }
+.rl-dm-specimen { border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; }
+.rl-dm-specimen:last-child { border-bottom: none; padding-bottom: 0; }
+.rl-dm-specimen-sample { color: var(--t-primary); line-height: 1.1; }
+.rl-dm-specimen-meta { font-size: 12px; color: var(--t-secondary); margin-top: 6px; }
+
+.rl-dm-components { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.rl-dm-component { background: var(--bg-2); border: 1px solid var(--glass-border); border-radius: var(--r-md); padding: 12px; }
+.rl-dm-component-preview { margin-bottom: 10px; }
+.rl-dm-prev { display: inline-block; padding: 7px 14px; font-size: 13px; background: var(--bg-3); color: var(--t-primary); border: 1px solid var(--glass-border); }
+.rl-dm-prev--badge { padding: 3px 9px; font-size: 11px; }
+.rl-dm-prev--input { width: 100%; box-sizing: border-box; color: var(--t-tertiary); }
+.rl-dm-component-name { font-weight: 600; color: var(--t-primary); font-size: 13px; }
+.rl-dm-component-desc { font-size: 12px; color: var(--t-secondary); margin-top: 4px; }
+
+.rl-dm-bars { display: flex; flex-direction: column; gap: 6px; }
+.rl-dm-bar-row { display: flex; align-items: center; gap: 10px; }
+.rl-dm-bar-label { width: 36px; text-align: right; font-family: var(--font-mono, monospace); font-size: 12px; color: var(--t-secondary); }
+.rl-dm-bar { height: 14px; background: var(--repolens-green); border-radius: var(--r-sm); opacity: 0.8; }
+.rl-dm-notes { font-size: 12px; color: var(--t-tertiary); margin-top: 8px; }
