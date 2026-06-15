@@ -1,12 +1,14 @@
 import { create } from "zustand";
 import { ulid } from "ulid";
 import { useModelPrefs } from "@/store/modelPrefsStore";
-import type { TopicRow, NodeRow, EdgeRow, Lesson } from "./learnTypes";
+import { toast } from "@/store/toastStore";
+import type { TopicRow, NodeRow, EdgeRow, Lesson, TopicProgress } from "./learnTypes";
 import type { Grade } from "./claude";
-import { generateGraph, generateLesson, gradeAnswer, findRealLinks } from "./claude";
+import { generateGraph, generateLesson, gradeAnswer, findRealLinks, generateFigure } from "./claude";
 import {
   listTopics,
   insertTopic,
+  updateTopic,
   insertNode,
   insertEdge,
   listNodes,
@@ -14,9 +16,13 @@ import {
   updateNode,
   insertReview,
   deleteTopic as dbDeleteTopic,
+  listAchievements,
+  insertAchievement,
+  topicProgress,
 } from "./learnDb";
 import { bktUpdate } from "./bkt";
 import { recomputeStatuses } from "./gating";
+import { detectNewAchievements, achievementKey } from "./achievements";
 
 interface LearnState {
   topics: Record<string, TopicRow>;
@@ -27,6 +33,10 @@ interface LearnState {
   generatingGraph: boolean;
   generatingLesson: boolean;
   recentMisses: string[];
+  progress: Record<string, TopicProgress>;
+  earnedKeys: Set<string>;
+  trophyShelfOpen: boolean;
+  celebrateTopicId: string | null;
   loadTopics: () => Promise<void>;
   createTopic: (title: string) => Promise<void>;
   openTopic: (id: string) => Promise<void>;
@@ -35,6 +45,10 @@ interface LearnState {
   submitAnswer: (nodeId: string, q: { question: string; expected: string; concept: string; answer: string }) => Promise<Grade>;
   findLinks: (nodeId: string) => Promise<void>;
   deleteTopic: (id: string) => Promise<void>;
+  loadTopicProgress: () => Promise<void>;
+  shapeTopic: (id: string) => Promise<void>;
+  openTrophyShelf: (open: boolean) => void;
+  dismissCelebration: () => void;
 }
 
 function toRecord<T extends { id: string }>(rows: T[]): Record<string, T> {
@@ -52,6 +66,10 @@ const initialState = {
   generatingGraph: false,
   generatingLesson: false,
   recentMisses: [] as string[],
+  progress: {} as Record<string, TopicProgress>,
+  earnedKeys: new Set<string>() as Set<string>,
+  trophyShelfOpen: false,
+  celebrateTopicId: null as string | null,
 };
 
 export const useLearn = create<LearnState>((set, get) => ({
@@ -60,6 +78,11 @@ export const useLearn = create<LearnState>((set, get) => ({
   async loadTopics() {
     const rows = await listTopics();
     set({ topics: toRecord(rows) });
+    await get().loadTopicProgress();
+  },
+
+  async loadTopicProgress() {
+    set({ progress: await topicProgress() });
   },
 
   async createTopic(title: string) {
@@ -136,8 +159,13 @@ export const useLearn = create<LearnState>((set, get) => ({
         openTopicId: topicId,
         nodes: finalRecord,
         edges,
+        earnedKeys: new Set<string>(),
         generatingGraph: false,
       }));
+
+      // Figure generation is fail-soft and must never block topic creation.
+      void get().shapeTopic(topicId);
+      await get().loadTopicProgress();
     } catch (err) {
       set({ generatingGraph: false });
       throw err;
@@ -145,8 +173,28 @@ export const useLearn = create<LearnState>((set, get) => ({
   },
 
   async openTopic(id: string) {
-    const [nodeRows, edges] = await Promise.all([listNodes(id), listEdges(id)]);
-    set({ openTopicId: id, nodes: toRecord(nodeRows), edges, openNodeId: null });
+    const [nodeRows, edges, achv] = await Promise.all([listNodes(id), listEdges(id), listAchievements(id)]);
+    const earnedKeys = new Set(achv.map((a) => a.kind === "node" ? achievementKey("node", a.node_id ?? "") : achievementKey("topic")));
+    set({ openTopicId: id, nodes: toRecord(nodeRows), edges, openNodeId: null, earnedKeys, trophyShelfOpen: false });
+  },
+
+  async shapeTopic(id: string) {
+    const model = useModelPrefs.getState().modelFor("learn");
+    const { topics, openTopicId } = get();
+    const topic = topics[id];
+    if (!topic) return;
+    const nodeCount = openTopicId === id
+      ? Object.keys(get().nodes).length
+      : (get().progress[id]?.total ?? 0);
+    const figure = await generateFigure(topic.title, Math.max(1, nodeCount), model);
+    if (!figure) return;
+    const json = JSON.stringify(figure);
+    await updateTopic(id, { figure_json: json });
+    set((s) => {
+      const t = s.topics[id];
+      if (!t) return {};
+      return { topics: { ...s.topics, [id]: { ...t, figure_json: json } } };
+    });
   },
 
   async openNode(id: string) {
@@ -208,6 +256,9 @@ export const useLearn = create<LearnState>((set, get) => ({
     set({ openNodeId: null });
   },
 
+  openTrophyShelf(open: boolean) { set({ trophyShelfOpen: open }); },
+  dismissCelebration() { set({ celebrateTopicId: null }); },
+
   async submitAnswer(nodeId: string, q: { question: string; expected: string; concept: string; answer: string }): Promise<Grade> {
     const model = useModelPrefs.getState().modelFor("learn");
     const grade = await gradeAnswer(q, model);
@@ -230,6 +281,31 @@ export const useLearn = create<LearnState>((set, get) => ({
     }
 
     set({ nodes: finalRecord });
+
+    // Achievement detection — pure diff over status transitions, idempotent.
+    const { earnedKeys, openTopicId } = get();
+    const det = detectNewAchievements(prevNodes, finalRecord, earnedKeys);
+    if (det.nodeIds.length || det.topicEarned) {
+      const nextEarned = new Set(earnedKeys);
+      const ts = Date.now();
+      for (const nid of det.nodeIds) {
+        nextEarned.add(achievementKey("node", nid));
+        const title = finalRecord[nid]?.title ?? "Concept";
+        toast.success(`Node mastered — ${title}`, { body: "Achievement unlocked" });
+        void insertAchievement({ id: ulid(), topic_id: openTopicId ?? "", kind: "node", node_id: nid, title, earned_at: ts });
+      }
+      if (det.topicEarned && openTopicId) {
+        nextEarned.add(achievementKey("topic"));
+        const tTitle = get().topics[openTopicId]?.title ?? "Topic";
+        void insertAchievement({ id: ulid(), topic_id: openTopicId, kind: "topic", node_id: null, title: tTitle, earned_at: ts });
+        set({ celebrateTopicId: openTopicId });
+      }
+      set({ earnedKeys: nextEarned });
+      if (openTopicId) {
+        const vals = Object.values(finalRecord);
+        set((s) => ({ progress: { ...s.progress, [openTopicId]: { total: vals.length, mastered: vals.filter((n) => n.status === "mastered").length } } }));
+      }
+    }
 
     if (grade.missed_concepts.length > 0) {
       set((s) => ({
@@ -295,9 +371,12 @@ export const useLearn = create<LearnState>((set, get) => ({
     set((s) => {
       const topics = { ...s.topics };
       delete topics[id];
+      const progress = { ...s.progress };
+      delete progress[id];
       const wasOpen = s.openTopicId === id;
       return {
         topics,
+        progress,
         ...(wasOpen ? { openTopicId: null as string | null, nodes: {} as Record<string, NodeRow>, edges: [] as EdgeRow[], openNodeId: null as string | null } : {}),
       };
     });

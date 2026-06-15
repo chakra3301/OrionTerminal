@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("./learnDb", () => ({
   listTopics: vi.fn().mockResolvedValue([]),
   insertTopic: vi.fn().mockResolvedValue(undefined),
+  updateTopic: vi.fn().mockResolvedValue(undefined),
   insertNode: vi.fn().mockResolvedValue(undefined),
   insertEdge: vi.fn().mockResolvedValue(undefined),
   listNodes: vi.fn().mockResolvedValue([]),
@@ -10,6 +11,9 @@ vi.mock("./learnDb", () => ({
   updateNode: vi.fn().mockResolvedValue(undefined),
   insertReview: vi.fn().mockResolvedValue(undefined),
   deleteTopic: vi.fn().mockResolvedValue(undefined),
+  listAchievements: vi.fn().mockResolvedValue([]),
+  insertAchievement: vi.fn().mockResolvedValue(undefined),
+  topicProgress: vi.fn().mockResolvedValue({}),
 }));
 vi.mock("./claude", () => ({
   generateGraph: vi.fn().mockResolvedValue({ summary: "s", nodes: [
@@ -19,10 +23,15 @@ vi.mock("./claude", () => ({
   generateLesson: vi.fn().mockResolvedValue({ objective: "o", concept_chunks: [], worked_example: null, key_terms: [], suggested_resources: [], recall_check: [] }),
   gradeAnswer: vi.fn().mockResolvedValue({ correct: true, partial: false, missed_concepts: [] }),
   findRealLinks: vi.fn().mockResolvedValue([]),
+  generateFigure: vi.fn().mockResolvedValue(null),
+}));
+vi.mock("@/store/toastStore", () => ({
+  toast: { success: vi.fn(), info: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
 vi.mock("../../../lib/models", () => ({ MODELS: [], DEFAULT_MODEL_ID: "claude-opus-4-8" }));
 
 import { useLearn } from "./useLearn";
+import { insertAchievement } from "./learnDb";
 
 beforeEach(() => { useLearn.setState(useLearn.getInitialState ? useLearn.getInitialState() : {} as any, true); });
 
@@ -49,5 +58,17 @@ describe("submitAnswer", () => {
     const nodes = Object.values(useLearn.getState().nodes) as any[];
     expect(nodes.find((n) => n.title === "A")!.status).toBe("mastered");
     expect(nodes.find((n) => n.title === "B")!.status).toBe("ready");
+  });
+});
+
+describe("achievements", () => {
+  it("records a node achievement when a node is mastered", async () => {
+    await useLearn.getState().createTopic("Photography");
+    const a = Object.values(useLearn.getState().nodes).find((n: any) => n.title === "A")! as any;
+    for (let i = 0; i < 4; i++) {
+      await useLearn.getState().submitAnswer(a.id, { question: "q", expected: "e", concept: "c", answer: "yes" });
+    }
+    expect(useLearn.getState().earnedKeys.has(`node:${a.id}`)).toBe(true);
+    expect(insertAchievement).toHaveBeenCalled();
   });
 });
