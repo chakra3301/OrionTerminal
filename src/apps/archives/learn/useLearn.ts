@@ -178,7 +178,7 @@ export const useLearn = create<LearnState>((set, get) => ({
   async openTopic(id: string) {
     const [nodeRows, edges, achv] = await Promise.all([listNodes(id), listEdges(id), listAchievements(id)]);
     const earnedKeys = new Set(achv.map((a) => a.kind === "node" ? achievementKey("node", a.node_id ?? "") : achievementKey("topic")));
-    set({ openTopicId: id, nodes: toRecord(nodeRows), edges, openNodeId: null, earnedKeys, trophyShelfOpen: false });
+    set({ openTopicId: id, nodes: toRecord(nodeRows), edges, openNodeId: null, earnedKeys, trophyShelfOpen: false, celebrateTopicId: null });
   },
 
   async shapeTopic(id: string) {
@@ -386,6 +386,7 @@ export const useLearn = create<LearnState>((set, get) => ({
       return {
         topics,
         progress,
+        ...(s.celebrateTopicId === id ? { celebrateTopicId: null as string | null } : {}),
         ...(wasOpen ? { openTopicId: null as string | null, nodes: {} as Record<string, NodeRow>, edges: [] as EdgeRow[], openNodeId: null as string | null } : {}),
       };
     });
