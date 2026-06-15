@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { ulid } from "ulid";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { toast } from "@/store/toastStore";
-import type { TopicRow, NodeRow, EdgeRow, Lesson, TopicProgress } from "./learnTypes";
+import type { TopicRow, NodeRow, EdgeRow, Lesson, TopicProgress, AchievementRow } from "./learnTypes";
 import type { Grade } from "./claude";
 import { generateGraph, generateLesson, gradeAnswer, findRealLinks, generateFigure } from "./claude";
 import {
@@ -47,6 +47,8 @@ interface LearnState {
   deleteTopic: (id: string) => Promise<void>;
   loadTopicProgress: () => Promise<void>;
   shapeTopic: (id: string) => Promise<void>;
+  allAchievements: AchievementRow[];
+  loadAllAchievements: () => Promise<void>;
   openTrophyShelf: (open: boolean) => void;
   dismissCelebration: () => void;
 }
@@ -70,6 +72,7 @@ const initialState = {
   earnedKeys: new Set<string>() as Set<string>,
   trophyShelfOpen: false,
   celebrateTopicId: null as string | null,
+  allAchievements: [] as AchievementRow[],
 };
 
 export const useLearn = create<LearnState>((set, get) => ({
@@ -256,7 +259,13 @@ export const useLearn = create<LearnState>((set, get) => ({
     set({ openNodeId: null });
   },
 
-  openTrophyShelf(open: boolean) { set({ trophyShelfOpen: open }); },
+  async loadAllAchievements() {
+    set({ allAchievements: await listAchievements() });
+  },
+  openTrophyShelf(open: boolean) {
+    set({ trophyShelfOpen: open });
+    if (open) void get().loadAllAchievements();
+  },
   dismissCelebration() { set({ celebrateTopicId: null }); },
 
   async submitAnswer(nodeId: string, q: { question: string; expected: string; concept: string; answer: string }): Promise<Grade> {

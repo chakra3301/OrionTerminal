@@ -6,6 +6,7 @@ import { LessonView } from "./LessonView";
 import { TutorPanel } from "./TutorPanel";
 import { ModelSelect } from "@/components/ModelSelect";
 import { MasteryCelebration } from "./MasteryCelebration";
+import { TrophyShelf } from "./TrophyShelf";
 
 export function LearnView() {
   const loadTopics = useLearn((s) => s.loadTopics);
@@ -18,6 +19,8 @@ export function LearnView() {
   const openTopic = useLearn((s) => s.openTopic);
   const deleteTopic = useLearn((s) => s.deleteTopic);
   const shapeTopic = useLearn((s) => s.shapeTopic);
+  const trophyShelfOpen = useLearn((s) => s.trophyShelfOpen);
+  const openTrophyShelf = useLearn((s) => s.openTrophyShelf);
 
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +54,13 @@ export function LearnView() {
         <div className="learn-rail-header">
           <GraduationCap size={14} className="learn-rail-icon" />
           <span className="learn-rail-title">Topics</span>
+          <button
+            className="learn-trophies-btn"
+            title="Trophies"
+            onClick={() => openTrophyShelf(!trophyShelfOpen)}
+          >
+            🏆 Trophies
+          </button>
         </div>
 
         <div className="learn-create-wrap">
@@ -113,7 +123,9 @@ export function LearnView() {
       </div>
 
       <div className="learn-body">
-        {!openTopicId ? (
+        {trophyShelfOpen ? (
+          <TrophyShelf />
+        ) : !openTopicId ? (
           <div className="learn-empty-state">
             <div className="learn-empty-glyph">
               <GraduationCap size={36} />
