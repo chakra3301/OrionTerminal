@@ -10,7 +10,8 @@ export type ArchivesView =
   | "favorites"
   | "chats"
   | "database"
-  | "repolens";
+  | "repolens"
+  | "learn";
 
 type ArchivesState = {
   view: ArchivesView;

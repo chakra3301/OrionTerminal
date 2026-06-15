@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Star,
   ScanSearch,
+  GraduationCap,
 } from "lucide-react";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { archivesClaude } from "@/apps/archives/claude";
@@ -39,6 +40,7 @@ import { ArchivesMood } from "@/apps/archives/Mood";
 import { ArchivesChats } from "@/apps/archives/Chats";
 import { ArchivesDatabase } from "@/apps/archives/database/ArchivesDatabase";
 import { RepoLensView } from "@/apps/archives/repolens/RepoLensView";
+import { LearnView } from "@/apps/archives/learn/LearnView";
 import { ArchivesFavorites } from "@/apps/archives/Favorites";
 import { ArchivesToolbar } from "@/apps/archives/Toolbar";
 import { AssetPreviewModal } from "@/apps/archives/AssetPreviewModal";
@@ -57,6 +59,7 @@ const LIBRARY: NavItem[] = [
   { key: "journal", label: "Journal", Icon: BookOpen },
   { key: "projects", label: "Projects", Icon: FolderKanban },
   { key: "repolens", label: "RepoLens", Icon: ScanSearch },
+  { key: "learn", label: "Learn", Icon: GraduationCap },
   { key: "notes", label: "Notes", Icon: StickyNote },
   { key: "mood", label: "Mood Boards", Icon: Image },
   { key: "media", label: "Media", Icon: Film },
@@ -341,6 +344,7 @@ export function ArchivesApp() {
               {view === "chats" && <ArchivesChats />}
               {view === "database" && <ArchivesDatabase />}
               {view === "repolens" && <RepoLensView />}
+              {view === "learn" && <LearnView />}
             </div>
           </main>
         </Panel>
