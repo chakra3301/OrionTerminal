@@ -15,6 +15,9 @@ import { useAssetsStore } from "@/store/assetsStore";
 import { useMoodBoardsStore } from "@/store/moodBoardsStore";
 import { useCollectionsStore } from "@/store/collectionsStore";
 import { useHermes } from "@/store/hermesStore";
+import { useProvidersStore } from "@/store/providersStore";
+import { useSkillsStore } from "@/store/skillsStore";
+import { useAgentsStore } from "@/store/agentsStore";
 import { LinkInsertPalette } from "@/features/notes/LinkInsertPalette";
 import { purgeEmptyNotes } from "@/lib/db";
 import { ipc } from "@/lib/ipc";
@@ -199,6 +202,21 @@ async function hydrate() {
     await useHermes.getState().load();
   } catch (err) {
     log.warn("hermes load failed", err);
+  }
+  try {
+    await useProvidersStore.getState().load();
+  } catch (err) {
+    log.warn("providers load failed", err);
+  }
+  try {
+    await useSkillsStore.getState().load();
+  } catch (err) {
+    log.warn("skills load failed", err);
+  }
+  try {
+    await useAgentsStore.getState().load();
+  } catch (err) {
+    log.warn("agents load failed", err);
   }
 
   if (typeof terminalHeight === "number") {
