@@ -407,12 +407,8 @@ export function Constellation() {
 
       <g className="lc-viewport" transform={`translate(${transform.tx},${transform.ty}) scale(${transform.scale})`}>
 
-        {figure && (
-          <polygon
-            className="lc-figure-outline"
-            points={figure.outline.map((p) => `${p.x * dims.w},${p.y * dims.h}`).join(" ")}
-          />
-        )}
+        {/* Figure drives node placement via anchors (the shape itself); the
+            silhouette watermark is intentionally not rendered. */}
 
         {/* ── Edges ─────────────────────────────────────────────────────────── */}
         <g className="lc-edges">
