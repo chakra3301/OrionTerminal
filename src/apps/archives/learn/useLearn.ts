@@ -210,34 +210,22 @@ export const useLearn = create<LearnState>((set, get) => ({
   async submitAnswer(nodeId: string, q: { question: string; expected: string; concept: string; answer: string }): Promise<Grade> {
     const model = useModelPrefs.getState().modelFor("learn");
     const grade = await gradeAnswer(q, model);
-    const { nodes, edges } = get();
-    const node = nodes[nodeId];
+
+    // Synchronous read-modify-write — no awaits between read and set
+    const prevNodes = get().nodes;
+    const { edges } = get();
+    const node = prevNodes[nodeId];
     if (!node) return grade;
 
     const p = bktUpdate(node.p_mastery, grade.correct);
     const now = Date.now();
     const updatedNode: NodeRow = { ...node, p_mastery: p, attempts: node.attempts + 1, last_seen: now };
-    const updatedRecord: Record<string, NodeRow> = { ...nodes, [nodeId]: updatedNode };
-
-    await insertReview({ id: ulid(), node_id: nodeId, ts: now, correct: grade.correct ? 1 : 0, kind: "recall" });
+    const updatedRecord: Record<string, NodeRow> = { ...prevNodes, [nodeId]: updatedNode };
 
     const recomputed = recomputeStatuses(Object.values(updatedRecord), edges);
     const finalRecord: Record<string, NodeRow> = {};
     for (const row of recomputed) {
       finalRecord[row.id] = row;
-    }
-
-    // Persist the answered node's full patch + status
-    const finalNode = finalRecord[nodeId];
-    if (finalNode) {
-      await updateNode(nodeId, { p_mastery: p, attempts: updatedNode.attempts, last_seen: now, status: finalNode.status });
-    }
-    // Persist any other node whose status changed
-    for (const row of recomputed) {
-      const prev = nodes[row.id];
-      if (row.id !== nodeId && prev && prev.status !== row.status) {
-        await updateNode(row.id, { status: row.status });
-      }
     }
 
     set({ nodes: finalRecord });
@@ -246,6 +234,19 @@ export const useLearn = create<LearnState>((set, get) => ({
       set((s) => ({
         recentMisses: [...new Set([...s.recentMisses, ...grade.missed_concepts])].slice(0, 20),
       }));
+    }
+
+    // Persist after set — DB writes don't race with in-memory state
+    const finalNode = finalRecord[nodeId];
+    await insertReview({ id: ulid(), node_id: nodeId, ts: now, correct: grade.correct ? 1 : 0, kind: "recall" });
+    if (finalNode) {
+      await updateNode(nodeId, { p_mastery: p, attempts: updatedNode.attempts, last_seen: now, status: finalNode.status });
+    }
+    for (const row of recomputed) {
+      const prev = prevNodes[row.id];
+      if (row.id !== nodeId && prev && prev.status !== row.status) {
+        await updateNode(row.id, { status: row.status });
+      }
     }
 
     return grade;
@@ -264,24 +265,28 @@ export const useLearn = create<LearnState>((set, get) => ({
       return;
     }
 
-    const topicTitle = openTopicId && topics[openTopicId] ? topics[openTopicId].title : "";
-    const links = await findRealLinks({ topic: topicTitle, nodeTitle: node.title, keyTerms: lesson.key_terms ?? [] }, model);
-    if (!links.length) return;
+    try {
+      const topicTitle = openTopicId && topics[openTopicId] ? topics[openTopicId].title : "";
+      const links = await findRealLinks({ topic: topicTitle, nodeTitle: node.title, keyTerms: lesson.key_terms ?? [] }, model);
+      if (!links.length) return;
 
-    const merged: Lesson = {
-      ...lesson,
-      suggested_resources: [
-        ...(lesson.suggested_resources ?? []),
-        ...links.map((l) => ({ type: l.type, title: l.title, search_query: l.title, url: l.url })),
-      ],
-    };
-    const json = JSON.stringify(merged);
-    await updateNode(nodeId, { lesson_json: json });
-    set((s) => {
-      const existing = s.nodes[nodeId];
-      if (!existing) return {};
-      return { nodes: { ...s.nodes, [nodeId]: { ...existing, lesson_json: json } } };
-    });
+      const merged: Lesson = {
+        ...lesson,
+        suggested_resources: [
+          ...(lesson.suggested_resources ?? []),
+          ...links.map((l) => ({ type: l.type, title: l.title, search_query: l.title, url: l.url })),
+        ],
+      };
+      const json = JSON.stringify(merged);
+      await updateNode(nodeId, { lesson_json: json });
+      set((s) => {
+        const existing = s.nodes[nodeId];
+        if (!existing) return {};
+        return { nodes: { ...s.nodes, [nodeId]: { ...existing, lesson_json: json } } };
+      });
+    } catch (e) {
+      console.error("learn findLinks failed", e);
+    }
   },
 
   async deleteTopic(id: string) {

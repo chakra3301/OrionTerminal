@@ -244,7 +244,7 @@ export function TutorPanel() {
   }, [input, running, openNodeId, sessionId, chatId, buildSystemPrompt]);
 
   const cancel = useCallback(() => {
-    void ipc.claudeCancel(chatId);
+    void ipc.claudeCancel(chatId).catch(() => {});
   }, [chatId]);
 
   if (!openNodeId) return null;

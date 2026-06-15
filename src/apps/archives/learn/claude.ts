@@ -20,19 +20,19 @@ function enqueue<T>(fn: () => Promise<T>): Promise<T> {
 
 export async function generateGraph(topic: string, model: string): Promise<GraphSpec> {
   const reply = await enqueue(() => learnClaudeCall(graphPrompt(topic), model, false));
-  return parseGraphSpec((reply as { result: string }).result);
+  return parseGraphSpec(reply.result);
 }
 
 export async function generateLesson(args: { topic: string; nodeTitle: string; objective: string; level: string; priorTitles: string[] }, model: string): Promise<Lesson> {
   const reply = await enqueue(() => learnClaudeCall(lessonPrompt(args), model, false));
-  return parseLesson((reply as { result: string }).result);
+  return parseLesson(reply.result);
 }
 
 export type Grade = { correct: boolean; partial: boolean; missed_concepts: string[] };
 export async function gradeAnswer(args: { question: string; expected: string; concept: string; answer: string }, model: string): Promise<Grade> {
   const reply = await enqueue(() => learnClaudeCall(gradePrompt(args), model, false));
   try {
-    const s = (reply as { result: string }).result; const a = s.indexOf("{"); const b = s.lastIndexOf("}");
+    const s = reply.result; const a = s.indexOf("{"); const b = s.lastIndexOf("}");
     const o = a >= 0 && b > a ? JSON.parse(s.slice(a, b + 1)) : {};
     return { correct: !!o.correct, partial: !!o.partial, missed_concepts: Array.isArray(o.missed_concepts) ? o.missed_concepts.map(String) : [] };
   } catch {
@@ -43,7 +43,7 @@ export async function gradeAnswer(args: { question: string; expected: string; co
 export async function findRealLinks(args: { topic: string; nodeTitle: string; keyTerms: string[] }, model: string): Promise<Array<{ type: string; title: string; url: string }>> {
   const reply = await enqueue(() => learnClaudeCall(findLinksPrompt(args), model, true)); // allow_web
   try {
-    const s = (reply as { result: string }).result; const a = s.indexOf("["); const b = s.lastIndexOf("]");
+    const s = reply.result; const a = s.indexOf("["); const b = s.lastIndexOf("]");
     const arr = a >= 0 && b > a ? JSON.parse(s.slice(a, b + 1)) : [];
     return Array.isArray(arr) ? arr.filter((r: any) => r?.url).map((r: any) => ({ type: String(r.type ?? "article"), title: String(r.title ?? r.url), url: String(r.url) })) : [];
   } catch {
