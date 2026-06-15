@@ -25,3 +25,18 @@ describe("gradeAnswer", () => {
     expect(Array.isArray(grade.missed_concepts)).toBe(true);
   });
 });
+
+import { generateFigure } from "./claude";
+
+describe("generateFigure", () => {
+  it("parses a figure reply", async () => {
+    (learnClaudeCall as any).mockResolvedValue({ result: JSON.stringify({ name: "penguin", outline: [{ x: 0.5, y: 0.1 }], anchors: [{ x: 0.5, y: 0.2 }] }), cost: 0, model: "m" });
+    const f = await generateFigure("Linux", 5, "model-x");
+    expect(f?.name).toBe("penguin");
+  });
+
+  it("returns null on garbage", async () => {
+    (learnClaudeCall as any).mockResolvedValue({ result: "no json", cost: 0, model: "m" });
+    expect(await generateFigure("Linux", 5, "model-x")).toBeNull();
+  });
+});

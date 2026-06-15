@@ -13,7 +13,7 @@
 // License/attribution: Wikipedia/learningscientists text is CC BY-SA / CC BY-NC-SA; only the *pedagogical ideas* are
 // adapted here — every instruction string in this file is original wording, so no source text is redistributed.
 
-export const PEDAGOGY_VERSION = "1.0.0";
+export const PEDAGOGY_VERSION = "1.1.0";
 
 const JSON_ONLY = "Return ONLY valid JSON matching this exact shape, no prose, no markdown fences:";
 
@@ -174,4 +174,22 @@ CRITICAL: Only return URLs you ACTUALLY FOUND via web search. NEVER guess, const
 
 ${JSON_ONLY}
 { "resources": [ { "type": "video|article|docs|course", "title": "string", "url": "https://..." } ] }`;
+}
+
+/**
+ * Build a figure prompt: a recognizable silhouette of the topic's iconic symbol
+ * as normalized points, for a "constellation that evokes the subject".
+ */
+export function figurePrompt(args: { topic: string; nodeCount: number }): string {
+  return `You are a constellation cartographer. For the learning topic "${args.topic}", design a simple, instantly recognizable SILHOUETTE of the single most iconic visual symbol of that topic (e.g. Linux -> a penguin, React -> an atom, Chess -> a knight piece).
+
+Express it in a normalized coordinate space where x and y each run 0.0 (left/top) to 1.0 (right/bottom).
+
+Return:
+  - "name": the symbol you chose (one or two words).
+  - "outline": an ORDERED list of 12 to 28 points that trace the symbol's outer silhouette as a single closed loop. Keep it clean and readable at small size — favor a bold, simple shape over fine detail.
+  - "anchors": EXACTLY ${args.nodeCount} points positioned so that, taken together, they clearly evoke the same symbol. Spread them across the whole figure (not clustered); they may sit on the outline or inside it. These are where stars (concepts) will be placed.
+
+Keep the figure centered and using most of the 0..1 box (roughly 0.1..0.9 on each axis). ${JSON_ONLY}
+{"name":"penguin","outline":[{"x":0.5,"y":0.08}, ...],"anchors":[{"x":0.5,"y":0.2}, ...]}`;
 }

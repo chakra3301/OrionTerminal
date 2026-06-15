@@ -1,7 +1,8 @@
 // src/apps/archives/learn/claude.ts
 import { learnClaudeCall } from "../../../lib/ipc";
 import { parseGraphSpec, parseLesson, type GraphSpec, type Lesson } from "./learnTypes";
-import { graphPrompt, lessonPrompt, gradePrompt, findLinksPrompt } from "./pedagogy";
+import { graphPrompt, lessonPrompt, gradePrompt, findLinksPrompt, figurePrompt } from "./pedagogy";
+import { parseFigure, type Figure } from "./figure";
 
 const MIN_GAP_MS = 1200;
 let chain: Promise<unknown> = Promise.resolve();
@@ -21,6 +22,15 @@ function enqueue<T>(fn: () => Promise<T>): Promise<T> {
 export async function generateGraph(topic: string, model: string): Promise<GraphSpec> {
   const reply = await enqueue(() => learnClaudeCall(graphPrompt(topic), model, false));
   return parseGraphSpec(reply.result);
+}
+
+export async function generateFigure(topic: string, nodeCount: number, model: string): Promise<Figure | null> {
+  try {
+    const reply = await enqueue(() => learnClaudeCall(figurePrompt({ topic, nodeCount }), model, false));
+    return parseFigure(reply.result);
+  } catch {
+    return null;
+  }
 }
 
 export async function generateLesson(args: { topic: string; nodeTitle: string; objective: string; level: string; priorTitles: string[] }, model: string): Promise<Lesson> {
