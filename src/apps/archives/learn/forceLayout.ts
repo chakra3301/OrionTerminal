@@ -1,5 +1,5 @@
 // src/apps/archives/learn/forceLayout.ts
-export type SimNode = { id: string; x: number; y: number; vx: number; vy: number; fixed?: boolean };
+export type SimNode = { id: string; x: number; y: number; vx: number; vy: number; fixed?: boolean; anchor?: { x: number; y: number } };
 export type SimEdge = { from: string; to: string };
 
 // The Constellation auto-fits the settled layout to the viewport, so these
@@ -11,6 +11,8 @@ const CENTER_PULL = 0.012; // gentle gravity — keeps disconnected components t
 const DAMPING = 0.9;       // velocity damping per tick (higher = settles sooner)
 const MAX_V = 30;
 const BOUND_MARGIN = 40;   // keep nodes this far inside the viewport — no node can ever fly off
+const ANCHOR_PULL = 0.08;   // spring toward a figure anchor (dominates when present)
+const EDGE_SPRING_FIGURE = 0.012; // softened edge stiffness when any node is anchored
 
 const clampV = (v: number) => Math.max(-MAX_V, Math.min(MAX_V, v));
 const clampPos = (p: number, lo: number, hi: number) =>
@@ -46,27 +48,32 @@ export function stepForces(nodes: SimNode[], edges: SimEdge[], w: number, h: num
       a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
     }
   }
-  // spring attraction along edges
+  // spring attraction along edges — softened when a figure is anchoring nodes
+  const anchored = next.some((n) => n.anchor);
+  const spring = anchored ? EDGE_SPRING_FIGURE : SPRING;
   for (const e of edges) {
     const a = byId.get(e.from), b = byId.get(e.to);
     if (!a || !b) continue;
     const dx = b.x - a.x, dy = b.y - a.y;
     const d = Math.hypot(dx, dy) || 1;
-    const f = SPRING * (d - REST_LEN);
+    const f = spring * (d - REST_LEN);
     const fx = (dx / d) * f, fy = (dy / d) * f;
     a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
   }
-  // centering + integrate
+  // anchor pull + centering + integrate
   for (const n of next) {
     if (n.fixed) { n.vx = 0; n.vy = 0; continue; }
-    n.vx += (cx - n.x) * CENTER_PULL;
-    n.vy += (cy - n.y) * CENTER_PULL;
+    if (n.anchor) {
+      n.vx += (n.anchor.x - n.x) * ANCHOR_PULL;
+      n.vy += (n.anchor.y - n.y) * ANCHOR_PULL;
+    } else {
+      n.vx += (cx - n.x) * CENTER_PULL;
+      n.vy += (cy - n.y) * CENTER_PULL;
+    }
     n.vx = clampV(n.vx * DAMPING);
     n.vy = clampV(n.vy * DAMPING);
     n.x += n.vx;
     n.y += n.vy;
-    // Hard-bound to the viewport so a single node can never escape and blow up
-    // the bounding box the Constellation auto-fits against.
     n.x = clampPos(n.x, BOUND_MARGIN, w - BOUND_MARGIN);
     n.y = clampPos(n.y, BOUND_MARGIN, h - BOUND_MARGIN);
   }
