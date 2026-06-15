@@ -1,23 +1,41 @@
 import { useModelPrefs, type ModelSurface } from "@/store/modelPrefsStore";
-import { MODELS, DEFAULT_MODEL_ID } from "@/lib/models";
+import { DEFAULT_MODEL_ID } from "@/lib/models";
+import { useProvidersStore } from "@/store/providersStore";
+import { useAgentsStore } from "@/store/agentsStore";
+import { formatAgentValue } from "@/features/agents/agentValue";
 
-/** Compact per-surface model picker used in each Claude rail + R.O.S.I.E. */
 export function ModelSelect({ surface }: { surface: ModelSurface }) {
-  const model = useModelPrefs((s) => s.models[surface]) || DEFAULT_MODEL_ID;
+  const value = useModelPrefs((s) => s.models[surface]) || DEFAULT_MODEL_ID;
   const setModel = useModelPrefs((s) => s.setModel);
+  const providers = useProvidersStore((s) => s.providers);
+  const agents = useAgentsStore((s) => Array.from(s.agents.values()));
+
   return (
     <select
       className="ot-model-select"
-      value={model}
-      title="Model for this assistant"
+      value={value}
+      title="Model or agent for this assistant"
       onClick={(e) => e.stopPropagation()}
       onChange={(e) => setModel(surface, e.target.value)}
     >
-      {MODELS.map((m) => (
-        <option key={m.id} value={m.id}>
-          {m.label}
-        </option>
+      {providers.map((p) => (
+        <optgroup key={p.id} label={p.builtin ? p.name : `${p.name} — needs runtime`}>
+          {p.models.map((m) => (
+            <option key={`${p.id}/${m.id}`} value={m.id} disabled={!p.builtin}>
+              {m.label}
+            </option>
+          ))}
+        </optgroup>
       ))}
+      {agents.length > 0 && (
+        <optgroup label="Your Agents">
+          {agents.map((a) => (
+            <option key={a.id} value={formatAgentValue(a.id)}>
+              {a.name}
+            </option>
+          ))}
+        </optgroup>
+      )}
     </select>
   );
 }
