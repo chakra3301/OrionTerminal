@@ -2,11 +2,13 @@
 export type SimNode = { id: string; x: number; y: number; vx: number; vy: number; fixed?: boolean };
 export type SimEdge = { from: string; to: string };
 
-const REPULSION = 30000;   // charge strength (must dominate centering so nodes spread, not clump)
-const SPRING = 0.02;       // edge stiffness
-const REST_LEN = 150;      // desired edge length
-const CENTER_PULL = 0.003; // gravity toward center (gentle — strong centering collapses the graph)
-const DAMPING = 0.85;      // velocity damping per tick
+// The Constellation auto-fits the settled layout to the viewport, so these
+// constants only govern the SHAPE (relative spacing), not absolute scale/position.
+const REPULSION = 9000;    // charge strength — separates nodes so hexes don't overlap
+const SPRING = 0.035;      // edge stiffness
+const REST_LEN = 110;      // desired edge length
+const CENTER_PULL = 0.012; // gentle gravity — keeps disconnected components together
+const DAMPING = 0.9;       // velocity damping per tick (higher = settles sooner)
 const MAX_V = 30;
 
 const clampV = (v: number) => Math.max(-MAX_V, Math.min(MAX_V, v));

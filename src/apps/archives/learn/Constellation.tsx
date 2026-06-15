@@ -12,8 +12,9 @@ import { toast } from "@/store/toastStore";
 // ─── constants ──────────────────────────────────────────────────────────────
 const SETTLED_EPSILON = 0.25;   // max velocity below which sim is considered done
 const STATIC_TICKS    = 300;    // iterations for reduced-motion static layout
-const MIN_SCALE       = 0.25;
+const MIN_SCALE       = 0.1;
 const MAX_SCALE       = 3.5;
+const FIT_PADDING     = 90;     // px breathing room around the graph bbox (node r + label)
 const NODE_R_BASE     = 22;     // base node radius
 const NODE_R_MASTERY  = 8;      // extra radius at full mastery
 
@@ -55,6 +56,9 @@ export function Constellation() {
   // Viewport transform
   const [transform, setTransform] = useState({ tx: 0, ty: 0, scale: 1 });
   const panStartRef = useRef<{ px: number; py: number; tx: number; ty: number } | null>(null);
+  // While false, the view auto-frames the graph every frame. Once the user
+  // pans/zooms/drags, we stop fighting them and leave the transform alone.
+  const userInteractedRef = useRef(false);
 
   // rAF loop control
   const rafRef      = useRef<number>(0);
@@ -85,6 +89,32 @@ export function Constellation() {
     return () => ro.disconnect();
   }, []);
 
+  // ── Fit the whole graph into the viewport ──────────────────────────────────
+  // Forces decide the shape; this decides where on screen it sits. Computes the
+  // node bounding box and sets pan/zoom so it's centered with padding. Runs every
+  // frame until the user takes over (userInteractedRef), so the web is always framed.
+  const fitToView = useCallback(() => {
+    const ns = simRef.current;
+    if (ns.length === 0 || userInteractedRef.current) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of ns) {
+      if (n.x < minX) minX = n.x;
+      if (n.x > maxX) maxX = n.x;
+      if (n.y < minY) minY = n.y;
+      if (n.y > maxY) maxY = n.y;
+    }
+    const { w, h } = dimsRef.current;
+    const bw = Math.max(1, maxX - minX);
+    const bh = Math.max(1, maxY - minY);
+    const scale = Math.max(
+      MIN_SCALE,
+      Math.min(MAX_SCALE, (w - FIT_PADDING * 2) / bw, (h - FIT_PADDING * 2) / bh),
+    );
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    setTransform({ tx: w / 2 - cx * scale, ty: h / 2 - cy * scale, scale });
+  }, []);
+
   // ── Seed sim when node id set changes ─────────────────────────────────────
   const prevNodeIdsRef = useRef<string>("");
   useEffect(() => {
@@ -92,6 +122,8 @@ export function Constellation() {
     const key = ids.join(",");
     if (key === prevNodeIdsRef.current && ids.length > 0) return;
     prevNodeIdsRef.current = key;
+    // New graph → resume auto-framing (a fresh topic should fit itself on screen).
+    userInteractedRef.current = false;
 
     if (ids.length === 0) { simRef.current = []; setSimNodes([]); return; }
 
@@ -112,6 +144,7 @@ export function Constellation() {
       simRef.current = nodes;
       setSimNodes(nodes);
       settledRef.current = true;
+      fitToView();
     } else {
       simRef.current = seeded;
       setSimNodes(seeded);
@@ -135,6 +168,7 @@ export function Constellation() {
       const next = stepForces(simRef.current, simEdges, dimsRef.current.w, dimsRef.current.h);
       simRef.current = next;
       setSimNodes([...next]);
+      fitToView();
 
       const maxV = next.reduce(
         (m, n) => Math.max(m, Math.abs(n.vx), Math.abs(n.vy)), 0,
@@ -212,7 +246,7 @@ export function Constellation() {
       if (draggingId !== id || !dragStartRef.current) return;
       const dx = e.clientX - dragStartRef.current.px;
       const dy = e.clientY - dragStartRef.current.py;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDragRef.current = true;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) { didDragRef.current = true; userInteractedRef.current = true; }
       const { x, y } = svgPoint(e.clientX, e.clientY);
       simRef.current = simRef.current.map((n) =>
         n.id === id ? { ...n, x, y, vx: 0, vy: 0 } : n,
@@ -263,6 +297,7 @@ export function Constellation() {
     if (!panStartRef.current) return;
     const dx = e.clientX - panStartRef.current.px;
     const dy = e.clientY - panStartRef.current.py;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) userInteractedRef.current = true;
     setTransform((t) => ({ ...t, tx: panStartRef.current!.tx + dx, ty: panStartRef.current!.ty + dy }));
   }, []);
 
@@ -271,6 +306,7 @@ export function Constellation() {
   // ── Wheel zoom ──────────────────────────────────────────────────────────────
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
+    userInteractedRef.current = true;
     const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
