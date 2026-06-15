@@ -4,11 +4,11 @@ import { DEFAULT_MODEL_ID } from "@/lib/models";
 
 // Each interactive Claude surface remembers its own model choice. Hermes is
 // excluded — its model is per-agent (stored on the agent row), not per-surface.
-export type ModelSurface = "archives" | "orion" | "xdesign" | "rosie";
+export type ModelSurface = "archives" | "orion" | "xdesign" | "rosie" | "learn";
 
 type Prefs = Record<ModelSurface, string>;
 
-const EMPTY: Prefs = { archives: "", orion: "", xdesign: "", rosie: "" };
+const EMPTY: Prefs = { archives: "", orion: "", xdesign: "", rosie: "", learn: "" };
 
 type ModelPrefsState = {
   models: Prefs;
