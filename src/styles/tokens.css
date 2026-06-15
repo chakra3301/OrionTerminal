@@ -12316,6 +12316,7 @@ html.ot-reduce-glass .note-page .note-editor-body {
 .learn-view {
   --lr: var(--learn-accent);
   --lr-rgb: var(--learn-accent-rgb);
+  --lr-gold-rgb: 232, 193, 74;
   display: flex;
   height: 100%;
   overflow: hidden;
@@ -14177,4 +14178,50 @@ html.ot-reduce-glass .note-page .note-editor-body {
 .learn-tutor-expand-btn:focus-visible {
   outline: 2px solid rgba(var(--lr-rgb), 0.55);
   outline-offset: 2px;
+}
+
+/* Mastered node — gold fill + glow (overrides the violet mastered look) */
+.lc-node--mastered .lc-hex-outer { fill: url(#lc-grad-gold); stroke: rgba(var(--lr-gold-rgb), 0.9); }
+.lc-node--mastered .lc-center-dot { fill: #fff3cf; }
+.lc-node--mastered { color: rgba(var(--lr-gold-rgb), 1); }
+
+/* Shimmer sweep — a translating highlight clipped to the hex */
+@keyframes lc-shimmer { 0% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+.lc-shimmer-bar { fill: rgba(255, 255, 255, 0.5); animation: lc-shimmer 2.6s linear infinite; }
+
+/* Figure silhouette watermark behind the nodes */
+.lc-figure-outline { fill: rgba(var(--lr-rgb), 0.05); stroke: rgba(var(--lr-rgb), 0.22); stroke-width: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-shimmer-bar { animation: none; opacity: 0; }
+}
+
+/* Mastery badge motion */
+@keyframes lb-spin { 100% { transform: rotate(360deg); } }
+@keyframes lb-spin-r { 100% { transform: rotate(-360deg); } }
+@keyframes lb-glow { 0%,100% { filter: drop-shadow(0 0 7px rgba(var(--lr-gold-rgb), .45)); } 50% { filter: drop-shadow(0 0 18px rgba(var(--lr-gold-rgb), .85)); } }
+@keyframes lb-scan { 0% { transform: translateY(-44px); } 100% { transform: translateY(44px); } }
+.lb-reticle { animation: lb-spin 26s linear infinite; transform-origin: center; }
+.lb-subdial { animation: lb-spin-r 34s linear infinite; transform-origin: center; }
+.lb-badge   { animation: lb-glow 2.8s ease-in-out infinite; }
+.lb-scan    { animation: lb-scan 3.4s ease-in-out infinite alternate; }
+
+/* Trophy shelf grid */
+.learn-trophy-shelf { padding: 28px; overflow-y: auto; }
+.learn-trophy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; }
+.learn-trophy-topic { font-family: var(--font-mono, ui-monospace); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--t-tertiary); margin: 18px 0 8px; }
+.learn-trophy-locked { opacity: .28; filter: grayscale(1); }
+
+/* Topic-mastery celebration overlay */
+@keyframes lb-zoom { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+.learn-celebrate { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: rgba(3, 6, 10, 0.82); z-index: 40; }
+.learn-celebrate-badge { animation: lb-zoom .5s cubic-bezier(.2,.9,.3,1.2) both; }
+.learn-celebrate-stamp { font-family: var(--font-mono, ui-monospace); letter-spacing: .3em; color: rgba(var(--lr-gold-rgb), 1); font-size: 13px; }
+
+/* Rail medallion next to a fully-mastered topic */
+.learn-topic-medallion { margin-left: auto; flex-shrink: 0; }
+.learn-topic-progress { margin-left: auto; font-size: 10px; color: var(--t-tertiary); font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-reticle, .lb-subdial, .lb-badge, .lb-scan, .learn-celebrate-badge { animation: none; }
 }
