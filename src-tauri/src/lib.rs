@@ -169,6 +169,12 @@ pub fn run() {
             sql: include_str!("../migrations/0024_learn.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 25,
+            description: "learn: topic figures + mastery achievements",
+            sql: include_str!("../migrations/0025_learn_figures_achievements.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
