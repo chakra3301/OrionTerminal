@@ -162,6 +162,12 @@ pub fn run() {
             sql: include_str!("../migrations/0023_repolens_website_design.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 24,
+            description: "learn: topics/nodes/edges/reviews",
+            sql: include_str!("../migrations/0024_learn.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
