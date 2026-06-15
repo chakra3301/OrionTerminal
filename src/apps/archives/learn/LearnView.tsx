@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { GraduationCap, Plus, Loader2, Trash2 } from "lucide-react";
 import { useLearn } from "./useLearn";
 import { Constellation } from "./Constellation";
+import { LessonView } from "./LessonView";
 
 export function LearnView() {
   const loadTopics = useLearn((s) => s.loadTopics);
   const topics = useLearn((s) => s.topics);
   const openTopicId = useLearn((s) => s.openTopicId);
+  const openNodeId = useLearn((s) => s.openNodeId);
   const nodes = useLearn((s) => s.nodes);
   const generatingGraph = useLearn((s) => s.generatingGraph);
   const createTopic = useLearn((s) => s.createTopic);
@@ -111,6 +113,10 @@ export function LearnView() {
               Type a topic in the rail — Claude builds a constellation of concepts,
               ordered by prerequisites, and teaches each one with spaced recall.
             </div>
+          </div>
+        ) : openNodeId ? (
+          <div className="learn-lesson-wrap">
+            <LessonView />
           </div>
         ) : (
           <div className="learn-constellation-wrap">
