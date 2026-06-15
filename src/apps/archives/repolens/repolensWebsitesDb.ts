@@ -21,6 +21,8 @@ export type WebsiteRipRow = {
   session_id: string | null;
   error: string | null;
   model: string;
+  design_json: string | null;
+  design_at: number | null;
   created_at: number;
   updated_at: number;
 };

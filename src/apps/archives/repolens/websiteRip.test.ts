@@ -41,7 +41,7 @@ describe("nextQueued", () => {
   const row = (id: string, status: WebsiteRipRow["status"]): WebsiteRipRow => ({
     id, url: "https://x", hostname: "x", title: "", status, phase: "",
     project_path: "", thumbnail_path: null, log: "", session_id: null,
-    error: null, model: "", created_at: 0, updated_at: 0,
+    error: null, model: "", design_json: null, design_at: null, created_at: 0, updated_at: 0,
   });
   it("returns null when a rip is already running", () => {
     expect(nextQueued([row("a", "running"), row("b", "queued")])).toBeNull();

@@ -156,6 +156,12 @@ pub fn run() {
             sql: include_str!("../migrations/0022_repolens_websites.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 23,
+            description: "repolens: per-website design spec (extract MD)",
+            sql: include_str!("../migrations/0023_repolens_website_design.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
