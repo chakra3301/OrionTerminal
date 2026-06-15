@@ -46,14 +46,14 @@ describe("stepForces", () => {
 
 describe("anchor pull", () => {
   it("draws an anchored node toward its anchor", () => {
-    let nodes = [{ id: "a", x: 100, y: 100, vx: 0, vy: 0, anchor: { x: 500, y: 300 } }];
+    let nodes: SimNode[] = [{ id: "a", x: 100, y: 100, vx: 0, vy: 0, anchor: { x: 500, y: 300 } }];
     for (let i = 0; i < 400; i++) nodes = stepForces(nodes, [], 800, 600);
     const a = nodes[0]!;
     expect(Math.hypot(a.x - 500, a.y - 300)).toBeLessThan(30);
   });
 
   it("leaves an unanchored single node near center (unchanged behavior)", () => {
-    let nodes = [{ id: "a", x: 100, y: 100, vx: 0, vy: 0 }];
+    let nodes: SimNode[] = [{ id: "a", x: 100, y: 100, vx: 0, vy: 0 }];
     for (let i = 0; i < 400; i++) nodes = stepForces(nodes, [], 800, 600);
     const a = nodes[0]!;
     expect(Math.hypot(a.x - 400, a.y - 300)).toBeLessThan(60);
