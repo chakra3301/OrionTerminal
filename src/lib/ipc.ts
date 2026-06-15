@@ -169,6 +169,8 @@ export const ipc = {
     sessionId: string | null,
     imagePath: string | null = null,
     model: string | null = null,
+    systemAppend: string | null = null,
+    allowedTools: string[] | null = null,
   ): Promise<void> =>
     invoke("claude_send", {
       chatId,
@@ -177,6 +179,8 @@ export const ipc = {
       sessionId,
       imagePath,
       model,
+      systemAppend,
+      allowedTools,
     }),
   claudeCancel: (chatId: string): Promise<void> =>
     invoke("claude_cancel", { chatId }),

@@ -58,6 +58,43 @@ pub(crate) fn base64_encode(input: &[u8]) -> String {
     out
 }
 
+/// Build the extra agent args appended after the base flags. Returns an empty
+/// vec when no agent overrides are present (byte-identical to pre-agent behavior).
+fn agent_args(system_append: &Option<String>, allowed_tools: &Option<Vec<String>>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    if let Some(sys) = system_append.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        out.push("--append-system-prompt".into());
+        out.push(sys.to_string());
+    }
+    if let Some(tools) = allowed_tools {
+        let tools: Vec<&String> = tools.iter().filter(|t| !t.trim().is_empty()).collect();
+        if !tools.is_empty() {
+            out.push("--allowed-tools".into());
+            for t in tools {
+                out.push(t.clone());
+            }
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod agent_args_tests {
+    use super::agent_args;
+
+    #[test]
+    fn none_yields_no_args() {
+        assert!(agent_args(&None, &None).is_empty());
+        assert!(agent_args(&Some("   ".into()), &Some(vec![])).is_empty());
+    }
+
+    #[test]
+    fn builds_system_and_tools() {
+        let out = agent_args(&Some("be terse".into()), &Some(vec!["WebSearch".into(), "mcp__playwright".into()]));
+        assert_eq!(out, vec!["--append-system-prompt", "be terse", "--allowed-tools", "WebSearch", "mcp__playwright"]);
+    }
+}
+
 /// Build a single stream-json `user` message line carrying the prompt text
 /// plus a base64-encoded PNG, ready to write to claude's stdin.
 fn build_user_image_message(prompt: &str, image_path: &str) -> Result<String, String> {
@@ -95,6 +132,8 @@ pub async fn claude_send(
     session_id: Option<String>,
     image_path: Option<String>,
     model: Option<String>,
+    system_append: Option<String>,
+    allowed_tools: Option<Vec<String>>,
 ) -> Result<(), String> {
     // Resolve cwd: explicit project_root wins, otherwise fall back to the
     // user's home dir so chat surfaces without a project context (Archives,
@@ -146,6 +185,9 @@ pub async fn claude_send(
         "MultiEdit",
         "NotebookEdit",
     ]);
+    for a in agent_args(&system_append, &allowed_tools) {
+        cmd.arg(a);
+    }
     // Hand claude our Orion MCP server so this chat has access to the
     // Orion-aware tools (list_recent_notes, search_archive, etc.) alongside
     // claude-code's built-in Bash/Read/Edit/Write toolset. Failure to write
