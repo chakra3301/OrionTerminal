@@ -47,3 +47,6 @@ DerivedData
 *.njsproj
 *.sln
 *.sw?
+
+# Brainstorm visual companion (local mockups)
+.superpowers/
