@@ -1,4 +1,5 @@
 mod api_key;
+mod provider_keys;
 mod asset;
 mod autocomplete;
 mod claude_cli;
@@ -244,6 +245,9 @@ pub fn run() {
             api_key::github_token_set,
             api_key::github_token_clear,
             api_key::github_token_status,
+            provider_keys::provider_key_set,
+            provider_keys::provider_key_clear,
+            provider_keys::provider_key_status,
             learn::learn_claude_call,
             repolens::repolens_claude_call,
             repolens::repolens_fetch_repo,

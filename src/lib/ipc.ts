@@ -128,6 +128,13 @@ export const ipc = {
   apiKeyClear: (): Promise<void> => invoke("api_key_clear"),
   apiKeyStatus: (): Promise<boolean> => invoke<boolean>("api_key_status"),
 
+  providerKeySet: (keyRef: string, key: string): Promise<void> =>
+    invoke("provider_key_set", { keyRef, key }),
+  providerKeyClear: (keyRef: string): Promise<void> =>
+    invoke("provider_key_clear", { keyRef }),
+  providerKeyStatus: (keyRef: string): Promise<boolean> =>
+    invoke("provider_key_status", { keyRef }),
+
   inlineEditRun: (
     streamId: string,
     prompt: string,
