@@ -35,11 +35,14 @@ type State = {
   remove: (id: string) => Promise<void>;
   openInOrion: (id: string) => Promise<void>;
   applyEvent: (e: WebsiteEvent) => void;
+  extracting: Set<string>;
+  extractDesign: (id: string, model: string | null) => Promise<void>;
 };
 
 export const useRepoLensWebsites = create<State>((set, get) => ({
   rips: [],
   loaded: false,
+  extracting: new Set<string>(),
 
   load: async () => {
     const rips = await listRips();
@@ -173,6 +176,29 @@ export const useRepoLensWebsites = create<State>((set, get) => ({
     if (isTerminal(e.status)) {
       if (e.status === "done") toast.success("Website clone finished");
       if (e.status === "error") toast.error("Website rip failed");
+    }
+  },
+
+  extractDesign: async (id, model) => {
+    if (get().extracting.has(id)) return;
+    set((s) => ({ extracting: new Set(s.extracting).add(id) }));
+    try {
+      const json = await ipc.repolensWebsiteExtractDesign(id, model);
+      set((s) => {
+        const rips = s.rips.map((r) =>
+          r.id === id ? { ...r, design_json: json, design_at: Date.now() } : r,
+        );
+        return { rips };
+      });
+      toast.success("Design MD ready");
+    } catch (e) {
+      toast.error(`Extract failed: ${String(e)}`);
+    } finally {
+      set((s) => {
+        const next = new Set(s.extracting);
+        next.delete(id);
+        return { extracting: next };
+      });
     }
   },
 }));

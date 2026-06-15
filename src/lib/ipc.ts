@@ -232,6 +232,11 @@ export const ipc = {
     invoke("repolens_website_continue", { id }),
   repolensWebsiteDelete: (id: string): Promise<void> =>
     invoke("repolens_website_delete", { id }),
+  repolensWebsiteExtractDesign: (
+    id: string,
+    model: string | null = null,
+  ): Promise<string> =>
+    invoke<string>("repolens_website_extract_design", { id, model }),
 
   terminalOpen: (
     ptyId: string,
