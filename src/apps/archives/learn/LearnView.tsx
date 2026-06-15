@@ -3,6 +3,7 @@ import { GraduationCap, Plus, Loader2, Trash2 } from "lucide-react";
 import { useLearn } from "./useLearn";
 import { Constellation } from "./Constellation";
 import { LessonView } from "./LessonView";
+import { TutorPanel } from "./TutorPanel";
 
 export function LearnView() {
   const loadTopics = useLearn((s) => s.loadTopics);
@@ -117,6 +118,7 @@ export function LearnView() {
         ) : openNodeId ? (
           <div className="learn-lesson-wrap">
             <LessonView />
+            <TutorPanel />
           </div>
         ) : (
           <div className="learn-constellation-wrap">
