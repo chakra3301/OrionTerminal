@@ -337,3 +337,10 @@ export type ClaudeUsage = {
   block_start_ms: number;
   last_24h: UsageWindow;
 };
+
+export const learnClaudeCall = (
+  prompt: string,
+  model: string,
+  allowWeb = false,
+): Promise<{ result: string; cost: number; model: string }> =>
+  ipc.learnClaudeCall(prompt, model, allowWeb);
