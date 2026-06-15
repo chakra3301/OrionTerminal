@@ -46,8 +46,6 @@ function arr<T>(v: unknown): T[] {
   return Array.isArray(v) ? (v as T[]) : [];
 }
 
-export function parseSkill(raw: { id: string; name: string } & Record<string, unknown>): Skill;
-export function parseSkill(raw: unknown): Skill | null;
 export function parseSkill(raw: unknown): Skill | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;

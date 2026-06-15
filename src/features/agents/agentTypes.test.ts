@@ -16,7 +16,7 @@ describe("parseSkill", () => {
   });
 
   it("coerces a non-array tools field to []", () => {
-    expect(parseSkill({ id: "s1", name: "x", tools: "nope" as never }).tools).toEqual([]);
+    expect(parseSkill({ id: "s1", name: "x", tools: "nope" as never })!.tools).toEqual([]);
   });
 
   it("returns null when id or name is missing", () => {
