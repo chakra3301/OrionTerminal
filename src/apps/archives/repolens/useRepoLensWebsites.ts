@@ -6,6 +6,15 @@ import { toast } from "@/store/toastStore";
 import { useProjectStore } from "@/store/projectStore";
 import { useShell } from "@/shell/store/useShell";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
+import { usePreviewStore } from "@/store/previewStore";
+
+// Stable per-rip dev-server port in an uncommon range (avoids the default 3000),
+// so reopening the same clone reuses its port and different clones don't collide.
+function devPort(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return 4300 + (h % 400);
+}
 
 type WebsiteEvent = {
   id: string;
@@ -75,18 +84,23 @@ export const useRepoLensWebsites = create<State>((set, get) => ({
     if (!row) return;
     await useProjectStore.getState().openProjectAtPath(row.project_path);
     useShell.getState().openApp("orion");
-    // Replace whatever was open with a clean view of the clone, then land on
-    // its entry file. The per-project workspace swap (App.tsx
-    // `useProjectScopedLayout`) hydrates the new project's layout asynchronously
-    // after a DB read, so we defer past it, then explicitly reset to a fresh
-    // layout (guaranteeing the previous project's tabs are gone) and open the
-    // first entry file that exists.
+
+    const port = devPort(row.id);
+    const previewUrl = `http://localhost:${port}`;
+
+    // The per-project workspace swap (App.tsx `useProjectScopedLayout`) hydrates
+    // the new project's layout asynchronously after a DB read, so defer past it,
+    // then build the clone's working view from scratch.
     setTimeout(() => {
       void (async () => {
+        // 1. Replace whatever was open with a clean layout (old project's tabs
+        //    are saved under its own slot first, then cleared here).
         const { defaultOrionLayout } = await import(
           "@/components/workspace/workspaceStore"
         );
         useWorkspace.getState().resetLayout(defaultOrionLayout);
+
+        // 2. Land on the clone's entry file.
         const candidates = [
           `${row.project_path}/src/app/page.tsx`,
           `${row.project_path}/README.md`,
@@ -99,12 +113,34 @@ export const useRepoLensWebsites = create<State>((set, get) => ({
               { kind: "file", path },
               { label: path.split("/").pop() ?? "page.tsx", preferRole: "editor" },
             );
-            return;
+            break;
           }
         }
+
+        // 3. Auto-start the clone's dev server in a terminal (the command runs
+        //    once the pty is ready) on its own port.
+        useWorkspace.getState().openTab(
+          {
+            kind: "terminal",
+            id: `webdev-${row.id}`,
+            initialCommand: `npm run dev -- -p ${port}`,
+          },
+          { label: "dev server" },
+        );
+
+        // 4. Point the live preview at the clone's dev server (replacing any
+        //    previous project's preview URL — it's global state).
+        usePreviewStore.getState().setMode("web");
+        usePreviewStore.getState().setUrl(previewUrl);
       })();
     }, 300);
-    toast.info("Run `npm run dev` in the terminal to preview the clone.");
+
+    // 5. The dev server takes a few seconds to compile; reload the preview as it
+    //    comes up so the iframe lands on the live clone without a manual reload.
+    setTimeout(() => usePreviewStore.getState().reload(), 7000);
+    setTimeout(() => usePreviewStore.getState().reload(), 14000);
+
+    toast.info("Starting the clone's dev server — the preview will go live shortly.");
   },
 
   applyEvent: (e) => {

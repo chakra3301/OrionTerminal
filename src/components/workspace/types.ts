@@ -13,7 +13,7 @@ export type TabDescriptor =
   | { kind: "preview" }
   | { kind: "claude" }
   | { kind: "claude-code"; id?: string }
-  | { kind: "terminal"; id?: string }
+  | { kind: "terminal"; id?: string; initialCommand?: string }
   | { kind: "problems" }
   | { kind: "search" }
   | { kind: "changes" }

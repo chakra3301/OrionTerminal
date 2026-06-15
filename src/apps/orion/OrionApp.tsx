@@ -39,7 +39,12 @@ const orionRegistry: ContentRegistry = {
       case "preview":
         return <OrionPreview />;
       case "terminal":
-        return <OrionTerminalPanel id={tab.descriptor.id} />;
+        return (
+          <OrionTerminalPanel
+            id={tab.descriptor.id}
+            initialCommand={tab.descriptor.initialCommand}
+          />
+        );
       case "claude":
         return <OrionClaudeRail />;
       case "claude-code":

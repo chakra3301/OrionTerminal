@@ -4,15 +4,31 @@ import { useProjectStore } from "@/store/projectStore";
 import { useTerminalStore } from "@/store/terminalStore";
 import { attachPtyTerminal } from "./ptyTerminal";
 
-export function OrionTerminalPanel({ id }: { id?: string }) {
+// pty ids whose one-shot `initialCommand` has already been sent, so a tab-switch
+// remount doesn't re-run it.
+const sentInitialCommands = new Set<string>();
+
+export function OrionTerminalPanel({
+  id,
+  initialCommand,
+}: {
+  id?: string;
+  initialCommand?: string;
+}) {
   return (
     <div className="or-terminal-panel">
-      <TerminalCanvas id={id} />
+      <TerminalCanvas id={id} initialCommand={initialCommand} />
     </div>
   );
 }
 
-function TerminalCanvas({ id }: { id?: string }) {
+function TerminalCanvas({
+  id,
+  initialCommand,
+}: {
+  id?: string;
+  initialCommand?: string;
+}) {
   const project = useProjectStore((s) => s.active);
   const containerRef = useRef<HTMLDivElement>(null);
   const attachedRef = useRef(false);
@@ -35,7 +51,13 @@ function TerminalCanvas({ id }: { id?: string }) {
       launchErrorLines: (e) => [
         `\x1b[31mFailed to open terminal: ${String(e)}\x1b[0m`,
       ],
-      onOpened: () => setPtyId(ptyId),
+      onOpened: () => {
+        setPtyId(ptyId);
+        if (initialCommand && !sentInitialCommands.has(ptyId)) {
+          sentInitialCommands.add(ptyId);
+          void ipc.terminalWrite(ptyId, `${initialCommand}\n`);
+        }
+      },
       onClosed: () => setPtyId(null),
     });
 
