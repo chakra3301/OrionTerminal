@@ -14225,3 +14225,20 @@ html.ot-reduce-glass .note-page .note-editor-body {
 @media (prefers-reduced-motion: reduce) {
   .lb-reticle, .lb-subdial, .lb-badge, .lb-scan, .learn-celebrate-badge { animation: none; }
 }
+
+/* "Shape this" affordance in the constellation header */
+.learn-shape-btn {
+  margin-left: auto;
+  font-family: var(--font-mono, ui-monospace);
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: rgba(var(--lr-rgb), 0.9);
+  background: rgba(var(--lr-rgb), 0.08);
+  border: 1px solid rgba(var(--lr-rgb), 0.35);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.learn-shape-btn:hover:not(:disabled) { background: rgba(var(--lr-rgb), 0.16); border-color: rgba(var(--lr-rgb), 0.6); }
+.learn-shape-btn:disabled { opacity: .55; cursor: default; }

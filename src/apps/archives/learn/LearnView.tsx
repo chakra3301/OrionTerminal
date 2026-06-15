@@ -16,9 +16,11 @@ export function LearnView() {
   const createTopic = useLearn((s) => s.createTopic);
   const openTopic = useLearn((s) => s.openTopic);
   const deleteTopic = useLearn((s) => s.deleteTopic);
+  const shapeTopic = useLearn((s) => s.shapeTopic);
 
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [shaping, setShaping] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export function LearnView() {
   const topicList = Object.values(topics).sort((a, b) => b.created_at - a.created_at);
   const openTopicData = openTopicId ? topics[openTopicId] : null;
   const nodeCount = Object.keys(nodes).length;
+  const hasFigure = !!(openTopicId && topics[openTopicId]?.figure_json);
 
   return (
     <div className="learn-view">
@@ -130,6 +133,15 @@ export function LearnView() {
             <div className="learn-constellation-header">
               <span className="learn-ph-topic">{openTopicData?.title ?? ""}</span>
               <span className="learn-ph-count">{nodeCount} {nodeCount === 1 ? "node" : "nodes"}</span>
+              {openTopicId && !hasFigure && (
+                <button
+                  className="learn-shape-btn"
+                  disabled={shaping}
+                  onClick={async () => { setShaping(true); try { await shapeTopic(openTopicId); } finally { setShaping(false); } }}
+                >
+                  {shaping ? "Shaping…" : "✦ Shape this"}
+                </button>
+              )}
             </div>
             <Constellation />
           </div>

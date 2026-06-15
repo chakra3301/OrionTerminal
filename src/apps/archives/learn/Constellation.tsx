@@ -6,6 +6,7 @@ import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { useLearn } from "./useLearn";
 import { initialPositions, stepForces } from "./forceLayout";
 import type { SimNode, SimEdge } from "./forceLayout";
+import { assignAnchors } from "./figure";
 import { needsReview } from "./gating";
 import { toast } from "@/store/toastStore";
 
@@ -33,6 +34,13 @@ export function Constellation() {
   const storeNodes  = useLearn((s) => s.nodes);
   const storeEdges  = useLearn((s) => s.edges);
   const openNode    = useLearn((s) => s.openNode);
+  const openTopicId = useLearn((s) => s.openTopicId);
+  const topics      = useLearn((s) => s.topics);
+  const figure = useMemo(() => {
+    const raw = openTopicId ? topics[openTopicId]?.figure_json : null;
+    if (!raw) return null;
+    try { return JSON.parse(raw) as import("./figure").Figure; } catch { return null; }
+  }, [openTopicId, topics]);
 
   // Container measurement
   const containerRef = useRef<SVGSVGElement>(null);
@@ -126,7 +134,7 @@ export function Constellation() {
   const prevNodeIdsRef = useRef<string>("");
   useEffect(() => {
     const ids = Object.keys(storeNodes).sort();
-    const key = ids.join(",");
+    const key = ids.join(",") + (figure ? "|fig" : "|nofig");
     if (key === prevNodeIdsRef.current && ids.length > 0) return;
     prevNodeIdsRef.current = key;
     // New graph → resume auto-framing (a fresh topic should fit itself on screen).
@@ -134,14 +142,19 @@ export function Constellation() {
 
     if (ids.length === 0) { simRef.current = []; setSimNodes([]); return; }
 
+    const ordered = ids
+      .map((id) => storeNodes[id])
+      .filter(Boolean)
+      .sort((a, b) => (a!.order_idx - b!.order_idx))
+      .map((n) => n!.id);
+    const anchorMap = figure ? assignAnchors(ordered, figure.anchors) : {};
     const positions = initialPositions(ids, dims.w, dims.h);
-    const seeded: SimNode[] = ids.map((id) => ({
-      id,
-      x: positions[id]?.x ?? dims.w / 2,
-      y: positions[id]?.y ?? dims.h / 2,
-      vx: 0,
-      vy: 0,
-    }));
+    const seeded: SimNode[] = ids.map((id) => {
+      const a = anchorMap[id];
+      const ax = a ? a.x * dims.w : (positions[id]?.x ?? dims.w / 2);
+      const ay = a ? a.y * dims.h : (positions[id]?.y ?? dims.h / 2);
+      return { id, x: ax, y: ay, vx: 0, vy: 0, ...(a ? { anchor: { x: ax, y: ay } } : {}) };
+    });
 
     if (reduceMotion) {
       let nodes = seeded;
@@ -158,7 +171,7 @@ export function Constellation() {
       startLoop();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeNodes, dims.w, dims.h]);
+  }, [storeNodes, dims.w, dims.h, figure]);
 
   // ── rAF loop ───────────────────────────────────────────────────────────────
   const startLoop = useCallback(() => {
@@ -378,6 +391,11 @@ export function Constellation() {
           <stop offset="60%" stopColor="rgba(var(--lr-rgb),0.7)" />
           <stop offset="100%" stopColor="rgba(var(--lr-rgb),0.4)" />
         </radialGradient>
+        <radialGradient id="lc-grad-gold" cx="40%" cy="35%" r="65%">
+          <stop offset="0%" stopColor="rgba(var(--lr-gold-rgb),1)" />
+          <stop offset="55%" stopColor="rgba(var(--lr-gold-rgb),0.78)" />
+          <stop offset="100%" stopColor="rgba(var(--lr-gold-rgb),0.42)" />
+        </radialGradient>
         {/* Clip path for edge signal animation */}
         <marker id="lc-arrow" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
           <circle cx="3" cy="3" r="1.5" fill="rgba(var(--lr-rgb),0.6)" />
@@ -388,6 +406,13 @@ export function Constellation() {
       <rect className="lc-aurora" x="0" y="0" width="100%" height="100%" />
 
       <g className="lc-viewport" transform={`translate(${transform.tx},${transform.ty}) scale(${transform.scale})`}>
+
+        {figure && (
+          <polygon
+            className="lc-figure-outline"
+            points={figure.outline.map((p) => `${p.x * dims.w},${p.y * dims.h}`).join(" ")}
+          />
+        )}
 
         {/* ── Edges ─────────────────────────────────────────────────────────── */}
         <g className="lc-edges">
@@ -513,7 +538,7 @@ export function Constellation() {
                   className="lc-hex-outer"
                   points={hexPoints(0, 0, r)}
                   fill={
-                    status === "mastered" ? "url(#lc-grad-mastered)" :
+                    status === "mastered" ? "url(#lc-grad-gold)" :
                     status === "in_progress" ? `rgba(var(--lr-rgb),${0.1 + mastery * 0.25})` :
                     status === "ready"    ? "rgba(var(--lr-rgb),0.06)" :
                     "transparent"
@@ -543,6 +568,17 @@ export function Constellation() {
                     strokeDasharray={`${mastery * 2 * Math.PI * r * 0.78} ${2 * Math.PI * r * 0.78}`}
                     transform="rotate(-90)"
                   />
+                )}
+
+                {status === "mastered" && !reduceMotion && (
+                  <g>
+                    <clipPath id={`lc-hexclip-${sim.id}`}>
+                      <polygon points={hexPoints(0, 0, r)} />
+                    </clipPath>
+                    <g clipPath={`url(#lc-hexclip-${sim.id})`}>
+                      <rect className="lc-shimmer-bar" x={-r} y={-r} width={r * 0.7} height={r * 2} transform="skewX(-18)" />
+                    </g>
+                  </g>
                 )}
 
                 {/* Center dot */}
