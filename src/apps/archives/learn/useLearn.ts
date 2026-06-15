@@ -74,6 +74,7 @@ export const useLearn = create<LearnState>((set, get) => ({
         title,
         summary: spec.summary,
         status: "active",
+        figure_json: null,
         created_at: now,
         updated_at: now,
       };

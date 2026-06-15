@@ -29,7 +29,7 @@ export type Lesson = {
 };
 
 // Persisted row shapes (match migration 0024)
-export type TopicRow = { id: string; title: string; summary: string | null; status: string; created_at: number; updated_at: number };
+export type TopicRow = { id: string; title: string; summary: string | null; status: string; figure_json: string | null; created_at: number; updated_at: number };
 export type NodeRow = {
   id: string; topic_id: string; title: string; objective: string | null; bloom_level: string | null;
   level: Level; order_idx: number; lesson_json: string | null; lesson_at: number | null;
@@ -37,6 +37,8 @@ export type NodeRow = {
 };
 export type EdgeRow = { topic_id: string; from_node: string; to_node: string };
 export type ReviewRow = { id: string; node_id: string; ts: number; correct: number; kind: string };
+export type AchievementRow = { id: string; topic_id: string; kind: "node" | "topic"; node_id: string | null; title: string; earned_at: number };
+export type TopicProgress = { total: number; mastered: number };
 
 const asArray = <T>(v: unknown, map: (x: any) => T): T[] =>
   Array.isArray(v) ? v.map(map) : [];
