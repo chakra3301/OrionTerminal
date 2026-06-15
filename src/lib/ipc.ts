@@ -181,6 +181,16 @@ export const ipc = {
   ): Promise<string> =>
     invoke("claude_oneshot_with_image", { prompt, imagePath }),
 
+  // Learn section — one-shot subscription-CLI call. `allowWeb=true` enables
+  // WebSearch so the model can find real links; `allowWeb=false` (default) is
+  // tool-less and faster (graph/lesson/grade generation).
+  learnClaudeCall: (
+    prompt: string,
+    model: string,
+    allowWeb = false,
+  ): Promise<{ result: string; cost: number; model: string }> =>
+    invoke("learn_claude_call", { prompt, model, allowWeb }),
+
   // RepoLens — JSON-envelope claude call (model-parameterized), public-registry
   // fetchers, and an optional GitHub token (keychain) for higher rate limits.
   repolensClaudeCall: (

@@ -8,6 +8,7 @@ mod fs_watch;
 mod git_ops;
 mod hermes;
 mod inline_edit;
+mod learn;
 mod lsp;
 mod mcp_config;
 pub mod mcp_server;
@@ -231,6 +232,7 @@ pub fn run() {
             api_key::github_token_set,
             api_key::github_token_clear,
             api_key::github_token_status,
+            learn::learn_claude_call,
             repolens::repolens_claude_call,
             repolens::repolens_fetch_repo,
             repolens::repolens_fetch_source,
