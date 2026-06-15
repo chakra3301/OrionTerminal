@@ -10,8 +10,11 @@ const REST_LEN = 110;      // desired edge length
 const CENTER_PULL = 0.012; // gentle gravity — keeps disconnected components together
 const DAMPING = 0.9;       // velocity damping per tick (higher = settles sooner)
 const MAX_V = 30;
+const BOUND_MARGIN = 40;   // keep nodes this far inside the viewport — no node can ever fly off
 
 const clampV = (v: number) => Math.max(-MAX_V, Math.min(MAX_V, v));
+const clampPos = (p: number, lo: number, hi: number) =>
+  hi > lo ? Math.max(lo, Math.min(hi, p)) : p;
 
 /** Deterministic ring layout around the center; used to seed the sim. */
 export function initialPositions(ids: string[], w: number, h: number): Record<string, { x: number; y: number }> {
@@ -62,6 +65,10 @@ export function stepForces(nodes: SimNode[], edges: SimEdge[], w: number, h: num
     n.vy = clampV(n.vy * DAMPING);
     n.x += n.vx;
     n.y += n.vy;
+    // Hard-bound to the viewport so a single node can never escape and blow up
+    // the bounding box the Constellation auto-fits against.
+    n.x = clampPos(n.x, BOUND_MARGIN, w - BOUND_MARGIN);
+    n.y = clampPos(n.y, BOUND_MARGIN, h - BOUND_MARGIN);
   }
   return next;
 }

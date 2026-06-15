@@ -103,7 +103,10 @@ export function Constellation() {
       if (n.y < minY) minY = n.y;
       if (n.y > maxY) maxY = n.y;
     }
-    const { w, h } = dimsRef.current;
+    // Measure the SVG live so framing never relies on a possibly-stale dims state.
+    const rect = containerRef.current?.getBoundingClientRect();
+    const w = rect && rect.width > 0 ? rect.width : dimsRef.current.w;
+    const h = rect && rect.height > 0 ? rect.height : dimsRef.current.h;
     const bw = Math.max(1, maxX - minX);
     const bh = Math.max(1, maxY - minY);
     const scale = Math.max(
