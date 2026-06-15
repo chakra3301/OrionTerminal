@@ -12305,6 +12305,14 @@ html.ot-reduce-glass .note-page .note-editor-body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Opacity-only fade for SVG nodes — a `transform` here would override each
+   node's positional transform="translate(x,y)" attribute and stack them all
+   at the origin. Never animate transform on .lc-node. */
+@keyframes lc-node-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 .learn-view {
   --lr: var(--learn-accent);
   --lr-rgb: var(--learn-accent-rgb);
@@ -12933,7 +12941,7 @@ html.ot-reduce-glass .note-page .note-editor-body {
     animation: learn-fade-in 0.4s ease both;
   }
   .lc-node {
-    animation: learn-fade-in 0.5s ease both;
+    animation: lc-node-fade 0.5s ease;
   }
 }
 

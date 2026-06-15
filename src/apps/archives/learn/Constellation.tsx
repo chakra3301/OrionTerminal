@@ -2,7 +2,7 @@
 // Force-directed prerequisite graph — the headline view of the Learn section.
 // Neo-Tokyo / astral cartography aesthetic: hexagonal nodes, signal-light edges,
 // mastery glows, review-ring pulses.
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { useLearn } from "./useLearn";
 import { initialPositions, stepForces } from "./forceLayout";
 import type { SimNode, SimEdge } from "./forceLayout";
@@ -53,12 +53,13 @@ export function Constellation() {
   const dragStartRef = useRef<{ px: number; py: number; nx: number; ny: number } | null>(null);
   const didDragRef   = useRef(false);
 
-  // Viewport transform
-  const [transform, setTransform] = useState({ tx: 0, ty: 0, scale: 1 });
-  const panStartRef = useRef<{ px: number; py: number; tx: number; ty: number } | null>(null);
-  // While false, the view auto-frames the graph every frame. Once the user
-  // pans/zooms/drags, we stop fighting them and leave the transform alone.
-  const userInteractedRef = useRef(false);
+  // Viewport transform. `manualTransform` null = AUTO-FIT mode: the applied
+  // transform is derived (below) purely from the rendered node positions, so it
+  // can NEVER diverge from what's drawn. Any pan/zoom/drag populates it, freezing
+  // the view under the user's control; a new graph clears it back to auto.
+  const [manualTransform, setManualTransform] =
+    useState<{ tx: number; ty: number; scale: number } | null>(null);
+  const panStartRef = useRef<{ px: number; py: number; base: { tx: number; ty: number; scale: number } } | null>(null);
 
   // rAF loop control
   const rafRef      = useRef<number>(0);
@@ -89,24 +90,19 @@ export function Constellation() {
     return () => ro.disconnect();
   }, []);
 
-  // ── Fit the whole graph into the viewport ──────────────────────────────────
-  // Forces decide the shape; this decides where on screen it sits. Computes the
-  // node bounding box and sets pan/zoom so it's centered with padding. Runs every
-  // frame until the user takes over (userInteractedRef), so the web is always framed.
-  const fitToView = useCallback(() => {
-    const ns = simRef.current;
-    if (ns.length === 0 || userInteractedRef.current) return;
+  // ── Auto-fit transform — DERIVED from the rendered nodes (no side-effect) ───
+  // This is a pure function of (simNodes, dims): it frames whatever is actually
+  // drawn this render, so the zoom can never lag behind or diverge from the nodes.
+  const autoFit = useMemo<{ tx: number; ty: number; scale: number }>(() => {
+    if (simNodes.length === 0) return { tx: 0, ty: 0, scale: 1 };
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const n of ns) {
+    for (const n of simNodes) {
       if (n.x < minX) minX = n.x;
       if (n.x > maxX) maxX = n.x;
       if (n.y < minY) minY = n.y;
       if (n.y > maxY) maxY = n.y;
     }
-    // Measure the SVG live so framing never relies on a possibly-stale dims state.
-    const rect = containerRef.current?.getBoundingClientRect();
-    const w = rect && rect.width > 0 ? rect.width : dimsRef.current.w;
-    const h = rect && rect.height > 0 ? rect.height : dimsRef.current.h;
+    const { w, h } = dims;
     const bw = Math.max(1, maxX - minX);
     const bh = Math.max(1, maxY - minY);
     const scale = Math.max(
@@ -115,8 +111,16 @@ export function Constellation() {
     );
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
-    setTransform({ tx: w / 2 - cx * scale, ty: h / 2 - cy * scale, scale });
-  }, []);
+    return { tx: w / 2 - cx * scale, ty: h / 2 - cy * scale, scale };
+  }, [simNodes, dims]);
+
+  // The applied transform: user override if they've grabbed the view, else auto-fit.
+  const transform = manualTransform ?? autoFit;
+  // Mirror for functional state updaters / pointer-start capture without staleness.
+  const autoFitRef = useRef(autoFit);
+  autoFitRef.current = autoFit;
+  const manualRef = useRef(manualTransform);
+  manualRef.current = manualTransform;
 
   // ── Seed sim when node id set changes ─────────────────────────────────────
   const prevNodeIdsRef = useRef<string>("");
@@ -126,7 +130,7 @@ export function Constellation() {
     if (key === prevNodeIdsRef.current && ids.length > 0) return;
     prevNodeIdsRef.current = key;
     // New graph → resume auto-framing (a fresh topic should fit itself on screen).
-    userInteractedRef.current = false;
+    setManualTransform(null);
 
     if (ids.length === 0) { simRef.current = []; setSimNodes([]); return; }
 
@@ -147,7 +151,6 @@ export function Constellation() {
       simRef.current = nodes;
       setSimNodes(nodes);
       settledRef.current = true;
-      fitToView();
     } else {
       simRef.current = seeded;
       setSimNodes(seeded);
@@ -171,7 +174,6 @@ export function Constellation() {
       const next = stepForces(simRef.current, simEdges, dimsRef.current.w, dimsRef.current.h);
       simRef.current = next;
       setSimNodes([...next]);
-      fitToView();
 
       const maxV = next.reduce(
         (m, n) => Math.max(m, Math.abs(n.vx), Math.abs(n.vy)), 0,
@@ -231,6 +233,8 @@ export function Constellation() {
     (e: React.PointerEvent, id: string) => {
       e.stopPropagation();
       e.currentTarget.setPointerCapture(e.pointerId);
+      // Freeze the viewport so dragging a node doesn't reframe the whole graph.
+      setManualTransform((mt) => mt ?? autoFitRef.current);
       const { x, y } = svgPoint(e.clientX, e.clientY);
       const node = simRef.current.find((n) => n.id === id);
       dragStartRef.current = { px: e.clientX, py: e.clientY, nx: node?.x ?? x, ny: node?.y ?? y };
@@ -249,7 +253,7 @@ export function Constellation() {
       if (draggingId !== id || !dragStartRef.current) return;
       const dx = e.clientX - dragStartRef.current.px;
       const dy = e.clientY - dragStartRef.current.py;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) { didDragRef.current = true; userInteractedRef.current = true; }
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDragRef.current = true;
       const { x, y } = svgPoint(e.clientX, e.clientY);
       simRef.current = simRef.current.map((n) =>
         n.id === id ? { ...n, x, y, vx: 0, vy: 0 } : n,
@@ -292,16 +296,17 @@ export function Constellation() {
   // ── Pointer handlers (pan) ─────────────────────────────────────────────────
   const onSvgPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.target !== containerRef.current && (e.target as Element).closest(".lc-node")) return;
-    panStartRef.current = { px: e.clientX, py: e.clientY, tx: transform.tx, ty: transform.ty };
+    const base = manualRef.current ?? autoFitRef.current;
+    panStartRef.current = { px: e.clientX, py: e.clientY, base };
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
-  }, [transform]);
+  }, []);
 
   const onSvgPointerMove = useCallback((e: React.PointerEvent) => {
     if (!panStartRef.current) return;
-    const dx = e.clientX - panStartRef.current.px;
-    const dy = e.clientY - panStartRef.current.py;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) userInteractedRef.current = true;
-    setTransform((t) => ({ ...t, tx: panStartRef.current!.tx + dx, ty: panStartRef.current!.ty + dy }));
+    const { px, py, base } = panStartRef.current;
+    const dx = e.clientX - px;
+    const dy = e.clientY - py;
+    setManualTransform({ scale: base.scale, tx: base.tx + dx, ty: base.ty + dy });
   }, []);
 
   const onSvgPointerUp = useCallback(() => { panStartRef.current = null; }, []);
@@ -309,21 +314,19 @@ export function Constellation() {
   // ── Wheel zoom ──────────────────────────────────────────────────────────────
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    userInteractedRef.current = true;
     const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
-    setTransform((t) => {
-      const factor = e.deltaY < 0 ? 1.12 : 0.89;
-      const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, t.scale * factor));
-      const ratio = newScale / t.scale;
-      return {
-        scale: newScale,
-        tx: px - ratio * (px - t.tx),
-        ty: py - ratio * (py - t.ty),
-      };
+    const t = manualRef.current ?? autoFitRef.current;
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, t.scale * factor));
+    const ratio = newScale / t.scale;
+    setManualTransform({
+      scale: newScale,
+      tx: px - ratio * (px - t.tx),
+      ty: py - ratio * (py - t.ty),
     });
   }, []);
 
