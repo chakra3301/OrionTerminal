@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { GraduationCap, Plus, Loader2, Trash2 } from "lucide-react";
 import { useLearn } from "./useLearn";
+import { Constellation } from "./Constellation";
 
 export function LearnView() {
   const loadTopics = useLearn((s) => s.loadTopics);
@@ -112,15 +113,12 @@ export function LearnView() {
             </div>
           </div>
         ) : (
-          <div className="learn-constellation-placeholder">
-            {/* Task 12 will render the force-layout constellation here */}
-            <div className="learn-ph-meta">
+          <div className="learn-constellation-wrap">
+            <div className="learn-constellation-header">
               <span className="learn-ph-topic">{openTopicData?.title ?? ""}</span>
               <span className="learn-ph-count">{nodeCount} {nodeCount === 1 ? "node" : "nodes"}</span>
             </div>
-            <div className="learn-ph-hint">
-              Constellation renders here (Task 12)
-            </div>
+            <Constellation />
           </div>
         )}
       </div>

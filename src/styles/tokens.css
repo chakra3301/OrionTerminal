@@ -12679,3 +12679,245 @@ html.ot-reduce-glass .note-page .note-editor-body {
   color: var(--t-faint);
   letter-spacing: 0.04em;
 }
+
+/* ── Constellation wrap (replaces the placeholder) ──────────────── */
+.learn-constellation-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.learn-constellation-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px 8px;
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(var(--lr-rgb), 0.03);
+  flex-shrink: 0;
+}
+
+/* reuse existing .learn-ph-topic / .learn-ph-count for the header */
+
+/* ── Constellation SVG ────────────────────────────────────────────── */
+.learn-constellation {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 40%, rgba(var(--lr-rgb), 0.05) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 30% at 20% 80%, rgba(var(--lr-rgb), 0.03) 0%, transparent 55%),
+    var(--bg-0);
+  user-select: none;
+  cursor: grab;
+}
+.learn-constellation:active { cursor: grabbing; }
+
+/* Aurora scanline overlay — purely decorative CSS rectangle */
+.lc-aurora {
+  fill: none;
+  /* A faint repeating horizontal scanline texture */
+  background: transparent;
+}
+
+/* ── Edges ────────────────────────────────────────────────────────── */
+.lc-edge {
+  stroke: rgba(var(--lr-rgb), 0.15);
+  stroke-width: 1px;
+  fill: none;
+  transition: stroke 0.2s ease, stroke-opacity 0.2s ease;
+}
+.lc-edge--active {
+  stroke: rgba(var(--lr-rgb), 0.3);
+  stroke-width: 1.5px;
+}
+.lc-edge--locked {
+  stroke: rgba(var(--lr-rgb), 0.06);
+  stroke-dasharray: 4 6;
+}
+.lc-edge--highlight {
+  stroke: rgba(var(--lr-rgb), 0.7);
+  stroke-width: 2px;
+}
+
+/* Animated signal-light — travels along active prerequisite edges */
+.lc-edge-signal {
+  stroke: rgba(var(--lr-rgb), 0.9);
+  stroke-width: 2.5px;
+  fill: none;
+  filter: drop-shadow(0 0 3px rgba(var(--lr-rgb), 0.8));
+}
+
+/* ── Node base ────────────────────────────────────────────────────── */
+.lc-node {
+  transition: opacity 0.2s ease;
+}
+.lc-node--locked {
+  opacity: 0.35;
+  filter: saturate(0.2);
+}
+.lc-node--incident { opacity: 0.6; }
+
+/* Outer hex */
+.lc-hex-outer {
+  stroke: rgba(var(--lr-rgb), 0.4);
+  stroke-width: 1.5px;
+  transition: stroke 0.2s ease, stroke-width 0.2s ease;
+}
+.lc-node--locked .lc-hex-outer {
+  stroke: rgba(var(--lr-rgb), 0.15);
+  stroke-dasharray: 4 4;
+}
+.lc-node--ready .lc-hex-outer {
+  stroke: rgba(var(--lr-rgb), 0.75);
+  stroke-width: 1.5px;
+}
+.lc-node--in_progress .lc-hex-outer {
+  stroke: rgba(var(--lr-rgb), 0.85);
+  stroke-width: 2px;
+}
+.lc-node--mastered .lc-hex-outer {
+  stroke: rgba(var(--lr-rgb), 1);
+  stroke-width: 2.5px;
+}
+.lc-node--hovered .lc-hex-outer,
+.lc-node--dragging .lc-hex-outer {
+  stroke: var(--lr);
+  stroke-width: 2.5px;
+}
+
+/* Inner hex */
+.lc-hex-inner {
+  fill: none;
+  stroke: rgba(var(--lr-rgb), 0.18);
+  stroke-width: 0.75px;
+}
+.lc-node--mastered .lc-hex-inner {
+  stroke: rgba(255,255,255,0.15);
+}
+
+/* Circuit crosshairs */
+.lc-circuit line {
+  stroke: rgba(var(--lr-rgb), 0.2);
+  stroke-width: 0.6px;
+}
+.lc-node--mastered .lc-circuit line {
+  stroke: rgba(255,255,255,0.2);
+}
+
+/* Mastery arc (in_progress partial fill using stroke-dasharray) */
+.lc-mastery-arc {
+  fill: none;
+  stroke: rgba(var(--lr-rgb), 0.6);
+  stroke-width: 2px;
+  stroke-linecap: round;
+}
+
+/* Center dot */
+.lc-center-dot {
+  fill: rgba(var(--lr-rgb), 0.5);
+  transition: r 0.3s ease, fill 0.2s ease;
+}
+.lc-node--ready .lc-center-dot     { fill: rgba(var(--lr-rgb), 0.8); }
+.lc-node--in_progress .lc-center-dot { fill: rgba(var(--lr-rgb), 0.9); }
+.lc-node--mastered .lc-center-dot  { fill: var(--lr); }
+.lc-node--hovered .lc-center-dot   { fill: var(--lr); }
+
+/* Label */
+.lc-label {
+  font: 600 10px/1 var(--f-mono);
+  fill: var(--t-secondary);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  transition: fill 0.2s ease;
+}
+.lc-node--ready .lc-label          { fill: var(--t-primary); }
+.lc-node--in_progress .lc-label    { fill: var(--t-primary); }
+.lc-node--mastered .lc-label       { fill: var(--lr); }
+.lc-node--hovered .lc-label        { fill: var(--lr); }
+.lc-node--locked .lc-label         { fill: var(--t-faint); }
+
+/* Level tag */
+.lc-level {
+  font: 400 8px/1 var(--f-mono);
+  fill: var(--t-faint);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.lc-node--mastered .lc-level { fill: rgba(var(--lr-rgb), 0.5); }
+
+/* ── Review ring ─────────────────────────────────────────────────── */
+.lc-review-ring {
+  fill: none;
+  stroke: rgba(var(--lr-rgb), 0.55);
+  stroke-width: 1.5px;
+  stroke-dasharray: 6 4;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lc-review-ring {
+    animation: lc-review-rotate 8s linear infinite, lc-review-pulse 2.5s ease-in-out infinite;
+  }
+}
+
+@keyframes lc-review-rotate {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes lc-review-pulse {
+  0%, 100% { stroke-opacity: 0.5; }
+  50%       { stroke-opacity: 1; stroke: var(--lr); }
+}
+
+/* Mastered node corona pulse */
+@media (prefers-reduced-motion: no-preference) {
+  .lc-node--mastered .lc-hex-outer {
+    animation: lc-corona 3s ease-in-out infinite;
+  }
+}
+@keyframes lc-corona {
+  0%, 100% { stroke-opacity: 0.85; }
+  50%       { stroke-opacity: 1; filter: drop-shadow(0 0 4px rgba(var(--lr-rgb), 0.6)); }
+}
+
+/* In-progress pulsing */
+@media (prefers-reduced-motion: no-preference) {
+  .lc-node--in_progress .lc-hex-outer {
+    animation: lc-inprog 2s ease-in-out infinite;
+  }
+}
+@keyframes lc-inprog {
+  0%, 100% { stroke-opacity: 0.6; }
+  50%       { stroke-opacity: 1; }
+}
+
+/* Ready node — slow breathe to suggest "available" */
+@media (prefers-reduced-motion: no-preference) {
+  .lc-node--ready .lc-center-dot {
+    animation: lc-ready-dot 2.8s ease-in-out infinite;
+  }
+}
+@keyframes lc-ready-dot {
+  0%, 100% { r: 2.5px; fill-opacity: 0.7; }
+  50%       { r: 4px;   fill-opacity: 1; }
+}
+
+/* Empty state text */
+.lc-empty {
+  font: 12px/1 var(--f-mono);
+  fill: var(--t-faint);
+  letter-spacing: 0.06em;
+}
+
+/* ── Fade-in on mount ────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .learn-constellation {
+    animation: learn-fade-in 0.4s ease both;
+  }
+  .lc-node {
+    animation: learn-fade-in 0.5s ease both;
+  }
+}
