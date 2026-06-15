@@ -175,6 +175,12 @@ pub fn run() {
             sql: include_str!("../migrations/0025_learn_figures_achievements.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 26,
+            description: "control panel: providers, skills, agents",
+            sql: include_str!("../migrations/0026_control_panel.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
