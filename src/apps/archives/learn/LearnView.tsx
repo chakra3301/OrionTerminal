@@ -7,6 +7,7 @@ import { TutorPanel } from "./TutorPanel";
 import { ModelSelect } from "@/components/ModelSelect";
 import { MasteryCelebration } from "./MasteryCelebration";
 import { TrophyShelf } from "./TrophyShelf";
+import { MasteryBadge } from "./MasteryBadge";
 
 export function LearnView() {
   const loadTopics = useLearn((s) => s.loadTopics);
@@ -21,6 +22,7 @@ export function LearnView() {
   const shapeTopic = useLearn((s) => s.shapeTopic);
   const trophyShelfOpen = useLearn((s) => s.trophyShelfOpen);
   const openTrophyShelf = useLearn((s) => s.openTrophyShelf);
+  const progress = useLearn((s) => s.progress);
 
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +109,22 @@ export function LearnView() {
               }}
             >
               <span className="learn-topic-title">{topic.title}</span>
+              {(() => {
+                const p = progress[topic.id];
+                if (p && p.total > 0 && p.mastered === p.total) {
+                  return (
+                    <span className="learn-topic-medallion">
+                      <MasteryBadge
+                        topicTitle={topic.title}
+                        outline={(() => { try { return topic.figure_json ? (JSON.parse(topic.figure_json) as import("./figure").Figure).outline : null; } catch { return null; } })()}
+                        masteredCount={p.mastered} total={p.total} size={26} variant="medallion"
+                      />
+                    </span>
+                  );
+                }
+                if (p && p.total > 0) return <span className="learn-topic-progress">{p.mastered}/{p.total}</span>;
+                return null;
+              })()}
               <button
                 className="learn-topic-delete"
                 title="Delete topic"
