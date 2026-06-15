@@ -5,6 +5,7 @@ import { Constellation } from "./Constellation";
 import { LessonView } from "./LessonView";
 import { TutorPanel } from "./TutorPanel";
 import { ModelSelect } from "@/components/ModelSelect";
+import { MasteryCelebration } from "./MasteryCelebration";
 
 export function LearnView() {
   const loadTopics = useLearn((s) => s.loadTopics);
@@ -146,6 +147,7 @@ export function LearnView() {
             <Constellation />
           </div>
         )}
+        <MasteryCelebration />
       </div>
     </div>
   );

@@ -12592,6 +12592,7 @@ html.ot-reduce-glass .note-page .note-editor-body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 /* ── Empty state ───────────────────────────────────────────── */
