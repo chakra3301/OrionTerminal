@@ -41,6 +41,7 @@ const VIEW_LABEL: Record<ArchivesView, string> = {
   chats: "Past chats",
   database: "Database",
   repolens: "RepoLens",
+  learn: "Learn",
 };
 
 type ActiveItem =
