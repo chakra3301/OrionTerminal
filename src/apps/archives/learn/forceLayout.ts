@@ -2,11 +2,11 @@
 export type SimNode = { id: string; x: number; y: number; vx: number; vy: number; fixed?: boolean };
 export type SimEdge = { from: string; to: string };
 
-const REPULSION = 6000;   // charge strength
-const SPRING = 0.02;      // edge stiffness
-const REST_LEN = 120;     // desired edge length
-const CENTER_PULL = 0.01; // gravity toward center
-const DAMPING = 0.85;     // velocity damping per tick
+const REPULSION = 30000;   // charge strength (must dominate centering so nodes spread, not clump)
+const SPRING = 0.02;       // edge stiffness
+const REST_LEN = 150;      // desired edge length
+const CENTER_PULL = 0.003; // gravity toward center (gentle — strong centering collapses the graph)
+const DAMPING = 0.85;      // velocity damping per tick
 const MAX_V = 30;
 
 const clampV = (v: number) => Math.max(-MAX_V, Math.min(MAX_V, v));

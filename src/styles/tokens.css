@@ -12375,6 +12375,21 @@ html.ot-reduce-glass .note-page .note-editor-body {
   border-bottom: 1px solid var(--glass-border);
 }
 
+.learn-model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+.learn-model-label {
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t-tertiary);
+}
+
 .learn-create-field {
   display: flex;
   align-items: center;

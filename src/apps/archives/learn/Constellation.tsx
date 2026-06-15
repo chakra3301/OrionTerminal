@@ -36,6 +36,10 @@ export function Constellation() {
   // Container measurement
   const containerRef = useRef<SVGSVGElement>(null);
   const [dims, setDims] = useState({ w: 800, h: 600 });
+  // Mirror dims in a ref so the rAF tick always centers against the LIVE size,
+  // not the size captured when the loop started (default 800×600 before measure).
+  const dimsRef = useRef(dims);
+  useEffect(() => { dimsRef.current = dims; }, [dims]);
 
   // Sim state lives in a ref so the rAF loop can read it without stale closures,
   // but we also keep a useState mirror so React re-renders on each frame.
@@ -128,7 +132,7 @@ export function Constellation() {
         runningRef.current = false;
         return;
       }
-      const next = stepForces(simRef.current, simEdges, dims.w, dims.h);
+      const next = stepForces(simRef.current, simEdges, dimsRef.current.w, dimsRef.current.h);
       simRef.current = next;
       setSimNodes([...next]);
 
@@ -157,6 +161,14 @@ export function Constellation() {
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [startLoop, reduceMotion]);
+
+  // Re-settle when the viewport size changes (e.g. first real measurement after
+  // the 800×600 default, or a window resize) so the web re-centers in the panel.
+  useEffect(() => {
+    if (reduceMotion || simRef.current.length === 0) return;
+    settledRef.current = false;
+    startLoop();
+  }, [dims.w, dims.h, startLoop, reduceMotion]);
 
   // Cleanup rAF on unmount
   useEffect(() => () => { cancelAnimationFrame(rafRef.current); }, []);

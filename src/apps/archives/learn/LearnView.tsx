@@ -4,6 +4,7 @@ import { useLearn } from "./useLearn";
 import { Constellation } from "./Constellation";
 import { LessonView } from "./LessonView";
 import { TutorPanel } from "./TutorPanel";
+import { ModelSelect } from "@/components/ModelSelect";
 
 export function LearnView() {
   const loadTopics = useLearn((s) => s.loadTopics);
@@ -62,6 +63,10 @@ export function LearnView() {
                 if (e.key === "Enter") void handleCreate();
               }}
             />
+          </div>
+          <div className="learn-model-row">
+            <span className="learn-model-label">Model</span>
+            <ModelSelect surface="learn" />
           </div>
           {generatingGraph && (
             <div className="learn-generating">
