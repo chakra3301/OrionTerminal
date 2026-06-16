@@ -265,6 +265,8 @@ pub fn run() {
             messages_chat::messages_chat_cancel,
             claude_cli::claude_send,
             claude_cli::claude_cancel,
+            runtime::runtime_send,
+            runtime::runtime_cancel,
             claude_cli::claude_oneshot,
             claude_cli::claude_oneshot_with_image,
             hermes::hermes_dispatch_task,
