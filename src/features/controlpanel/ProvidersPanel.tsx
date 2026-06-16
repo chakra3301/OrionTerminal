@@ -23,7 +23,7 @@ export function ProvidersPanel() {
             </div>
             {p.builtin
               ? <span className="cp-badge live">live ✓</span>
-              : <span className="cp-badge wait">needs runtime</span>}
+              : <span className="cp-badge wait">chat ready · no tools yet</span>}
             {!p.builtin && <button className="cp-link-danger" onClick={() => remove(p.id)}>Remove</button>}
           </div>
         ))}

@@ -18,15 +18,17 @@ export function ModelSelect({ surface }: { surface: ModelSurface }) {
       onClick={(e) => e.stopPropagation()}
       onChange={(e) => setModel(surface, e.target.value)}
     >
-      {providers.map((p) => (
-        <optgroup key={p.id} label={p.builtin ? p.name : `${p.name} — needs runtime`}>
-          {p.models.map((m) => (
-            <option key={`${p.id}/${m.id}`} value={m.id} disabled={!p.builtin}>
-              {m.label}
-            </option>
-          ))}
-        </optgroup>
-      ))}
+      {providers
+        .filter((p) => p.enabled)
+        .map((p) => (
+          <optgroup key={p.id} label={p.name}>
+            {p.models.map((m) => (
+              <option key={`${p.id}/${m.id}`} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </optgroup>
+        ))}
       {agents.length > 0 && (
         <optgroup label="Your Agents">
           {agents.map((a) => (
