@@ -3,6 +3,7 @@ import { useControlPanel, type CpSection } from "@/store/controlPanelStore";
 import { ProvidersPanel } from "./ProvidersPanel";
 import { SkillLibraryPanel } from "./SkillLibraryPanel";
 import { AgentForge } from "./AgentForge";
+import { APIKeySection, ThemeSection, WallpaperSection, McpSection, ShortcutsSection, AboutSection } from "@/features/settings/SettingsPanel";
 import { X } from "lucide-react";
 import "./controlpanel.css";
 
@@ -51,7 +52,12 @@ export function ControlPanel() {
             {section === "providers" && <ProvidersPanel />}
             {section === "agents" && <AgentForge />}
             {section === "skills" && <SkillLibraryPanel />}
-            {/* existing settings sections wired in Task 17 */}
+            {section === "key" && <APIKeySection />}
+            {section === "theme" && <ThemeSection />}
+            {section === "wallpaper" && <WallpaperSection />}
+            {section === "mcp" && <McpSection />}
+            {section === "shortcuts" && <ShortcutsSection />}
+            {section === "about" && <AboutSection />}
           </div>
         </main>
       </div>

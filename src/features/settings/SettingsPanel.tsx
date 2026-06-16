@@ -109,7 +109,7 @@ export function SettingsPanel() {
 // API key
 // ─────────────────────────────────────────────────────────────
 
-function APIKeySection() {
+export function APIKeySection() {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [draft, setDraft] = useState("");
   const [reveal, setReveal] = useState(false);
@@ -362,7 +362,7 @@ function GithubTokenField() {
 // Theme
 // ─────────────────────────────────────────────────────────────
 
-function ThemeSection() {
+export function ThemeSection() {
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.set);
   const reduceGlass = useThemeStore((s) => s.reduceGlass);
@@ -433,7 +433,7 @@ const OVERLAY_OPTIONS: Array<{
   { key: "stars", label: "Stars", hint: "Quiet night sky" },
 ];
 
-function WallpaperSection() {
+export function WallpaperSection() {
   const mode = useWallpaperStore((s) => s.mode);
   const customPath = useWallpaperStore((s) => s.customPath);
   const originalName = useWallpaperStore((s) => s.originalName);
@@ -576,7 +576,7 @@ function WallpaperSection() {
 // MCP servers
 // ─────────────────────────────────────────────────────────────
 
-function McpSection() {
+export function McpSection() {
   const servers = useMcpServers((s) => s.servers);
   const loaded = useMcpServers((s) => s.loaded);
   const load = useMcpServers((s) => s.load);
@@ -806,7 +806,7 @@ function useCommandsSnapshot(): Command[] {
   );
 }
 
-function ShortcutsSection() {
+export function ShortcutsSection() {
   const commands = useCommandsSnapshot();
   const grouped = useMemo(() => {
     const bound = commands.filter((c) => !!c.hotkey);
@@ -870,7 +870,7 @@ function formatHotkey(hk: string): string {
 // About
 // ─────────────────────────────────────────────────────────────
 
-function AboutSection() {
+export function AboutSection() {
   return (
     <>
       <h2 className="ot-settings-h2">About</h2>
