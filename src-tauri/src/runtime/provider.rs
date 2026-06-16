@@ -31,3 +31,31 @@ pub trait Provider {
     fn body(&self, req: &ChatRequest) -> serde_json::Value;
     fn parse_sse_line(&self, line: &str) -> Vec<StreamItem>;
 }
+
+/// Pick the adapter for a provider kind. "google" → Gemini; every other kind
+/// ("openai" | "openai_compat" | "custom" | …) speaks /v1/chat/completions.
+pub fn make_provider(kind: &str) -> Box<dyn Provider + Send + Sync> {
+    match kind {
+        "google" => Box::new(super::gemini::Gemini),
+        _ => Box::new(super::openai::OpenAi),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::make_provider;
+
+    #[test]
+    fn google_kind_routes_to_gemini() {
+        let p = make_provider("google");
+        assert!(p.endpoint("", "gemini-2.0-flash").contains("streamGenerateContent"));
+    }
+
+    #[test]
+    fn other_kinds_route_to_openai_compat() {
+        for kind in ["openai", "openai_compat", "custom", "anything"] {
+            let p = make_provider(kind);
+            assert!(p.endpoint("", "gpt-4o").ends_with("/chat/completions"));
+        }
+    }
+}
