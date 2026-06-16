@@ -184,6 +184,26 @@ export const ipc = {
     }),
   claudeCancel: (chatId: string): Promise<void> =>
     invoke("claude_cancel", { chatId }),
+  runtimeSend: (
+    chatId: string,
+    providerKind: string,
+    baseUrl: string,
+    keyRef: string,
+    model: string,
+    system: string,
+    history: Array<{ role: "user" | "assistant"; content: string }>,
+  ): Promise<void> =>
+    invoke("runtime_send", {
+      chatId,
+      providerKind,
+      baseUrl,
+      keyRef,
+      model,
+      system,
+      history,
+    }),
+  runtimeCancel: (chatId: string): Promise<void> =>
+    invoke("runtime_cancel", { chatId }),
   claudeOneshot: (prompt: string): Promise<string> =>
     invoke("claude_oneshot", { prompt }),
   claudeOneshotWithImage: (
