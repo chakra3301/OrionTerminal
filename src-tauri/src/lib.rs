@@ -16,6 +16,7 @@ pub mod mcp_server;
 mod messages_chat;
 mod repolens;
 mod repolens_website;
+mod runtime;
 mod sysstats;
 mod terminal;
 mod ui_bridge;
