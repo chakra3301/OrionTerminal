@@ -3,6 +3,7 @@ import { ulid } from "ulid";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ipc } from "@/lib/ipc";
 import { useModelPrefs } from "@/store/modelPrefsStore";
+import { resolveSendFromStores } from "@/features/agents/resolveSend";
 import { log } from "@/lib/log";
 import { upsertChat, getChatById, listAllChats } from "@/lib/db";
 
@@ -432,13 +433,16 @@ async function runSubprocessTurn(
 
       try {
         const sid = store.getState().sessionId;
+        const r = resolveSendFromStores(useModelPrefs.getState().modelFor("rosie"));
         await ipc.claudeSend(
           chatId,
           fullPrompt,
           null,
           sid && sid.length > 0 ? sid : null,
           null,
-          useModelPrefs.getState().modelFor("rosie"),
+          r.model,
+          r.systemAppend,
+          r.allowedTools,
         );
       } catch (err) {
         const message =

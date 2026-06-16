@@ -8,6 +8,7 @@ import { upsertChat } from "@/lib/db";
 import { scheduleReindex } from "@/lib/embeddingIndexer";
 import { ipc } from "@/lib/ipc";
 import { useModelPrefs } from "@/store/modelPrefsStore";
+import { resolveSendFromStores } from "@/features/agents/resolveSend";
 import { log } from "@/lib/log";
 import { xdesignClaude, COMPOSER_PROMPT } from "@/apps/xdesign/claude";
 import {
@@ -247,13 +248,16 @@ export function XDesignClaudeRail() {
       // Pass the snapshot path through to claude_send, which attaches it as a
       // real stream-json image block (NOT an `@path` mention — those get
       // dropped on --resume turns). Null path → plain text-only send.
+      const r = resolveSendFromStores(useModelPrefs.getState().modelFor("xdesign"));
       await ipc.claudeSend(
         chatId,
         prompt,
         null,
         thread.sessionId,
         snapshotPath,
-        useModelPrefs.getState().modelFor("xdesign"),
+        r.model,
+        r.systemAppend,
+        r.allowedTools,
       );
     } catch (e) {
       log.error("xdesign chat send failed", e);

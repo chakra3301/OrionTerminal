@@ -7,6 +7,7 @@ import { useChatStore, type ChatMessage } from "@/store/chatStore";
 import { useProjectStore } from "@/store/projectStore";
 import { ipc } from "@/lib/ipc";
 import { useModelPrefs } from "@/store/modelPrefsStore";
+import { resolveSendFromStores } from "@/features/agents/resolveSend";
 import { log } from "@/lib/log";
 import { upsertChat } from "@/lib/db";
 import { scheduleReindex } from "@/lib/embeddingIndexer";
@@ -131,13 +132,16 @@ export function OrionClaudeRail() {
     }
     setRunning(true);
     try {
+      const r = resolveSendFromStores(useModelPrefs.getState().modelFor("orion"));
       await ipc.claudeSend(
         chat.id,
         prompt,
         project.root_path,
         chat.sessionId,
         null,
-        useModelPrefs.getState().modelFor("orion"),
+        r.model,
+        r.systemAppend,
+        r.allowedTools,
       );
     } catch (e) {
       log.error("claude_send failed", e);
