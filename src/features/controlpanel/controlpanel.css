@@ -35,3 +35,25 @@
 .cp-label { font-size: 11px; color: var(--t-tertiary); text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; }
 .cp-tool-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
 .cp-tool { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--t-secondary); }
+.forge-grid { display: grid; grid-template-columns: 180px 1fr 240px; gap: 16px; }
+.forge-eyebrow { font: 600 9px var(--font-mono); letter-spacing: 2px; color: var(--t-tertiary); margin: 6px 0; }
+.forge-equip { display: flex; flex-direction: column; gap: 12px; }
+.forge-slot { padding: 10px; border-radius: var(--r-md); background: var(--bg-2); border: 1.5px solid var(--glass-border); }
+.forge-slot.brain { border-color: var(--neon-violet); box-shadow: 0 0 16px -6px var(--neon-violet); }
+.forge-slot.action { border-color: var(--neon-green); box-shadow: 0 0 16px -6px var(--neon-green); }
+.forge-slot-label { font-size: 9px; letter-spacing: 1px; margin-bottom: 6px; color: var(--t-secondary); }
+.forge-hint { color: var(--t-tertiary); }
+.forge-center { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.forge-portrait { width: 120px; height: 120px; border-radius: 24px; border: 1.5px solid; background: var(--bg-3); color: var(--t-tertiary); cursor: pointer; overflow: hidden; display: grid; place-items: center; }
+.forge-portrait img { width: 100%; height: 100%; object-fit: cover; }
+.forge-name { text-align: center; font-size: 16px; }
+.forge-role { text-align: center; font-size: 12px; }
+.forge-accents { display: flex; gap: 6px; }
+.forge-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.forge-dot.on { border-color: var(--t-primary); }
+.forge-equipped { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+.forge-chip { padding: 4px 8px; border-radius: var(--r-pill); border: 1px solid; font-size: 11px; cursor: pointer; }
+.cp-skill-tile.on { background: var(--bg-3); }
+.forge-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--glass-border); }
+.forge-summary { font-size: 11px; color: var(--t-secondary); }
+.forge-saved { margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
