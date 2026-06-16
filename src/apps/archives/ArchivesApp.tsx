@@ -21,7 +21,7 @@ import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { archivesClaude } from "@/apps/archives/claude";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
-import { resolveSendFromStores } from "@/features/agents/resolveSend";
+import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { useArchives, type ArchivesView } from "@/apps/archives/useArchives";
 import { useNotesStore } from "@/store/notesStore";
 import { setNoteNavigator } from "@/lib/orionProtocol";
@@ -29,7 +29,6 @@ import { useAssetsStore } from "@/store/assetsStore";
 import { useMoodBoardsStore } from "@/store/moodBoardsStore";
 import { listAllChats, upsertChat } from "@/lib/db";
 import { scheduleReindex } from "@/lib/embeddingIndexer";
-import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
 import { useFileDropZone } from "@/lib/fileDrop";
 import { ArchivesToday } from "@/apps/archives/Today";
@@ -229,17 +228,15 @@ export function ArchivesApp() {
       const prompt = isFirstTurn
         ? `${archivesClaude.systemPrompt}\n\n---\n\n${text}`
         : text;
-      const r = resolveSendFromStores(useModelPrefs.getState().modelFor("archives"));
-      await ipc.claudeSend(
+      await dispatchSend({
         chatId,
+        value: useModelPrefs.getState().modelFor("archives"),
         prompt,
-        null,
-        thread.sessionId,
-        null,
-        r.model,
-        r.systemAppend,
-        r.allowedTools,
-      );
+        history: toRuntimeHistory(useAppChat.getState().threads.archives.messages),
+        projectRoot: null,
+        sessionId: thread.sessionId,
+        imagePath: null,
+      });
     } catch (e) {
       log.error("archives chat send failed", e);
       forgetStream(chatId);
@@ -248,7 +245,7 @@ export function ArchivesApp() {
   };
 
   const handleCancel = () => {
-    void ipc.claudeCancel(thread.threadId);
+    void dispatchCancel(thread.threadId, useModelPrefs.getState().modelFor("archives"));
   };
 
   const chatMessages: ClaudeChatMessage[] = thread.messages.map((m) => ({

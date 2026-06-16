@@ -5,9 +5,8 @@ import {
 } from "@/components/ClaudeChat";
 import { useChatStore, type ChatMessage } from "@/store/chatStore";
 import { useProjectStore } from "@/store/projectStore";
-import { ipc } from "@/lib/ipc";
 import { useModelPrefs } from "@/store/modelPrefsStore";
-import { resolveSendFromStores } from "@/features/agents/resolveSend";
+import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
 import { upsertChat } from "@/lib/db";
 import { scheduleReindex } from "@/lib/embeddingIndexer";
@@ -132,17 +131,15 @@ export function OrionClaudeRail() {
     }
     setRunning(true);
     try {
-      const r = resolveSendFromStores(useModelPrefs.getState().modelFor("orion"));
-      await ipc.claudeSend(
-        chat.id,
+      await dispatchSend({
+        chatId: chat.id,
+        value: useModelPrefs.getState().modelFor("orion"),
         prompt,
-        project.root_path,
-        chat.sessionId,
-        null,
-        r.model,
-        r.systemAppend,
-        r.allowedTools,
-      );
+        history: toRuntimeHistory(useChatStore.getState().active?.messages ?? []),
+        projectRoot: project.root_path,
+        sessionId: chat.sessionId,
+        imagePath: null,
+      });
     } catch (e) {
       log.error("claude_send failed", e);
       setRunning(false);
@@ -151,7 +148,7 @@ export function OrionClaudeRail() {
 
   const cancel = () => {
     if (!active) return;
-    void ipc.claudeCancel(active.id);
+    void dispatchCancel(active.id, useModelPrefs.getState().modelFor("orion"));
   };
 
   const subtitle = active?.title

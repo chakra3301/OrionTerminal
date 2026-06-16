@@ -8,7 +8,7 @@ import { upsertChat } from "@/lib/db";
 import { scheduleReindex } from "@/lib/embeddingIndexer";
 import { ipc } from "@/lib/ipc";
 import { useModelPrefs } from "@/store/modelPrefsStore";
-import { resolveSendFromStores } from "@/features/agents/resolveSend";
+import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
 import { xdesignClaude, COMPOSER_PROMPT } from "@/apps/xdesign/claude";
 import {
@@ -248,17 +248,15 @@ export function XDesignClaudeRail() {
       // Pass the snapshot path through to claude_send, which attaches it as a
       // real stream-json image block (NOT an `@path` mention — those get
       // dropped on --resume turns). Null path → plain text-only send.
-      const r = resolveSendFromStores(useModelPrefs.getState().modelFor("xdesign"));
-      await ipc.claudeSend(
+      await dispatchSend({
         chatId,
+        value: useModelPrefs.getState().modelFor("xdesign"),
         prompt,
-        null,
-        thread.sessionId,
-        snapshotPath,
-        r.model,
-        r.systemAppend,
-        r.allowedTools,
-      );
+        history: toRuntimeHistory(useAppChat.getState().threads.xdesign.messages),
+        projectRoot: null,
+        sessionId: thread.sessionId,
+        imagePath: snapshotPath,
+      });
     } catch (e) {
       log.error("xdesign chat send failed", e);
       forgetStream(chatId);
@@ -287,7 +285,7 @@ export function XDesignClaudeRail() {
   };
 
   const handleCancel = () => {
-    void ipc.claudeCancel(thread.threadId);
+    void dispatchCancel(thread.threadId, useModelPrefs.getState().modelFor("xdesign"));
   };
 
   const chatMessages: ClaudeChatMessage[] = thread.messages.map((m) => ({

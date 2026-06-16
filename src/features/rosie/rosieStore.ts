@@ -1,9 +1,8 @@
 import { create } from "zustand";
 import { ulid } from "ulid";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { ipc } from "@/lib/ipc";
 import { useModelPrefs } from "@/store/modelPrefsStore";
-import { resolveSendFromStores } from "@/features/agents/resolveSend";
+import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
 import { upsertChat, getChatById, listAllChats } from "@/lib/db";
 
@@ -233,7 +232,10 @@ export const useRosie = create<RosieState>((set, get) => ({
 
   cancel: () => {
     const sid = get().activeStreamId;
-    if (sid) void ipc.claudeCancel(sid).catch(() => undefined);
+    if (sid)
+      void dispatchCancel(sid, useModelPrefs.getState().modelFor("rosie")).catch(
+        () => undefined,
+      );
     set({ running: false, activeStreamId: null, turnStartedAt: null });
   },
 
@@ -373,7 +375,9 @@ async function runSubprocessTurn(
         }));
         // Best-effort cancel of the running subprocess so it doesn't keep
         // burning resources after we've given up on it.
-        void ipc.claudeCancel(chatId).catch(() => undefined);
+        void dispatchCancel(chatId, useModelPrefs.getState().modelFor("rosie")).catch(
+          () => undefined,
+        );
         done();
       }, 180_000);
     };
@@ -433,17 +437,15 @@ async function runSubprocessTurn(
 
       try {
         const sid = store.getState().sessionId;
-        const r = resolveSendFromStores(useModelPrefs.getState().modelFor("rosie"));
-        await ipc.claudeSend(
+        await dispatchSend({
           chatId,
-          fullPrompt,
-          null,
-          sid && sid.length > 0 ? sid : null,
-          null,
-          r.model,
-          r.systemAppend,
-          r.allowedTools,
-        );
+          value: useModelPrefs.getState().modelFor("rosie"),
+          prompt: fullPrompt,
+          history: toRuntimeHistory(store.getState().messages),
+          projectRoot: null,
+          sessionId: sid && sid.length > 0 ? sid : null,
+          imagePath: null,
+        });
       } catch (err) {
         const message =
           err instanceof Error ? err.message : String(err);
