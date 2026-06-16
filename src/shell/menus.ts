@@ -154,6 +154,7 @@ function xdesignObject(): MenuItem[] {
 /** The application menu hung under the bold app-name label. */
 export function appMenu(): MenuItem[] {
   return [
+    cmd("controlpanel.open", "Control Panel…"),
     cmd("settings.open", "Settings…"),
     cmd("keybindings.show", "Keyboard Shortcuts"),
     sep,

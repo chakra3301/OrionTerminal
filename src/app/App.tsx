@@ -3,6 +3,7 @@ import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { EventBridge } from "@/app/EventBridge";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
+import { ControlPanel } from "@/features/controlpanel/ControlPanel";
 import { KeybindingsOverlay } from "@/features/keybindings/KeybindingsOverlay";
 import { installBuiltinCommands } from "@/commands/builtins";
 import { installShellCommands } from "@/shell/commands/shellCommands";
@@ -619,6 +620,7 @@ export default function App() {
       <EventBridge />
       <Shell />
       <SettingsPanel />
+      <ControlPanel />
       <KeybindingsOverlay />
       <LinkInsertPalette />
     </ErrorBoundary>

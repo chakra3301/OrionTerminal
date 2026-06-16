@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Archive, Code2, Palette, Search, Workflow } from "lucide-react";
+import { Archive, Code2, Palette, Search, SlidersHorizontal, Workflow } from "lucide-react";
 import { useShell, type AppId, APP_NAMES } from "@/shell/store/useShell";
 import { useRosie } from "@/features/rosie/rosieStore";
+import { useControlPanel } from "@/store/controlPanelStore";
 
 type DockApp = {
   id: AppId;
@@ -147,6 +148,13 @@ export function Dock() {
             style={{ width: 24, height: 24 }}
             aria-hidden
           />
+        </DockTile>
+        <DockTile
+          cursorX={cursorX}
+          title="Control Panel (⌘,)"
+          onClick={() => useControlPanel.getState().show()}
+        >
+          <SlidersHorizontal size={18} color="var(--t-primary)" />
         </DockTile>
       </div>
     </div>

@@ -15,8 +15,8 @@ import { useFocusStore } from "@/store/focusStore";
 import { useInlineEditStore } from "@/store/inlineEditStore";
 import { useChatStore } from "@/store/chatStore";
 import { useTerminalStore } from "@/store/terminalStore";
-import { useSettingsStore } from "@/store/settingsStore";
 import { useKeybindingsStore } from "@/store/keybindingsStore";
+import { useControlPanel } from "@/store/controlPanelStore";
 import { useNotesStore } from "@/store/notesStore";
 import { useMoodBoardsStore } from "@/store/moodBoardsStore";
 import { useArchives } from "@/apps/archives/useArchives";
@@ -402,11 +402,17 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
-    id: "settings.open",
-    label: "Open Settings",
+    id: "controlpanel.open",
+    label: "Open Control Panel",
     hotkey: "mod+,",
     group: "View",
-    run: () => useSettingsStore.getState().show(),
+    run: () => useControlPanel.getState().show(),
+  });
+  registry.register({
+    id: "settings.open",
+    label: "Open Settings",
+    group: "View",
+    run: () => useControlPanel.getState().show("theme"),
   });
 
   registry.register({
