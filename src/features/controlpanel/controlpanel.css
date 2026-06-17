@@ -152,8 +152,16 @@
 
 /* center: the agent */
 .forge-center { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.forge-portrait-wrap { --acc-rgb: var(--neon-violet-rgb); position: relative; width: 132px; height: 146px; }
+.forge-corners { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.forge-corner {
+  position: absolute; transform: translate(-50%, -50%); padding: 3px; border: none; cursor: pointer;
+  pointer-events: auto; line-height: 0; border-radius: 50%;
+  background: radial-gradient(circle, rgba(3,6,10,0.95) 52%, rgba(3,6,10,0) 74%);
+  transition: transform .14s ease;
+}
+.forge-corner:hover { transform: translate(-50%, -50%) scale(1.18); }
 .forge-portrait {
-  --acc-rgb: var(--neon-violet-rgb);
   position: relative; padding: 0; border: none; background: none; cursor: pointer; line-height: 0;
   filter: drop-shadow(0 0 14px rgba(var(--acc-rgb), 0.4)); transition: filter .2s, transform .2s;
 }

@@ -3,40 +3,58 @@ import type { CSSProperties } from "react";
 import { ulid } from "ulid";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { Brain, Zap, Hammer, X } from "lucide-react";
+import { Brain, Zap, Hammer } from "lucide-react";
 import { useAgentsStore } from "@/store/agentsStore";
 import { useSkillsStore } from "@/store/skillsStore";
 import { useProvidersStore } from "@/store/providersStore";
-import type { Agent } from "@/features/agents/agentTypes";
+import type { Agent, Skill } from "@/features/agents/agentTypes";
 import { SkillTile } from "./SkillTile";
+import { SkillEmblem } from "./SkillEmblem";
 import { hexToRgb } from "./sigil";
 
 const ACCENTS = ["#b14cff", "#00e0ff", "#39ff88", "#e6ff3a", "#ff3ea5"];
 const HEX = "60,4 112,34 112,98 60,128 8,98 8,34";
+// The six hexagon vertices in portrait pixel space (132×146), for corner slots.
+const CORNERS = [
+  { x: 66, y: 4 }, { x: 123, y: 38 }, { x: 123, y: 108 },
+  { x: 66, y: 142 }, { x: 9, y: 108 }, { x: 9, y: 38 },
+];
 
 function blank(): Agent {
   return { id: ulid(), name: "New Agent", role: "", accent: "#b14cff", avatarAssetId: null, avatarUrl: null, brainModel: "claude-opus-4-8", actionModel: "", skillIds: [] };
 }
 
-function ForgePortrait({ url, accent, onClick }: { url: string | null; accent: string; onClick: () => void }) {
+function ForgePortrait({ url, accent, equipped, onPick, onUnequip }: { url: string | null; accent: string; equipped: Skill[]; onPick: () => void; onUnequip: (id: string) => void }) {
   return (
-    <button className="forge-portrait" style={{ "--acc-rgb": hexToRgb(accent) } as CSSProperties} onClick={onClick} title="Choose a portrait image">
-      <svg width={132} height={146} viewBox="0 0 120 132" style={{ overflow: "visible" }} aria-hidden>
-        <defs>
-          <clipPath id="fp-hex"><polygon points={HEX} /></clipPath>
-        </defs>
-        <g className="fp-reticle">
-          <circle cx="60" cy="66" r="62" fill="none" stroke="rgba(var(--acc-rgb), 0.3)" strokeWidth="0.8" strokeDasharray="2 9" />
-          <path d="M60,2 v9 M60,130 v-9 M4,66 h9 M116,66 h-9" stroke="rgba(var(--acc-rgb), 0.85)" strokeWidth="1.2" />
-        </g>
-        <polygon className="fp-plate" points={HEX} />
-        {url ? (
-          <image href={url} x="8" y="4" width="104" height="124" preserveAspectRatio="xMidYMid slice" clipPath="url(#fp-hex)" />
-        ) : (
-          <text className="fp-empty" x="60" y="70" textAnchor="middle">ADD IMAGE</text>
-        )}
-      </svg>
-    </button>
+    <div className="forge-portrait-wrap" style={{ "--acc-rgb": hexToRgb(accent) } as CSSProperties}>
+      <button className="forge-portrait" onClick={onPick} title="Choose a portrait image">
+        <svg width={132} height={146} viewBox="0 0 120 132" style={{ overflow: "visible" }} aria-hidden>
+          <defs>
+            <clipPath id="fp-hex"><polygon points={HEX} /></clipPath>
+          </defs>
+          <g className="fp-reticle">
+            <circle cx="60" cy="66" r="62" fill="none" stroke="rgba(var(--acc-rgb), 0.3)" strokeWidth="0.8" strokeDasharray="2 9" />
+            <path d="M60,2 v9 M60,130 v-9 M4,66 h9 M116,66 h-9" stroke="rgba(var(--acc-rgb), 0.85)" strokeWidth="1.2" />
+          </g>
+          <polygon className="fp-plate" points={HEX} />
+          {url ? (
+            <image href={url} x="8" y="4" width="104" height="124" preserveAspectRatio="xMidYMid slice" clipPath="url(#fp-hex)" />
+          ) : (
+            <text className="fp-empty" x="60" y="70" textAnchor="middle">ADD IMAGE</text>
+          )}
+        </svg>
+      </button>
+      <div className="forge-corners">
+        {CORNERS.map((pos, i) => {
+          const s = equipped[i];
+          return s ? (
+            <button key={s.id} className="forge-corner" style={{ left: pos.x, top: pos.y }} onClick={() => onUnequip(s.id)} title={`${s.name} — unequip`}>
+              <SkillEmblem skill={s} size={36} equipped />
+            </button>
+          ) : null;
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -50,6 +68,7 @@ export function AgentForge() {
   const [draft, setDraft] = useState<Agent>(blank());
 
   const equipped = new Set(draft.skillIds);
+  const equippedSkills = draft.skillIds.map((id) => skills.find((x) => x.id === id)).filter((s): s is Skill => !!s);
   const toggleSkill = (id: string) =>
     setDraft((d) => ({ ...d, skillIds: equipped.has(id) ? d.skillIds.filter((x) => x !== id) : [...d.skillIds, id] }));
 
@@ -81,23 +100,13 @@ export function AgentForge() {
         </div>
 
         <div className="forge-center">
-          <ForgePortrait url={draft.avatarUrl} accent={draft.accent} onClick={pickAvatar} />
+          <ForgePortrait url={draft.avatarUrl} accent={draft.accent} equipped={equippedSkills} onPick={pickAvatar} onUnequip={toggleSkill} />
           <input className="forge-name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <input className="forge-role" placeholder="class / title" value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value })} />
           <div className="forge-accents">
             {ACCENTS.map((c) => <button key={c} type="button" className={`forge-dot${draft.accent === c ? " on" : ""}`} style={{ background: c, color: c }} onClick={() => setDraft({ ...draft, accent: c })} aria-label="accent" />)}
           </div>
           <div className="cp-eyebrow">Equipped <span className="cp-count">{draft.skillIds.length}</span></div>
-          <div className="forge-equipped">
-            {draft.skillIds.map((id) => {
-              const s = skills.find((x) => x.id === id);
-              return s ? (
-                <span key={id} className="forge-chip" style={{ "--acc-rgb": hexToRgb(s.accent) } as CSSProperties} onClick={() => toggleSkill(id)} title="Unequip">
-                  {s.name} <X className="x" size={11} strokeWidth={2.4} />
-                </span>
-              ) : null;
-            })}
-          </div>
         </div>
 
         <div className="forge-inv">
