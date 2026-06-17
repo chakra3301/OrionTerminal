@@ -3,6 +3,7 @@ import { ulid } from "ulid";
 import { useSkillsStore } from "@/store/skillsStore";
 import type { Skill } from "@/features/agents/agentTypes";
 import { SkillEditor } from "./SkillEditor";
+import { SkillGlyph } from "./SkillGlyph";
 
 export function SkillLibraryPanel() {
   const skills = Array.from(useSkillsStore((s) => s.skills).values());
@@ -15,17 +16,18 @@ export function SkillLibraryPanel() {
 
   return (
     <div>
-      <div className="cp-skill-grid">
+      <div className="cp-eyebrow">Skill Codex <span className="cp-count">{skills.length}</span></div>
+      <div className="cp-glyph-grid">
         {skills.map((s) => (
-          <button key={s.id} className="cp-skill-tile" style={{ borderColor: s.accent || "var(--glass-border)" }}
-            onClick={() => setEditing(s.builtin ? duplicate(s) : s)} title={s.builtin ? "Built-in — opens a customizable copy" : "Edit"}>
-            <span className="cp-skill-icon">{s.icon || "✨"}</span>
-            <span className="cp-skill-name">{s.name}</span>
-            {s.builtin && <span className="cp-skill-flag">built-in</span>}
-          </button>
+          <SkillGlyph
+            key={s.id}
+            skill={s}
+            onClick={() => setEditing(s.builtin ? duplicate(s) : s)}
+            title={s.builtin ? "Built-in — opens a customizable copy" : "Edit"}
+          />
         ))}
       </div>
-      <button className="cp-btn" onClick={() => setEditing(newSkill())}>+ New skill</button>
+      <button className="cp-btn" style={{ marginTop: 16 }} onClick={() => setEditing(newSkill())}>+ Inscribe new skill</button>
     </div>
   );
 }
