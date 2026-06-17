@@ -11,7 +11,7 @@ function hasGrant(tools: ToolGrant[], g: ToolGrant): boolean {
 export function SkillEditor({ skill, onClose }: { skill: Skill; onClose: () => void }) {
   const save = useSkillsStore((s) => s.save);
   const remove = useSkillsStore((s) => s.remove);
-  const mcp = useMcpServers((s) => s.servers.filter((x) => x.enabled));
+  const mcp = useMcpServers((s) => s.servers).filter((x) => x.enabled);
   const [draft, setDraft] = useState<Skill>(skill);
 
   const toggle = (g: ToolGrant) =>

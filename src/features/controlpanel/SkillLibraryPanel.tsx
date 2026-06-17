@@ -5,7 +5,7 @@ import type { Skill } from "@/features/agents/agentTypes";
 import { SkillEditor } from "./SkillEditor";
 
 export function SkillLibraryPanel() {
-  const skills = useSkillsStore((s) => s.list());
+  const skills = Array.from(useSkillsStore((s) => s.skills).values());
   const [editing, setEditing] = useState<Skill | null>(null);
 
   const newSkill = (): Skill => ({ id: ulid(), name: "New Skill", icon: "✨", accent: "#b14cff", instructions: "", tools: [], builtin: false });

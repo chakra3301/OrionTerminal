@@ -8,7 +8,7 @@ export function ModelSelect({ surface }: { surface: ModelSurface }) {
   const value = useModelPrefs((s) => s.models[surface]) || DEFAULT_MODEL_ID;
   const setModel = useModelPrefs((s) => s.setModel);
   const providers = useProvidersStore((s) => s.providers);
-  const agents = useAgentsStore((s) => Array.from(s.agents.values()));
+  const agents = Array.from(useAgentsStore((s) => s.agents).values());
 
   return (
     <select

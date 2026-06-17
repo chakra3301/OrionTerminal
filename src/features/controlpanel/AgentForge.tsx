@@ -14,8 +14,8 @@ function blank(): Agent {
 }
 
 export function AgentForge() {
-  const agents = useAgentsStore((s) => s.list());
-  const skills = useSkillsStore((s) => s.list());
+  const agents = Array.from(useAgentsStore((s) => s.agents).values());
+  const skills = Array.from(useSkillsStore((s) => s.skills).values());
   const save = useAgentsStore((s) => s.save);
   const remove = useAgentsStore((s) => s.remove);
   const providers = useProvidersStore((s) => s.providers);
