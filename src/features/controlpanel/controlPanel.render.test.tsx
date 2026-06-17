@@ -48,7 +48,7 @@ function rendersWithoutLoop(el: React.ReactElement): { ok: boolean; detail: stri
 const sampleSkill: Skill = {
   id: "s1",
   name: "Test Skill",
-  icon: "✨",
+  icon: "",
   accent: "#b14cff",
   instructions: "",
   tools: [],

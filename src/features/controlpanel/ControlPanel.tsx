@@ -1,22 +1,23 @@
 import { Fragment } from "react";
+import type { LucideIcon } from "lucide-react";
 import { useControlPanel, type CpSection } from "@/store/controlPanelStore";
 import { ProvidersPanel } from "./ProvidersPanel";
 import { SkillLibraryPanel } from "./SkillLibraryPanel";
 import { AgentForge } from "./AgentForge";
 import { APIKeySection, ThemeSection, WallpaperSection, McpSection, ShortcutsSection, AboutSection } from "@/features/settings/SettingsPanel";
-import { X } from "lucide-react";
+import { X, Cpu, Hammer, Sparkles, KeyRound, Palette, Image as ImageIcon, Plug, Keyboard, Info } from "lucide-react";
 import "./controlpanel.css";
 
-const NAV: { key: CpSection; label: string; icon: string }[] = [
-  { key: "providers", label: "Providers", icon: "🧠" },
-  { key: "agents", label: "Agent Forge", icon: "⚒" },
-  { key: "skills", label: "Skill Library", icon: "📚" },
-  { key: "key", label: "API Keys", icon: "🔑" },
-  { key: "theme", label: "Appearance", icon: "🎨" },
-  { key: "wallpaper", label: "Wallpaper", icon: "🖼" },
-  { key: "mcp", label: "MCP Servers", icon: "🔌" },
-  { key: "shortcuts", label: "Shortcuts", icon: "⌨" },
-  { key: "about", label: "About", icon: "ℹ" },
+const NAV: { key: CpSection; label: string; Icon: LucideIcon }[] = [
+  { key: "providers", label: "Providers", Icon: Cpu },
+  { key: "agents", label: "Agent Forge", Icon: Hammer },
+  { key: "skills", label: "Skill Library", Icon: Sparkles },
+  { key: "key", label: "API Keys", Icon: KeyRound },
+  { key: "theme", label: "Appearance", Icon: Palette },
+  { key: "wallpaper", label: "Wallpaper", Icon: ImageIcon },
+  { key: "mcp", label: "MCP Servers", Icon: Plug },
+  { key: "shortcuts", label: "Shortcuts", Icon: Keyboard },
+  { key: "about", label: "About", Icon: Info },
 ];
 
 export function ControlPanel() {
@@ -30,7 +31,7 @@ export function ControlPanel() {
     <div className="cp-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) hide(); }}>
       <div className="cp-surface" onMouseDown={(e) => e.stopPropagation()}>
         <aside className="cp-rail">
-          <div className="cp-rail-title">⌃ Control Panel</div>
+          <div className="cp-rail-title">Control Panel</div>
           {NAV.map((n) => (
             <Fragment key={n.key}>
               {n.key === "key" && <div className="cp-rail-divider" />}
@@ -38,7 +39,7 @@ export function ControlPanel() {
                 className={`cp-rail-item${section === n.key ? " active" : ""}`}
                 onClick={() => setSection(n.key)}
               >
-                <span className="cp-rail-icon">{n.icon}</span>{n.label}
+                <n.Icon size={15} strokeWidth={1.75} />{n.label}
               </button>
             </Fragment>
           ))}
