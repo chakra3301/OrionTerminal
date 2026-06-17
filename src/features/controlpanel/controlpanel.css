@@ -89,9 +89,8 @@
 /* ── Skill emblem (SVG) ──────────────────────────────────────────────────── */
 .se { display: block; overflow: visible; }
 .se-plate { fill: rgba(var(--acc-rgb), 0.05); stroke: rgba(var(--acc-rgb), 0.5); stroke-width: 1.2px; }
-.se-sigil { fill: none; stroke: rgba(var(--acc-rgb), 0.9); stroke-width: 1.3px; stroke-linejoin: round;
+.se-sigil { fill: none; stroke: rgba(var(--acc-rgb), 0.95); stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round;
   filter: drop-shadow(0 0 3px rgba(var(--acc-rgb), 0.45)); }
-.se-core { fill: rgba(var(--acc-rgb), 0.9); }
 .se-reticle, .se-subdial { transform-box: fill-box; transform-origin: center; }
 .se.on .se-plate { fill: rgba(var(--acc-rgb), 0.13); stroke: rgba(var(--acc-rgb), 0.9); }
 .se.on { filter: drop-shadow(0 0 7px rgba(var(--acc-rgb), 0.5)); }
