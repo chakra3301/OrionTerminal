@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
+use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -10,6 +10,7 @@ use tauri::{AppHandle, Emitter};
 struct PtyHandle {
     master: Box<dyn MasterPty + Send>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
+    killer: Box<dyn ChildKiller + Send + Sync>,
 }
 
 static PTYS: Lazy<Mutex<HashMap<String, PtyHandle>>> =
@@ -95,6 +96,7 @@ fn spawn_pty_with(
 
     let mut child = pair.slave.spawn_command(builder).map_err(|e| e.to_string())?;
     drop(pair.slave);
+    let killer = child.clone_killer();
 
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
     let writer_arc = Arc::new(Mutex::new(writer));
@@ -105,6 +107,7 @@ fn spawn_pty_with(
         PtyHandle {
             master: pair.master,
             writer: writer_arc,
+            killer,
         },
     );
 
@@ -245,8 +248,19 @@ pub fn terminal_resize(pty_id: String, cols: u16, rows: u16) -> Result<(), Strin
 
 #[tauri::command]
 pub fn terminal_kill(pty_id: String) -> Result<(), String> {
-    PTYS.lock().remove(&pty_id);
+    if let Some(mut handle) = PTYS.lock().remove(&pty_id) {
+        let _ = handle.killer.kill();
+    }
     Ok(())
+}
+
+/// Kill every live PTY child. Called on app exit so no shell/claude session
+/// outlives the window.
+pub fn kill_all() {
+    let mut map = PTYS.lock();
+    for (_, mut handle) in map.drain() {
+        let _ = handle.killer.kill();
+    }
 }
 
 #[cfg(test)]
