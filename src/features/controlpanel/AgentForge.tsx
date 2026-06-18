@@ -64,7 +64,7 @@ export function AgentForge() {
   const save = useAgentsStore((s) => s.save);
   const remove = useAgentsStore((s) => s.remove);
   const providers = useProvidersStore((s) => s.providers);
-  const runnableModels = providers.filter((p) => p.builtin).flatMap((p) => p.models);
+  const runnableModels = providers.filter((p) => p.enabled).flatMap((p) => p.models);
   const [draft, setDraft] = useState<Agent>(blank());
 
   const equipped = new Set(draft.skillIds);
