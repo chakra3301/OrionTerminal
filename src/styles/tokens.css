@@ -1975,6 +1975,31 @@ summary:focus-visible,
   margin-left: 4px;
   animation: ot-blink 1s infinite;
 }
+.ot-plan-block {
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--r-sm);
+  background: rgba(255,255,255,0.02);
+  margin: 2px 0;
+  overflow: hidden;
+}
+.ot-plan-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: var(--font-mono, monospace);
+}
+.ot-plan-caret { margin-left: auto; opacity: 0.7; }
+.ot-plan-body { padding: 0 10px 8px; }
+.ot-plan-body p:first-child { margin-top: 0; }
 @keyframes ot-blink { 50% { opacity: 0; } }
 
 .ot-claude-suggest {

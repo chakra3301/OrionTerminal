@@ -93,6 +93,7 @@ export function OrionClaudeRail() {
       role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
       content: blocksToText(m) || (m.pending ? "…" : ""),
       pending: m.pending,
+      planning: m.planning,
       pills: m.pills,
     }));
   }, [active]);

@@ -41,6 +41,7 @@ export type ClaudeChatMessage = {
   role: "user" | "assistant";
   content: ReactNode | string;
   pending?: boolean;
+  planning?: boolean;
   pills?: ClaudeChatPill[];
 };
 
@@ -131,6 +132,37 @@ function MessageBody({ content }: { content: ReactNode | string }) {
     >
       {content}
     </ReactMarkdown>
+  );
+}
+
+/** Brain-pass plan, rendered as a labeled collapsible block in the agent
+ *  accent. Sits above the execution stream in a two-pass agent turn. */
+function PlanningBlock({
+  content,
+  accent,
+}: {
+  content: ReactNode | string;
+  accent: string;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="ot-plan-block" style={{ borderColor: `${accent}40` }}>
+      <button
+        type="button"
+        className="ot-plan-head"
+        style={{ color: accent }}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Sparkles size={12} />
+        <span>Planning</span>
+        <span className="ot-plan-caret">{open ? "−" : "+"}</span>
+      </button>
+      {open && (
+        <div className="ot-plan-body">
+          <MessageBody content={content} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -300,7 +332,11 @@ export function ClaudeChat(props: ClaudeChatProps) {
               className={`ot-msg ${m.role}${m.pending ? " thinking" : ""}`}
               style={userStyle}
             >
-              <MessageBody content={m.content} />
+              {m.planning ? (
+                <PlanningBlock content={m.content} accent={accentColor} />
+              ) : (
+                <MessageBody content={m.content} />
+              )}
               {m.pills && m.pills.length > 0 && <MessagePills pills={m.pills} />}
             </div>
           );
