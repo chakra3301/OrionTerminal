@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { memo, useEffect, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -123,7 +123,11 @@ export function detectAtToken(value: string, caret: number): { at: number; query
   return { at, query };
 }
 
-function MessageBody({ content }: { content: ReactNode | string }) {
+const MessageBody = memo(function MessageBody({
+  content,
+}: {
+  content: ReactNode | string;
+}) {
   if (typeof content !== "string") return <>{content}</>;
   return (
     <ReactMarkdown
@@ -133,7 +137,7 @@ function MessageBody({ content }: { content: ReactNode | string }) {
       {content}
     </ReactMarkdown>
   );
-}
+});
 
 /** Brain-pass plan, rendered as a labeled collapsible block in the agent
  *  accent. Sits above the execution stream in a two-pass agent turn. */
