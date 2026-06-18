@@ -1,4 +1,5 @@
 #![recursion_limit = "256"]
+mod app_handle;
 mod api_key;
 mod provider_keys;
 mod asset;

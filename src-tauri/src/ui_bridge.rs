@@ -38,6 +38,13 @@ static BRIDGE: OnceCell<BridgeInfo> = OnceCell::new();
 static PENDING: Lazy<Mutex<HashMap<String, oneshot::Sender<BridgeResult>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
+/// In-process equivalent of `PENDING`: the runtime's `dispatch_sync` blocks a
+/// `spawn_blocking` thread on a std sync channel (not a tokio oneshot) because
+/// it runs synchronously. `ui_bridge_respond` resolves whichever map holds the
+/// request id.
+static PENDING_SYNC: Lazy<Mutex<HashMap<String, std::sync::mpsc::Sender<BridgeResult>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
 static REQ_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone)]
@@ -179,9 +186,46 @@ async fn handle_request(app: &AppHandle, expected_token: &str, line: &str) -> Re
     }
 }
 
+/// Emit a `ui:action` event and block (synchronously) for the frontend's
+/// `ui_bridge_respond`. Used by the in-process runtime tool dispatch, which
+/// runs on `spawn_blocking`. Same 5s bound + request shape as the TCP path.
+pub fn dispatch_sync(app: &AppHandle, kind: &str, payload: Value) -> Result<Value, String> {
+    use serde_json::json;
+    let request_id = format!("req-{}", REQ_COUNTER.fetch_add(1, Ordering::Relaxed));
+    let (tx, rx) = std::sync::mpsc::channel::<BridgeResult>();
+    PENDING_SYNC.lock().insert(request_id.clone(), tx);
+
+    let emitted = app.emit(
+        "ui:action",
+        UiActionEvent {
+            kind: kind.to_string(),
+            payload,
+            request_id: request_id.clone(),
+        },
+    );
+    if emitted.is_err() {
+        PENDING_SYNC.lock().remove(&request_id);
+        return Err("failed to emit ui:action".into());
+    }
+
+    match rx.recv_timeout(std::time::Duration::from_secs(5)) {
+        Ok(result) => {
+            if result.ok {
+                Ok(result.data.unwrap_or_else(|| json!({})))
+            } else {
+                Err(result.error.unwrap_or_else(|| "ui action failed".into()))
+            }
+        }
+        Err(_) => {
+            PENDING_SYNC.lock().remove(&request_id);
+            Err("ui action timed out (is the target app open?)".into())
+        }
+    }
+}
+
 /// Frontend → backend: deliver the result of a `ui:action` back to the
-/// waiting bridge connection. No-op if the request already timed out (the
-/// sender will have been removed).
+/// waiting bridge connection (TCP or in-process). No-op if the request
+/// already timed out (the sender will have been removed from both maps).
 #[tauri::command]
 pub fn ui_bridge_respond(
     request_id: String,
@@ -189,8 +233,13 @@ pub fn ui_bridge_respond(
     data: Option<Value>,
     error: Option<String>,
 ) {
+    let result = BridgeResult { ok, data, error };
     if let Some(tx) = PENDING.lock().remove(&request_id) {
-        let _ = tx.send(BridgeResult { ok, data, error });
+        let _ = tx.send(result);
+        return;
+    }
+    if let Some(tx) = PENDING_SYNC.lock().remove(&request_id) {
+        let _ = tx.send(result);
     }
 }
 
@@ -216,4 +265,31 @@ fn getrandom(buf: &mut [u8]) -> Result<(), std::io::Error> {
     // timestamp-derived token if reading fails.
     let mut f = File::open("/dev/urandom")?;
     f.read_exact(buf)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc;
+
+    #[test]
+    fn respond_resolves_sync_pending_map() {
+        let (tx, rx) = mpsc::channel::<BridgeResult>();
+        PENDING_SYNC.lock().insert("req-sync-test".to_string(), tx);
+        ui_bridge_respond(
+            "req-sync-test".to_string(),
+            true,
+            Some(serde_json::json!({ "ok": 1 })),
+            None,
+        );
+        let got = rx.recv_timeout(std::time::Duration::from_secs(1)).unwrap();
+        assert!(got.ok);
+        assert_eq!(got.data.unwrap()["ok"], 1);
+    }
+
+    #[test]
+    fn respond_unknown_id_is_noop() {
+        // Must not panic when the id is in neither map.
+        ui_bridge_respond("nope".to_string(), true, None, None);
+    }
 }
