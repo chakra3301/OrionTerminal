@@ -267,7 +267,9 @@ export function InlineEditSession({ editorRef, monacoRef, path, mountTick }: Pro
       allowEditorOverflow: true,
       getPosition: () => {
         const r = regionRange();
-        const line = r ? r.startLineNumber : m.getPositionAt(ctx.selStart).lineNumber;
+        const liveCtx = useInlineEditStore.getState().ctx;
+        const anchor = liveCtx ? liveCtx.selStart : ctx.selStart;
+        const line = r ? r.startLineNumber : m.getPositionAt(anchor).lineNumber;
         return {
           position: { lineNumber: line, column: 1 },
           preference: [
