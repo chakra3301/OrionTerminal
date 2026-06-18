@@ -5,6 +5,7 @@ mod provider_keys;
 mod asset;
 mod autocomplete;
 mod claude_cli;
+mod cli_engine;
 mod db_backup;
 mod fs_ops;
 mod fs_watch;
