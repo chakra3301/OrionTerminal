@@ -4,6 +4,8 @@ import type { ResolvedSend } from "@/features/agents/resolveSend";
 import type { Provider } from "@/features/agents/agentTypes";
 import { useProvidersStore } from "@/store/providersStore";
 import { mapToRuntimeTools } from "@/features/agents/runtimeTools";
+import { shouldTwoPass, planningSystem, executionPrompt } from "./twoPass";
+import { beginTwoPass, twoPassPhase, clearTwoPass } from "./twoPassCoordinator";
 
 export type RuntimeMsg = { role: "user" | "assistant"; content: string };
 
@@ -136,10 +138,77 @@ export async function dispatchSend(args: DispatchSendArgs): Promise<void> {
   });
 }
 
+export type TwoPassHooks = {
+  /** Seal the streamed plan message in the rail store and return its text. */
+  capturePlan: () => string;
+  /** Fresh runtime history (incl. the plan) for a runtime Action pass. */
+  nextHistory: () => RuntimeMsg[];
+  /** Rail-specific prep before the Action pass streams (e.g. open a new
+   *  assistant message). Not needed for chatStore — it opens lazily. */
+  beginExecute?: () => void;
+};
+
+/** A chat-turn dispatch that may split into Brain(plan) -> Action(execute).
+ *  Without hooks, or for a single-pass selection, this is identical to
+ *  dispatchSend. */
+export async function dispatchAgentTurn(
+  args: DispatchSendArgs,
+  hooks?: TwoPassHooks,
+): Promise<void> {
+  const resolved = resolveSendFromStores(args.value);
+  const opts: ResolvedDispatchOpts = {
+    projectRoot: args.projectRoot,
+    sessionId: args.sessionId,
+    imagePath: args.imagePath,
+  };
+  if (!hooks || !shouldTwoPass(resolved)) {
+    return dispatchResolved(args.chatId, resolved, args.prompt, args.history, opts);
+  }
+
+  const userPrompt = args.prompt;
+  const actionModel = resolved.actionModel as string; // non-null by shouldTwoPass
+
+  beginTwoPass(args.chatId, {
+    phase: "plan",
+    value: args.value,
+    capturePlan: hooks.capturePlan,
+    fireExecute: (plan) => {
+      hooks.beginExecute?.();
+      const action: ResolvedSend = {
+        model: actionModel,
+        actionModel: null,
+        systemAppend: resolved.systemAppend,
+        allowedTools: resolved.allowedTools,
+      };
+      const prompt = executionPrompt(userPrompt, plan);
+      // Claude/CLI read `prompt`; the runtime reads `history` — give the
+      // runtime an explicit execute turn so the plan rides along either way.
+      const history: RuntimeMsg[] = [
+        ...hooks.nextHistory(),
+        { role: "user", content: prompt },
+      ];
+      void dispatchResolved(args.chatId, action, prompt, history, opts);
+    },
+  });
+
+  const brain: ResolvedSend = {
+    model: resolved.model,
+    actionModel: null,
+    systemAppend: planningSystem(resolved.systemAppend),
+    allowedTools: [],
+  };
+  return dispatchResolved(args.chatId, brain, userPrompt, args.history, opts);
+}
+
 export async function dispatchCancel(chatId: string, value: string): Promise<void> {
+  const phase = twoPassPhase(chatId);
+  // A cancel ends the whole two-pass turn — drop the entry so the killed
+  // subprocess's exit never triggers the Action pass.
+  clearTwoPass(chatId);
   const r = resolveSendFromStores(value);
+  const model = phase === "execute" && r.actionModel ? r.actionModel : r.model;
   const providers = useProvidersStore.getState().providers;
-  const route = routeFor(providers, r.model);
+  const route = routeFor(providers, model);
   if (route === "claude") return ipc.claudeCancel(chatId);
   if (typeof route === "object" && "engine" in route) return ipc.cliCancel(chatId);
   return ipc.runtimeCancel(chatId);
