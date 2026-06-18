@@ -6,7 +6,7 @@ import {
 import { useChatStore, type ChatMessage } from "@/store/chatStore";
 import { useProjectStore } from "@/store/projectStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
-import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
+import { dispatchAgentTurn, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
 import { upsertChat } from "@/lib/db";
 import { scheduleReindex } from "@/lib/embeddingIndexer";
@@ -131,15 +131,22 @@ export function OrionClaudeRail() {
     }
     setRunning(true);
     try {
-      await dispatchSend({
-        chatId: chat.id,
-        value: useModelPrefs.getState().modelFor("orion"),
-        prompt,
-        history: toRuntimeHistory(useChatStore.getState().active?.messages ?? []),
-        projectRoot: project.root_path,
-        sessionId: chat.sessionId,
-        imagePath: null,
-      });
+      await dispatchAgentTurn(
+        {
+          chatId: chat.id,
+          value: useModelPrefs.getState().modelFor("orion"),
+          prompt,
+          history: toRuntimeHistory(useChatStore.getState().active?.messages ?? []),
+          projectRoot: project.root_path,
+          sessionId: chat.sessionId,
+          imagePath: null,
+        },
+        {
+          capturePlan: () => useChatStore.getState().sealPlanningTurn(),
+          nextHistory: () =>
+            toRuntimeHistory(useChatStore.getState().active?.messages ?? []),
+        },
+      );
     } catch (e) {
       log.error("claude_send failed", e);
       setRunning(false);

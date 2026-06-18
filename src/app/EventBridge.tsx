@@ -24,6 +24,7 @@ import {
 } from "@/lib/orionToolMatch";
 import { useHermes, type HermesStatus, type HermesColumn } from "@/store/hermesStore";
 import { useRepoLensWebsites } from "@/apps/archives/repolens/useRepoLensWebsites";
+import { onPassExit } from "@/features/agents/twoPassCoordinator";
 import { log } from "@/lib/log";
 
 /** UI actions the MCP server can request via the local TCP bridge. Each
@@ -717,6 +718,10 @@ export function EventBridge() {
         }
         const store = useChatStore.getState();
         if (!store.active || store.active.id !== e.payload.chatId) return;
+        // Two-pass agent? On the Brain pass's exit this seals the plan and
+        // fires the Action pass — do NOT finalize. The Action pass's exit (or
+        // a single-pass turn) falls through to the normal finalize below.
+        if (onPassExit(e.payload.chatId, e.payload.error)) return;
         store.finishTurn();
         store.setRunning(false);
         if (e.payload.error) log.warn("[claude exit]", e.payload.error);
