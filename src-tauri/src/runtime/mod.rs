@@ -2,6 +2,7 @@ pub mod gemini;
 pub mod openai;
 pub mod pricing;
 pub mod provider;
+pub mod tools;
 
 use futures_util::StreamExt;
 use once_cell::sync::Lazy;
@@ -100,6 +101,7 @@ pub async fn runtime_send(
         model: model.clone(),
         system,
         messages: history,
+        tools: vec![],
     };
     let body = prov.body(&req);
 
@@ -152,6 +154,7 @@ pub async fn runtime_send(
                                         acc.push_str(&t);
                                         emit_assistant(&app, &chat_id, &acc);
                                     }
+                                    StreamItem::ToolCallDelta { .. } => {}
                                     StreamItem::Usage { in_tokens: i, out_tokens: o } => {
                                         in_tokens = i;
                                         out_tokens = o;
