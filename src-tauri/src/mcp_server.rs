@@ -315,6 +315,20 @@ pub fn tool_definitions() -> Value {
             }
         },
         {
+            "name": "orion_read_file",
+            "description": "Read the full contents of a file in the user's \
+                project (absolute path or relative to the active project \
+                root). Read-only; capped at 64 KB. Use before editing a file \
+                with orion_apply_edit so old_string matches exactly.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string" }
+                },
+                "required": ["path"]
+            }
+        },
+        {
             "name": "orion_get_context",
             "description": "Snapshot of what the user is currently looking at: \
                 focused app, active code project, open file/note, current \
@@ -753,6 +767,7 @@ pub fn dispatch_tool(name: &str, args: &Value) -> Result<String, String> {
         "orion_open_file" => tool_open_file(args),
         "orion_apply_edit" => tool_apply_edit(args),
         "orion_write_file" => tool_write_file(args),
+        "orion_read_file" => tool_read_file(args),
         "orion_get_context" => tool_get_context(args),
         "orion_search_files" => tool_search_files(args),
         "orion_list_assets" => tool_list_assets(args),
@@ -1423,6 +1438,29 @@ fn tool_write_file(args: &Value) -> Result<String, String> {
         "review": "change applied and shown to the user for Accept/Reject",
     })
     .to_string())
+}
+
+/// Read a file's contents (absolute or project-relative). Read-only,
+/// char-capped at 64 KB so a large file can't blow the model's context.
+fn tool_read_file(args: &Value) -> Result<String, String> {
+    let path = args
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "path required".to_string())?
+        .trim();
+    if path.is_empty() {
+        return Err("path cannot be blank".to_string());
+    }
+    let abs = resolve_path(path)?;
+    let body = std::fs::read_to_string(&abs)
+        .map_err(|e| format!("read {}: {}", abs.display(), e))?;
+    let truncated = body.chars().count() > 65536;
+    let body: String = if truncated {
+        body.chars().take(65536).collect::<String>() + "\n…[truncated]"
+    } else {
+        body
+    };
+    Ok(body)
 }
 
 /// Reads + returns the JSON snapshot the frontend writes whenever UI state
@@ -2321,6 +2359,19 @@ fn tool_hermes_decompose(args: &Value) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn read_file_returns_contents_and_errors_on_missing() {
+        let dir = std::env::temp_dir();
+        let p = dir.join("orion_read_file_test.txt");
+        std::fs::write(&p, "hello world").unwrap();
+        let ok = super::tool_read_file(&serde_json::json!({ "path": p.to_string_lossy() })).unwrap();
+        assert!(ok.contains("hello world"));
+        let _ = std::fs::remove_file(&p);
+
+        let missing = super::tool_read_file(&serde_json::json!({ "path": "/no/such/orion/file.xyz" }));
+        assert!(missing.is_err());
+    }
+
     #[test]
     fn dispatch_tool_unknown_name_errors_like_inline_match() {
         let err = super::dispatch_tool("nope_not_a_tool", &serde_json::json!({}));
