@@ -12,6 +12,36 @@ export const BUILTIN_PROVIDER: Provider = {
   builtin: true,
 };
 
+// Subscription CLI engines (Phase 2c). Models are provisional pending a
+// logged-in run; ids match the engines' -m/--model flag values.
+export const CODEX_CLI_PROVIDER: Provider = {
+  id: "builtin:codex-cli",
+  name: "OpenAI Codex (CLI)",
+  kind: "codex_cli",
+  baseUrl: "",
+  models: [
+    { id: "gpt-5.1-codex", label: "GPT-5.1 Codex" },
+    { id: "gpt-5.1-codex-mini", label: "GPT-5.1 Codex Mini" },
+  ],
+  keyRef: "",
+  enabled: true,
+  builtin: true,
+};
+
+export const GEMINI_CLI_PROVIDER: Provider = {
+  id: "builtin:gemini-cli",
+  name: "Google Gemini (CLI)",
+  kind: "gemini_cli",
+  baseUrl: "",
+  models: [
+    { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  ],
+  keyRef: "",
+  enabled: true,
+  builtin: true,
+};
+
 export const STARTER_SKILLS: Skill[] = [
   { id: "builtin:web-research", name: "Web Research", icon: "", accent: "#00e0ff", instructions: "Search the web for primary, current sources. Prefer official docs and firsthand reports over summaries.", tools: [{ kind: "builtin", name: "WebSearch" }], builtin: true },
   { id: "builtin:cite-sources", name: "Cite Sources", icon: "", accent: "#00e0ff", instructions: "Back every non-obvious claim with a citation. Use [n] markers and list sources at the end.", tools: [], builtin: true },
