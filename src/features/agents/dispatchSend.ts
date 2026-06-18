@@ -2,6 +2,7 @@ import { ipc } from "@/lib/ipc";
 import { resolveSendFromStores } from "@/features/agents/resolveSend";
 import type { Provider } from "@/features/agents/agentTypes";
 import { useProvidersStore } from "@/store/providersStore";
+import { mapToRuntimeTools } from "@/features/agents/runtimeTools";
 
 export type RuntimeMsg = { role: "user" | "assistant"; content: string };
 
@@ -92,6 +93,7 @@ export async function dispatchSend(args: DispatchSendArgs): Promise<void> {
     r.model,
     r.systemAppend ?? "",
     args.history,
+    mapToRuntimeTools(r.allowedTools),
   );
 }
 

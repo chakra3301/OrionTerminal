@@ -192,6 +192,7 @@ export const ipc = {
     model: string,
     system: string,
     history: Array<{ role: "user" | "assistant"; content: string }>,
+    allowedTools: string[],
   ): Promise<void> =>
     invoke("runtime_send", {
       chatId,
@@ -201,6 +202,7 @@ export const ipc = {
       model,
       system,
       history,
+      allowedTools,
     }),
   runtimeCancel: (chatId: string): Promise<void> =>
     invoke("runtime_cancel", { chatId }),

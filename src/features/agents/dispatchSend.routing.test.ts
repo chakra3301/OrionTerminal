@@ -72,6 +72,7 @@ describe("dispatchSend routing", () => {
       "gpt-4o",
       "",
       [{ role: "user", content: "hi" }],
+      [],
     );
     expect(ipc.claudeSend).not.toHaveBeenCalled();
   });
