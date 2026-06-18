@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Notify;
 
-use provider::{make_provider, ChatRequest, Msg, StreamItem, ToolCall};
+use provider::{make_provider, ChatRequest, Msg, StreamItem};
 
 const MAX_ROUNDS: usize = 24;
 
