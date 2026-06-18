@@ -60,6 +60,17 @@ function useClock(): string {
   return t;
 }
 
+// Confines the 1Hz tick to this node so HermesApp / FloorView / BoardView
+// don't re-render every second just to advance the clock.
+function HermesClock() {
+  const clock = useClock();
+  return (
+    <>
+      {clock} <span>LOCAL</span>
+    </>
+  );
+}
+
 export function HermesApp() {
   const tasks = useHermes((s) => s.tasks);
   const agents = useHermes((s) => s.agents);
@@ -68,7 +79,6 @@ export function HermesApp() {
   const [focusAgentId, setFocusAgentId] = useState<string | null>(null);
   const [reportAgentId, setReportAgentId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<HermesColumn | null>(null);
-  const clock = useClock();
 
   const allAgents = Array.from(agents.values());
   const runningAgents = allAgents.filter((a) => a.status === "running").length;
@@ -143,7 +153,7 @@ export function HermesApp() {
           <span className="sv">{String(reportCount).padStart(3, "0")}</span>
         </div>
         <div className="hm-clock mono">
-          {clock} <span>LOCAL</span>
+          <HermesClock />
         </div>
         <div className={`hm-pill${runningAgents > 0 ? "" : " off"}`}>
           <span className="led" /> {runningAgents > 0 ? "Live" : "Idle"}
