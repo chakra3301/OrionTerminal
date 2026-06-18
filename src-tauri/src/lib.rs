@@ -304,7 +304,14 @@ pub fn run() {
             wallpaper::wallpaper_clear_file,
             sysstats::system_stats,
             sysstats::claude_usage,
+            sysstats::claude_limits,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                crate::terminal::kill_all();
+                crate::lsp::kill_all();
+            }
+        });
 }

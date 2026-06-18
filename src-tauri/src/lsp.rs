@@ -179,6 +179,16 @@ pub async fn lsp_stop(server_id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Kill every running language server. Called on app exit. `start_kill` is the
+/// non-async SIGKILL trigger on tokio's Child, safe to call from the sync
+/// RunEvent handler.
+pub fn kill_all() {
+    let mut map = SERVERS.lock();
+    for (_, mut proc) in map.drain() {
+        let _ = proc.child.start_kill();
+    }
+}
+
 fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack
         .windows(needle.len())
