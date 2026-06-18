@@ -306,7 +306,8 @@ function MoodBoardDetail({ board }: { board: MoodBoard }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [sel]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel.selected.size, sel.clear]);
 
   const bulkRemoveFromBoard = async () => {
     const ids = Array.from(sel.selected);

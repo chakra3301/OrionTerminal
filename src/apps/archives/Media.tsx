@@ -90,7 +90,8 @@ export function ArchivesMedia() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [sel]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel.selected.size, sel.clear]);
 
   // If the underlying filtered list shrinks (e.g., the user changes the filter
   // or an asset is deleted), drop any orphan ids from the selection.
