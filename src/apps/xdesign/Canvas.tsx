@@ -306,11 +306,12 @@ export function XDesignCanvas() {
     };
     const intersects = (s: Shape) =>
       s.x < vis.x + vis.w && s.x + s.w > vis.x && s.y < vis.y + vis.h && s.y + s.h > vis.y;
+    const byId = new Map(displayShapes.map((s) => [s.id, s]));
     const keep = new Set<string>();
     for (const s of displayShapes) {
       if (s.parentId) continue; // handled with its top-level ancestor
       const subtree = collectDescendantIds(displayShapes, s.id);
-      if (subtree.some((id) => { const d = displayShapes.find((x) => x.id === id); return d && intersects(d); })) {
+      if (subtree.some((id) => { const d = byId.get(id); return d && intersects(d); })) {
         for (const id of subtree) keep.add(id);
       }
     }
