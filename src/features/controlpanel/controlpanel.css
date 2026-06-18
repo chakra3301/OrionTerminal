@@ -205,6 +205,7 @@
 }
 .forge-summary { font: 11px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--t-tertiary); }
 .forge-summary b { color: var(--t-secondary); font-weight: 600; }
+.forge-twopass { color: var(--neon-violet); font-weight: 600; }
 .forge-btn {
   display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px; border: none; cursor: pointer;
   font: 700 12px var(--f-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--bg-0);

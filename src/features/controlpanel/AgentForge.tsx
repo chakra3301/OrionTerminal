@@ -91,7 +91,7 @@ export function AgentForge() {
             </select>
           </div>
           <div className="forge-slot action">
-            <div className="forge-slot-label"><Zap size={13} strokeWidth={2} /> Action · does <span className="forge-hint">soon</span></div>
+            <div className="forge-slot-label"><Zap size={13} strokeWidth={2} /> Action · runs the plan</div>
             <select value={draft.actionModel} onChange={(e) => setDraft({ ...draft, actionModel: e.target.value })}>
               <option value="">same as brain</option>
               {runnableModels.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
@@ -120,7 +120,12 @@ export function AgentForge() {
       </div>
 
       <div className="forge-bar">
-        <div className="forge-summary">Brain <b>{short(draft.brainModel)}</b> · Action <b>{short(draft.actionModel || draft.brainModel)}</b> · <b>{draft.skillIds.length}</b> skills</div>
+        <div className="forge-summary">
+          Brain <b>{short(draft.brainModel)}</b> · Action <b>{short(draft.actionModel || draft.brainModel)}</b> · <b>{draft.skillIds.length}</b> skills
+          {draft.actionModel && draft.actionModel !== draft.brainModel ? (
+            <span className="forge-twopass"> · two-pass</span>
+          ) : null}
+        </div>
         <button className="forge-btn" onClick={() => { void save(draft); setDraft(blank()); }}><Hammer size={14} strokeWidth={2.2} /> Forge Agent</button>
       </div>
 
