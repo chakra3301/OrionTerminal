@@ -105,6 +105,33 @@ fn read_user_mcp_servers(
     out
 }
 
+/// Decompose the Orion MCP server into command/args/env for the CLI-engine
+/// config writers (Phase 2c). Mirrors the `orion` server `write()` emits.
+/// Returns None if the current exe / config dir can't be resolved.
+pub fn orion_server(app: &AppHandle) -> Option<crate::cli_engine::config::OrionServer> {
+    let exe = std::env::current_exe().ok()?;
+    let config_dir = app.path().app_config_dir().ok()?;
+    let _ = std::fs::create_dir_all(&config_dir);
+    let db_path = config_dir.join("orion.db");
+    let context_path = config_dir.join("orion-context.json");
+    let mut env: Vec<(String, String)> = vec![
+        ("ORION_DB_PATH".into(), db_path.to_string_lossy().into_owned()),
+        (
+            "ORION_CONTEXT_PATH".into(),
+            context_path.to_string_lossy().into_owned(),
+        ),
+    ];
+    if let Some(bridge) = crate::ui_bridge::current() {
+        env.push(("ORION_BRIDGE_PORT".into(), bridge.port.to_string()));
+        env.push(("ORION_BRIDGE_TOKEN".into(), bridge.token.clone()));
+    }
+    Some(crate::cli_engine::config::OrionServer {
+        command: exe.to_string_lossy().into_owned(),
+        args: vec!["--mcp-serve".into()],
+        env,
+    })
+}
+
 /// Frontend writes its current context snapshot here (debounced). The MCP
 /// server reads the file when `orion_get_context` is called so the agent
 /// sees what the user is actually looking at.
