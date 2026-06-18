@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { listProviders, upsertProvider, deleteProvider } from "@/lib/agentsDb";
-import { BUILTIN_PROVIDER } from "@/features/agents/seedData";
+import { BUILTIN_PROVIDER, CODEX_CLI_PROVIDER, GEMINI_CLI_PROVIDER } from "@/features/agents/seedData";
 import type { Provider } from "@/features/agents/agentTypes";
 import { log } from "@/lib/log";
 
@@ -18,10 +18,12 @@ export const useProvidersStore = create<ProvidersState>((set, get) => ({
   load: async () => {
     try {
       let rows = await listProviders();
-      if (!rows.some((p) => p.id === BUILTIN_PROVIDER.id)) {
-        await upsertProvider(BUILTIN_PROVIDER);
-        rows = await listProviders();
+      const seeds = [BUILTIN_PROVIDER, CODEX_CLI_PROVIDER, GEMINI_CLI_PROVIDER];
+      let seeded = false;
+      for (const s of seeds) {
+        if (!rows.some((p) => p.id === s.id)) { await upsertProvider(s); seeded = true; }
       }
+      if (seeded) rows = await listProviders();
       set({ providers: rows, loaded: true });
     } catch (e) {
       log.warn("providers load failed", e);
