@@ -75,7 +75,10 @@ export function Constellation() {
   const runningRef  = useRef(false);
 
   // Sim edges derived from storeEdges
-  const simEdges: SimEdge[] = storeEdges.map((e) => ({ from: e.from_node, to: e.to_node }));
+  const simEdges = useMemo<SimEdge[]>(
+    () => storeEdges.map((e) => ({ from: e.from_node, to: e.to_node })),
+    [storeEdges],
+  );
 
   // ── Accessibility: reduced-motion ─────────────────────────────────────────
   const reduceMotion =
