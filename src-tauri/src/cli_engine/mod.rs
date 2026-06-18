@@ -8,9 +8,33 @@ pub mod config;
 pub mod gemini;
 pub mod transcode;
 
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::process::Stdio;
-use tokio::process::Command as TokioCommand;
+use std::sync::Arc;
+use tauri::{AppHandle, Emitter};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, Command as TokioCommand};
+use tokio::sync::Notify;
+
+static CLI_CHILDREN: Lazy<Mutex<HashMap<String, Arc<Notify>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+#[derive(Serialize, Clone)]
+struct EventPayload {
+    #[serde(rename = "chatId")]
+    chat_id: String,
+    event: serde_json::Value,
+}
+#[derive(Serialize, Clone)]
+struct ExitPayload {
+    #[serde(rename = "chatId")]
+    chat_id: String,
+    code: Option<i32>,
+    error: Option<String>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CliEngine {
@@ -138,6 +162,138 @@ pub async fn cli_status(engine: String) -> CliStatus {
             CliStatus { installed, logged_in, version, detail }
         }
     }
+}
+
+#[tauri::command]
+pub async fn cli_send(
+    app: AppHandle,
+    engine: String,
+    chat_id: String,
+    prompt: String,
+    project_root: Option<String>,
+    session_id: Option<String>,
+    model: String,
+    system_append: String,
+) -> Result<(), String> {
+    let eng = CliEngine::from_str(&engine).ok_or_else(|| format!("unknown engine: {engine}"))?;
+    let spec = match eng {
+        CliEngine::Codex => codex::prepare(
+            &app,
+            &prompt,
+            project_root.as_deref(),
+            session_id.as_deref(),
+            &model,
+            &system_append,
+        )?,
+        CliEngine::Gemini => gemini::prepare(
+            &app,
+            &prompt,
+            project_root.as_deref(),
+            session_id.as_deref(),
+            &model,
+            &system_append,
+        )?,
+    };
+
+    let mut cmd = TokioCommand::new(&spec.program);
+    cmd.args(&spec.args);
+    cmd.current_dir(&spec.cwd);
+    cmd.env("PATH", crate::claude_cli::augmented_path());
+    for (k, v) in &spec.envs {
+        cmd.env(k, v);
+    }
+    cmd.stdin(if spec.stdin_data.is_some() {
+        Stdio::piped()
+    } else {
+        Stdio::null()
+    });
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+    cmd.kill_on_drop(true);
+
+    let mut child: Child = cmd.spawn().map_err(|e| {
+        format!(
+            "failed to spawn `{}` — is the CLI installed and on PATH? ({})",
+            spec.program, e
+        )
+    })?;
+
+    if let Some(data) = spec.stdin_data {
+        if let Some(mut stdin) = child.stdin.take() {
+            tokio::spawn(async move {
+                let _ = stdin.write_all(data.as_bytes()).await;
+                let _ = stdin.shutdown().await;
+            });
+        }
+    }
+
+    let stdout = child.stdout.take().ok_or_else(|| "no stdout".to_string())?;
+    let cancel = Arc::new(Notify::new());
+    CLI_CHILDREN.lock().insert(chat_id.clone(), cancel.clone());
+
+    let app_loop = app.clone();
+    let chat_loop = chat_id.clone();
+    let mut lines = BufReader::new(stdout).lines();
+    let mut codex_state = transcode::CodexState::default();
+    let mut gemini_state = transcode::GeminiState::default();
+
+    let result: Result<Option<i32>, String> = async {
+        loop {
+            tokio::select! {
+                _ = cancel.notified() => {
+                    let _ = child.kill().await;
+                    let _ = child.wait().await;
+                    return Ok(None);
+                }
+                line = lines.next_line() => {
+                    match line {
+                        Ok(Some(text)) => {
+                            let events = match eng {
+                                CliEngine::Codex => transcode::codex_line_to_events(&text, &mut codex_state),
+                                CliEngine::Gemini => transcode::gemini_line_to_events(&text, &mut gemini_state),
+                            };
+                            for ev in events {
+                                let _ = app_loop.emit("claude:event", EventPayload {
+                                    chat_id: chat_loop.clone(), event: ev });
+                            }
+                        }
+                        Ok(None) => {
+                            let status = child.wait().await.map_err(|e| e.to_string())?;
+                            return Ok(status.code());
+                        }
+                        Err(e) => { let _ = child.kill().await; return Err(e.to_string()); }
+                    }
+                }
+            }
+        }
+    }
+    .await;
+
+    CLI_CHILDREN.lock().remove(&chat_id);
+    match result {
+        Ok(code) => {
+            let _ = app.emit(
+                "claude:exit",
+                ExitPayload { chat_id, code, error: None },
+            );
+            Ok(())
+        }
+        Err(e) => {
+            let _ = app.emit(
+                "claude:exit",
+                ExitPayload { chat_id, code: None, error: Some(e.clone()) },
+            );
+            Err(e)
+        }
+    }
+}
+
+#[tauri::command]
+pub fn cli_cancel(chat_id: String) -> Result<(), String> {
+    if let Some(n) = CLI_CHILDREN.lock().remove(&chat_id) {
+        n.notify_waiters();
+    }
+    Ok(())
 }
 
 #[cfg(test)]
