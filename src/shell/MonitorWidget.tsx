@@ -1,18 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Activity, Minus } from "lucide-react";
-import { ipc, type SystemStats, type ClaudeUsage } from "@/lib/ipc";
+import { ipc, type SystemStats, type ClaudeUsage, type ClaudeLimits } from "@/lib/ipc";
 import { getAppState, setAppState } from "@/lib/db";
 import { useDraggable } from "@/shell/useDraggable";
 import { log } from "@/lib/log";
 
 const SYS_POLL_MS = 2000;
 const USAGE_POLL_MS = 30_000;
-const FIVE_H_MS = 5 * 3_600_000;
-// Calibratable ceiling for the 5h limit gauge, in estimated USD (cost is the
-// best local proxy for Anthropic's weighted limit — it discounts cache reads
-// and accounts for model). No official number exists; the user tunes this by
-// noting the figure when they actually hit the cap. Default is a placeholder.
-const DEFAULT_BUDGET_USD = 25;
+// The real `/usage` scrape spawns a `claude` subprocess (~2–4s) and the
+// numbers move slowly, so poll it far less often than the local file read.
+const LIMITS_POLL_MS = 90_000;
 
 type Pos = { x: number; y: number };
 
@@ -26,11 +23,13 @@ function fmtBytes(n: number): string {
   return `${(n / 1024 ** 3).toFixed(1)} GB`;
 }
 
-function fmtCountdown(ms: number): string {
-  if (ms <= 0) return "now";
-  const m = Math.floor(ms / 60000);
-  const h = Math.floor(m / 60);
-  return h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
+// "Jun 18 at 11:09pm (Asia/Tokyo)" → "11:09pm". Drops the timezone suffix and,
+// when present, the leading date so the compact gauge shows just the time.
+function shortReset(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const noTz = s.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const at = noTz.indexOf(" at ");
+  return at >= 0 ? noTz.slice(at + 4).trim() : noTz;
 }
 
 function Bar({ pct, tone }: { pct: number; tone: string }) {
@@ -47,52 +46,66 @@ function Bar({ pct, tone }: { pct: number; tone: string }) {
 export function MonitorWidget() {
   const [pos, setPos] = useState<Pos | null>(null);
   const [collapsed, setCollapsed] = useState(false);
-  const [budget, setBudget] = useState(DEFAULT_BUDGET_USD);
-  const [calibrating, setCalibrating] = useState(false);
   const [sys, setSys] = useState<SystemStats | null>(null);
   const [usage, setUsage] = useState<ClaudeUsage | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [limits, setLimits] = useState<ClaudeLimits | null>(null);
   const posRef = useRef<Pos>({ x: 0, y: 0 });
 
-  // Hydrate persisted position + collapsed + budget once.
+  // Hydrate persisted position + collapsed once.
   useEffect(() => {
-    void getAppState<{ pos: Pos; collapsed?: boolean; budget?: number }>(
-      "widget.monitor",
-    ).then((v) => {
+    void getAppState<{ pos: Pos; collapsed?: boolean }>("widget.monitor").then((v) => {
       const init = v?.pos ?? { x: window.innerWidth - 280, y: 52 };
       posRef.current = init;
       setPos(init);
       if (v?.collapsed) setCollapsed(true);
-      if (typeof v?.budget === "number" && v.budget > 0) setBudget(v.budget);
     });
   }, []);
 
-  // Poll only while expanded.
+  // Poll only while expanded AND the OS window is visible (skip work when
+  // hidden/minimized — avoids spawning a `claude` subprocess every 90s for
+  // nothing).
   useEffect(() => {
     if (collapsed || !pos) return;
     let alive = true;
-    const pullSys = () =>
-      ipc.systemStats().then((s) => alive && setSys(s)).catch(() => undefined);
-    const pullUsage = () =>
-      ipc.claudeUsage().then((u) => alive && setUsage(u)).catch(() => undefined);
+    const pullSys = () => {
+      if (document.hidden) return;
+      void ipc.systemStats().then((s) => alive && setSys(s)).catch(() => undefined);
+    };
+    const pullUsage = () => {
+      if (document.hidden) return;
+      void ipc.claudeUsage().then((u) => alive && setUsage(u)).catch(() => undefined);
+    };
+    const pullLimits = () => {
+      if (document.hidden) return;
+      void ipc.claudeLimits().then((l) => alive && setLimits(l)).catch(() => undefined);
+    };
     pullSys();
     pullUsage();
+    pullLimits();
     const a = setInterval(pullSys, SYS_POLL_MS);
     const b = setInterval(pullUsage, USAGE_POLL_MS);
-    const c = setInterval(() => alive && setNow(Date.now()), 30_000);
+    const c = setInterval(pullLimits, LIMITS_POLL_MS);
+    const onVis = () => {
+      if (!document.hidden) {
+        pullSys();
+        pullUsage();
+        pullLimits();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       alive = false;
       clearInterval(a);
       clearInterval(b);
       clearInterval(c);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, [collapsed, pos]);
 
-  const persist = (next: Partial<{ pos: Pos; collapsed: boolean; budget: number }>) => {
+  const persist = (next: Partial<{ pos: Pos; collapsed: boolean }>) => {
     void setAppState("widget.monitor", {
       pos: next.pos ?? posRef.current,
       collapsed: next.collapsed ?? collapsed,
-      budget: next.budget ?? budget,
     }).catch((e) => log.warn("monitor widget persist failed", e));
   };
 
@@ -135,26 +148,24 @@ export function MonitorWidget() {
   const memPct = sys ? (sys.mem_used / sys.mem_total) * 100 : 0;
   const block = usage?.block;
   const w24 = usage?.last_24h;
-  const active = !!usage && usage.block_start_ms > 0;
-  const cost5 = active ? block!.cost_usd : 0;
-  const usedPct = (cost5 / budget) * 100;
   const tok5 = block ? block.input + block.output + block.cache_creation + block.cache_read : 0;
   const tok24 = w24 ? w24.input + w24.output + w24.cache_creation + w24.cache_read : 0;
-  const resetMs = active ? usage!.block_start_ms + FIVE_H_MS - now : 0;
-  const usedTone =
-    usedPct >= 90 ? "var(--neon-magenta)" : usedPct >= 70 ? "var(--neon-yellow)" : "var(--neon-green)";
 
-  // Calibrate the gauge to reality: the user reads their true % from Claude and
-  // enters it here; we back-solve the 5h $ ceiling from the current block cost.
-  const commitCalibration = (raw: string) => {
-    setCalibrating(false);
-    const pct = Number(raw);
-    if (pct > 0 && cost5 > 0) {
-      const b = Math.max(1, cost5 / (pct / 100));
-      setBudget(b);
-      persist({ budget: b });
-    }
-  };
+  // Authoritative numbers from `/usage`; null while loading, `ok:false` when
+  // the CLI couldn't be read (e.g. not logged in).
+  const live = limits?.ok ? limits : null;
+  const sessionPct = live?.session_pct ?? null;
+  const weekPct = live?.week_pct ?? null;
+  const sonnetPct = live?.week_sonnet_pct ?? null;
+  const sessionReset = shortReset(live?.session_reset);
+  const sessionTone =
+    sessionPct == null
+      ? "var(--neon-green)"
+      : sessionPct >= 90
+        ? "var(--neon-magenta)"
+        : sessionPct >= 70
+          ? "var(--neon-yellow)"
+          : "var(--neon-green)";
 
   return (
     <div
@@ -196,47 +207,37 @@ export function MonitorWidget() {
 
       <div className="ot-mon-section">
         <div className="ot-mon-row">
-          <span className="ot-mon-label">CLAUDE · 5h limit</span>
-          {calibrating ? (
-            <span className="ot-mon-cal" data-no-drag>
-              <input
-                className="ot-mon-budget-input"
-                type="number"
-                min={1}
-                max={100}
-                placeholder="real %"
-                defaultValue={usage ? Math.round(usedPct) : undefined}
-                autoFocus
-                onBlur={(e) => commitCalibration(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                  if (e.key === "Escape") setCalibrating(false);
-                }}
-              />
-              <span>%</span>
-            </span>
-          ) : (
-            <span
-              className="ot-mon-val ot-mon-pct"
-              data-no-drag
-              style={{ color: usedTone }}
-              title="Click to calibrate — enter your real % from Claude"
-              onClick={() => cost5 > 0 && setCalibrating(true)}
-            >
-              {usage ? `${usedPct.toFixed(0)}%` : "—"}
-            </span>
-          )}
+          <span
+            className="ot-mon-label"
+            title="Real subscription usage, from Claude's /usage"
+          >
+            CLAUDE · session
+          </span>
+          <span className="ot-mon-val ot-mon-pct" style={{ color: sessionTone }}>
+            {sessionPct != null
+              ? `${sessionPct}%`
+              : limits && !limits.ok
+                ? "n/a"
+                : "—"}
+          </span>
         </div>
-        <Bar pct={usedPct} tone={usedTone} />
+        <Bar pct={sessionPct ?? 0} tone={sessionTone} />
         <div className="ot-mon-row ot-mon-sub">
           <span>
-            ${cost5.toFixed(2)} / ${budget.toFixed(0)}
+            {sessionReset
+              ? `resets ${sessionReset}`
+              : limits && !limits.ok
+                ? "/usage unavailable"
+                : ""}
           </span>
-          <span>{active ? `resets ${fmtCountdown(resetMs)}` : "window clear"}</span>
+          <span>
+            {weekPct != null ? `week ${weekPct}%` : ""}
+            {sonnetPct != null ? ` · sonnet ${sonnetPct}%` : ""}
+          </span>
         </div>
         <div className="ot-mon-row ot-mon-sub">
           <span>{fmtTokens(tok5)} tok · 5h</span>
-          <span>{w24 ? `${fmtTokens(tok24)} · $${w24.cost_usd.toFixed(2)} · 24h` : ""}</span>
+          <span>{w24 ? `${fmtTokens(tok24)} · 24h` : ""}</span>
         </div>
       </div>
     </div>
