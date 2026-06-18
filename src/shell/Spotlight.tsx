@@ -307,6 +307,22 @@ export function Spotlight() {
     activity,
   ]);
 
+  const fuse = useMemo(
+    () =>
+      new Fuse(
+        entries.filter((e) => e.kind !== "archive"),
+        {
+          keys: [
+            { name: "label", weight: 0.7 },
+            { name: "hint", weight: 0.3 },
+          ],
+          threshold: 0.4,
+          ignoreLocation: true,
+        },
+      ),
+    [entries],
+  );
+
   const visible: SpotlightEntry[] = useMemo(() => {
     if (!trimmedQuery) {
       if (isCommandsOnly) return entries.slice(0, 20);
@@ -324,18 +340,9 @@ export function Spotlight() {
     // Archive hits keep their FTS-rank ordering (already scored on the DB
     // side); we mix them with Fuse-ranked everything-else.
     const archives = entries.filter((e) => e.kind === "archive");
-    const others = entries.filter((e) => e.kind !== "archive");
-    const fused = new Fuse(others, {
-      keys: [
-        { name: "label", weight: 0.7 },
-        { name: "hint", weight: 0.3 },
-      ],
-      threshold: 0.4,
-      ignoreLocation: true,
-    });
-    const fuseHits = fused.search(trimmedQuery, { limit: 14 }).map((r) => r.item);
+    const fuseHits = fuse.search(trimmedQuery, { limit: 14 }).map((r) => r.item);
     return [...archives, ...fuseHits];
-  }, [entries, trimmedQuery, isCommandsOnly]);
+  }, [entries, trimmedQuery, isCommandsOnly, fuse]);
 
   useEffect(() => {
     setSelected(0);
