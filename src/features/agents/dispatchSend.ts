@@ -1,5 +1,6 @@
 import { ipc } from "@/lib/ipc";
 import { resolveSendFromStores } from "@/features/agents/resolveSend";
+import type { ResolvedSend } from "@/features/agents/resolveSend";
 import type { Provider } from "@/features/agents/agentTypes";
 import { useProvidersStore } from "@/store/providersStore";
 import { mapToRuntimeTools } from "@/features/agents/runtimeTools";
@@ -74,17 +75,30 @@ export type DispatchSendArgs = {
   imagePath?: string | null;
 };
 
-export async function dispatchSend(args: DispatchSendArgs): Promise<void> {
-  const r = resolveSendFromStores(args.value);
+export type ResolvedDispatchOpts = {
+  projectRoot?: string | null;
+  sessionId?: string | null;
+  imagePath?: string | null;
+};
+
+/** Route an already-resolved send to the owning engine. Byte-identical IPC
+ *  output to the pre-refactor dispatchSend body. */
+export async function dispatchResolved(
+  chatId: string,
+  r: ResolvedSend,
+  prompt: string,
+  history: RuntimeMsg[],
+  opts: ResolvedDispatchOpts,
+): Promise<void> {
   const providers = useProvidersStore.getState().providers;
   const route = routeFor(providers, r.model);
   if (route === "claude") {
     return ipc.claudeSend(
-      args.chatId,
-      args.prompt,
-      args.projectRoot ?? null,
-      args.sessionId ?? null,
-      args.imagePath ?? null,
+      chatId,
+      prompt,
+      opts.projectRoot ?? null,
+      opts.sessionId ?? null,
+      opts.imagePath ?? null,
       r.model,
       r.systemAppend,
       r.allowedTools,
@@ -93,24 +107,33 @@ export async function dispatchSend(args: DispatchSendArgs): Promise<void> {
   if (typeof route === "object" && "engine" in route) {
     return ipc.cliSend(
       route.engine,
-      args.chatId,
-      args.prompt,
-      args.projectRoot ?? null,
-      args.sessionId ?? null,
+      chatId,
+      prompt,
+      opts.projectRoot ?? null,
+      opts.sessionId ?? null,
       r.model,
       r.systemAppend ?? "",
     );
   }
   return ipc.runtimeSend(
-    args.chatId,
+    chatId,
     route.kind,
     route.baseUrl,
     route.keyRef,
     r.model,
     r.systemAppend ?? "",
-    args.history,
+    history,
     mapToRuntimeTools(r.allowedTools),
   );
+}
+
+export async function dispatchSend(args: DispatchSendArgs): Promise<void> {
+  const r = resolveSendFromStores(args.value);
+  return dispatchResolved(args.chatId, r, args.prompt, args.history, {
+    projectRoot: args.projectRoot,
+    sessionId: args.sessionId,
+    imagePath: args.imagePath,
+  });
 }
 
 export async function dispatchCancel(chatId: string, value: string): Promise<void> {
