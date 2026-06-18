@@ -1923,6 +1923,14 @@ fn tool_delete_note(args: &Value) -> Result<String, String> {
 /// `{}` if the action had no payload to report); otherwise we surface the
 /// error to the tool so the agent sees it.
 fn send_ui_action(kind: &str, payload: Value) -> Result<Value, String> {
+    // In the main process (runtime tool dispatch) the app handle is set, so
+    // we emit directly and block on the in-process channel. The `--mcp-serve`
+    // subprocess never sets it, so it falls through to the TCP path below
+    // (byte-identical to before).
+    if let Some(app) = crate::app_handle::current() {
+        return crate::ui_bridge::dispatch_sync(&app, kind, payload);
+    }
+
     use std::io::{BufRead, BufReader, Write};
     use std::net::TcpStream;
     use std::time::Duration;
@@ -2384,6 +2392,15 @@ mod tests {
         let out = super::call_tool(&serde_json::json!({ "name": "nope", "arguments": {} })).unwrap();
         assert_eq!(out["isError"], true);
         assert!(out["content"][0]["text"].as_str().unwrap().contains("unknown tool"));
+    }
+
+    #[test]
+    fn send_ui_action_without_handle_or_env_reports_bridge_unavailable() {
+        // No app_handle set (test bin) and clear bridge env → TCP path,
+        // which must surface the "not set" error exactly as before.
+        std::env::remove_var("ORION_BRIDGE_PORT");
+        let err = super::send_ui_action("open_app", serde_json::json!({})).unwrap_err();
+        assert!(err.contains("ORION_BRIDGE_PORT not set"));
     }
 }
 

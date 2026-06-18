@@ -24,6 +24,7 @@ mod terminal;
 mod ui_bridge;
 mod wallpaper;
 
+use tauri::Manager;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -200,6 +201,16 @@ pub fn run() {
             // frontend opens the DB and migrations run.
             db_backup::run(app.handle());
             repolens_website::reconcile_on_boot(&app.handle());
+            // Make the runtime's in-process tool dispatch self-sufficient:
+            // record the app handle so send_ui_action can emit directly, and
+            // export the same paths the MCP subprocess gets via its config so
+            // in-process tool handlers can open the DB / read context.
+            crate::app_handle::set(app.handle().clone());
+            if let Ok(dir) = app.path().app_config_dir() {
+                let _ = std::fs::create_dir_all(&dir);
+                std::env::set_var("ORION_DB_PATH", dir.join("orion.db"));
+                std::env::set_var("ORION_CONTEXT_PATH", dir.join("orion-context.json"));
+            }
             let handle = app.handle().clone();
             // Spawn the localhost UI bridge so out-of-process MCP servers
             // can reach the running app to drive UI-state actions
