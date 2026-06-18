@@ -139,6 +139,15 @@ pub async fn start(app: AppHandle) -> Result<BridgeInfo, String> {
     Ok(info)
 }
 
+/// Removes a PENDING entry on ANY exit path (including a dropped/aborted
+/// request future), so an abandoned request can't leak its slot + sender.
+struct PendingGuard(String);
+impl Drop for PendingGuard {
+    fn drop(&mut self) {
+        PENDING.lock().remove(&self.0);
+    }
+}
+
 async fn handle_request(app: &AppHandle, expected_token: &str, line: &str) -> Response {
     let req: Request = match serde_json::from_str(line.trim()) {
         Ok(v) => v,
@@ -151,6 +160,7 @@ async fn handle_request(app: &AppHandle, expected_token: &str, line: &str) -> Re
     let request_id = format!("req-{}", REQ_COUNTER.fetch_add(1, Ordering::Relaxed));
     let (tx, rx) = oneshot::channel::<BridgeResult>();
     PENDING.lock().insert(request_id.clone(), tx);
+    let _guard = PendingGuard(request_id.clone());
 
     let emitted = app.emit(
         "ui:action",
