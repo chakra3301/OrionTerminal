@@ -258,6 +258,11 @@ textarea.cp-input { resize: vertical; line-height: 1.55; font-family: var(--f-mo
 .cp-btn.ghost:hover { color: var(--t-primary); border-color: var(--glass-border-bright); filter: none; }
 .cp-link-danger { background: none; border: none; color: var(--neon-magenta); cursor: pointer; font: 500 12px var(--f-display); padding: 4px 6px; }
 .cp-link-danger:hover { text-decoration: underline; }
+.cp-link { background: none; border: none; color: var(--neon-cyan); cursor: pointer; font: 500 12px var(--f-display); padding: 4px 6px; }
+.cp-link:hover { text-decoration: underline; }
+.cp-link:disabled { color: var(--t-tertiary); cursor: default; text-decoration: none; }
+.cp-cli-status { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.cp-cli-status .cp-badge { display: inline-flex; align-items: center; gap: 4px; }
 .cp-label { font: 10px/1 var(--f-mono); color: var(--t-tertiary); text-transform: uppercase; letter-spacing: 0.16em; margin-top: 4px; }
 
 /* tool grants as selectable rune chips */

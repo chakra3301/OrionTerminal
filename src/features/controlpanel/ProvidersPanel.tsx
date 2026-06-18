@@ -1,10 +1,56 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ulid } from "ulid";
+import { RefreshCw, CheckCircle2, LogIn, Download } from "lucide-react";
 import { useProvidersStore } from "@/store/providersStore";
 import { ipc } from "@/lib/ipc";
 import type { Provider, ProviderKind } from "@/features/agents/agentTypes";
 
 const KINDS: ProviderKind[] = ["openai", "google", "openai_compat", "custom"];
+
+type CliStat = { installed: boolean; loggedIn: boolean; version: string | null; detail: string };
+
+function CliEngineStatus({ engine }: { engine: "codex_cli" | "gemini_cli" }) {
+  const [stat, setStat] = useState<CliStat | null>(null);
+  const [busy, setBusy] = useState(false);
+  const check = async () => {
+    setBusy(true);
+    try {
+      setStat(await ipc.cliStatus(engine));
+    } finally {
+      setBusy(false);
+    }
+  };
+  useEffect(() => {
+    void check();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine]);
+  const Icon = !stat
+    ? RefreshCw
+    : !stat.installed
+      ? Download
+      : !stat.loggedIn
+        ? LogIn
+        : CheckCircle2;
+  const cls = stat?.loggedIn ? "live" : "wait";
+  const label = !stat
+    ? "checking"
+    : stat.loggedIn
+      ? "ready"
+      : stat.installed
+        ? "login needed"
+        : "not found";
+  return (
+    <div className="cp-cli-status">
+      <span className={`cp-badge ${cls}`}>
+        <Icon size={12} /> {label}
+      </span>
+      <span className="cp-card-sub">{stat?.detail ?? ""}</span>
+      <button className="cp-link" disabled={busy} onClick={() => void check()}>
+        Re-check
+      </button>
+    </div>
+  );
+}
 
 export function ProvidersPanel() {
   const providers = useProvidersStore((s) => s.providers);
@@ -15,18 +61,22 @@ export function ProvidersPanel() {
   return (
     <div>
       <div className="cp-list">
-        {providers.map((p) => (
-          <div key={p.id} className="cp-card">
-            <div className="cp-card-main">
-              <div className="cp-card-title">{p.name}</div>
-              <div className="cp-card-sub">{p.kind}{p.models.length ? ` · ${p.models.length} models` : ""}</div>
+        {providers.map((p) => {
+          const isCli = p.kind === "codex_cli" || p.kind === "gemini_cli";
+          return (
+            <div key={p.id} className="cp-card">
+              <div className="cp-card-main">
+                <div className="cp-card-title">{p.name}</div>
+                <div className="cp-card-sub">{p.kind}{p.models.length ? ` · ${p.models.length} models` : ""}</div>
+                {isCli && <CliEngineStatus engine={p.kind as "codex_cli" | "gemini_cli"} />}
+              </div>
+              {p.builtin
+                ? <span className="cp-badge live">built-in</span>
+                : <span className="cp-badge wait">chat ready</span>}
+              {!p.builtin && <button className="cp-link-danger" onClick={() => remove(p.id)}>Remove</button>}
             </div>
-            {p.builtin
-              ? <span className="cp-badge live">live</span>
-              : <span className="cp-badge wait">chat ready</span>}
-            {!p.builtin && <button className="cp-link-danger" onClick={() => remove(p.id)}>Remove</button>}
-          </div>
-        ))}
+          );
+        })}
       </div>
       {adding
         ? <AddProvider onDone={() => setAdding(false)} onSave={save} />
