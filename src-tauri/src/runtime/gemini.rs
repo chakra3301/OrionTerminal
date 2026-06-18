@@ -27,6 +27,31 @@ impl Provider for Gemini {
             .messages
             .iter()
             .map(|m| {
+                if m.role == "assistant" {
+                    if let Some(calls) = &m.tool_calls {
+                        let mut parts: Vec<Value> = Vec::new();
+                        if !m.content.trim().is_empty() {
+                            parts.push(json!({ "text": m.content }));
+                        }
+                        for c in calls {
+                            let args: Value = serde_json::from_str(&c.arguments).unwrap_or_else(|_| json!({}));
+                            parts.push(json!({ "functionCall": { "name": c.name, "args": args } }));
+                        }
+                        return json!({ "role": "model", "parts": parts });
+                    }
+                }
+                if m.role == "tool" {
+                    let name = m.name.clone().unwrap_or_default();
+                    return json!({
+                        "role": "user",
+                        "parts": [{
+                            "functionResponse": {
+                                "name": name,
+                                "response": { "result": m.content },
+                            }
+                        }],
+                    });
+                }
                 let role = if m.role == "assistant" { "model" } else { "user" };
                 json!({ "role": role, "parts": [{ "text": m.content }] })
             })
@@ -34,6 +59,9 @@ impl Provider for Gemini {
         let mut b = json!({ "contents": contents });
         if !req.system.trim().is_empty() {
             b["system_instruction"] = json!({ "parts": [{ "text": req.system }] });
+        }
+        if !req.tools.is_empty() {
+            b["tools"] = crate::runtime::tools::gemini_tools(&req.tools);
         }
         b
     }
@@ -62,6 +90,16 @@ impl Provider for Gemini {
             if !text.is_empty() {
                 out.push(StreamItem::TextDelta(text));
             }
+            for p in parts {
+                if let Some(fc) = p.get("functionCall") {
+                    let name = fc.get("name").and_then(|x| x.as_str()).map(|s| s.to_string());
+                    let args = fc
+                        .get("args")
+                        .map(|a| a.to_string())
+                        .unwrap_or_else(|| "{}".to_string());
+                    out.push(StreamItem::ToolCallDelta { index: -1, id: None, name, args });
+                }
+            }
         }
         if let Some(usage) = v.get("usageMetadata").filter(|u| u.is_object()) {
             let in_tokens = usage
@@ -89,8 +127,15 @@ mod tests {
             system: system.into(),
             messages: msgs
                 .into_iter()
-                .map(|(r, c)| Msg { role: r.into(), content: c.into() })
+                .map(|(r, c)| Msg {
+                    role: r.into(),
+                    content: c.into(),
+                    tool_calls: None,
+                    tool_call_id: None,
+                    name: None,
+                })
                 .collect(),
+            tools: vec![],
         }
     }
 
@@ -143,5 +188,56 @@ mod tests {
         assert!(Gemini.parse_sse_line("").is_empty());
         assert!(Gemini.parse_sse_line("data:").is_empty());
         assert!(Gemini.parse_sse_line("data: {bad").is_empty());
+    }
+
+    #[test]
+    fn parses_function_call_as_negative_index() {
+        let line = r#"data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"orion_read_file","args":{"path":"/x"}}}]}}]}"#;
+        let items = Gemini.parse_sse_line(line);
+        assert_eq!(items.len(), 1);
+        match &items[0] {
+            StreamItem::ToolCallDelta { index, name, args, .. } => {
+                assert_eq!(*index, -1);
+                assert_eq!(name.as_deref(), Some("orion_read_file"));
+                let v: serde_json::Value = serde_json::from_str(args).unwrap();
+                assert_eq!(v["path"], "/x");
+            }
+            other => panic!("expected ToolCallDelta, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn body_includes_function_declarations() {
+        let mut r = req("", vec![("user", "hi")]);
+        r.tools = vec![crate::runtime::tools::ToolDef {
+            name: "orion_read_file".into(),
+            description: "d".into(),
+            parameters: serde_json::json!({"type":"object","properties":{"path":{"type":"string"}}}),
+        }];
+        let b = Gemini.body(&r);
+        assert_eq!(b["tools"][0]["functionDeclarations"][0]["name"], "orion_read_file");
+    }
+
+    #[test]
+    fn body_maps_tool_calls_and_results() {
+        let mut r = req("", vec![]);
+        r.messages = vec![
+            Msg {
+                role: "assistant".into(),
+                content: "".into(),
+                tool_calls: Some(vec![crate::runtime::provider::ToolCall {
+                    id: "call_0".into(), name: "orion_read_file".into(), arguments: "{\"path\":\"/x\"}".into(),
+                }]),
+                tool_call_id: None, name: None,
+            },
+            Msg { role: "tool".into(), content: "body".into(), tool_calls: None, tool_call_id: Some("call_0".into()), name: Some("orion_read_file".into()) },
+        ];
+        let b = Gemini.body(&r);
+        assert_eq!(b["contents"][0]["role"], "model");
+        assert_eq!(b["contents"][0]["parts"][0]["functionCall"]["name"], "orion_read_file");
+        assert_eq!(b["contents"][0]["parts"][0]["functionCall"]["args"]["path"], "/x");
+        assert_eq!(b["contents"][1]["role"], "user");
+        assert_eq!(b["contents"][1]["parts"][0]["functionResponse"]["name"], "orion_read_file");
+        assert_eq!(b["contents"][1]["parts"][0]["functionResponse"]["response"]["result"], "body");
     }
 }
