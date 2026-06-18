@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, X, Wand2 } from "lucide-react";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
@@ -20,6 +20,7 @@ import { parseDesignPlan, stripDesignPlan } from "@/apps/xdesign/designPlan";
 import { ingestDesignPlan } from "@/apps/xdesign/ingestDesignPlan";
 import { promptText } from "@/components/PromptModal";
 import { computeExportBounds, renderPngBytes } from "@/apps/xdesign/exportXD";
+import { clamp } from "@/lib/time";
 
 // With the vision loop attaching a render every turn, Claude can SEE all the
 // layers — but it still needs each layer's id to target it for update/delete,
@@ -34,7 +35,6 @@ type Box = { left: number; top: number; w: number; h: number };
 
 const MIN_W = 300;
 const MIN_H = 280;
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 export function XDesignClaudeRail() {
   const [open, setOpen] = useState(false);
@@ -288,15 +288,19 @@ export function XDesignClaudeRail() {
     void dispatchCancel(thread.threadId, useModelPrefs.getState().modelFor("xdesign"));
   };
 
-  const chatMessages: ClaudeChatMessage[] = thread.messages.map((m) => ({
-    id: m.id,
-    role: m.role,
-    content:
-      m.role === "assistant"
-        ? stripDesignPlan(stripCanvasCommands(m.content))
-        : m.content,
-    pending: m.pending,
-  }));
+  const chatMessages: ClaudeChatMessage[] = useMemo(
+    () =>
+      thread.messages.map((m) => ({
+        id: m.id,
+        role: m.role,
+        content:
+          m.role === "assistant"
+            ? stripDesignPlan(stripCanvasCommands(m.content))
+            : m.content,
+        pending: m.pending,
+      })),
+    [thread.messages],
+  );
 
   if (!open) {
     return (
