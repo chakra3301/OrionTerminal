@@ -13,10 +13,15 @@ export function findOwningProvider(
   return providers.find((p) => p.models.some((m) => m.id === model));
 }
 
-/** "claude" → unchanged CLI path; otherwise the runtime Provider to use. */
-export function routeFor(providers: Provider[], model: string): "claude" | Provider {
+export type CliEngine = "codex_cli" | "gemini_cli";
+export type Route = "claude" | { engine: CliEngine } | Provider;
+
+/** "claude" → unchanged Claude CLI path; `{engine}` → subscription CLI engine
+ *  (Phase 2c); otherwise the HTTP-runtime Provider to use. */
+export function routeFor(providers: Provider[], model: string): Route {
   const owner = findOwningProvider(providers, model);
   if (!owner || owner.kind === "anthropic") return "claude";
+  if (owner.kind === "codex_cli" || owner.kind === "gemini_cli") return { engine: owner.kind };
   return owner;
 }
 
@@ -85,6 +90,17 @@ export async function dispatchSend(args: DispatchSendArgs): Promise<void> {
       r.allowedTools,
     );
   }
+  if (typeof route === "object" && "engine" in route) {
+    return ipc.cliSend(
+      route.engine,
+      args.chatId,
+      args.prompt,
+      args.projectRoot ?? null,
+      args.sessionId ?? null,
+      r.model,
+      r.systemAppend ?? "",
+    );
+  }
   return ipc.runtimeSend(
     args.chatId,
     route.kind,
@@ -102,5 +118,6 @@ export async function dispatchCancel(chatId: string, value: string): Promise<voi
   const providers = useProvidersStore.getState().providers;
   const route = routeFor(providers, r.model);
   if (route === "claude") return ipc.claudeCancel(chatId);
+  if (typeof route === "object" && "engine" in route) return ipc.cliCancel(chatId);
   return ipc.runtimeCancel(chatId);
 }
