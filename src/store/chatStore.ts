@@ -26,6 +26,7 @@ export type ChatMessage = {
   blocks: ContentBlock[];
   createdAt: number;
   pending?: boolean;
+  planning?: boolean;
   pills?: MessagePill[];
 };
 
@@ -59,6 +60,7 @@ type ChatState = {
     result: { content: unknown; isError?: boolean },
   ) => void;
   finishTurn: () => void;
+  sealPlanningTurn: () => string;
   setSessionId: (sid: string) => void;
   addCost: (usd: number) => void;
   setRunning: (running: boolean) => void;
@@ -188,6 +190,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
       };
     }),
+
+  sealPlanningTurn: () => {
+    const s = get();
+    if (!s.active) return "";
+    const id = s.pendingAssistantId;
+    if (!id) return "";
+    const msg = s.active.messages.find((m) => m.id === id);
+    const text = msg
+      ? msg.blocks
+          .filter((b): b is TextBlock => b.type === "text")
+          .map((b) => b.text)
+          .join("")
+      : "";
+    set({
+      pendingAssistantId: null, // running stays true — the Action pass continues
+      active: {
+        ...s.active,
+        messages: s.active.messages.map((m) =>
+          m.id === id ? { ...m, pending: false, planning: true } : m,
+        ),
+        updatedAt: Date.now(),
+      },
+    });
+    return text;
+  },
 
   setSessionId: (sid) =>
     set((s) =>
