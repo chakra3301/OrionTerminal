@@ -19,6 +19,19 @@ describe("composeAgent", () => {
     expect(composeAgent(agent, skills).model).toBe("claude-sonnet-4-6");
   });
 
+  it("carries the agent's actionModel through", () => {
+    expect(composeAgent(agent, skills).actionModel).toBe("claude-haiku-4-5-20251001");
+  });
+
+  it("actionModel is empty string when the agent has none", () => {
+    const solo: Agent = {
+      id: "a2", name: "Solo", role: "", accent: "#fff",
+      avatarAssetId: null, avatarUrl: null,
+      brainModel: "claude-opus-4-8", actionModel: "", skillIds: [],
+    };
+    expect(composeAgent(solo, []).actionModel).toBe("");
+  });
+
   it("concatenates equipped skill instructions (in skillIds order) with a role header", () => {
     const out = composeAgent(agent, skills).appendSystemPrompt;
     expect(out).toContain("Research analyst");

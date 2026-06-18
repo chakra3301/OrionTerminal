@@ -2,6 +2,7 @@ import type { Agent, Skill } from "./agentTypes";
 
 export type ComposedAgent = {
   model: string;
+  actionModel: string;
   appendSystemPrompt: string;
   allowedTools: string[];
 };
@@ -23,5 +24,5 @@ export function composeAgent(agent: Agent, allSkills: Skill[]): ComposedAgent {
     }
   }
 
-  return { model: agent.brainModel, appendSystemPrompt, allowedTools: [...tools] };
+  return { model: agent.brainModel, actionModel: agent.actionModel, appendSystemPrompt, allowedTools: [...tools] };
 }
