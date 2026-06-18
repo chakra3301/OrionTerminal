@@ -112,11 +112,20 @@ export function Shell() {
         {windows.map((w) => {
           if (w.minimized) return null;
           const meta = APP_TITLES[w.app];
+          // A maximized window fills the canvas, so any window stacked below it
+          // (lower z) is fully hidden. Skip its paint/layout via the body's
+          // content-visibility while keeping its React tree (pty/editor state)
+          // mounted and alive. Never true for a partially-covered window —
+          // only a *maximized* window above qualifies.
+          const occluded = windows.some(
+            (o) => o.maximized && !o.minimized && o.z > w.z,
+          );
           return (
             <WindowFrame
               key={w.id}
               window={w}
               focused={focusedId === w.id}
+              occluded={occluded}
               title={meta.title}
               subtitle={meta.subtitle}
             >

@@ -7,6 +7,7 @@ type WindowFrameProps = {
   focused: boolean;
   title: string;
   subtitle?: string;
+  occluded?: boolean;
   children: ReactNode;
 };
 
@@ -22,6 +23,7 @@ export function WindowFrame({
   focused,
   title,
   subtitle,
+  occluded,
   children,
 }: WindowFrameProps) {
   const moveWindow = useShell((s) => s.moveWindow);
@@ -164,7 +166,12 @@ export function WindowFrame({
           <span className="kbd">⌘K</span>
         </div>
       </div>
-      <div className="ot-window-body">{children}</div>
+      <div
+        className="ot-window-body"
+        style={occluded ? { contentVisibility: "hidden" } : undefined}
+      >
+        {children}
+      </div>
 
       {!w.maximized && (
         <>
