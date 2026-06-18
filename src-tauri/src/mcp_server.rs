@@ -79,6 +79,7 @@ fn handle_request(req: &Value) -> Option<Value> {
     })
 }
 
+#[derive(Debug)]
 struct RpcError {
     code: i32,
     message: String,
@@ -724,47 +725,7 @@ fn call_tool(params: &Value) -> Result<Value, RpcError> {
         })?;
     let args = params.get("arguments").cloned().unwrap_or(json!({}));
 
-    let result = match name {
-        "orion_list_recent_notes" => tool_list_recent_notes(&args),
-        "orion_search_archive" => tool_search_archive(&args),
-        "orion_list_projects" => tool_list_projects(&args),
-        "orion_create_note" => tool_create_note(&args),
-        "orion_create_project" => tool_create_project(&args),
-        "orion_update_note_body" => tool_update_note_body(&args),
-        "orion_read_note" => tool_read_note(&args),
-        "orion_open_app" => tool_open_app(&args),
-        "orion_switch_project" => tool_switch_project(&args),
-        "orion_open_file" => tool_open_file(&args),
-        "orion_apply_edit" => tool_apply_edit(&args),
-        "orion_write_file" => tool_write_file(&args),
-        "orion_get_context" => tool_get_context(&args),
-        "orion_search_files" => tool_search_files(&args),
-        "orion_list_assets" => tool_list_assets(&args),
-        "orion_search_assets" => tool_search_assets(&args),
-        "orion_run_in_terminal" => tool_run_in_terminal(&args),
-        "orion_xdesign_add_rect" => tool_xdesign_add_rect(&args),
-        "orion_xdesign_add_text" => tool_xdesign_add_text(&args),
-        "orion_xdesign_add_ellipse" => tool_xdesign_add_ellipse(&args),
-        "orion_xdesign_add_frame" => tool_xdesign_add_frame(&args),
-        "orion_xdesign_get_canvas" => tool_xdesign_get_canvas(&args),
-        "orion_xdesign_get_selection" => tool_xdesign_get_selection(&args),
-        "orion_xdesign_apply" => tool_xdesign_apply(&args),
-        "orion_create_mood_board" => tool_create_mood_board(&args),
-        "orion_add_to_mood_board" => tool_add_to_mood_board(&args),
-        "orion_attach_tag" => tool_attach_tag(&args),
-        "orion_delete_note" => tool_delete_note(&args),
-        "orion_hermes_list_tasks" => tool_hermes_list_tasks(&args),
-        "orion_hermes_get_task" => tool_hermes_get_task(&args),
-        "orion_hermes_create_task" => tool_hermes_create_task(&args),
-        "orion_hermes_add_agent" => tool_hermes_add_agent(&args),
-        "orion_hermes_update_task" => tool_hermes_update_task(&args),
-        "orion_hermes_move_task" => tool_hermes_move_task(&args),
-        "orion_hermes_decompose" => tool_hermes_decompose(&args),
-        "orion_recent_activity" => tool_recent_activity(&args),
-        other => Err(format!("unknown tool: {}", other)),
-    };
-
-    match result {
+    match dispatch_tool(name, &args) {
         Ok(text) => Ok(json!({
             "content": [{ "type": "text", "text": text }],
             "isError": false,
@@ -773,6 +734,50 @@ fn call_tool(params: &Value) -> Result<Value, RpcError> {
             "content": [{ "type": "text", "text": format!("error: {}", msg) }],
             "isError": true,
         })),
+    }
+}
+
+/// Shared tool dispatcher. The stdio serve loop (`call_tool`) and the
+/// in-process runtime both call this — one implementation, no duplication.
+pub fn dispatch_tool(name: &str, args: &Value) -> Result<String, String> {
+    match name {
+        "orion_list_recent_notes" => tool_list_recent_notes(args),
+        "orion_search_archive" => tool_search_archive(args),
+        "orion_list_projects" => tool_list_projects(args),
+        "orion_create_note" => tool_create_note(args),
+        "orion_create_project" => tool_create_project(args),
+        "orion_update_note_body" => tool_update_note_body(args),
+        "orion_read_note" => tool_read_note(args),
+        "orion_open_app" => tool_open_app(args),
+        "orion_switch_project" => tool_switch_project(args),
+        "orion_open_file" => tool_open_file(args),
+        "orion_apply_edit" => tool_apply_edit(args),
+        "orion_write_file" => tool_write_file(args),
+        "orion_get_context" => tool_get_context(args),
+        "orion_search_files" => tool_search_files(args),
+        "orion_list_assets" => tool_list_assets(args),
+        "orion_search_assets" => tool_search_assets(args),
+        "orion_run_in_terminal" => tool_run_in_terminal(args),
+        "orion_xdesign_add_rect" => tool_xdesign_add_rect(args),
+        "orion_xdesign_add_text" => tool_xdesign_add_text(args),
+        "orion_xdesign_add_ellipse" => tool_xdesign_add_ellipse(args),
+        "orion_xdesign_add_frame" => tool_xdesign_add_frame(args),
+        "orion_xdesign_get_canvas" => tool_xdesign_get_canvas(args),
+        "orion_xdesign_get_selection" => tool_xdesign_get_selection(args),
+        "orion_xdesign_apply" => tool_xdesign_apply(args),
+        "orion_create_mood_board" => tool_create_mood_board(args),
+        "orion_add_to_mood_board" => tool_add_to_mood_board(args),
+        "orion_attach_tag" => tool_attach_tag(args),
+        "orion_delete_note" => tool_delete_note(args),
+        "orion_hermes_list_tasks" => tool_hermes_list_tasks(args),
+        "orion_hermes_get_task" => tool_hermes_get_task(args),
+        "orion_hermes_create_task" => tool_hermes_create_task(args),
+        "orion_hermes_add_agent" => tool_hermes_add_agent(args),
+        "orion_hermes_update_task" => tool_hermes_update_task(args),
+        "orion_hermes_move_task" => tool_hermes_move_task(args),
+        "orion_hermes_decompose" => tool_hermes_decompose(args),
+        "orion_recent_activity" => tool_recent_activity(args),
+        other => Err(format!("unknown tool: {}", other)),
     }
 }
 
@@ -2312,6 +2317,23 @@ fn tool_hermes_decompose(args: &Value) -> Result<String, String> {
         }
     }
     Ok(json!({ "ok": true, "parent_id": parent_id, "created": created }).to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn dispatch_tool_unknown_name_errors_like_inline_match() {
+        let err = super::dispatch_tool("nope_not_a_tool", &serde_json::json!({}));
+        assert!(err.is_err());
+        assert!(err.unwrap_err().contains("unknown tool"));
+    }
+
+    #[test]
+    fn call_tool_wraps_dispatch_result_in_envelope() {
+        let out = super::call_tool(&serde_json::json!({ "name": "nope", "arguments": {} })).unwrap();
+        assert_eq!(out["isError"], true);
+        assert!(out["content"][0]["text"].as_str().unwrap().contains("unknown tool"));
+    }
 }
 
 #[cfg(test)]
