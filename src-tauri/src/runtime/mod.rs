@@ -154,6 +154,9 @@ pub async fn runtime_send(
     let mut had_usage = false;
 
     'rounds: for round in 0..MAX_ROUNDS {
+        if !STREAMS.lock().contains_key(&chat_id) {
+            break 'rounds;
+        }
         let req = ChatRequest {
             model: model.clone(),
             system: system.clone(),
@@ -256,6 +259,9 @@ pub async fn runtime_send(
         });
 
         for c in &calls {
+            if !STREAMS.lock().contains_key(&chat_id) {
+                break 'rounds;
+            }
             let name = c.name.clone();
             let args: serde_json::Value =
                 serde_json::from_str(&c.arguments).unwrap_or_else(|_| serde_json::json!({}));
