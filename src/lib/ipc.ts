@@ -206,6 +206,29 @@ export const ipc = {
     }),
   runtimeCancel: (chatId: string): Promise<void> =>
     invoke("runtime_cancel", { chatId }),
+  cliSend: (
+    engine: "codex_cli" | "gemini_cli",
+    chatId: string,
+    prompt: string,
+    projectRoot: string | null,
+    sessionId: string | null,
+    model: string,
+    systemAppend: string,
+  ): Promise<void> =>
+    invoke("cli_send", {
+      engine,
+      chatId,
+      prompt,
+      projectRoot,
+      sessionId,
+      model,
+      systemAppend,
+    }),
+  cliCancel: (chatId: string): Promise<void> => invoke("cli_cancel", { chatId }),
+  cliStatus: (
+    engine: "codex_cli" | "gemini_cli",
+  ): Promise<{ installed: boolean; loggedIn: boolean; version: string | null; detail: string }> =>
+    invoke("cli_status", { engine }),
   claudeOneshot: (prompt: string): Promise<string> =>
     invoke("claude_oneshot", { prompt }),
   claudeOneshotWithImage: (
