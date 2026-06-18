@@ -101,7 +101,7 @@ fn dispatch(method: &str, params: &Value) -> Result<Value, RpcError> {
     }
 }
 
-fn tool_definitions() -> Value {
+pub fn tool_definitions() -> Value {
     json!([
         {
             "name": "orion_list_recent_notes",

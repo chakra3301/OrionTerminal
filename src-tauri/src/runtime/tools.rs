@@ -2,6 +2,7 @@
 //! tool-call accumulation. Pure (network-free), unit-tested.
 
 use crate::runtime::provider::ToolCall;
+use serde_json::{json, Value};
 
 /// One tool exposed to a non-Claude provider.
 #[derive(Debug, Clone, PartialEq)]
@@ -9,6 +10,76 @@ pub struct ToolDef {
     pub name: String,
     pub description: String,
     pub parameters: serde_json::Value,
+}
+
+/// Build the runtime toolset from the agent's resolved allow-list. The list
+/// contains Orion tool names (e.g. "orion_read_file"); the sentinel
+/// "mcp__orion" means "expose the entire Orion catalog".
+pub fn filter_tools(allowed: &[String]) -> Vec<ToolDef> {
+    let defs = crate::mcp_server::tool_definitions();
+    let all = allowed.iter().any(|t| t == "mcp__orion");
+    let mut out = Vec::new();
+    if let Some(arr) = defs.as_array() {
+        for d in arr {
+            let name = d.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            if name.is_empty() {
+                continue;
+            }
+            if all || allowed.iter().any(|t| t == name) {
+                out.push(ToolDef {
+                    name: name.to_string(),
+                    description: d.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    parameters: d
+                        .get("inputSchema")
+                        .cloned()
+                        .unwrap_or_else(|| json!({ "type": "object", "properties": {} })),
+                });
+            }
+        }
+    }
+    out
+}
+
+/// OpenAI `tools: [{ type:"function", function:{ name, description, parameters } }]`.
+pub fn openai_tools(defs: &[ToolDef]) -> Value {
+    Value::Array(
+        defs.iter()
+            .map(|d| {
+                json!({
+                    "type": "function",
+                    "function": {
+                        "name": d.name,
+                        "description": d.description,
+                        "parameters": d.parameters,
+                    }
+                })
+            })
+            .collect(),
+    )
+}
+
+fn params_are_empty(p: &Value) -> bool {
+    p.get("properties")
+        .and_then(|x| x.as_object())
+        .map(|o| o.is_empty())
+        .unwrap_or(true)
+}
+
+/// Gemini `tools: [{ functionDeclarations: [ { name, description, parameters? } ] }]`.
+/// `parameters` is omitted for no-arg tools — some Gemini versions reject an
+/// empty `properties` object.
+pub fn gemini_tools(defs: &[ToolDef]) -> Value {
+    let decls: Vec<Value> = defs
+        .iter()
+        .map(|d| {
+            let mut decl = json!({ "name": d.name, "description": d.description });
+            if !params_are_empty(&d.parameters) {
+                decl["parameters"] = d.parameters.clone();
+            }
+            decl
+        })
+        .collect();
+    json!([{ "functionDeclarations": decls }])
 }
 
 struct PartialCall {
@@ -118,5 +189,68 @@ mod acc_tests {
         assert!(a.is_empty());
         a.push(0, Some("c"), Some("t"), "{}");
         assert!(!a.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod schema_tests {
+    use super::{filter_tools, gemini_tools, openai_tools, ToolDef};
+    use serde_json::json;
+
+    #[test]
+    fn filter_by_name_subset() {
+        let got = filter_tools(&["orion_read_note".to_string(), "orion_apply_edit".to_string()]);
+        let names: Vec<&str> = got.iter().map(|t| t.name.as_str()).collect();
+        assert!(names.contains(&"orion_read_note"));
+        assert!(names.contains(&"orion_apply_edit"));
+        assert!(!names.contains(&"orion_delete_note"));
+    }
+
+    #[test]
+    fn mcp_orion_means_all() {
+        let all = filter_tools(&["mcp__orion".to_string()]);
+        // Catalog has 30+ tools; "all" must be much larger than a 1-name filter.
+        assert!(all.len() > 10);
+        assert!(all.iter().any(|t| t.name == "orion_read_note"));
+    }
+
+    #[test]
+    fn empty_allowed_means_no_tools() {
+        assert!(filter_tools(&[]).is_empty());
+    }
+
+    #[test]
+    fn openai_shape() {
+        let defs = vec![ToolDef {
+            name: "t".into(),
+            description: "d".into(),
+            parameters: json!({"type":"object","properties":{"x":{"type":"string"}},"required":["x"]}),
+        }];
+        let v = openai_tools(&defs);
+        assert_eq!(v[0]["type"], "function");
+        assert_eq!(v[0]["function"]["name"], "t");
+        assert_eq!(v[0]["function"]["parameters"]["required"][0], "x");
+    }
+
+    #[test]
+    fn gemini_shape_wraps_declarations() {
+        let defs = vec![ToolDef {
+            name: "t".into(),
+            description: "d".into(),
+            parameters: json!({"type":"object","properties":{"x":{"type":"string"}}}),
+        }];
+        let v = gemini_tools(&defs);
+        assert_eq!(v[0]["functionDeclarations"][0]["name"], "t");
+    }
+
+    #[test]
+    fn gemini_omits_empty_parameters() {
+        let defs = vec![ToolDef {
+            name: "noargs".into(),
+            description: "d".into(),
+            parameters: json!({"type":"object","properties":{}}),
+        }];
+        let v = gemini_tools(&defs);
+        assert!(v[0]["functionDeclarations"][0].get("parameters").is_none());
     }
 }
