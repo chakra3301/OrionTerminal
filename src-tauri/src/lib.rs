@@ -281,6 +281,7 @@ pub fn run() {
             claude_cli::claude_cancel,
             runtime::runtime_send,
             runtime::runtime_cancel,
+            cli_engine::cli_status,
             claude_cli::claude_oneshot,
             claude_cli::claude_oneshot_with_image,
             hermes::hermes_dispatch_task,
