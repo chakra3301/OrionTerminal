@@ -61,7 +61,7 @@ Run:
 cd /tmp && rm -rf wct && git clone --depth 1 --branch master https://github.com/JCodesMore/ai-website-cloner-template.git wct
 cd /tmp/wct && git rev-parse HEAD   # record this SHA for VENDOR.md
 rm -rf /tmp/wct/.git
-cd /Users/lucaorion/Orion_Terminal && mkdir -p resources/website-cloner-scaffold
+cd ~/Orion_Terminal && mkdir -p resources/website-cloner-scaffold
 cp -R /tmp/wct/. resources/website-cloner-scaffold/
 ```
 Expected: `resources/website-cloner-scaffold/` contains `package.json`, `package-lock.json`, `src/`, `docs/`, `.claude/skills/clone-website/SKILL.md`, `LICENSE`, `components.json`, `next.config.ts`, etc. It must **not** contain `.git/` or `node_modules/`.
