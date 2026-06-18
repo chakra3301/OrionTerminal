@@ -9,21 +9,10 @@ import { useContextMenu } from "@/components/ContextMenu";
 import { noteMenuItems } from "@/apps/archives/itemMenus";
 import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
 import { log } from "@/lib/log";
+import { formatRelative } from "@/lib/time";
 
 function noteAccent(idx: number): string {
   return ["green", "cyan", "magenta", "yellow", "violet"][idx % 5]!;
-}
-
-function formatRelative(ms: number, now: number): string {
-  const diff = Math.max(0, now - ms);
-  const days = Math.floor(diff / (24 * 60 * 60 * 1000));
-  if (days < 1) return "today";
-  if (days < 2) return "yesterday";
-  if (days < 7) return `${days}d ago`;
-  return new Date(ms).toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-  });
 }
 
 export function ArchivesNotes() {

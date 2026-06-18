@@ -27,6 +27,7 @@ import { useArchives } from "@/apps/archives/useArchives";
 import { openChatById } from "@/apps/archives/searchNav";
 import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
+import { relativeTime } from "@/lib/time";
 
 function greetingForHour(h: number): string {
   if (h < 5) return "Still up?";
@@ -534,16 +535,4 @@ function FooterStat({
       <span className="ar-stat-value">{value}</span>
     </div>
   );
-}
-
-function relativeTime(then: number, now: number): string {
-  const diff = Math.max(0, now - then);
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min}m`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h`;
-  const days = Math.floor(hr / 24);
-  if (days < 7) return `${days}d`;
-  return new Date(then).toLocaleDateString([], { month: "short", day: "numeric" });
 }

@@ -29,6 +29,7 @@ import { useContextMenu } from "@/components/ContextMenu";
 import { boardMenuItems } from "@/apps/archives/itemMenus";
 import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
 import { log } from "@/lib/log";
+import { relativeTime } from "@/lib/time";
 
 export function ArchivesMood() {
   const openBoardId = useArchives((s) => s.openBoardId);
@@ -735,16 +736,4 @@ function AddAssetPicker({
       </div>
     </div>
   );
-}
-
-function relativeTime(then: number, now: number): string {
-  const diff = Math.max(0, now - then);
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min}m`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h`;
-  const days = Math.floor(hr / 24);
-  if (days < 7) return `${days}d`;
-  return new Date(then).toLocaleDateString([], { month: "short", day: "numeric" });
 }

@@ -5,14 +5,12 @@ import { useRosie } from "@/features/rosie/rosieStore";
 import { CompanionScene } from "./CompanionScene";
 import { useCompanionProactive } from "./companionProactiveStore";
 import { dragState } from "./dragState";
+import { clamp } from "@/lib/time";
 
 const W = 300;
 const H = 460;
 const THROW_SPEED = 1.3; // px/ms — a flick at least this fast dismisses her
 const VELOCITY_STALE_MS = 90; // a pause-then-release is not a throw
-
-const clamp = (v: number, lo: number, hi: number) =>
-  Math.max(lo, Math.min(hi, v));
 
 const defaultPos = () => ({
   left: Math.max(8, window.innerWidth - W - 24),

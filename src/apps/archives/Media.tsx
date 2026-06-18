@@ -27,6 +27,7 @@ import { assetMenuItems } from "@/apps/archives/itemMenus";
 import type { AssetKind } from "@/lib/db";
 import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
 import { log } from "@/lib/log";
+import { formatRelative } from "@/lib/time";
 
 const KIND_TABS: Array<{ key: AssetKind | "all"; label: string }> = [
   { key: "all", label: "All" },
@@ -42,18 +43,6 @@ function formatBytes(n: number): string {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
-
-function formatRelative(ms: number, now: number): string {
-  const diff = Math.max(0, now - ms);
-  const days = Math.floor(diff / (24 * 60 * 60 * 1000));
-  if (days < 1) return "today";
-  if (days < 2) return "yesterday";
-  if (days < 7) return `${days}d ago`;
-  return new Date(ms).toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-  });
 }
 
 function KindIcon({ kind }: { kind: AssetKind }) {
