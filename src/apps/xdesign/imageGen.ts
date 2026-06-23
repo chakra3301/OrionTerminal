@@ -5,6 +5,7 @@
 // `xdesign_image_gen` command does the HTTP; placement lives in the rail.
 
 import type { Provider, ProviderKind } from "@/features/agents/agentTypes";
+import type { DesignSystem } from "./designSystem";
 
 /** Kinds that expose an image-generation endpoint we support. The CLI engines
  * (codex/gemini), nous_oauth, and anthropic (no image API) are excluded. */
@@ -60,6 +61,22 @@ export function base64ToBytes(b64: string): Uint8Array {
  * easy to resize on canvas). */
 export function defaultSize(): string {
   return "1024x1024";
+}
+
+/** Fold the active brand's aesthetic + palette into a raster prompt so a
+ * generated image stays on-brand. No brand → the description unchanged. */
+export function styleImagePrompt(description: string, brand: DesignSystem | null): string {
+  if (!brand) return description.trim();
+  const bits: string[] = [];
+  if (brand.aesthetic) bits.push(brand.aesthetic);
+  const palette = brand.colors
+    .slice(0, 4)
+    .map((c) => c.value)
+    .filter(Boolean)
+    .join(", ");
+  if (palette) bits.push(`color palette ${palette}`);
+  const base = description.trim();
+  return bits.length ? `${base}. Visual style — ${bits.join("; ")}.` : base;
 }
 
 /** Aspect ratio (w/h) of a "WxH" size string; 1 when unparseable. */

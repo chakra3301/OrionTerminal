@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle, Globe, ImagePlus } from "lucide-react";
+import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle, Globe, ImagePlus, Image as ImageIcon } from "lucide-react";
 import { ulid } from "ulid";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
@@ -9,6 +9,17 @@ import { upsertChat } from "@/lib/db";
 import { scheduleReindex } from "@/lib/embeddingIndexer";
 import { ipc } from "@/lib/ipc";
 import { useModelPrefs } from "@/store/modelPrefsStore";
+import { useProvidersStore } from "@/store/providersStore";
+import { useAssetsStore } from "@/store/assetsStore";
+import { useToasts } from "@/store/toastStore";
+import {
+  pickImageProvider,
+  defaultImageModel,
+  defaultSize,
+  base64ToBytes,
+  sizeAspect,
+  styleImagePrompt,
+} from "@/apps/xdesign/imageGen";
 import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
 import { xdesignClaude, COMPOSER_PROMPT, composerVariationsPrompt } from "@/apps/xdesign/claude";
@@ -502,6 +513,78 @@ export function XDesignClaudeRail() {
     );
   };
 
+  // 🖼️ Generate image — real raster image from a text prompt via a
+  // user-configured image provider (OpenAI/Google). Ingested into the Archives
+  // asset library, then placed as an editable image layer (real filePath, not
+  // an embedded data URL — keeps the document light). Direct API call, not a
+  // chat turn.
+  const handleGenerateImage = async () => {
+    const provider = pickImageProvider(useProvidersStore.getState().providers);
+    if (!provider) {
+      toast.info("No image provider", {
+        body: "Add an image-capable key (OpenAI or Google) in Control Panel → Providers.",
+      });
+      return;
+    }
+    const desc = await promptText({
+      title: "Generate an image",
+      label: `Describe the image — ${provider.name} renders it as a real raster image.`,
+      placeholder: "a dark moody mountain range at dusk, cinematic",
+      confirmLabel: "Generate",
+    });
+    if (desc === null) return;
+    const d = desc.trim();
+    if (!d) return;
+    const model = defaultImageModel(provider.kind);
+    const size = defaultSize();
+    const styled = styleImagePrompt(d, useDesignSystems.getState().active());
+    const loadingId = toast.info("Generating image…", {
+      durationMs: 0,
+      body: `${provider.name} · ${model}`,
+    });
+    try {
+      const { b64, mime } = await ipc.xdesignImageGen(
+        provider.kind,
+        provider.baseUrl,
+        provider.keyRef,
+        model,
+        styled,
+        size,
+      );
+      const ext = mime.includes("jpeg") ? "jpg" : mime.includes("webp") ? "webp" : "png";
+      const blob = new Blob([base64ToBytes(b64)], { type: mime });
+      const [asset] = await useAssetsStore
+        .getState()
+        .ingestBlobs([{ blob, suggestedName: `generated.${ext}` }]);
+      if (!asset) throw new Error("could not save the generated image");
+      const ratio = sizeAspect(size);
+      const w = 420;
+      const h = Math.round(w / ratio);
+      useXDesign.getState().addShape({
+        kind: "image",
+        x: 500 - w / 2,
+        y: 350 - h / 2,
+        w,
+        h,
+        filePath: asset.filePath,
+        assetId: asset.id,
+        fill: "transparent",
+        stroke: "transparent",
+        strokeWidth: 0,
+        name: "Generated image",
+      });
+      useToasts.getState().dismiss(loadingId);
+      toast.success("Image generated", { body: "Placed on canvas + saved to Archives." });
+      log.info("xdesign: placed generated raster image");
+    } catch (e) {
+      useToasts.getState().dismiss(loadingId);
+      toast.error("Image generation failed", {
+        body: e instanceof Error ? e.message : String(e),
+      });
+      log.error("xdesign image gen failed", e);
+    }
+  };
+
   const handleCancel = () => {
     void dispatchCancel(thread.threadId, useModelPrefs.getState().modelFor("xdesign"));
   };
@@ -600,6 +683,15 @@ export function XDesignClaudeRail() {
           title="Illustrate — generate a vector SVG illustration"
         >
           <ImagePlus size={13} />
+        </button>
+        <button
+          type="button"
+          className="xd-rail-icon"
+          data-no-drag
+          onClick={handleGenerateImage}
+          title="Generate image — real raster image from a text prompt (needs an image key)"
+        >
+          <ImageIcon size={13} />
         </button>
         <button
           type="button"

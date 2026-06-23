@@ -7,8 +7,10 @@ import {
   pickImageProvider,
   base64ToBytes,
   sizeAspect,
+  styleImagePrompt,
 } from "./imageGen";
 import type { Provider } from "@/features/agents/agentTypes";
+import type { DesignSystem } from "./designSystem";
 
 function prov(p: Partial<Provider>): Provider {
   return {
@@ -84,6 +86,31 @@ describe("base64ToBytes", () => {
   it("strips a data: prefix", () => {
     const bytes = base64ToBytes("data:image/png;base64,UE5H");
     expect(Array.from(bytes)).toEqual([80, 78, 71]);
+  });
+});
+
+describe("styleImagePrompt", () => {
+  const brand: DesignSystem = {
+    id: "b",
+    name: "Neo",
+    aesthetic: "neo-tokyo, neon",
+    colors: [
+      { name: "bg", value: "#03060a" },
+      { name: "accent", value: "#39ff88" },
+    ],
+    typography: [],
+    builtin: false,
+    createdAt: 0,
+    updatedAt: 0,
+  };
+  it("passes the description through with no brand", () => {
+    expect(styleImagePrompt("  a fox  ", null)).toBe("a fox");
+  });
+  it("folds in aesthetic + palette", () => {
+    const out = styleImagePrompt("a fox", brand);
+    expect(out).toContain("a fox");
+    expect(out).toContain("neo-tokyo, neon");
+    expect(out).toContain("#39ff88");
   });
 });
 
