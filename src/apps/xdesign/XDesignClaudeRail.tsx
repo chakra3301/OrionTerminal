@@ -12,6 +12,7 @@ import { useModelPrefs } from "@/store/modelPrefsStore";
 import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
 import { xdesignClaude, COMPOSER_PROMPT, composerVariationsPrompt } from "@/apps/xdesign/claude";
+import { composeCraftBrief, lensesForBrief } from "@/apps/xdesign/designKnowledge";
 import { useDesignSystems } from "@/store/designSystemStore";
 import {
   designSystemToPrompt,
@@ -317,9 +318,10 @@ export function XDesignClaudeRail() {
     const brandNote = brand
       ? `${brand}\nUse the brand contract above as your design system: take its color tokens AS the plan's tokens.colors (same names + hex), honor its fonts, type scale, spacing, radii, voice, and principles. Do not invent an off-brand palette.\n`
       : "";
+    const craft = `\n\n${composeCraftBrief(lensesForBrief(b))}\n`;
     await sendTurn(
       `✦ Generate a design — ${b}`,
-      `${COMPOSER_PROMPT}${brandNote}\n\n---\n\nBRIEF: ${b}`,
+      `${COMPOSER_PROMPT}${brandNote}${craft}\n\n---\n\nBRIEF: ${b}`,
     );
   };
 
@@ -378,9 +380,10 @@ export function XDesignClaudeRail() {
     const brandNote = brand
       ? `${brand}\nUse the brand contract above as the shared design system across all directions: same color tokens, fonts, type scale, spacing, radii, voice.\n`
       : "";
+    const craft = `\n\n${composeCraftBrief(lensesForBrief(b))}\n`;
     await sendTurn(
       `⧉ Generate 3 directions — ${b}`,
-      `${composerVariationsPrompt(3)}${brandNote}\n\n---\n\nBRIEF: ${b}`,
+      `${composerVariationsPrompt(3)}${brandNote}${craft}\n\n---\n\nBRIEF: ${b}`,
     );
   };
 
