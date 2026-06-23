@@ -27,6 +27,7 @@ import {
   inlineGeneratedImages,
 } from "@/apps/xdesign/imageSlots";
 import { designTurnModel } from "@/apps/xdesign/designModel";
+import { blueprintForLenses, buildBlueprintPrompt } from "@/apps/xdesign/htmlBlueprints";
 import {
   inspectArtifact,
   summarizeIssues,
@@ -491,13 +492,18 @@ export function XDesignClaudeRail() {
     refiningRef.current = false;
     repairAttemptRef.current = 0;
     const imagesAvailable = !!pickImageProvider(useProvidersStore.getState().providers);
+    // Lever 2: pick the expert blueprint for the brief; the model fills its
+    // named slots instead of free-architecting the page. Core craft only — the
+    // blueprint already carries the artifact structure the lens used to hint.
+    const blueprint = buildBlueprintPrompt(blueprintForLenses(lensesForBrief(b)));
     await sendTurn(
       `🌐 Build webpage — ${b}`,
       buildWebpagePrompt(
         b,
         useDesignSystems.getState().active(),
-        composeCraftBrief(lensesForBrief(b)),
+        composeCraftBrief(),
         imagesAvailable,
+        blueprint,
       ),
       bestModel(),
     );

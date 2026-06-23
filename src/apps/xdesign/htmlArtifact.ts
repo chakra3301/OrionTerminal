@@ -65,13 +65,15 @@ export function buildWebpagePrompt(
   brand: DesignSystem | null,
   craftBrief: string,
   imagesAvailable = false,
+  blueprint = "",
 ): string {
   const brandPart = brand
     ? `\n\n${designSystemToPrompt(brand, { withRamps: true })}\n\nBuild the page strictly within this brand contract: use its derived token values (ramps + semantic roles), fonts, type scale, spacing, radii, voice, and principles.`
     : "";
+  const blueprintPart = blueprint ? `\n\n${blueprint}` : "";
   return `You are an elite front-end design engineer. Build a real, shippable web page for this brief as actual HTML & CSS (not a mockup).
 
-${craftBrief}${brandPart}
+${craftBrief}${brandPart}${blueprintPart}
 
 ${sharedRules(imagesAvailable)}
 
