@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle, Globe } from "lucide-react";
+import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle, Globe, ImagePlus } from "lucide-react";
 import { ulid } from "ulid";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
@@ -20,6 +20,13 @@ import {
   buildRefinePrompt,
 } from "@/apps/xdesign/htmlArtifact";
 import { useHtmlArtifact } from "@/apps/xdesign/htmlArtifactStore";
+import {
+  extractSvg,
+  stripSvg,
+  svgToDataUrl,
+  illustrationBox,
+  buildIllustrationPrompt,
+} from "@/apps/xdesign/svgIllustration";
 import { useDesignSystems } from "@/store/designSystemStore";
 import {
   designSystemToPrompt,
@@ -134,6 +141,9 @@ export function XDesignClaudeRail() {
   // When true, the next finished assistant reply is treated as an HTML
   // artifact (set by Build webpage / Refine) rather than canvas commands.
   const pendingArtifactRef = useRef(false);
+  // When true, the next finished reply is an SVG illustration to place on the
+  // canvas as an image layer (data: URL).
+  const pendingSvgRef = useRef(false);
 
   // Whenever the latest assistant message in this thread finishes streaming
   // (pending=false), parse any <canvas-command> blocks and run them. Single
@@ -143,6 +153,29 @@ export function XDesignClaudeRail() {
     if (!last || last.role !== "assistant" || last.pending) return;
     if (executedRef.current.has(last.id)) return;
     executedRef.current.add(last.id);
+    // SVG-illustration turn: place the produced <svg> as a data-URL image.
+    if (pendingSvgRef.current) {
+      pendingSvgRef.current = false;
+      const svg = extractSvg(last.content);
+      if (svg) {
+        const { w, h } = illustrationBox(svg, 420);
+        useXDesign.getState().addShape({
+          kind: "image",
+          x: 500 - w / 2,
+          y: 350 - h / 2,
+          w,
+          h,
+          filePath: svgToDataUrl(svg),
+          assetId: null,
+          fill: "transparent",
+          stroke: "transparent",
+          strokeWidth: 0,
+          name: "Illustration",
+        });
+        log.info("xdesign claude: placed SVG illustration");
+      }
+      return;
+    }
     // HTML-artifact turn: consume the produced document into the live preview.
     if (pendingArtifactRef.current) {
       pendingArtifactRef.current = false;
@@ -451,6 +484,24 @@ export function XDesignClaudeRail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ◈ Illustrate — generate a vector SVG illustration (brand-colored) and drop
+  // it on the canvas as an editable image layer.
+  const handleIllustrate = async () => {
+    const desc = await promptText({
+      title: "Generate an illustration",
+      label: "Describe the illustration — Claude draws it as scalable vector art.",
+      placeholder: "an abstract aurora wave, depth, brand colors",
+      confirmLabel: "Illustrate",
+    });
+    if (desc === null) return;
+    const d = desc.trim() || "an abstract brand-colored hero graphic";
+    pendingSvgRef.current = true;
+    await sendTurn(
+      `◈ Illustrate — ${d}`,
+      buildIllustrationPrompt(d, useDesignSystems.getState().active()),
+    );
+  };
+
   const handleCancel = () => {
     void dispatchCancel(thread.threadId, useModelPrefs.getState().modelFor("xdesign"));
   };
@@ -462,8 +513,10 @@ export function XDesignClaudeRail() {
         role: m.role,
         content:
           m.role === "assistant"
-            ? stripHtmlArtifact(
-                stripDesignSystemReply(stripDesignPlan(stripCanvasCommands(m.content))),
+            ? stripSvg(
+                stripHtmlArtifact(
+                  stripDesignSystemReply(stripDesignPlan(stripCanvasCommands(m.content))),
+                ),
               )
             : m.content,
         pending: m.pending,
@@ -537,6 +590,16 @@ export function XDesignClaudeRail() {
           title="Build webpage — real, shippable HTML you can preview & export"
         >
           <Globe size={13} />
+        </button>
+        <button
+          type="button"
+          className="xd-rail-icon"
+          data-no-drag
+          onClick={handleIllustrate}
+          disabled={thread.running}
+          title="Illustrate — generate a vector SVG illustration"
+        >
+          <ImagePlus size={13} />
         </button>
         <button
           type="button"

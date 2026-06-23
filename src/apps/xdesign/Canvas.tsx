@@ -27,6 +27,10 @@ import { reflowConstraints, type Box } from "@/apps/xdesign/constraints";
 import { setExportSvgRef } from "@/apps/xdesign/exportXD";
 import type { Asset } from "@/store/assetsStore";
 
+/** Image source resolver: data: URLs (AI-authored SVG illustrations) pass
+ * through untouched; real file paths go through Tauri's asset protocol. */
+const imgHref = (p: string): string => (p.startsWith("data:") ? p : convertFileSrc(p));
+
 const MIN_DIM = 4;
 // New shapes default to Figma's neutral gray fill with no stroke.
 const DEFAULT_FILL = "#d9d9d9";
@@ -2204,7 +2208,7 @@ function ShapeNode({
         opacity={opacityAttr}
       >
         <image
-          href={convertFileSrc(shape.filePath)}
+          href={imgHref(shape.filePath)}
           x={shape.x}
           y={shape.y}
           width={shape.w}
@@ -2420,7 +2424,7 @@ function ImageFillDef({
       height={1}
     >
       <image
-        href={convertFileSrc(filePath)}
+        href={imgHref(filePath)}
         x={0}
         y={0}
         width={1}
