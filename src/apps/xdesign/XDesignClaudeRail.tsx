@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle } from "lucide-react";
+import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle, Globe } from "lucide-react";
 import { ulid } from "ulid";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
@@ -13,6 +13,13 @@ import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agent
 import { log } from "@/lib/log";
 import { xdesignClaude, COMPOSER_PROMPT, composerVariationsPrompt } from "@/apps/xdesign/claude";
 import { composeCraftBrief, lensesForBrief } from "@/apps/xdesign/designKnowledge";
+import {
+  extractHtmlArtifact,
+  stripHtmlArtifact,
+  buildWebpagePrompt,
+  buildRefinePrompt,
+} from "@/apps/xdesign/htmlArtifact";
+import { useHtmlArtifact } from "@/apps/xdesign/htmlArtifactStore";
 import { useDesignSystems } from "@/store/designSystemStore";
 import {
   designSystemToPrompt,
@@ -124,6 +131,9 @@ export function XDesignClaudeRail() {
   // Track which assistant messages we've already executed commands for so
   // streaming snapshot updates don't re-run the same batch.
   const executedRef = useRef<Set<string>>(new Set());
+  // When true, the next finished assistant reply is treated as an HTML
+  // artifact (set by Build webpage / Refine) rather than canvas commands.
+  const pendingArtifactRef = useRef(false);
 
   // Whenever the latest assistant message in this thread finishes streaming
   // (pending=false), parse any <canvas-command> blocks and run them. Single
@@ -133,6 +143,17 @@ export function XDesignClaudeRail() {
     if (!last || last.role !== "assistant" || last.pending) return;
     if (executedRef.current.has(last.id)) return;
     executedRef.current.add(last.id);
+    // HTML-artifact turn: consume the produced document into the live preview.
+    if (pendingArtifactRef.current) {
+      pendingArtifactRef.current = false;
+      const doc = extractHtmlArtifact(last.content);
+      if (doc) {
+        const title = (doc.match(/<title>([^<]*)<\/title>/i)?.[1] ?? "").trim();
+        useHtmlArtifact.getState().setArtifact(doc, title || undefined);
+        log.info("xdesign claude: rendered HTML artifact");
+      }
+      return;
+    }
     // An extract-brand reply (one ```xd-designsystem block) becomes a new,
     // active design system; it must take priority over canvas commands.
     const ds = parseDesignSystemReply(last.content, `ds-${ulid()}`);
@@ -387,6 +408,49 @@ export function XDesignClaudeRail() {
     );
   };
 
+  // 🌐 Build webpage — generate a real, shippable single-file HTML page from a
+  // brief (brand- + craft-aware), rendered live in the sandboxed preview.
+  const handleBuildWebpage = async () => {
+    const brief = await promptText({
+      title: "Build a webpage",
+      label: "Describe the page — Claude builds real, shippable HTML/CSS you can preview & export.",
+      placeholder: "a landing page for a privacy-first email app",
+      confirmLabel: "Build",
+    });
+    if (brief === null) return;
+    const b = brief.trim() || "a clean, modern landing page";
+    pendingArtifactRef.current = true;
+    await sendTurn(
+      `🌐 Build webpage — ${b}`,
+      buildWebpagePrompt(b, useDesignSystems.getState().active(), composeCraftBrief(lensesForBrief(b))),
+    );
+  };
+
+  // Open the preview if we already have a page; otherwise build a new one.
+  const handleWebpageButton = () => {
+    if (useHtmlArtifact.getState().html) useHtmlArtifact.getState().openPreview();
+    else void handleBuildWebpage();
+  };
+
+  const refineWebpage = (instruction: string) => {
+    const cur = useHtmlArtifact.getState().html;
+    if (!cur) return;
+    pendingArtifactRef.current = true;
+    void sendTurn(
+      `Refine webpage — ${instruction}`,
+      buildRefinePrompt(cur, instruction, useDesignSystems.getState().active()),
+    );
+  };
+
+  // Let the preview overlay drive build/refine without coupling components.
+  useEffect(() => {
+    useHtmlArtifact.getState().setActions({
+      builder: () => void handleBuildWebpage(),
+      refiner: refineWebpage,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleCancel = () => {
     void dispatchCancel(thread.threadId, useModelPrefs.getState().modelFor("xdesign"));
   };
@@ -398,7 +462,9 @@ export function XDesignClaudeRail() {
         role: m.role,
         content:
           m.role === "assistant"
-            ? stripDesignSystemReply(stripDesignPlan(stripCanvasCommands(m.content)))
+            ? stripHtmlArtifact(
+                stripDesignSystemReply(stripDesignPlan(stripCanvasCommands(m.content))),
+              )
             : m.content,
         pending: m.pending,
       })),
@@ -461,6 +527,16 @@ export function XDesignClaudeRail() {
           title="Variations — 3 distinct directions side-by-side"
         >
           <Shuffle size={13} />
+        </button>
+        <button
+          type="button"
+          className="xd-rail-icon"
+          data-no-drag
+          onClick={handleWebpageButton}
+          disabled={thread.running}
+          title="Build webpage — real, shippable HTML you can preview & export"
+        >
+          <Globe size={13} />
         </button>
         <button
           type="button"

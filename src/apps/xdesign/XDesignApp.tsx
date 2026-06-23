@@ -8,6 +8,7 @@ import { XDesignInspector } from "@/apps/xdesign/Inspector";
 import { XDesignClaudeRail } from "@/apps/xdesign/XDesignClaudeRail";
 import { XDesignAlignBar } from "@/apps/xdesign/AlignBar";
 import { PresentMode } from "@/apps/xdesign/PresentMode";
+import { HtmlArtifactPreview } from "@/apps/xdesign/HtmlArtifactPreview";
 import { usePresentMode } from "@/apps/xdesign/presentStore";
 import { initialScreen, topLevelFrames } from "@/apps/xdesign/prototype";
 import { useFileDropZone } from "@/lib/fileDrop";
@@ -135,6 +136,7 @@ export function XDesignApp() {
           </button>
         )}
         <PresentMode />
+        <HtmlArtifactPreview />
       </div>
       <XDesignInspector />
     </div>
