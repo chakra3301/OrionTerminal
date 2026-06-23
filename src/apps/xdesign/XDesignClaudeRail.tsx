@@ -150,7 +150,7 @@ export function XDesignClaudeRail() {
   // the canvas-edit system prompt and the ✦ Generate composer so the AI stays
   // on-brand. Empty when no system is active.
   const brandBlock = (): string =>
-    activeBrand ? `\n\n${designSystemToPrompt(activeBrand)}\n` : "";
+    activeBrand ? `\n\n${designSystemToPrompt(activeBrand, { withRamps: true })}\n` : "";
 
   const thread = useAppChat((s) => s.threads.xdesign);
   const appendUser = useAppChat((s) => s.appendUser);

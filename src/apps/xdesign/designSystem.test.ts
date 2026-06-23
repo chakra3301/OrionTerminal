@@ -61,6 +61,14 @@ describe("designSystemToPrompt", () => {
     expect(p).toContain("Principles");
   });
 
+  it("appends the derived token system only when withRamps is set", () => {
+    const ds = BUILTIN_DESIGN_SYSTEMS[0]!;
+    expect(designSystemToPrompt(ds)).not.toContain("Derived token system");
+    const withRamps = designSystemToPrompt(ds, { withRamps: true });
+    expect(withRamps).toContain("Derived token system");
+    expect(withRamps).toContain("Semantic roles");
+  });
+
   it("omits empty sections", () => {
     const ds: DesignSystem = {
       id: "x",

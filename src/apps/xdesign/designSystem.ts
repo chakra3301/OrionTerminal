@@ -10,6 +10,8 @@
 // Pure + framework-free: parsing/serialization/prompt-compilation are cheap to
 // unit-test. Id generation, DB, and store mutation live elsewhere.
 
+import { brandTokensPrompt } from "./tokenEngine";
+
 export type DSColor = {
   /** Token name referenced as color/<name> in plans, e.g. "brand". */
   name: string;
@@ -153,8 +155,14 @@ export function parseDesignSystem(raw: unknown, fallbackId?: string): DesignSyst
 }
 
 /** Compile a design system into a compact brand-contract block the AI must
- * adhere to. Kept terse — it's prepended to generation prompts every turn. */
-export function designSystemToPrompt(ds: DesignSystem): string {
+ * adhere to. Kept terse — it's prepended to generation prompts every turn.
+ * With `withRamps`, the deterministic token engine appends coherent 10-step
+ * color ramps + semantic role tokens + scales (Lever 1) so the model designs
+ * from a derived system instead of inventing shades. */
+export function designSystemToPrompt(
+  ds: DesignSystem,
+  opts: { withRamps?: boolean } = {},
+): string {
   const lines: string[] = [];
   lines.push(`# BRAND CONTRACT — "${ds.name}"`);
   lines.push(
@@ -200,6 +208,9 @@ export function designSystemToPrompt(ds: DesignSystem): string {
   if (ds.principles?.length) {
     lines.push(`\n## Principles`);
     for (const p of ds.principles) lines.push(`- ${p}`);
+  }
+  if (opts.withRamps) {
+    lines.push(`\n${brandTokensPrompt(ds)}`);
   }
   return lines.join("\n");
 }
@@ -249,7 +260,7 @@ Write one short sentence before the block and nothing after it.`;
  * so the critique is brand-aware. */
 export function buildCritiquePrompt(brand: DesignSystem | null): string {
   const brandPart = brand
-    ? `\n\n${designSystemToPrompt(brand)}\n\nCritique against this brand contract: flag any off-brand color, font, spacing, or tone, and fix it to the tokens above.`
+    ? `\n\n${designSystemToPrompt(brand, { withRamps: true })}\n\nCritique against this brand contract: flag any off-brand color, font, spacing, or tone, and fix it to the tokens above.`
     : "";
   return `Act as a brutally honest senior design critic. Study the attached render of the CURRENT canvas as ground truth and critique it like an Awwwards juror would — hierarchy, spacing rhythm, alignment, contrast, balance, typographic scale, color harmony, and overall polish.
 
@@ -261,7 +272,7 @@ Keep your written critique to a few tight bullets, then make the edits.`;
 /** Restyle the existing canvas to conform to the active brand without changing
  * the layout/structure. */
 export function buildApplyBrandPrompt(brand: DesignSystem): string {
-  return `${designSystemToPrompt(brand)}\n\nRestyle the EXISTING canvas to fully conform to this brand contract WITHOUT changing the layout or structure: remap fills/strokes/text colors to the nearest brand color token, align font sizes/weights to the type scale, normalize corner radii and spacing to the brand's steps, and adjust any off-brand element. Use the apply tool with update ops on the existing shapes (read their ids from the canvas summary / get_canvas). Do not add or delete shapes unless an element is fundamentally off-brand. Briefly say what you changed, then apply.`;
+  return `${designSystemToPrompt(brand, { withRamps: true })}\n\nRestyle the EXISTING canvas to fully conform to this brand contract WITHOUT changing the layout or structure: remap fills/strokes/text colors to the nearest brand color token, align font sizes/weights to the type scale, normalize corner radii and spacing to the brand's steps, and adjust any off-brand element. Use the apply tool with update ops on the existing shapes (read their ids from the canvas summary / get_canvas). Do not add or delete shapes unless an element is fundamentally off-brand. Briefly say what you changed, then apply.`;
 }
 
 /** Built-in starter design systems. Stable ids so re-seed is idempotent.

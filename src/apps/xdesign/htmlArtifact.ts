@@ -67,7 +67,7 @@ export function buildWebpagePrompt(
   imagesAvailable = false,
 ): string {
   const brandPart = brand
-    ? `\n\n${designSystemToPrompt(brand)}\n\nBuild the page strictly within this brand contract: use its color values, fonts, type scale, spacing, radii, voice, and principles.`
+    ? `\n\n${designSystemToPrompt(brand, { withRamps: true })}\n\nBuild the page strictly within this brand contract: use its derived token values (ramps + semantic roles), fonts, type scale, spacing, radii, voice, and principles.`
     : "";
   return `You are an elite front-end design engineer. Build a real, shippable web page for this brief as actual HTML & CSS (not a mockup).
 
@@ -91,7 +91,7 @@ export function buildRefinePrompt(
   imagesAvailable = false,
 ): string {
   const brandPart = brand
-    ? `\n\nStay within the brand contract:\n${designSystemToPrompt(brand)}`
+    ? `\n\nStay within the brand contract:\n${designSystemToPrompt(brand, { withRamps: true })}`
     : "";
   return `Here is the current web page. Apply the requested change and return the COMPLETE updated document (not a diff, not a fragment).
 
