@@ -243,6 +243,27 @@ Return EXACTLY one fenced code block tagged xd-designsystem containing valid JSO
 
 Write one short sentence before the block and nothing after it.`;
 
+/** Self-critique & refine: look at the current render, critique it against the
+ * active brand + craft principles, then make targeted edits. Open Design's
+ * "critique" stage as a one-click loop. The active brand (if any) is folded in
+ * so the critique is brand-aware. */
+export function buildCritiquePrompt(brand: DesignSystem | null): string {
+  const brandPart = brand
+    ? `\n\n${designSystemToPrompt(brand)}\n\nCritique against this brand contract: flag any off-brand color, font, spacing, or tone, and fix it to the tokens above.`
+    : "";
+  return `Act as a brutally honest senior design critic. Study the attached render of the CURRENT canvas as ground truth and critique it like an Awwwards juror would — hierarchy, spacing rhythm, alignment, contrast, balance, typographic scale, color harmony, and overall polish.
+
+List the 3–5 most impactful problems you SEE (be specific and reference what's wrong), then FIX them with targeted edits via the apply tool — don't rebuild from scratch, surgically improve. Prioritize the changes that most raise the quality bar.${brandPart}
+
+Keep your written critique to a few tight bullets, then make the edits.`;
+}
+
+/** Restyle the existing canvas to conform to the active brand without changing
+ * the layout/structure. */
+export function buildApplyBrandPrompt(brand: DesignSystem): string {
+  return `${designSystemToPrompt(brand)}\n\nRestyle the EXISTING canvas to fully conform to this brand contract WITHOUT changing the layout or structure: remap fills/strokes/text colors to the nearest brand color token, align font sizes/weights to the type scale, normalize corner radii and spacing to the brand's steps, and adjust any off-brand element. Use the apply tool with update ops on the existing shapes (read their ids from the canvas summary / get_canvas). Do not add or delete shapes unless an element is fundamentally off-brand. Briefly say what you changed, then apply.`;
+}
+
 /** Built-in starter design systems. Stable ids so re-seed is idempotent.
  * createdAt/updatedAt are filled at seed time (0 here keeps them pure). */
 export const BUILTIN_DESIGN_SYSTEMS: DesignSystem[] = [

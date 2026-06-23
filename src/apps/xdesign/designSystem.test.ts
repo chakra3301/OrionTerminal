@@ -4,6 +4,8 @@ import {
   designSystemToPrompt,
   parseDesignSystemReply,
   stripDesignSystemReply,
+  buildCritiquePrompt,
+  buildApplyBrandPrompt,
   BUILTIN_DESIGN_SYSTEMS,
   type DesignSystem,
 } from "./designSystem";
@@ -95,6 +97,24 @@ describe("parseDesignSystemReply / strip", () => {
 
   it("strips the block from the transcript", () => {
     expect(stripDesignSystemReply(reply)).toBe("Here is the system.");
+  });
+});
+
+describe("refine prompts", () => {
+  it("critique folds in the active brand when present", () => {
+    const ds = BUILTIN_DESIGN_SYSTEMS[0]!;
+    const withBrand = buildCritiquePrompt(ds);
+    expect(withBrand).toContain("BRAND CONTRACT");
+    expect(withBrand).toContain("critic");
+    const noBrand = buildCritiquePrompt(null);
+    expect(noBrand).not.toContain("BRAND CONTRACT");
+    expect(noBrand).toContain("critic");
+  });
+
+  it("apply-brand references the contract and forbids structural change", () => {
+    const p = buildApplyBrandPrompt(BUILTIN_DESIGN_SYSTEMS[0]!);
+    expect(p).toContain("BRAND CONTRACT");
+    expect(p).toMatch(/without changing the layout/i);
   });
 });
 

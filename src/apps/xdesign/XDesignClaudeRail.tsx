@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, X, Wand2, Palette } from "lucide-react";
+import { Sparkles, X, Wand2, Palette, Eye, Paintbrush } from "lucide-react";
 import { ulid } from "ulid";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
@@ -17,6 +17,8 @@ import {
   designSystemToPrompt,
   parseDesignSystemReply,
   stripDesignSystemReply,
+  buildCritiquePrompt,
+  buildApplyBrandPrompt,
   EXTRACT_SYSTEM_PROMPT,
 } from "@/apps/xdesign/designSystem";
 import { toast } from "@/store/toastStore";
@@ -328,6 +330,34 @@ export function XDesignClaudeRail() {
     );
   };
 
+  // ◉ Critique & refine — vision-based self-critique against the active brand,
+  // then targeted fixes. Open Design's "critique" stage as one click.
+  const handleCritique = async () => {
+    if (useXDesign.getState().shapes.length === 0) {
+      toast.info("Nothing to critique", { body: "The canvas is empty." });
+      return;
+    }
+    await sendTurn(
+      "◉ Critique & refine",
+      buildCritiquePrompt(useDesignSystems.getState().active()),
+    );
+  };
+
+  // ◈ Apply brand — restyle the existing canvas to the active brand contract
+  // without changing layout/structure.
+  const handleApplyBrand = async () => {
+    const brand = useDesignSystems.getState().active();
+    if (!brand) {
+      toast.info("No active brand", { body: "Pick a design system in the Brand panel." });
+      return;
+    }
+    if (useXDesign.getState().shapes.length === 0) {
+      toast.info("Nothing to restyle", { body: "The canvas is empty." });
+      return;
+    }
+    await sendTurn(`◈ Apply brand — ${brand.name}`, buildApplyBrandPrompt(brand));
+  };
+
   const handleCancel = () => {
     void dispatchCancel(thread.threadId, useModelPrefs.getState().modelFor("xdesign"));
   };
@@ -395,14 +425,33 @@ export function XDesignClaudeRail() {
         </button>
         <button
           type="button"
-          className="xd-rail-generate"
+          className="xd-rail-icon"
+          data-no-drag
+          onClick={handleCritique}
+          disabled={thread.running}
+          title="Critique & refine — self-critique the canvas, then fix it"
+        >
+          <Eye size={13} />
+        </button>
+        <button
+          type="button"
+          className="xd-rail-icon"
+          data-no-drag
+          onClick={handleApplyBrand}
+          disabled={thread.running}
+          title="Apply brand — restyle the canvas to the active design system"
+        >
+          <Paintbrush size={13} />
+        </button>
+        <button
+          type="button"
+          className="xd-rail-icon"
           data-no-drag
           onClick={handleExtractBrand}
           disabled={thread.running}
-          title="Distill the current canvas into a reusable design system"
+          title="Extract brand — distill the canvas into a reusable design system"
         >
-          <Palette size={12} />
-          <span>Extract brand</span>
+          <Palette size={13} />
         </button>
         <button
           type="button"

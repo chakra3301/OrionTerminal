@@ -7923,6 +7923,21 @@ summary:focus-visible,
   background: rgba(var(--xd-accent-rgb), 0.28);
 }
 .xd-rail-generate:disabled { opacity: 0.5; cursor: default; }
+.xd-rail-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(var(--xd-accent-rgb), 0.10);
+  border: 1px solid rgba(var(--xd-accent-rgb), 0.28);
+  color: var(--xd-accent);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.xd-rail-icon:hover:not(:disabled) { background: rgba(var(--xd-accent-rgb), 0.24); }
+.xd-rail-icon:disabled { opacity: 0.5; cursor: default; }
 
 .xd-claude-rail-body {
   flex: 1;
