@@ -221,7 +221,12 @@ export function buildMenu(app: AppId | null, name: string): MenuItem[] {
           cmd("view.toggleTheme", "Toggle Theme"),
         ];
       case "Run":
-        return [cmd("view.openPreview", "Open Preview"), cmd("view.openClaudeCode", "Open Claude Code")];
+        return [
+          cmd("view.openPreview", "Open Preview"),
+          cmd("view.openClaudeCode", "Open Claude Code"),
+          cmd("view.openHermes", "Open Hermes"),
+          cmd("view.openPi", "Open Pi"),
+        ];
       case "Terminal":
         return [
           cmd("view.openTerminal", "New Terminal"),

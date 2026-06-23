@@ -1,3 +1,11 @@
+export type AgentCli = "claude" | "hermes" | "pi";
+
+export const AGENT_LABELS: Record<AgentCli, string> = {
+  claude: "Claude Code",
+  hermes: "Hermes",
+  pi: "Pi",
+};
+
 export type AssetFilter = {
   kinds?: string[];
   tags?: string[];
@@ -12,7 +20,7 @@ export type TabDescriptor =
   | { kind: "files-tree" }
   | { kind: "preview" }
   | { kind: "claude" }
-  | { kind: "claude-code"; id?: string }
+  | { kind: "claude-code"; id?: string; agent?: AgentCli }
   | { kind: "terminal"; id?: string; initialCommand?: string }
   | { kind: "problems" }
   | { kind: "search" }
@@ -70,7 +78,7 @@ export function descriptorKey(d: TabDescriptor): string {
     case "claude":
       return "claude";
     case "claude-code":
-      return `claude-code:${d.id ?? "default"}`;
+      return `claude-code:${d.agent ?? "claude"}:${d.id ?? "default"}`;
     case "terminal":
       return `terminal:${d.id ?? "main"}`;
     case "problems":
@@ -118,7 +126,7 @@ export function defaultLabel(d: TabDescriptor): string {
     case "claude":
       return "Orix47";
     case "claude-code":
-      return "Claude Code";
+      return AGENT_LABELS[d.agent ?? "claude"];
     case "terminal":
       return "Terminal";
     case "problems":

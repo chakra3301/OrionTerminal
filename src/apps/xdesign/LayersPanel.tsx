@@ -26,6 +26,7 @@ import {
   type ShapePatch,
 } from "@/apps/xdesign/store";
 import { XDesignVariablesPanel } from "@/apps/xdesign/VariablesPanel";
+import { XDesignBrandPanel } from "@/apps/xdesign/BrandPanel";
 
 const LAYER_DRAG_MIME = "application/x-xdesign-layer";
 
@@ -197,6 +198,7 @@ export function XDesignLayersPanel() {
   return (
     <div className="xd-layers scroll">
       <PagesList />
+      <XDesignBrandPanel />
       <XDesignVariablesPanel />
       <div
         className={`heading${dropTarget === "root" ? " drop-into" : ""}`}

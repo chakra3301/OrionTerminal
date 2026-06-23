@@ -241,6 +241,14 @@
 .cp-form { display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--bg-1); border: 1px solid var(--glass-border); border-radius: var(--r-lg); }
 .cp-form-row { display: flex; gap: 10px; align-items: center; }
 .cp-form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 2px; }
+.cp-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.cp-chip {
+  padding: 4px 10px; background: var(--bg-0); border: 1px solid var(--glass-border);
+  border-radius: var(--r-pill); color: var(--t-secondary); font: 500 12px var(--f-display);
+  cursor: pointer; transition: color .14s, border-color .14s;
+}
+.cp-chip:hover { color: var(--t-primary); border-color: var(--glass-border-bright); }
+.cp-form-error { color: var(--neon-magenta); font: 500 12px var(--f-display); }
 .cp-input {
   padding: 9px 11px; background: var(--bg-0); border: 1px solid var(--glass-border);
   border-radius: var(--r-sm); color: var(--t-primary); font: 400 13px var(--f-display); transition: border-color .14s, box-shadow .14s;

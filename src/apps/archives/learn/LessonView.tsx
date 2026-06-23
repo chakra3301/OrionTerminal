@@ -22,7 +22,8 @@ import {
   BookOpen,
 } from "lucide-react";
 import { useLearn } from "./useLearn";
-import { parseLesson } from "./learnTypes";
+import { parseLesson, type LessonVisual as Visual } from "./learnTypes";
+import { LessonVisual } from "./LessonVisual";
 import type { Grade } from "./claude";
 
 // ── Markdown renderer — mirrors ClaudeChat.tsx config exactly ─────────────
@@ -259,6 +260,20 @@ export function LessonView() {
   const allDone  = revealedChunks >= total;
   const pMastery = node.p_mastery;
 
+  // Group visuals by the concept chunk they illustrate; anything with an
+  // out-of-range or -1 chunk index becomes a general visual shown after the chunks.
+  const visualsByChunk = new Map<number, Visual[]>();
+  const generalVisuals: Visual[] = [];
+  for (const v of lesson.visuals) {
+    if (v.chunk >= 0 && v.chunk < total) {
+      const arr = visualsByChunk.get(v.chunk) ?? [];
+      arr.push(v);
+      visualsByChunk.set(v.chunk, arr);
+    } else {
+      generalVisuals.push(v);
+    }
+  }
+
   return (
     <div className="ll-spine">
       {/* ── Breadcrumb ─────────────────────────────────────────────── */}
@@ -299,6 +314,7 @@ export function LessonView() {
             <div className="ll-chunk-body">
               <Markdown>{chunk.body}</Markdown>
             </div>
+            {(visualsByChunk.get(i) ?? []).map((v, vi) => <LessonVisual key={vi} v={v} />)}
           </div>
         ))}
         {!allDone && (
@@ -316,6 +332,14 @@ export function LessonView() {
       {/* ── Remaining content (shown after all chunks revealed) ────── */}
       {allDone && (
         <>
+          {/* General / overview visuals */}
+          {generalVisuals.length > 0 && (
+            <div className="ll-section">
+              <h3 className="ll-section-title">Visualize It</h3>
+              {generalVisuals.map((v, i) => <LessonVisual key={i} v={v} />)}
+            </div>
+          )}
+
           {/* Worked example */}
           {lesson.worked_example && (
             <div className="ll-section">

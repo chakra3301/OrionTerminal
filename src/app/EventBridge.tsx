@@ -23,6 +23,9 @@ import {
   isOrionHermesWriteTool,
 } from "@/lib/orionToolMatch";
 import { useHermes, type HermesStatus, type HermesColumn } from "@/store/hermesStore";
+import { useCommand } from "@/store/commandStore";
+import { type CcEvent } from "@/apps/command/ccRun";
+import { useSpotify } from "@/store/spotifyStore";
 import { useRepoLensWebsites } from "@/apps/archives/repolens/useRepoLensWebsites";
 import { onPassExit } from "@/features/agents/twoPassCoordinator";
 import { log } from "@/lib/log";
@@ -608,6 +611,30 @@ export function EventBridge() {
     listen<ClaudeEnvelope>("claude:event", (e) => handleClaude(e.payload)).then(
       (u) => unlisteners.push(u),
     );
+
+    // Command Center — a profile's headless pi run streams flat cc events here;
+    // mirror them into the live run, persist on exit.
+    listen<{ runId: string; event: CcEvent }>("cc:event", (e) => {
+      useCommand.getState().applyRunEvent(e.payload.runId, e.payload.event);
+    }).then((u) => unlisteners.push(u));
+
+    listen<{ runId: string; code: number | null; error: string | null }>(
+      "cc:exit",
+      (e) => {
+        void useCommand
+          .getState()
+          .finishRun(e.payload.runId, e.payload.error ?? undefined);
+      },
+    ).then((u) => unlisteners.push(u));
+
+    // OS-level Spotify media hotkeys (registered in Rust). Single code path:
+    // the global shortcut fires here even when Orion is unfocused.
+    listen<string>("spotify:hotkey", (e) => {
+      const action = e.payload;
+      if (action === "playpause" || action === "next" || action === "previous") {
+        void useSpotify.getState().control(action);
+      }
+    }).then((u) => unlisteners.push(u));
 
     // Hermes swarm — the engine streams each agent's assistant text + status
     // and rolls the task up; mirror it into the store for the live board.

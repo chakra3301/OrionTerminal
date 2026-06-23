@@ -5,6 +5,7 @@ import { useVoice } from "@/store/voiceStore";
 import { useContextMenu } from "@/components/ContextMenu";
 import { buildMenu, appMenu } from "@/shell/menus";
 import { NotificationCenter } from "@/shell/NotificationCenter";
+import { SpotifyWidget } from "@/shell/SpotifyWidget";
 
 // Twelve bars driven by CSS animations. Heights/delays are pseudo-random
 // (hand-picked) so each bar moves on its own beat — gives the impression of
@@ -170,6 +171,7 @@ export function MenuBar() {
       {menu}
       <div className="ot-menubar-spacer" />
       <div className="ot-menubar-status">
+        <SpotifyWidget />
         <VoiceIndicator />
         <NotificationCenter />
         <span className="pill">

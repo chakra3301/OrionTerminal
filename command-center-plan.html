@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Command Center — Refined Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-0:#03060a; --bg-1:#060a0f; --bg-2:#0a1015; --bg-3:#10171d;
+    --green:#39ff88; --cyan:#00e0ff; --yellow:#e6ff3a; --magenta:#ff3ea5; --violet:#b14cff;
+    --gold:#ffc24b;
+    --t1:#e6f4ec; --t2:#9ab0a8; --t3:#5a706a; --t4:#324036;
+    --line:rgba(154,176,168,0.12);
+    --r-sm:6px; --r-md:10px; --r-lg:16px; --r-xl:22px;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --ui:'Space Grotesk',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html { scroll-behavior:smooth; }
+  body {
+    background:var(--bg-0);
+    color:var(--t1);
+    font-family:var(--ui);
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  /* aurora backdrop */
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-2;
+    background:
+      radial-gradient(60% 50% at 80% -5%, rgba(177,76,255,0.18), transparent 60%),
+      radial-gradient(50% 45% at 0% 10%, rgba(0,224,255,0.12), transparent 60%),
+      radial-gradient(55% 50% at 50% 110%, rgba(255,194,75,0.10), transparent 60%);
+    filter:blur(8px);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:64px 64px; opacity:.25;
+    mask-image:radial-gradient(circle at 50% 30%, #000 0%, transparent 80%);
+  }
+  .wrap { max-width:1080px; margin:0 auto; padding:0 28px 120px; }
+
+  /* ---------- HERO ---------- */
+  header.hero { padding:90px 0 48px; text-align:center; position:relative; }
+  .eyebrow {
+    font-family:var(--mono); font-size:12px; letter-spacing:.32em; text-transform:uppercase;
+    color:var(--gold); display:inline-flex; align-items:center; gap:10px; margin-bottom:24px;
+    padding:7px 16px; border:1px solid rgba(255,194,75,.3); border-radius:999px;
+    background:rgba(255,194,75,.06); box-shadow:0 0 24px -8px rgba(255,194,75,.5);
+  }
+  .eyebrow .dot { width:7px; height:7px; border-radius:50%; background:var(--gold); box-shadow:0 0 10px var(--gold); animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  h1 { font-size:clamp(40px,7vw,76px); font-weight:700; letter-spacing:-.03em; line-height:1.02; }
+  h1 .grad {
+    background:linear-gradient(120deg,var(--gold),var(--magenta) 55%,var(--violet));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .sub { max-width:680px; margin:22px auto 0; color:var(--t2); font-size:18px; }
+  .sub b { color:var(--t1); font-weight:600; }
+
+  /* ---------- SECTION ---------- */
+  section { margin-top:80px; scroll-margin-top:30px; }
+  .kicker { font-family:var(--mono); font-size:12px; letter-spacing:.28em; text-transform:uppercase; color:var(--t3); }
+  h2 { font-size:clamp(26px,3.4vw,38px); font-weight:600; letter-spacing:-.02em; margin:10px 0 4px; }
+  h2 .num { color:var(--violet); font-family:var(--mono); font-size:.55em; vertical-align:middle; margin-right:14px; opacity:.8; }
+  .lead { color:var(--t2); max-width:760px; margin-bottom:28px; font-size:16.5px; }
+
+  /* ---------- CARD ---------- */
+  .card {
+    background:linear-gradient(180deg,rgba(10,16,21,.9),rgba(6,10,15,.9));
+    border:1px solid var(--line); border-radius:var(--r-lg); padding:26px 28px;
+    backdrop-filter:blur(12px);
+  }
+  .card + .card { margin-top:16px; }
+
+  /* ---------- TABLE (reuse map) ---------- */
+  .tbl { width:100%; border-collapse:collapse; font-size:14.5px; overflow:hidden; border-radius:var(--r-md); }
+  .tbl th { text-align:left; font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--t3); padding:14px 16px; border-bottom:1px solid var(--line); }
+  .tbl td { padding:14px 16px; border-bottom:1px solid var(--line); vertical-align:top; }
+  .tbl tr:last-child td { border-bottom:none; }
+  .tbl tr:hover td { background:rgba(57,255,136,.03); }
+  .tbl .have { color:var(--green); font-weight:600; }
+  .tbl code, code.k { font-family:var(--mono); font-size:12.5px; color:var(--cyan); background:rgba(0,224,255,.08); padding:2px 7px; border-radius:5px; }
+
+  /* ---------- ORG CHART ---------- */
+  .org { display:flex; flex-direction:column; align-items:center; gap:0; padding:14px 0 4px; }
+  .rank {
+    border-radius:var(--r-md); padding:14px 22px; text-align:center; position:relative;
+    border:1px solid var(--line); background:var(--bg-2); min-width:240px;
+  }
+  .rank .role { font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; }
+  .rank .who { font-size:15px; font-weight:600; margin-top:3px; color:var(--t1); }
+  .rank .desc { font-size:12.5px; color:var(--t2); margin-top:4px; max-width:420px; }
+  .connector { width:2px; height:26px; background:linear-gradient(var(--line),var(--line)); }
+  .commander { border-color:rgba(255,194,75,.45); box-shadow:0 0 30px -10px rgba(255,194,75,.5); }
+  .commander .role { color:var(--gold); }
+  .general { border-color:rgba(177,76,255,.45); box-shadow:0 0 30px -12px rgba(177,76,255,.5); }
+  .general .role { color:var(--violet); }
+  .captains { display:flex; gap:14px; flex-wrap:wrap; justify-content:center; }
+  .captain { border-color:rgba(0,224,255,.35); min-width:150px; }
+  .captain .role { color:var(--cyan); }
+  .captain .who { font-size:13.5px; }
+  .operatives { font-family:var(--mono); font-size:12px; color:var(--t3); margin-top:20px; text-align:center; }
+  .operatives b { color:var(--green); }
+
+  /* ---------- FLOW (protocol) ---------- */
+  .flow { display:flex; flex-direction:column; gap:10px; font-family:var(--mono); font-size:13.5px; }
+  .step { display:flex; gap:14px; align-items:flex-start; padding:13px 16px; border:1px solid var(--line); border-radius:var(--r-md); background:var(--bg-1); }
+  .step .ic { width:26px; height:26px; flex:0 0 26px; border-radius:7px; display:grid; place-items:center; font-size:13px; font-weight:700; color:var(--bg-0); }
+  .step .b { color:var(--t2); }
+  .step .b strong { color:var(--t1); }
+  .ic.c{background:var(--gold)} .ic.g{background:var(--violet)} .ic.cap{background:var(--cyan)} .ic.op{background:var(--green)}
+  .arrow { font-family:var(--mono); color:var(--magenta); font-weight:600; }
+
+  /* ---------- MEMORY TREE ---------- */
+  pre.tree { font-family:var(--mono); font-size:13px; color:var(--t2); line-height:1.85; background:var(--bg-1); border:1px solid var(--line); border-radius:var(--r-md); padding:20px 24px; overflow-x:auto; }
+  pre.tree .root { color:var(--gold); }
+  pre.tree .org-i { color:var(--violet); }
+  pre.tree .div-i { color:var(--cyan); }
+  pre.tree .cm { color:var(--t3); }
+
+  /* ---------- AUTONOMY ---------- */
+  .ladder { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+  .rung { border:1px solid var(--line); border-radius:var(--r-md); padding:16px 18px; background:var(--bg-1); position:relative; overflow:hidden; }
+  .rung .lvl { font-family:var(--mono); font-size:11px; letter-spacing:.1em; color:var(--t3); }
+  .rung .nm { font-weight:600; font-size:15px; margin:4px 0 6px; }
+  .rung .d { font-size:13px; color:var(--t2); }
+  .rung::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; }
+  .rung:nth-child(1)::before{background:var(--t3)} .rung:nth-child(1) .nm{color:var(--t2)}
+  .rung:nth-child(2)::before{background:var(--green)} .rung:nth-child(2) .nm{color:var(--green)}
+  .rung:nth-child(3)::before{background:var(--yellow)} .rung:nth-child(3) .nm{color:var(--yellow)}
+  .rung:nth-child(4)::before{background:var(--magenta)} .rung:nth-child(4) .nm{color:var(--magenta)}
+  .badge-default { font-family:var(--mono); font-size:10px; color:var(--green); border:1px solid rgba(57,255,136,.4); padding:2px 8px; border-radius:999px; margin-left:8px; }
+
+  /* ---------- SCHEMA ---------- */
+  pre.code { font-family:var(--mono); font-size:13px; line-height:1.8; background:#020409; border:1px solid var(--line); border-radius:var(--r-md); padding:22px 24px; overflow-x:auto; color:var(--t2); }
+  pre.code .tname { color:var(--cyan); font-weight:600; }
+  pre.code .cmt { color:var(--t4); }
+  pre.code .kw { color:var(--violet); }
+
+  /* ---------- DECISIONS ---------- */
+  .dec { counter-reset:d; display:flex; flex-direction:column; gap:12px; }
+  .q { display:flex; gap:18px; align-items:flex-start; padding:18px 20px; border:1px solid var(--line); border-radius:var(--r-md); background:var(--bg-1); transition:border-color .2s; }
+  .q:hover { border-color:rgba(255,62,165,.4); }
+  .q::before { counter-increment:d; content:counter(d); font-family:var(--mono); font-weight:700; font-size:15px; color:var(--magenta); width:34px; height:34px; flex:0 0 34px; display:grid; place-items:center; border:1px solid rgba(255,62,165,.35); border-radius:50%; background:rgba(255,62,165,.06); }
+  .q.ok::before { content:"\2713"; color:var(--green); border-color:rgba(57,255,136,.4); background:rgba(57,255,136,.06); }
+  .q.ok:hover { border-color:rgba(57,255,136,.4); }
+  .q .qt { font-weight:600; font-size:15.5px; }
+  .q .rec { font-size:13.5px; color:var(--t2); margin-top:5px; }
+  .q .rec b { color:var(--green); }
+
+  .pill { display:inline-block; font-family:var(--mono); font-size:11px; padding:3px 10px; border-radius:999px; border:1px solid var(--line); color:var(--t2); margin:2px 4px 2px 0; }
+  .pill.new { color:var(--gold); border-color:rgba(255,194,75,.4); background:rgba(255,194,75,.06); }
+
+  footer { margin-top:90px; padding-top:34px; border-top:1px solid var(--line); text-align:center; color:var(--t3); font-family:var(--mono); font-size:12.5px; }
+  footer .cta { color:var(--t1); font-size:15px; font-family:var(--ui); margin-bottom:8px; }
+  footer .cta b { color:var(--gold); }
+
+  @media (max-width:640px){
+    .wrap{padding:0 18px 80px}
+    header.hero{padding:60px 0 36px}
+    .card{padding:20px}
+    .captains{flex-direction:column;align-items:stretch}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="eyebrow"><span class="dot"></span> Orion Terminal · App 05 · Refined Plan</div>
+    <h1>Command<span class="grad"> Center</span></h1>
+    <p class="sub">A <b>team of AI specialists</b> inside Orion Terminal. One engine, many <b>profiles</b> — each a division with its own brain that grows. They delegate, collaborate, and work autonomously while you command. <b>Replaces the Hermes Kanban.</b></p>
+  </header>
+
+  <!-- 1 — YOU ALREADY BUILT 70% -->
+  <section id="reuse">
+    <div class="kicker">The honest starting point</div>
+    <h2><span class="num">01</span>You've already built ~70% of this</h2>
+    <p class="lead">Command Center isn't from scratch — it's a <b>profiles + comms layer</b> composing systems already shipped in Orion, and it <b>supersedes the Hermes Kanban</b> as the orchestration surface. Only two pieces are genuinely new.</p>
+    <div class="card">
+      <table class="tbl">
+        <thead><tr><th>Your vision</th><th>Already exists</th><th>Where</th></tr></thead>
+        <tbody>
+          <tr><td>A profile — persona + model + skills</td><td class="have">Agent Forge</td><td><code>agents</code> · AgentForge.tsx</td></tr>
+          <tr><td>Track a profile's mission list</td><td class="have">Hermes tasks <span style="color:var(--gold)">→ absorbed</span></td><td><code>hermes_tasks</code> (board retires)</td></tr>
+          <tr><td>Run pi / claude / codex / gemini</td><td class="have">Provider + CLI runtime</td><td><code>runtime/</code> · <code>cli_engine/</code></td></tr>
+          <tr><td>Per-division Obsidian brain that grows</td><td class="have">LLM Wiki + force-graph</td><td><code>wiki_*</code> · forceLayout.ts</td></tr>
+          <tr><td>Shared memory + reporting</td><td class="have">activity_log + Notifications</td><td><code>0017_activity_log</code></td></tr>
+          <tr><td>Plan-but-don't-fire-without-approval</td><td class="have">ROSIE gated planning</td><td>rosieStore.ts</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:20px;font-size:14.5px;color:var(--t2)">Genuinely new: <span class="pill new">Pi as an engine</span> <span class="pill new">The delegation protocol</span> — everything else is composition. <b style="color:var(--t1)">No swarms, no operatives</b> — each profile works serially, itself.</p>
+    </div>
+  </section>
+
+  <!-- 2 — ORG MODEL -->
+  <section id="org">
+    <div class="kicker">The chain of command</div>
+    <h2><span class="num">02</span>The org model, refined</h2>
+    <p class="lead">Flat by design — no worker tier. Each division <b>is</b> a profile, and that profile does its own work. One word per rank.</p>
+    <div class="card">
+      <div class="org">
+        <div class="rank commander">
+          <div class="role">Commander</div>
+          <div class="who">You</div>
+          <div class="desc">Issue missions · approve · receive briefings · talk to anyone</div>
+        </div>
+        <div class="connector"></div>
+        <div class="rank general">
+          <div class="role">General · GM</div>
+          <div class="who">Pure coordinator — a profile</div>
+          <div class="desc">Delegate missions → directives · aggregate reports → one briefing · runs pi + org-index wiki. Doesn't do division work itself.</div>
+        </div>
+        <div class="connector"></div>
+        <div class="captains">
+          <div class="rank captain"><div class="role">Captain</div><div class="who">Design</div></div>
+          <div class="rank captain"><div class="role">Captain</div><div class="who">Marketing</div></div>
+          <div class="rank captain"><div class="role">Captain</div><div class="who">Research</div></div>
+          <div class="rank captain"><div class="role">Captain</div><div class="who">Dev</div></div>
+        </div>
+        <div class="operatives">each captain <b>profile</b> = pi + its own wiki + its own skills · <b>does the work itself, serially</b> — no tier below</div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--line);margin:24px 0 20px">
+      <div style="font-family:var(--mono);font-size:13px;color:var(--t2);line-height:2">
+        <div style="color:var(--t3);text-transform:uppercase;letter-spacing:.16em;font-size:11px;margin-bottom:8px">Comms graph — who can talk to whom</div>
+        <div><span style="color:var(--gold)">Commander</span> <span class="arrow">↔</span> everyone</div>
+        <div><span style="color:var(--violet)">General</span> <span class="arrow">↔</span> all Captains + Commander</div>
+        <div><span style="color:var(--cyan)">Captain</span> <span class="arrow">↔</span> General + peer Captains (handoffs) + Commander</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 — TWO NEW PIECES -->
+  <section id="new">
+    <div class="kicker">The only real net-new work</div>
+    <h2><span class="num">03</span>The two genuinely new pieces</h2>
+    <div class="card">
+      <div style="font-family:var(--mono);font-size:12px;color:var(--gold);letter-spacing:.14em;text-transform:uppercase">A · Pi as an engine</div>
+      <p style="margin-top:8px;color:var(--t2);font-size:15px">Pi ships a full SDK (<code class="k">session.prompt()</code> + streaming) and a headless RPC mode. Add a <code class="k">pi_engine</code> next to <code class="k">codex.rs</code> / <code class="k">gemini.rs</code> — ideally an <b style="color:var(--t1)">SDK sidecar</b> so every profile gets the real llm-wiki skill + extensions. <b style="color:var(--t1)">One engine, many profiles</b> — the persona, model, skills and memory vault differ per division; the runtime is shared.</p>
+    </div>
+    <div class="card">
+      <div style="font-family:var(--mono);font-size:12px;color:var(--magenta);letter-spacing:.14em;text-transform:uppercase">B · The delegation protocol</div>
+      <p style="margin:8px 0 18px;color:var(--t2);font-size:15px">The heart of it — <b style="color:var(--t1)">structured messages, not free chat.</b> Every arrow is one typed row in <code class="k">cc_messages</code>. The Slack/Discord feel is just a view over that log.</p>
+      <div class="flow">
+        <div class="step"><div class="ic c">C</div><div class="b"><strong>Commander</strong> issues a Mission <span class="arrow">▶</span> General <span style="color:var(--t4)">(or straight to a Captain)</span></div></div>
+        <div class="step"><div class="ic g">G</div><div class="b"><strong>General</strong> writes a Plan (which divisions · deliverables · deps) <span class="arrow">▶</span> approval gate <span class="arrow">▶</span> Directives</div></div>
+        <div class="step"><div class="ic cap">C</div><div class="b"><strong>Captain</strong> works the Directive <span class="arrow">▶</span> itself, serially, in its own session</div></div>
+        <div class="step"><div class="ic op">◉</div><div class="b">outputs land <span class="arrow">▶</span> division wiki + activity_log</div></div>
+        <div class="step"><div class="ic cap">C</div><div class="b"><strong>Captain</strong> finishes <span class="arrow">▶</span> Report <span class="arrow">▶</span> General</div></div>
+        <div class="step"><div class="ic g">G</div><div class="b"><strong>General</strong> aggregates <span class="arrow">▶</span> Briefing <span class="arrow">▶</span> Commander</div></div>
+        <div class="step" style="border-style:dashed"><div class="ic cap">↔</div><div class="b">Cross-division need <span class="arrow">▶</span> Handoff message (Captain → Captain, logged)</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 — MEMORY -->
+  <section id="memory">
+    <div class="kicker">The part you care most about</div>
+    <h2><span class="num">04</span>Memory — brains that grow</h2>
+    <p class="lead">One LLM Wiki vault per profile under a shared parent, plus a thin org-index for the General. After every mission the profile runs <code class="k">wiki_retro</code> into its vault — that's literally "the division gets stronger."</p>
+    <div class="card">
+<pre class="tree"><span class="root">command-center/</span>
+├─ <span class="org-i">org/wiki/</span>                 <span class="cm"># General's org-wide index · mission history · links out</span>
+└─ divisions/
+   ├─ <span class="div-i">design/wiki/</span>
+   ├─ <span class="div-i">marketing/wiki/</span>
+   ├─ <span class="div-i">research/wiki/</span>
+   └─ <span class="div-i">dev/wiki/</span></pre>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:18px">
+        <div style="flex:1;min-width:240px;border:1px solid var(--line);border-radius:var(--r-md);padding:16px">
+          <div style="color:var(--green);font-weight:600;font-size:14px;margin-bottom:5px">↻ The growth loop</div>
+          <div style="font-size:13.5px;color:var(--t2)">Reusable skills get <b style="color:var(--t1)">promoted into the Control Panel Skill Library</b> — so any profile, any division, can equip what one division learned.</div>
+        </div>
+        <div style="flex:1;min-width:240px;border:1px solid var(--line);border-radius:var(--r-md);padding:16px">
+          <div style="color:var(--cyan);font-weight:600;font-size:14px;margin-bottom:5px">◉ The Obsidian view</div>
+          <div style="font-size:13.5px;color:var(--t2)">Reuses Learn's <code class="k">forceLayout.ts</code> physics + wiki backlinks. Per-vault graph, switchable, with a <b style="color:var(--t1)">whole-org union mode</b>.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 — SCHEMA -->
+  <section id="schema">
+    <div class="kicker">Append-only · migration 0027</div>
+    <h2><span class="num">05</span>Data model</h2>
+    <p class="lead">A <b>profile</b> is a persona + brain model + skills + memory vault + rank. Missions are tracked as a per-profile list (the Kanban's job, absorbed) — no swarm fan-out, so no <code class="k">cc_agents</code> table.</p>
+    <div class="card">
+<pre class="code"><span class="cmt">-- 0027_command_center.sql (append-only · supersedes Hermes board)</span>
+<span class="kw">cc_profiles</span>    id, name, rank(commander|general|captain), division, accent,
+               <span class="tname">brain_model</span>, skill_ids, wiki_root, charter, autonomy_level
+<span class="kw">cc_channels</span>    id, kind(command|division|cross|dm), division?, name
+<span class="kw">cc_messages</span>    id, channel_id, from_profile_id, to_profile_id?,
+               kind(chat|directive|report|handoff), body, mission_ref, ts
+<span class="kw">cc_missions</span>    id, title, brief, status, autonomy_level,
+               <span class="tname">assigned_profile_id</span>, origin_profile_id, ts</pre>
+    </div>
+  </section>
+
+  <!-- 6 — AUTONOMY -->
+  <section id="autonomy">
+    <div class="kicker">Ship gated · graduate later</div>
+    <h2><span class="num">06</span>The autonomy ladder</h2>
+    <p class="lead">Same approval pattern ROSIE/Hermes already use — so it's just a column, not new code. Default everything to level&nbsp;1, per division.</p>
+    <div class="ladder">
+      <div class="rung"><div class="lvl">LEVEL 0</div><div class="nm">Manual</div><div class="d">Nothing fires without a human click.</div></div>
+      <div class="rung"><div class="lvl">LEVEL 1 <span class="badge-default">default</span></div><div class="nm">Approve each step</div><div class="d">Agent plans; you approve every dispatch.</div></div>
+      <div class="rung"><div class="lvl">LEVEL 2</div><div class="nm">Auto within budget</div><div class="d">Runs to a token / task ceiling, then auto-stops.</div></div>
+      <div class="rung"><div class="lvl">LEVEL 3</div><div class="nm">Full auto + digest</div><div class="d">Runs free; you read the briefing after.</div></div>
+    </div>
+  </section>
+
+  <!-- 7 — DECISIONS -->
+  <section id="decisions">
+    <div class="kicker">All locked · 2026-06-20</div>
+    <h2><span class="num">07</span>Six decisions — locked ✓</h2>
+    <div class="card dec">
+      <div class="q ok"><div><div class="qt">New top-level app that replaces the Hermes tile</div><div class="rec">New app · gold "command" accent · Hermes surface retires (data stays, board hides).</div></div></div>
+      <div class="q ok"><div><div class="qt">Pi engine via SDK sidecar</div><div class="rec">Real wiki + skills for every profile.</div></div></div>
+      <div class="q ok"><div><div class="qt">Vault-per-profile</div><div class="rec">Clean separation · independent growth · scoped recall.</div></div></div>
+      <div class="q ok"><div><div class="qt">General = pure coordinator</div><div class="rec">One throat to choke · delegates + briefs you · doesn't do division work.</div></div></div>
+      <div class="q ok"><div><div class="qt">Channel-first surface</div><div class="rec">Slack-like channels + a lightweight per-profile mission list.</div></div></div>
+      <div class="q ok"><div><div class="qt">Start clean</div><div class="rec">Fresh missions · keep <code class="k">hermes_tasks</code> read-only for history.</div></div></div>
+    </div>
+  </section>
+
+  <section id="brief">
+    <div class="kicker">Paste at the start of every build session</div>
+    <h2><span class="num">08</span>Master brief</h2>
+    <div class="card" style="border-color:rgba(255,194,75,.3)">
+      <p style="font-size:15px;color:var(--t2);line-height:1.8"><b style="color:var(--gold)">COMMAND CENTER — MASTER BRIEF.</b> Build a new top-level Orion app (gold accent) that <b style="color:var(--t1)">replaces the Hermes Kanban</b>: an AI org you command. <b style="color:var(--t1)">One engine (pi, via SDK sidecar), many profiles.</b> A profile = persona + brain model + skills + its own LLM-Wiki vault + rank. Ranks: <b style="color:var(--t1)">Commander (you) → General (pure coordinator) → Captain (one per division: Design/Marketing/Research/Dev…)</b>. No operatives, no swarms — each Captain works serially in its own session. Surface is <b style="color:var(--t1)">channel-first</b> (Slack-like: command / per-division / cross-division / DM) over a typed <code class="k">cc_messages</code> log; delegation = directive→report→briefing messages, approval-gated (autonomy ladder, default L1). Each profile's vault grows via <code class="k">wiki_retro</code>; reusable skills promote into the Control Panel library; an Obsidian-style graph view reuses Learn's <code class="k">forceLayout.ts</code>. Migration <b style="color:var(--t1)">0027</b>, append-only (<code class="k">cc_profiles</code>/<code class="k">cc_channels</code>/<code class="k">cc_messages</code>/<code class="k">cc_missions</code>); keep <code class="k">hermes_tasks</code> read-only. Reuse Agent Forge, provider runtime, activity_log, ROSIE's gated-planning pattern. Per-phase protocol: research → audit → ranked plan (approval) → green TDD slices → user smoke test. <b style="color:var(--t1)">First slice:</b> migration + profiles model + read-only org/channel shell, before any profile runs.</p>
+    </div>
+  </section>
+
+  <footer>
+    <div class="cta">Decisions locked — next: a phased, TDD'd build plan in your <b>docs/superpowers/</b> format.</div>
+    <div>First slice: migration 0027 + profiles model + read-only org/channel shell — before any profile runs.</div>
+    <div style="margin-top:14px;color:var(--t4)">Orion Terminal · Command Center · refined 2026-06-20</div>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -227,3 +227,123 @@ pub fn claude_usage() -> ClaudeUsage {
     }
     out
 }
+
+/// The AUTHORITATIVE subscription limits, as Claude's own `/usage` panel
+/// reports them (session = the 5h limit, plus the rolling weekly limits).
+/// Server-side truth — unlike the locally-estimated cost gauge above, these
+/// are the real percentages the user sees in `claude`. `ok` is false when the
+/// CLI couldn't be run or the panel couldn't be parsed.
+#[derive(Serialize, Default, Debug, PartialEq)]
+pub struct ClaudeLimits {
+    ok: bool,
+    session_pct: Option<u32>,
+    session_reset: Option<String>,
+    week_pct: Option<u32>,
+    week_reset: Option<String>,
+    week_sonnet_pct: Option<u32>,
+    week_sonnet_reset: Option<String>,
+}
+
+/// Parse the trailing `… NN% used · resets <when>` of a `/usage` line into the
+/// percentage and the raw reset phrase. `split_once(':')` upstream already
+/// removed the label, so the first `%` here is always the figure.
+fn parse_pct_rest(rest: &str) -> Option<(u32, Option<String>)> {
+    let rest = rest.trim();
+    let pct: u32 = rest.split('%').next()?.trim().parse().ok()?;
+    let reset = rest
+        .split_once("resets ")
+        .map(|(_, r)| r.trim().to_string());
+    Some((pct, reset))
+}
+
+/// Parse the plain-text `claude --print '/usage'` panel. Tolerant: only the
+/// three limit lines are read; everything else (the "what's contributing"
+/// breakdown) is ignored, and missing lines just stay `None`.
+fn parse_usage_panel(text: &str) -> ClaudeLimits {
+    let mut out = ClaudeLimits::default();
+    for line in text.lines() {
+        let Some((label, rest)) = line.trim().split_once(':') else {
+            continue;
+        };
+        let Some((pct, reset)) = parse_pct_rest(rest) else {
+            continue;
+        };
+        match label.trim() {
+            "Current session" => {
+                out.session_pct = Some(pct);
+                out.session_reset = reset;
+                out.ok = true;
+            }
+            "Current week (all models)" => {
+                out.week_pct = Some(pct);
+                out.week_reset = reset;
+                out.ok = true;
+            }
+            "Current week (Sonnet only)" => {
+                out.week_sonnet_pct = Some(pct);
+                out.week_sonnet_reset = reset;
+                out.ok = true;
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Scrape the real subscription limits by running `claude --print '/usage'`
+/// (~2–4s; the monitor polls this on a slow interval). Mirrors the
+/// `claude_oneshot` spawn setup so the CLI is found and no API-key env leaks
+/// in. Any failure returns `ok: false` rather than erroring.
+#[tauri::command]
+pub async fn claude_limits() -> ClaudeLimits {
+    use std::process::Stdio;
+    use tokio::process::Command;
+    let mut cmd = Command::new("claude");
+    cmd.args(["--print", "/usage"]);
+    if let Some(home) = std::env::var_os("HOME") {
+        cmd.current_dir(home);
+    }
+    cmd.env("PATH", crate::claude_cli::augmented_path());
+    cmd.env_remove("ANTHROPIC_API_KEY");
+    cmd.env_remove("ANTHROPIC_AUTH_TOKEN");
+    cmd.stdin(Stdio::null());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+    cmd.kill_on_drop(true);
+    match cmd.output().await {
+        Ok(o) if o.status.success() => parse_usage_panel(&String::from_utf8_lossy(&o.stdout)),
+        _ => ClaudeLimits::default(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PANEL: &str = "You are currently using your subscription to power your Claude Code usage\n\nCurrent session: 58% used · resets Jun 18 at 11:09pm (Asia/Tokyo)\nCurrent week (all models): 29% used · resets Jun 23 at 8:59am (Asia/Tokyo)\nCurrent week (Sonnet only): 7% used · resets Jun 23 at 9am (Asia/Tokyo)\n\nWhat's contributing to your limits usage?\nLast 24h · 1517 requests · 192 sessions\n  Top skills: /superpowers:executing-plans 15%, /update-config 1%\n";
+
+    #[test]
+    fn parses_all_three_limits() {
+        let u = parse_usage_panel(PANEL);
+        assert!(u.ok);
+        assert_eq!(u.session_pct, Some(58));
+        assert_eq!(u.session_reset.as_deref(), Some("Jun 18 at 11:09pm (Asia/Tokyo)"));
+        assert_eq!(u.week_pct, Some(29));
+        assert_eq!(u.week_sonnet_pct, Some(7));
+    }
+
+    #[test]
+    fn ignores_breakdown_lines_with_colons_and_percents() {
+        // "Top skills:" has a colon and percent signs but is not a limit line.
+        let u = parse_usage_panel(PANEL);
+        // Only the three limit fields are populated; nothing bled in from the
+        // skills/sessions lines.
+        assert_eq!(u.week_sonnet_pct, Some(7));
+    }
+
+    #[test]
+    fn empty_or_garbage_is_not_ok() {
+        assert!(!parse_usage_panel("").ok);
+        assert!(!parse_usage_panel("login required\nrun /login").ok);
+    }
+}

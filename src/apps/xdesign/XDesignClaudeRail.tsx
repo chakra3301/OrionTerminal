@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, X, Wand2 } from "lucide-react";
+import { Sparkles, X, Wand2, Palette } from "lucide-react";
+import { ulid } from "ulid";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
 import { useDraggable } from "@/shell/useDraggable";
@@ -11,6 +12,14 @@ import { useModelPrefs } from "@/store/modelPrefsStore";
 import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
 import { xdesignClaude, COMPOSER_PROMPT } from "@/apps/xdesign/claude";
+import { useDesignSystems } from "@/store/designSystemStore";
+import {
+  designSystemToPrompt,
+  parseDesignSystemReply,
+  stripDesignSystemReply,
+  EXTRACT_SYSTEM_PROMPT,
+} from "@/apps/xdesign/designSystem";
+import { toast } from "@/store/toastStore";
 import {
   parseCanvasCommands,
   runCanvasCommands,
@@ -95,6 +104,14 @@ export function XDesignClaudeRail() {
     },
   });
 
+  const activeBrand = useDesignSystems((s) => s.active());
+
+  // The active brand contract, compiled to a prompt block — injected into both
+  // the canvas-edit system prompt and the ✦ Generate composer so the AI stays
+  // on-brand. Empty when no system is active.
+  const brandBlock = (): string =>
+    activeBrand ? `\n\n${designSystemToPrompt(activeBrand)}\n` : "";
+
   const thread = useAppChat((s) => s.threads.xdesign);
   const appendUser = useAppChat((s) => s.appendUser);
   const beginAssistant = useAppChat((s) => s.beginAssistant);
@@ -113,6 +130,16 @@ export function XDesignClaudeRail() {
     if (!last || last.role !== "assistant" || last.pending) return;
     if (executedRef.current.has(last.id)) return;
     executedRef.current.add(last.id);
+    // An extract-brand reply (one ```xd-designsystem block) becomes a new,
+    // active design system; it must take priority over canvas commands.
+    const ds = parseDesignSystemReply(last.content, `ds-${ulid()}`);
+    if (ds) {
+      void useDesignSystems.getState().save(ds);
+      void useDesignSystems.getState().setActive(ds.id);
+      toast.success("Brand extracted", { body: `"${ds.name}" is now active` });
+      log.info("xdesign claude: extracted design system");
+      return;
+    }
     // A composer reply (one ```xd-design block) ingests as a whole design;
     // otherwise fall through to the low-level canvas-command path.
     const plan = parseDesignPlan(last.content);
@@ -243,7 +270,7 @@ export function XDesignClaudeRail() {
         ? "\n\nThe attached image is a render of the CURRENT canvas. Read it to judge layout, spacing, alignment, color, contrast, and overlap before deciding what to change."
         : "";
       const prompt = isFirstTurn
-        ? `${xdesignClaude.systemPrompt}\n\n${note}${visionNote}\n\n---\n\n${sentText}`
+        ? `${xdesignClaude.systemPrompt}${brandBlock()}\n\n${note}${visionNote}\n\n---\n\n${sentText}`
         : `${note}${visionNote}\n\n---\n\n${sentText}`;
       // Pass the snapshot path through to claude_send, which attaches it as a
       // real stream-json image block (NOT an `@path` mention — those get
@@ -278,9 +305,26 @@ export function XDesignClaudeRail() {
     });
     if (brief === null) return;
     const b = brief.trim() || "a clean, modern landing page";
+    const brand = brandBlock();
+    const brandNote = brand
+      ? `${brand}\nUse the brand contract above as your design system: take its color tokens AS the plan's tokens.colors (same names + hex), honor its fonts, type scale, spacing, radii, voice, and principles. Do not invent an off-brand palette.\n`
+      : "";
     await sendTurn(
       `✦ Generate a design — ${b}`,
-      `${COMPOSER_PROMPT}\n\n---\n\nBRIEF: ${b}`,
+      `${COMPOSER_PROMPT}${brandNote}\n\n---\n\nBRIEF: ${b}`,
+    );
+  };
+
+  // ◈ Extract brand — distill the current canvas into a reusable design
+  // system. The vision snapshot sendTurn attaches lets the model read pixels.
+  const handleExtractBrand = async () => {
+    if (useXDesign.getState().shapes.length === 0) {
+      toast.info("Nothing to extract", { body: "The canvas is empty." });
+      return;
+    }
+    await sendTurn(
+      "◈ Extract a design system from this canvas",
+      EXTRACT_SYSTEM_PROMPT,
     );
   };
 
@@ -295,7 +339,7 @@ export function XDesignClaudeRail() {
         role: m.role,
         content:
           m.role === "assistant"
-            ? stripDesignPlan(stripCanvasCommands(m.content))
+            ? stripDesignSystemReply(stripDesignPlan(stripCanvasCommands(m.content)))
             : m.content,
         pending: m.pending,
       })),
@@ -348,6 +392,17 @@ export function XDesignClaudeRail() {
         >
           <Wand2 size={12} />
           <span>Generate</span>
+        </button>
+        <button
+          type="button"
+          className="xd-rail-generate"
+          data-no-drag
+          onClick={handleExtractBrand}
+          disabled={thread.running}
+          title="Distill the current canvas into a reusable design system"
+        >
+          <Palette size={12} />
+          <span>Extract brand</span>
         </button>
         <button
           type="button"

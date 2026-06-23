@@ -4,6 +4,7 @@ export type CommandGroup =
   | "Claude"
   | "Notes"
   | "Assets"
+  | "Media"
   | "Dev";
 
 export type CommandContext = Record<string, never>;
@@ -13,6 +14,10 @@ export type Command = {
   label: string;
   keywords?: string[];
   hotkey?: string;
+  /** When true, `hotkey` is shown in Spotlight as a hint but NOT bound by the
+   * in-app HotkeyHost — an OS-level global shortcut owns it instead (so it
+   * works app-unfocused, without double-firing when focused). */
+  globalOnly?: boolean;
   group?: CommandGroup;
   when?: () => boolean;
   run: (ctx: CommandContext) => void | Promise<void>;
@@ -80,7 +85,7 @@ class Registry {
   private rebuildSnapshots(): void {
     this.listSnapshot = Array.from(this.commands.values());
     this.hotkeysSnapshot = this.listSnapshot
-      .filter((c) => Boolean(c.hotkey))
+      .filter((c) => Boolean(c.hotkey) && !c.globalOnly)
       .map((c) => ({ id: c.id, hotkey: c.hotkey as string }));
   }
 

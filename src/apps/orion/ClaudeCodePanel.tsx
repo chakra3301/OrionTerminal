@@ -3,20 +3,31 @@ import { ulid } from "ulid";
 import { ipc } from "@/lib/ipc";
 import { useProjectStore } from "@/store/projectStore";
 import { attachPtyTerminal } from "./ptyTerminal";
+import { AGENT_LABELS, type AgentCli } from "@/components/workspace/types";
 
-export function OrionClaudeCodePanel() {
+const AGENT_BIN: Record<AgentCli, string> = {
+  claude: "claude",
+  hermes: "hermes",
+  pi: "pi",
+};
+
+export function OrionClaudeCodePanel({
+  agent = "claude",
+}: {
+  agent?: AgentCli;
+}) {
   return (
     <div className="or-terminal-panel">
-      <ClaudeCodeCanvas />
+      <ClaudeCodeCanvas agent={agent} />
     </div>
   );
 }
 
-function ClaudeCodeCanvas() {
+function ClaudeCodeCanvas({ agent }: { agent: AgentCli }) {
   const project = useProjectStore((s) => s.active);
   const containerRef = useRef<HTMLDivElement>(null);
   const attachedRef = useRef(false);
-  const ptyId = useMemo(() => `claude-code-${ulid()}`, []);
+  const ptyId = useMemo(() => `agent-${agent}-${ulid()}`, [agent]);
 
   useEffect(() => {
     if (!containerRef.current || attachedRef.current || !project) return;
@@ -26,11 +37,12 @@ function ClaudeCodeCanvas() {
     const handle = attachPtyTerminal({
       ptyId,
       container: containerRef.current,
-      open: (id, cols, rows) => ipc.terminalOpenClaude(id, root, cols, rows),
-      exitMessage: "\r\n\x1b[31m[claude exited]\x1b[0m",
+      open: (id, cols, rows) =>
+        ipc.terminalOpenAgent(agent, id, root, cols, rows),
+      exitMessage: `\r\n\x1b[31m[${AGENT_BIN[agent]} exited]\x1b[0m`,
       launchErrorLines: (e) => [
-        `\x1b[31mFailed to launch Claude Code: ${String(e)}\x1b[0m`,
-        `\x1b[90mIs the \`claude\` CLI installed and on PATH?\x1b[0m`,
+        `\x1b[31mFailed to launch ${AGENT_LABELS[agent]}: ${String(e)}\x1b[0m`,
+        `\x1b[90mIs the \`${AGENT_BIN[agent]}\` CLI installed and on PATH?\x1b[0m`,
       ],
     });
 
@@ -38,7 +50,7 @@ function ClaudeCodeCanvas() {
       handle.dispose();
       attachedRef.current = false;
     };
-  }, [project, ptyId]);
+  }, [project, ptyId, agent]);
 
   if (!project) {
     return (
@@ -53,7 +65,7 @@ function ClaudeCodeCanvas() {
           fontSize: 11,
         }}
       >
-        Open a project to launch Claude Code.
+        Open a project to launch {AGENT_LABELS[agent]}.
       </div>
     );
   }

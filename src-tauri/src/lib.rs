@@ -6,6 +6,7 @@ mod asset;
 mod autocomplete;
 mod claude_cli;
 mod cli_engine;
+mod pi_engine;
 mod db_backup;
 mod fs_ops;
 mod fs_watch;
@@ -16,10 +17,12 @@ mod learn;
 mod lsp;
 mod mcp_config;
 pub mod mcp_server;
+mod nous_oauth;
 mod messages_chat;
 mod repolens;
 mod repolens_website;
 mod runtime;
+mod spotify;
 mod sysstats;
 mod terminal;
 mod ui_bridge;
@@ -187,11 +190,30 @@ pub fn run() {
             sql: include_str!("../migrations/0026_control_panel.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 27,
+            description: "command center: profiles, channels, messages, missions",
+            sql: include_str!("../migrations/0027_command_center.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 28,
+            description: "command center: per-profile avatar",
+            sql: include_str!("../migrations/0028_cc_avatar.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 29,
+            description: "xdesign: design systems (brand contracts)",
+            sql: include_str!("../migrations/0029_xdesign_design_systems.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(spotify::global_shortcut_plugin())
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:orion.db", migrations)
@@ -222,6 +244,9 @@ pub fn run() {
                     eprintln!("[ui_bridge] failed to start: {}", e);
                 }
             });
+            // OS-level media hotkeys for Spotify (work while Orion is
+            // unfocused). Non-fatal if a combo is already claimed.
+            spotify::register_global_shortcuts(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -263,6 +288,10 @@ pub fn run() {
             provider_keys::provider_key_set,
             provider_keys::provider_key_clear,
             provider_keys::provider_key_status,
+            nous_oauth::nous_device_start,
+            nous_oauth::nous_device_poll,
+            nous_oauth::nous_oauth_status,
+            nous_oauth::nous_oauth_clear,
             learn::learn_claude_call,
             repolens::repolens_claude_call,
             repolens::repolens_fetch_repo,
@@ -284,6 +313,16 @@ pub fn run() {
             cli_engine::cli_status,
             cli_engine::cli_send,
             cli_engine::cli_cancel,
+            pi_engine::pi_status,
+            pi_engine::pi_send,
+            pi_engine::pi_cancel,
+            pi_engine::pi_oneshot,
+            pi_engine::cc_workspace_path,
+            pi_engine::cc_recent_artifacts,
+            pi_engine::cc_open_path,
+            pi_engine::cc_read_image,
+            pi_engine::cc_vault_pages,
+            pi_engine::cc_vault_graph,
             claude_cli::claude_oneshot,
             claude_cli::claude_oneshot_with_image,
             hermes::hermes_dispatch_task,
@@ -292,6 +331,7 @@ pub fn run() {
             hermes::hermes_stop_task,
             terminal::terminal_open,
             terminal::terminal_open_claude,
+            terminal::terminal_open_agent,
             terminal::terminal_write,
             terminal::terminal_resize,
             terminal::terminal_kill,
@@ -305,6 +345,12 @@ pub fn run() {
             sysstats::system_stats,
             sysstats::claude_usage,
             sysstats::claude_limits,
+            spotify::spotify_now_playing,
+            spotify::spotify_control,
+            spotify::spotify_seek,
+            spotify::spotify_connect,
+            spotify::spotify_status,
+            spotify::spotify_disconnect,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

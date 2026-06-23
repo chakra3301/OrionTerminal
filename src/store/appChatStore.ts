@@ -76,6 +76,8 @@ export const useAppChat = create<AppChatState>((set) => ({
     // Hermes has no chat rail (ROSIE orchestrates it via MCP tools), but the
     // per-app thread map is keyed by AppId, so it gets an inert thread.
     hermes: makeThread(),
+    // Command Center routes chat through cc_messages, not this rail; inert.
+    command: makeThread(),
   },
 
   appendUser: (app, content) =>

@@ -2,7 +2,6 @@ import { open as openDialog, confirm as confirmDialog } from "@tauri-apps/plugin
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { registry } from "@/commands/registry";
 import { useProjectStore } from "@/store/projectStore";
-import { useLayoutStore } from "@/store/layoutStore";
 import { useTabsStore, isFileTabDirty } from "@/store/tabsStore";
 import {
   useWorkspace,
@@ -64,6 +63,13 @@ function focusedTab() {
 function focusedFilePath() {
   const ws = useWorkspace.getState();
   return activeFilePathInFocused(ws.root, ws.focusedPanelId);
+}
+
+/** True when Orion is the focused window with a project open (its workspace is mounted). */
+function orionFocused() {
+  if (useProjectStore.getState().active === null) return false;
+  const s = useShell.getState();
+  return s.windows.find((w) => w.id === s.focusedWindowId)?.app === "orion";
 }
 
 export function installBuiltinCommands() {
@@ -397,7 +403,27 @@ export function installBuiltinCommands() {
     keywords: ["claude", "code", "cli", "interactive", "agent"],
     group: "View",
     run: () => {
-      useWorkspace.getState().openTab({ kind: "claude-code" });
+      useWorkspace.getState().openTab({ kind: "claude-code", agent: "claude" });
+    },
+  });
+
+  registry.register({
+    id: "view.openHermes",
+    label: "View: Open Hermes",
+    keywords: ["hermes", "cli", "interactive", "agent", "code"],
+    group: "View",
+    run: () => {
+      useWorkspace.getState().openTab({ kind: "claude-code", agent: "hermes" });
+    },
+  });
+
+  registry.register({
+    id: "view.openPi",
+    label: "View: Open Pi",
+    keywords: ["pi", "cli", "interactive", "agent", "code"],
+    group: "View",
+    run: () => {
+      useWorkspace.getState().openTab({ kind: "claude-code", agent: "pi" });
     },
   });
 
@@ -803,20 +829,28 @@ export function installBuiltinCommands() {
     },
   });
 
-  // Legacy layout-store toggles — keep ids registered so any hotkey muscle
-  // memory still works; they no-op for now until needed.
+  // Hide/show Orion's explorer (sidebar) and claude (right rail) panels in the
+  // workspace tree. The scope check lives inside run() (not `when`) so the menu
+  // item stays clickable; it only stops the global ⌘B/⌘J hotkey from mutating
+  // Orion's layout while another app is focused.
   registry.register({
     id: "panel.toggleSidebar",
     label: "Toggle Sidebar",
     hotkey: "mod+b",
     group: "View",
-    run: () => useLayoutStore.getState().toggleSidebar(),
+    run: () => {
+      if (!orionFocused()) return;
+      useWorkspace.getState().togglePanelByRole("explorer");
+    },
   });
   registry.register({
     id: "panel.toggleRightRail",
-    label: "Toggle Chat Panel",
+    label: "Toggle Right Rail",
     hotkey: "mod+j",
     group: "View",
-    run: () => useLayoutStore.getState().toggleRight(),
+    run: () => {
+      if (!orionFocused()) return;
+      useWorkspace.getState().togglePanelByRole("claude");
+    },
   });
 }

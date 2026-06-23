@@ -1,6 +1,6 @@
 export type ProviderKind =
   | "anthropic" | "openai" | "google" | "openai_compat" | "custom"
-  | "codex_cli" | "gemini_cli";
+  | "codex_cli" | "gemini_cli" | "nous_oauth";
 
 export type ProviderModel = { id: string; label: string };
 

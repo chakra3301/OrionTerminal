@@ -4,12 +4,13 @@ import { setAppState } from "@/lib/db";
 /** Named visual themes. Each is a full set of design-token overrides applied
  * via `data-theme` on <html> (see styles/themes.css). All are dark-base for
  * now, so we keep the `.dark` class on too for any dark-scoped styling. */
-export type ThemeName = "neon" | "minimal" | "modern";
+export type ThemeName = "neon" | "minimal" | "modern" | "bmw-m";
 
 export const THEMES: { id: ThemeName; label: string; blurb: string }[] = [
   { id: "neon", label: "Neon", blurb: "Neo-Tokyo glow — the original." },
   { id: "minimal", label: "Minimal", blurb: "Calm monochrome, no glow, flatter." },
   { id: "modern", label: "Modern", blurb: "Refined slate with soft accents." },
+  { id: "bmw-m", label: "BMW M", blurb: "Motorsport black — M tricolor, zero radius." },
 ];
 
 const KNOWN = new Set<ThemeName>(THEMES.map((t) => t.id));

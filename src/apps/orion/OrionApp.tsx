@@ -48,7 +48,7 @@ const orionRegistry: ContentRegistry = {
       case "claude":
         return <OrionClaudeRail />;
       case "claude-code":
-        return <OrionClaudeCodePanel />;
+        return <OrionClaudeCodePanel agent={tab.descriptor.agent ?? "claude"} />;
       case "problems":
         return <OrionProblemsPanel />;
       case "search":
@@ -79,8 +79,16 @@ const orionRegistry: ContentRegistry = {
         return <TerminalIcon size={11} color="var(--neon-green)" />;
       case "claude":
         return <Sparkles size={11} color="var(--neon-cyan)" />;
-      case "claude-code":
-        return <Bot size={11} color="var(--neon-violet)" />;
+      case "claude-code": {
+        const a = tab.descriptor.agent ?? "claude";
+        const color =
+          a === "hermes"
+            ? "var(--neon-cyan)"
+            : a === "pi"
+              ? "var(--neon-green)"
+              : "var(--neon-violet)";
+        return <Bot size={11} color={color} />;
+      }
       case "problems":
         return <AlertCircle size={11} color="var(--neon-magenta)" />;
       case "search":
@@ -146,7 +154,21 @@ const orionRegistry: ContentRegistry = {
         id: "claude-code",
         label: "Claude Code",
         icon: <Bot size={13} color="var(--neon-violet)" />,
-        onSelect: () => open({ kind: "claude-code", id: ulid() }),
+        onSelect: () =>
+          open({ kind: "claude-code", id: ulid(), agent: "claude" }),
+      },
+      {
+        id: "hermes-code",
+        label: "Hermes",
+        icon: <Bot size={13} color="var(--neon-cyan)" />,
+        onSelect: () =>
+          open({ kind: "claude-code", id: ulid(), agent: "hermes" }),
+      },
+      {
+        id: "pi-code",
+        label: "Pi",
+        icon: <Bot size={13} color="var(--neon-green)" />,
+        onSelect: () => open({ kind: "claude-code", id: ulid(), agent: "pi" }),
       },
     ];
 

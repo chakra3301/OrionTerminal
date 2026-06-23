@@ -8,6 +8,8 @@ import { ModelSelect } from "@/components/ModelSelect";
 import { MasteryCelebration } from "./MasteryCelebration";
 import { TrophyShelf } from "./TrophyShelf";
 import { MasteryBadge } from "./MasteryBadge";
+import { ScratchpadWidget } from "./ScratchpadWidget";
+import { useScratchpad } from "./scratchpadStore";
 
 export function LearnView() {
   const loadTopics = useLearn((s) => s.loadTopics);
@@ -29,9 +31,11 @@ export function LearnView() {
   const [shaping, setShaping] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const loadScratchpad = useScratchpad((s) => s.load);
   useEffect(() => {
     void loadTopics();
-  }, [loadTopics]);
+    void loadScratchpad();
+  }, [loadTopics, loadScratchpad]);
 
   const handleCreate = async () => {
     const title = input.trim();
@@ -176,6 +180,9 @@ export function LearnView() {
             </div>
             <Constellation />
           </div>
+        )}
+        {openTopicId && !trophyShelfOpen && (
+          <ScratchpadWidget topicId={openTopicId} topicTitle={openTopicData?.title ?? ""} />
         )}
         <MasteryCelebration />
       </div>

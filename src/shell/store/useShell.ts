@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { ulid } from "ulid";
 
-export type AppId = "archives" | "orion" | "xdesign" | "hermes";
+export type AppId = "archives" | "orion" | "xdesign" | "hermes" | "command";
 
 export type WindowState = {
   id: string;
@@ -50,6 +50,7 @@ const DEFAULT_SIZE: Record<AppId, { w: number; h: number }> = {
   xdesign:  { w: 1180, h: 760 },
   // Hermes is a dashboard — open large; clamped to the viewport in openApp.
   hermes:   { w: 1760, h: 1080 },
+  command:  { w: 1280, h: 820 },
 };
 
 function clampY(y: number): number {
@@ -235,4 +236,5 @@ export const APP_NAMES: Record<AppId, string> = {
   orion: "Orion",
   xdesign: "XDesign",
   hermes: "Hermes",
+  command: "Command Center",
 };

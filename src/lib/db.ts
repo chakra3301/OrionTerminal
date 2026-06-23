@@ -41,7 +41,8 @@ export type AppStateKey =
   | "widget.monitor"
   | "reduce_glass"
   | "tab_autocomplete"
-  | "repolens";
+  | "repolens"
+  | "learn_scratchpad";
 
 export async function getAppState<T = unknown>(
   key: AppStateKey,
@@ -1384,4 +1385,168 @@ export async function purgeEmptyNotes(): Promise<number> {
        )`,
   );
   return result.rowsAffected ?? 0;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Command Center — profiles, channels, messages, missions (migration 0027)
+// ─────────────────────────────────────────────────────────────
+
+export type CCProfileRow = {
+  id: string;
+  name: string;
+  rank: string;
+  division: string;
+  accent: string;
+  brain_model: string;
+  skill_ids_json: string;
+  wiki_root: string;
+  charter: string;
+  autonomy_level: number;
+  position: number;
+  created_at: number;
+  updated_at: number;
+  avatar_path: string;
+};
+
+export type CCChannelRow = {
+  id: string;
+  kind: string;
+  division: string;
+  name: string;
+  position: number;
+  created_at: number;
+};
+
+export type CCMessageRow = {
+  id: string;
+  channel_id: string;
+  from_profile_id: string;
+  to_profile_id: string | null;
+  kind: string;
+  body: string;
+  mission_ref: string;
+  ts: number;
+};
+
+export type CCMissionRow = {
+  id: string;
+  title: string;
+  brief: string;
+  status: string;
+  autonomy_level: number;
+  assigned_profile_id: string | null;
+  origin_profile_id: string | null;
+  ts: number;
+  updated_at: number;
+};
+
+export async function listCCProfiles(): Promise<CCProfileRow[]> {
+  const db = await getDb();
+  return db.select<CCProfileRow[]>(
+    "SELECT * FROM cc_profiles ORDER BY rank, position, name",
+  );
+}
+
+export async function insertCCProfile(p: CCProfileRow): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT OR IGNORE INTO cc_profiles
+       (id, name, rank, division, accent, brain_model, skill_ids_json, wiki_root, charter, autonomy_level, position, created_at, updated_at, avatar_path)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+    [p.id, p.name, p.rank, p.division, p.accent, p.brain_model, p.skill_ids_json, p.wiki_root, p.charter, p.autonomy_level, p.position, p.created_at, p.updated_at, p.avatar_path ?? ""],
+  );
+}
+
+export async function updateCCProfile(
+  id: string,
+  patch: Partial<Omit<CCProfileRow, "id" | "created_at">> & { updated_at: number },
+): Promise<void> {
+  const db = await getDb();
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  let i = 1;
+  for (const [k, v] of Object.entries(patch)) {
+    sets.push(`${k} = $${i++}`);
+    vals.push(v);
+  }
+  vals.push(id);
+  await db.execute(`UPDATE cc_profiles SET ${sets.join(", ")} WHERE id = $${i}`, vals);
+}
+
+export async function deleteCCProfile(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM cc_profiles WHERE id = $1", [id]);
+}
+
+export async function listCCChannels(): Promise<CCChannelRow[]> {
+  const db = await getDb();
+  return db.select<CCChannelRow[]>(
+    "SELECT * FROM cc_channels ORDER BY position, created_at",
+  );
+}
+
+export async function insertCCChannel(c: CCChannelRow): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT OR IGNORE INTO cc_channels (id, kind, division, name, position, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6)`,
+    [c.id, c.kind, c.division, c.name, c.position, c.created_at],
+  );
+}
+
+export async function deleteCCChannel(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM cc_channels WHERE id = $1", [id]);
+}
+
+export async function listCCMessages(channelId?: string): Promise<CCMessageRow[]> {
+  const db = await getDb();
+  if (channelId) {
+    return db.select<CCMessageRow[]>(
+      "SELECT * FROM cc_messages WHERE channel_id = $1 ORDER BY ts",
+      [channelId],
+    );
+  }
+  return db.select<CCMessageRow[]>("SELECT * FROM cc_messages ORDER BY ts");
+}
+
+export async function insertCCMessage(m: CCMessageRow): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO cc_messages (id, channel_id, from_profile_id, to_profile_id, kind, body, mission_ref, ts)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [m.id, m.channel_id, m.from_profile_id, m.to_profile_id, m.kind, m.body, m.mission_ref, m.ts],
+  );
+}
+
+export async function listCCMissions(): Promise<CCMissionRow[]> {
+  const db = await getDb();
+  return db.select<CCMissionRow[]>(
+    "SELECT * FROM cc_missions ORDER BY updated_at DESC",
+  );
+}
+
+export async function insertCCMission(m: CCMissionRow): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO cc_missions (id, title, brief, status, autonomy_level, assigned_profile_id, origin_profile_id, ts, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [m.id, m.title, m.brief, m.status, m.autonomy_level, m.assigned_profile_id, m.origin_profile_id, m.ts, m.updated_at],
+  );
+}
+
+export async function updateCCMission(
+  id: string,
+  patch: Partial<Omit<CCMissionRow, "id" | "ts">> & { updated_at: number },
+): Promise<void> {
+  const db = await getDb();
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  let i = 1;
+  for (const [k, v] of Object.entries(patch)) {
+    sets.push(`${k} = $${i++}`);
+    vals.push(v);
+  }
+  vals.push(id);
+  await db.execute(`UPDATE cc_missions SET ${sets.join(", ")} WHERE id = $${i}`, vals);
 }

@@ -107,3 +107,53 @@
 
   --xd-accent-rgb: 148, 163, 184;
 }
+
+/* ---------- BMW M — motorsport black, M tricolor, zero radius ---------- */
+[data-theme="bmw-m"] {
+  --bg-0: #000000;
+  --bg-1: #0d0d0d;
+  --bg-2: #1a1a1a;
+  --bg-3: #262626;
+
+  /* M tricolor + heritage blue carry the brand; the green/yellow slots reuse
+     the BMW M success/warning tones so each app stays distinguishable */
+  --neon-green: #0fa336; /* Archives accent / success */
+  --neon-cyan: #1c69d4; /* Orion accent / info / git — BMW heritage blue */
+  --neon-yellow: #f4b400; /* warnings */
+  --neon-magenta: #e22718; /* XDesign accent / errors — M red */
+  --neon-violet: #0653b6; /* aurora / syntax keywords — electric blue */
+
+  /* rgba() triplet twins of the accents above */
+  --neon-green-rgb: 15, 163, 54;
+  --neon-cyan-rgb: 28, 105, 212;
+  --neon-yellow-rgb: 244, 180, 0;
+  --neon-magenta-rgb: 226, 39, 24;
+  --neon-violet-rgb: 6, 83, 182;
+
+  --t-primary: #ffffff;
+  --t-secondary: #bbbbbb;
+  --t-tertiary: #7e7e7e;
+  --t-faint: #3c3c3c;
+
+  --glass-bg: rgba(26, 26, 26, 0.9);
+  --glass-bg-strong: rgba(13, 13, 13, 0.94);
+  --glass-bg-deep: rgba(0, 0, 0, 0.96);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-bright: rgba(255, 255, 255, 0.18);
+  --glass-highlight: rgba(255, 255, 255, 0.03);
+
+  /* engineered precision — corners stay sharp */
+  --r-sm: 0px;
+  --r-md: 2px;
+  --r-lg: 4px;
+  --r-xl: 6px;
+
+  /* no neon bloom — flat, with a neutral shadow only for window separation */
+  --shadow-window: 0 16px 44px -18px rgba(0, 0, 0, 0.7),
+    0 4px 14px -6px rgba(0, 0, 0, 0.5);
+  --shadow-glow-green: none;
+  --shadow-glow-cyan: none;
+  --shadow-glow-magenta: none;
+
+  --xd-accent-rgb: 226, 39, 24;
+}

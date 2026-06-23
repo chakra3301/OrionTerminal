@@ -204,16 +204,45 @@ pub fn terminal_open_claude(
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
-    let mut builder = CommandBuilder::new("claude");
-    builder.args(["--model", crate::claude_cli::OPUS_MODEL]);
-    if let Some(mcp_config_path) = crate::mcp_config::write(&app) {
-        builder.args(["--mcp-config", &mcp_config_path]);
-    }
+    terminal_open_agent(app, "claude".to_string(), pty_id, cwd, cols, rows)
+}
+
+/// Spawn an interactive coding-agent CLI directly inside a pty. Generalises
+/// the Claude Code surface to any installed agent harness — `claude`, `hermes`,
+/// or `pi` — each launched in its own native interactive mode. Claude also gets
+/// Orion's in-process MCP server (same binary, --mcp-serve) and an Opus pin to
+/// match the chat-rail path.
+#[tauri::command]
+pub fn terminal_open_agent(
+    app: AppHandle,
+    agent: String,
+    pty_id: String,
+    cwd: String,
+    cols: u16,
+    rows: u16,
+) -> Result<(), String> {
+    let mut builder = match agent.as_str() {
+        "hermes" => {
+            let mut b = CommandBuilder::new("hermes");
+            b.arg("chat");
+            b
+        }
+        "pi" => CommandBuilder::new("pi"),
+        // Default to claude for the legacy "claude" agent and any unknown id.
+        _ => {
+            let mut b = CommandBuilder::new("claude");
+            b.args(["--model", crate::claude_cli::OPUS_MODEL]);
+            if let Some(mcp_config_path) = crate::mcp_config::write(&app) {
+                b.args(["--mcp-config", &mcp_config_path]);
+            }
+            b
+        }
+    };
     standard_env(&mut builder, &cwd);
     // Identify ourselves so claude doesn't try to auto-install its VS Code
     // extension (which fails with ERR_STREAM_PREMATURE_CLOSE when `code` is
     // not on PATH). Setting TERM_PROGRAM to a non-IDE value makes claude skip
-    // the install path entirely.
+    // the install path entirely. Harmless for the other agents.
     builder.env("TERM_PROGRAM", "OrionTerminal");
     spawn_pty_with(app, pty_id, builder, cols, rows)
 }

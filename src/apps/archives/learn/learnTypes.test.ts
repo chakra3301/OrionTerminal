@@ -49,5 +49,43 @@ describe("parseLesson", () => {
     expect(l.concept_chunks).toEqual([]);
     expect(l.recall_check).toEqual([]);
     expect(l.worked_example).toBeNull();
+    expect(l.visuals).toEqual([]);
+  });
+});
+
+describe("parseLesson visuals", () => {
+  it("parses each visual kind and keeps only its payload", () => {
+    const raw = JSON.stringify({
+      visuals: [
+        { kind: "flow", title: "Pipeline", chunk: 0, caption: "x", steps: [{ label: "A", detail: "first" }, { label: "B", detail: "second" }] },
+        { kind: "tree", title: "Taxonomy", chunk: 1, nodes: [{ label: "Root", detail: "", parent: null }, { label: "Child", detail: "", parent: 0 }] },
+        { kind: "compare", title: "A vs B", chunk: 2, leftLabel: "A", rightLabel: "B", rows: [{ aspect: "speed", left: "fast", right: "slow" }] },
+        { kind: "analogy", title: "Map", chunk: 0, leftLabel: "Bucket", rightLabel: "Memory", pairs: [{ familiar: "water", concept: "data", note: "flows in" }] },
+        { kind: "timeline", title: "History", chunk: 3, steps: [{ label: "1990", detail: "start" }, { label: "2000", detail: "grew" }] },
+      ],
+    });
+    const l = parseLesson(raw);
+    expect(l.visuals.map((v) => v.kind)).toEqual(["flow", "tree", "compare", "analogy", "timeline"]);
+    expect(l.visuals[1]!.nodes[1]!.parent).toBe(0);
+    expect(l.visuals[3]!.pairs[0]!.note).toBe("flows in");
+  });
+
+  it("drops unknown kinds and payload-less visuals", () => {
+    const raw = JSON.stringify({
+      visuals: [
+        { kind: "pie-chart", title: "nope", steps: [] },
+        { kind: "flow", title: "too short", steps: [{ label: "only one", detail: "" }] },
+        { kind: "compare", title: "empty", rows: [] },
+        { kind: "cycle", title: "ok", steps: [{ label: "A", detail: "" }, { label: "B", detail: "" }] },
+      ],
+    });
+    const l = parseLesson(raw);
+    expect(l.visuals).toHaveLength(1);
+    expect(l.visuals[0]!.kind).toBe("cycle");
+  });
+
+  it("defaults chunk to -1 when missing", () => {
+    const raw = JSON.stringify({ visuals: [{ kind: "flow", title: "t", steps: [{ label: "A" }, { label: "B" }] }] });
+    expect(parseLesson(raw).visuals[0]!.chunk).toBe(-1);
   });
 });

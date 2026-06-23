@@ -245,6 +245,69 @@ describe("hydrate role inference for legacy layouts", () => {
   });
 });
 
+describe("togglePanelByRole (⌘B sidebar / ⌘J right rail)", () => {
+  beforeEach(() => {
+    useWorkspace.getState().resetLayout(defaultOrionLayout);
+  });
+
+  it("hides the explorer (sidebar) and restores it on the left", () => {
+    const before = collectPanels(useWorkspace.getState().root);
+    const explorerBefore = before.find((p) => p.role === "explorer")!;
+    expect(explorerBefore).toBeTruthy();
+
+    useWorkspace.getState().togglePanelByRole("explorer");
+    let panels = collectPanels(useWorkspace.getState().root);
+    expect(panels.some((p) => p.role === "explorer")).toBe(false);
+    expect(panels).toHaveLength(before.length - 1);
+
+    useWorkspace.getState().togglePanelByRole("explorer");
+    panels = collectPanels(useWorkspace.getState().root);
+    const explorerAfter = panels.find((p) => p.role === "explorer")!;
+    expect(explorerAfter).toBeTruthy();
+    // Restored on the far left and preserving its files-tree tab.
+    const root = asSplit(useWorkspace.getState().root);
+    const first = root.children[0]!;
+    expect(first.kind === "panel" && first.role).toBe("explorer");
+    expect(
+      explorerAfter.tabs.some((t) => t.descriptor.kind === "files-tree"),
+    ).toBe(true);
+  });
+
+  it("hides the claude rail and restores it on the right", () => {
+    useWorkspace.getState().togglePanelByRole("claude");
+    let panels = collectPanels(useWorkspace.getState().root);
+    expect(panels.some((p) => p.role === "claude")).toBe(false);
+
+    useWorkspace.getState().togglePanelByRole("claude");
+    const root = asSplit(useWorkspace.getState().root);
+    const last = lastChild(root);
+    expect(last.kind === "panel" && last.role).toBe("claude");
+  });
+
+  it("preserves the exact tabs of a hidden panel when restoring", () => {
+    // Stack a second AI tab into the claude rail, then hide + show it.
+    const claude = collectPanels(useWorkspace.getState().root).find(
+      (p) => p.role === "claude",
+    )!;
+    useWorkspace
+      .getState()
+      .openTab({ kind: "claude-code" }, { panelId: claude.id });
+    const railBefore = collectPanels(useWorkspace.getState().root).find(
+      (p) => p.role === "claude",
+    )!;
+    const tabCount = railBefore.tabs.length;
+    expect(tabCount).toBeGreaterThan(1);
+
+    useWorkspace.getState().togglePanelByRole("claude");
+    useWorkspace.getState().togglePanelByRole("claude");
+
+    const railAfter = collectPanels(useWorkspace.getState().root).find(
+      (p) => p.role === "claude",
+    )!;
+    expect(railAfter.tabs).toHaveLength(tabCount);
+  });
+});
+
 describe("splitFocusedPanel (⌘\\ split editor right)", () => {
   beforeEach(() => {
     useWorkspace.getState().resetLayout(defaultOrionLayout);

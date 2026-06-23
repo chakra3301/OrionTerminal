@@ -13,7 +13,7 @@
 // License/attribution: Wikipedia/learningscientists text is CC BY-SA / CC BY-NC-SA; only the *pedagogical ideas* are
 // adapted here — every instruction string in this file is original wording, so no source text is redistributed.
 
-export const PEDAGOGY_VERSION = "1.1.0";
+export const PEDAGOGY_VERSION = "1.2.0";
 
 const JSON_ONLY = "Return ONLY valid JSON matching this exact shape, no prose, no markdown fences:";
 
@@ -87,8 +87,17 @@ Write the lesson following these rules exactly:
 
 8. RETRIEVAL PRACTICE: end with 2 to 4 answer-first recall questions that force active recall of THIS lesson's chunks (not recognition). For each, give the "prompt", the "expected" answer, and the "concept" tag it tests.
 
+9. VISUALS (dual coding — Mayer/Paivio): generate 2 to 4 diagrams that make the hardest ideas SEEABLE. Each visual MUST carry real instructional load (never decorative) and "chunk" MUST be the 0-based index of the concept chunk it illustrates (use -1 only for a whole-lesson overview). Pick the form that fits the idea — do NOT force one type:
+   - "flow": a sequential process / algorithm / cause→effect chain. Use "steps" (ordered) where each step has a "label" (short, ≤ 4 words) and a "detail" (one sentence shown on step-through).
+   - "cycle": a feedback loop or repeating process that returns to its start. Same "steps" shape (the last step loops back to the first).
+   - "tree": a hierarchy / taxonomy / dependency. Use "nodes" where each node has a "label", a "detail", and "parent" = the array index of its parent node (or null for the single root). Order parents before children.
+   - "compare": contrast two things side by side. Set "leftLabel" and "rightLabel" to the two things, and "rows" where each row has an "aspect", a "left" value, and a "right" value.
+   - "analogy": REUSE the structural analogy from rule 4 — set "leftLabel" to the familiar domain and "rightLabel" to the concept domain, and "pairs" mapping each "familiar" element to its "concept" counterpart with a short "note" explaining the mapping.
+   - "timeline": an ordered sequence of events / historical or build-up progression. Same "steps" shape, read top to bottom.
+   Every visual needs a short "title" and a one-line "caption". Keep labels terse so they render cleanly; put the prose in "detail"/"note"/"caption".
+
 ${JSON_ONLY}
-{ "objective": "ABCD string", "concept_chunks": [ { "tag": "string", "body": "markdown" } ], "worked_example": { "title": "string", "steps": [ { "text": "string", "why": "string" } ] }, "key_terms": ["string"], "suggested_resources": [ { "type": "video|article|book|course|docs", "title": "string", "search_query": "string" } ], "recall_check": [ { "prompt": "string", "expected": "string", "concept": "string" } ] }`;
+{ "objective": "ABCD string", "concept_chunks": [ { "tag": "string", "body": "markdown" } ], "worked_example": { "title": "string", "steps": [ { "text": "string", "why": "string" } ] }, "key_terms": ["string"], "suggested_resources": [ { "type": "video|article|book|course|docs", "title": "string", "search_query": "string" } ], "recall_check": [ { "prompt": "string", "expected": "string", "concept": "string" } ], "visuals": [ { "kind": "flow|cycle|tree|compare|analogy|timeline", "title": "string", "chunk": 0, "caption": "string", "steps": [ { "label": "string", "detail": "string" } ], "nodes": [ { "label": "string", "detail": "string", "parent": null } ], "rows": [ { "aspect": "string", "left": "string", "right": "string" } ], "pairs": [ { "familiar": "string", "concept": "string", "note": "string" } ], "leftLabel": "string", "rightLabel": "string" } ] }`;
 }
 
 /**

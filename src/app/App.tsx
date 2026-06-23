@@ -7,6 +7,7 @@ import { ControlPanel } from "@/features/controlpanel/ControlPanel";
 import { KeybindingsOverlay } from "@/features/keybindings/KeybindingsOverlay";
 import { installBuiltinCommands } from "@/commands/builtins";
 import { installShellCommands } from "@/shell/commands/shellCommands";
+import { installSpotifyCommands } from "@/shell/commands/spotifyCommands";
 import { HotkeyHost } from "@/lib/hotkeys";
 import { useTerminalStore } from "@/store/terminalStore";
 import { getAppState, getDb } from "@/lib/db";
@@ -16,7 +17,9 @@ import { useAssetsStore } from "@/store/assetsStore";
 import { useMoodBoardsStore } from "@/store/moodBoardsStore";
 import { useCollectionsStore } from "@/store/collectionsStore";
 import { useHermes } from "@/store/hermesStore";
+import { useCommand } from "@/store/commandStore";
 import { useProvidersStore } from "@/store/providersStore";
+import { useDesignSystems } from "@/store/designSystemStore";
 import { useSkillsStore } from "@/store/skillsStore";
 import { useAgentsStore } from "@/store/agentsStore";
 import { LinkInsertPalette } from "@/features/notes/LinkInsertPalette";
@@ -55,6 +58,7 @@ import type { LayoutNode } from "@/components/workspace/types";
 
 installBuiltinCommands();
 installShellCommands();
+installSpotifyCommands();
 void ensureOrionTheme();
 
 /**
@@ -205,6 +209,11 @@ async function hydrate() {
     log.warn("hermes load failed", err);
   }
   try {
+    await useCommand.getState().load();
+  } catch (err) {
+    log.warn("command center load failed", err);
+  }
+  try {
     await useProvidersStore.getState().load();
   } catch (err) {
     log.warn("providers load failed", err);
@@ -218,6 +227,11 @@ async function hydrate() {
     await useAgentsStore.getState().load();
   } catch (err) {
     log.warn("agents load failed", err);
+  }
+  try {
+    await useDesignSystems.getState().load();
+  } catch (err) {
+    log.warn("design systems load failed", err);
   }
 
   if (typeof terminalHeight === "number") {

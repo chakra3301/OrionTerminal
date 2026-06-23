@@ -139,7 +139,17 @@ pub async fn runtime_send(
     history: Vec<Msg>,
     allowed_tools: Vec<String>,
 ) -> Result<(), String> {
-    let key = crate::provider_keys::read(&key_ref).unwrap_or_default();
+    let key = if provider_kind == "nous_oauth" {
+        match crate::nous_oauth::access_token(&key_ref).await {
+            Ok(t) => t,
+            Err(e) => {
+                emit_error_exit(&app, &chat_id, &e);
+                return Err(e);
+            }
+        }
+    } else {
+        crate::provider_keys::read(&key_ref).unwrap_or_default()
+    };
     let prov = make_provider(&provider_kind);
     let url = prov.endpoint(&base_url, &model);
     let tools = crate::runtime::tools::filter_tools(&allowed_tools);

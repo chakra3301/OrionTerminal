@@ -135,6 +135,25 @@ export const ipc = {
   providerKeyStatus: (keyRef: string): Promise<boolean> =>
     invoke("provider_key_status", { keyRef }),
 
+  nousDeviceStart: (): Promise<{
+    deviceCode: string;
+    userCode: string;
+    verificationUriComplete: string;
+    interval: number;
+    expiresIn: number;
+  }> => invoke("nous_device_start"),
+  nousDevicePoll: (
+    keyRef: string,
+    deviceCode: string,
+    interval: number,
+    expiresIn: number,
+  ): Promise<void> =>
+    invoke("nous_device_poll", { keyRef, deviceCode, interval, expiresIn }),
+  nousOauthStatus: (keyRef: string): Promise<boolean> =>
+    invoke("nous_oauth_status", { keyRef }),
+  nousOauthClear: (keyRef: string): Promise<void> =>
+    invoke("nous_oauth_clear", { keyRef }),
+
   inlineEditRun: (
     streamId: string,
     prompt: string,
@@ -229,6 +248,61 @@ export const ipc = {
     engine: "codex_cli" | "gemini_cli",
   ): Promise<{ installed: boolean; loggedIn: boolean; version: string | null; detail: string }> =>
     invoke("cli_status", { engine }),
+
+  // Command Center — drive a profile as a headless `pi` run.
+  piSend: (
+    runId: string,
+    prompt: string,
+    model: string,
+    sessionId: string,
+    systemAppend: string,
+    wikiRoot: string,
+  ): Promise<void> =>
+    invoke("pi_send", {
+      runId,
+      prompt,
+      model,
+      sessionId,
+      systemAppend,
+      wikiRoot,
+    }),
+  piCancel: (runId: string): Promise<void> => invoke("pi_cancel", { runId }),
+  piOneshot: (
+    prompt: string,
+    model: string,
+    systemAppend: string,
+    wikiRoot: string,
+  ): Promise<{ result: string; cost: number }> =>
+    invoke("pi_oneshot", { prompt, model, systemAppend, wikiRoot }),
+  ccWorkspacePath: (wikiRoot: string): Promise<string> =>
+    invoke("cc_workspace_path", { wikiRoot }),
+  ccRecentArtifacts: (
+    wikiRoot: string,
+    sinceMs: number,
+    limit: number,
+  ): Promise<string[]> =>
+    invoke("cc_recent_artifacts", { wikiRoot, sinceMs, limit }),
+  ccOpenPath: (path: string, reveal: boolean): Promise<void> =>
+    invoke("cc_open_path", { path, reveal }),
+  ccReadImage: (path: string): Promise<string> =>
+    invoke("cc_read_image", { path }),
+  ccVaultPages: (
+    wikiRoot: string,
+    limit: number,
+  ): Promise<{ title: string; path: string; kind: string; mtime: number }[]> =>
+    invoke("cc_vault_pages", { wikiRoot, limit }),
+  ccVaultGraph: (
+    wikiRoot: string,
+  ): Promise<{
+    nodes: { id: string; title: string; kind: string; path: string }[];
+    edges: { from: string; to: string }[];
+  }> => invoke("cc_vault_graph", { wikiRoot }),
+  piStatus: (): Promise<{
+    installed: boolean;
+    loggedIn: boolean;
+    version: string | null;
+    detail: string;
+  }> => invoke("pi_status", {}),
   claudeOneshot: (prompt: string): Promise<string> =>
     invoke("claude_oneshot", { prompt }),
   claudeOneshotWithImage: (
@@ -317,6 +391,14 @@ export const ipc = {
     rows: number,
   ): Promise<void> =>
     invoke("terminal_open_claude", { ptyId, cwd, cols, rows }),
+  terminalOpenAgent: (
+    agent: "claude" | "hermes" | "pi",
+    ptyId: string,
+    cwd: string,
+    cols: number,
+    rows: number,
+  ): Promise<void> =>
+    invoke("terminal_open_agent", { agent, ptyId, cwd, cols, rows }),
   terminalWrite: (ptyId: string, data: string): Promise<void> =>
     invoke("terminal_write", { ptyId, data }),
   terminalResize: (ptyId: string, cols: number, rows: number): Promise<void> =>
@@ -370,6 +452,34 @@ export const ipc = {
 
   systemStats: (): Promise<SystemStats> => invoke("system_stats"),
   claudeUsage: (): Promise<ClaudeUsage> => invoke("claude_usage"),
+  claudeLimits: (): Promise<ClaudeLimits> => invoke("claude_limits"),
+
+  spotifyNowPlaying: (): Promise<SpotifyNowPlaying> =>
+    invoke("spotify_now_playing"),
+  spotifyControl: (
+    action: "playpause" | "play" | "pause" | "next" | "previous",
+  ): Promise<void> => invoke("spotify_control", { action }),
+  spotifySeek: (positionS: number): Promise<void> =>
+    invoke("spotify_seek", { positionS }),
+  spotifyConnect: (clientId: string): Promise<{ connected: boolean }> =>
+    invoke("spotify_connect", { clientId }),
+  spotifyStatus: (): Promise<{ connected: boolean }> =>
+    invoke("spotify_status"),
+  spotifyDisconnect: (): Promise<void> => invoke("spotify_disconnect"),
+};
+
+export type SpotifyNowPlaying = {
+  connected: boolean;
+  active: boolean;
+  is_playing: boolean;
+  track: string;
+  artist: string;
+  album: string;
+  artwork_url: string;
+  duration_ms: number;
+  position_s: number;
+  url: string;
+  needs_reauth: boolean;
 };
 
 export type SystemStats = {
@@ -392,6 +502,17 @@ export type ClaudeUsage = {
   block: UsageWindow;
   block_start_ms: number;
   last_24h: UsageWindow;
+};
+
+/** Authoritative subscription limits scraped from `claude --print '/usage'`. */
+export type ClaudeLimits = {
+  ok: boolean;
+  session_pct: number | null;
+  session_reset: string | null;
+  week_pct: number | null;
+  week_reset: string | null;
+  week_sonnet_pct: number | null;
+  week_sonnet_reset: string | null;
 };
 
 export const learnClaudeCall = (

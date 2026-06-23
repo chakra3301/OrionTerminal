@@ -25,6 +25,8 @@ type WorkspaceState = {
    * area. Reset when the panel is closed or contains no file tabs.
    */
   lastFilePanelId: string | null;
+  /** Panels hidden via togglePanelByRole, keyed by role so they restore intact. */
+  hiddenPanels: Partial<Record<PanelRole, LayoutPanel>>;
 
   // queries
   findPanel: (panelId: string) => LayoutPanel | null;
@@ -51,6 +53,12 @@ type WorkspaceState = {
 
   // layout
   setSplitSizes: (splitId: string, sizes: number[]) => void;
+  /**
+   * Hide the panel with the given role (stashing it), or restore a previously
+   * hidden one. Explorer restores on the far left, claude on the far right.
+   * Backs the ⌘B sidebar / ⌘J right-rail toggles.
+   */
+  togglePanelByRole: (role: PanelRole) => void;
   closePanel: (panelId: string) => void;
   resetLayout: (factory: () => LayoutNode) => void;
   hydrate: (root: LayoutNode | null, focusedPanelId: string | null) => void;
@@ -437,6 +445,48 @@ function dockTabAtBottom(
   };
 }
 
+/**
+ * Insert a full-height panel at the left or right edge of the workspace. If the
+ * root is already a horizontal split the panel joins as a flat sibling (no extra
+ * nesting); otherwise the whole tree is wrapped so the panel spans full height
+ * beside everything else (Cursor-style sidebar / rail). Sizes always sum to 100.
+ */
+function insertPanelAtEdge(
+  root: LayoutNode,
+  panel: LayoutPanel,
+  edge: "left" | "right",
+  fraction: number,
+): LayoutNode {
+  if (root.kind === "split" && root.direction === "horizontal") {
+    const total = root.sizes.reduce((a, b) => a + b, 0) || 1;
+    const keep = 100 - fraction;
+    const scaled = root.sizes.map((s) => (s / total) * keep);
+    return edge === "left"
+      ? { ...root, sizes: [fraction, ...scaled], children: [panel, ...root.children] }
+      : { ...root, sizes: [...scaled, fraction], children: [...root.children, panel] };
+  }
+  return {
+    kind: "split",
+    id: ulid(),
+    direction: "horizontal",
+    sizes: edge === "left" ? [fraction, 100 - fraction] : [100 - fraction, fraction],
+    children: edge === "left" ? [panel, root] : [root, panel],
+  };
+}
+
+function defaultTabForRole(role: PanelRole): TabDescriptor {
+  switch (role) {
+    case "explorer":
+      return { kind: "files-tree" };
+    case "claude":
+      return { kind: "claude" };
+    case "terminal":
+      return { kind: "terminal", id: ulid() };
+    default:
+      return { kind: "preview" };
+  }
+}
+
 // ============================================================
 // Initial layout factory — mirrors today's Orion look.
 // ============================================================
@@ -474,6 +524,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   root: initialRoot,
   focusedPanelId: initialFocus,
   lastFilePanelId: null,
+  hiddenPanels: {},
 
   findPanel: (panelId) => findPanelIn(get().root, panelId),
   findTab: (tabId) => findTabIn(get().root, tabId),
@@ -716,6 +767,36 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     persistLayout(nextRoot, newPanelId);
   },
 
+  togglePanelByRole: (role) => {
+    const root = get().root;
+    const existing = findPanelByRole(root, role);
+    if (existing) {
+      const next = removePanel(root, existing.id);
+      if (!next) return; // never hide the last surviving panel
+      const focus =
+        get().focusedPanelId === existing.id
+          ? firstPanel(next)?.id ?? null
+          : get().focusedPanelId;
+      set({
+        root: next,
+        focusedPanelId: focus,
+        hiddenPanels: { ...get().hiddenPanels, [role]: existing },
+      });
+      persistLayout(next, focus);
+      return;
+    }
+    const stash = get().hiddenPanels[role];
+    const panel =
+      stash ?? newPanel([newTab(defaultTabForRole(role))], role);
+    const edge = role === "explorer" ? "left" : "right";
+    const fraction = role === "explorer" ? 16 : 24;
+    const next = insertPanelAtEdge(root, panel, edge, fraction);
+    const { [role]: _drop, ...restHidden } = get().hiddenPanels;
+    void _drop;
+    set({ root: next, focusedPanelId: panel.id, hiddenPanels: restHidden });
+    persistLayout(next, panel.id);
+  },
+
   closePanel: (panelId) => {
     const next = removePanel(get().root, panelId);
     if (!next) {
@@ -745,7 +826,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   resetLayout: (factory) => {
     const root = factory();
     const focus = firstPanel(root)?.id ?? null;
-    set({ root, focusedPanelId: focus });
+    set({ root, focusedPanelId: focus, hiddenPanels: {} });
     persistLayout(root, focus);
   },
 
@@ -761,7 +842,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       focusedPanelId && findPanelIn(effective, focusedPanelId)
         ? focusedPanelId
         : firstPanel(effective)?.id ?? null;
-    set({ root: effective, focusedPanelId: focus, lastFilePanelId: null });
+    set({ root: effective, focusedPanelId: focus, lastFilePanelId: null, hiddenPanels: {} });
     if (!withRoles || withRoles !== root) persistLayout(effective, focus);
   },
 }));
