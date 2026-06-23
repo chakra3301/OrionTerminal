@@ -1,10 +1,14 @@
 import { useState } from "react";
-import { Palette, Plus, Trash2, Copy, Check, Sparkles } from "lucide-react";
+import { Palette, Plus, Trash2, Copy, Check, Sparkles, Globe } from "lucide-react";
 import { ulid } from "ulid";
 import { useDesignSystems } from "@/store/designSystemStore";
 import { useXDesign } from "@/apps/xdesign/store";
 import type { DesignSystem, DSColor } from "@/apps/xdesign/designSystem";
-import { toast } from "@/store/toastStore";
+import { brandFromSite } from "@/apps/xdesign/brandFromSite";
+import { ipc } from "@/lib/ipc";
+import { promptText } from "@/components/PromptModal";
+import { useToasts, toast } from "@/store/toastStore";
+import { log } from "@/lib/log";
 
 function blankSystem(name: string): DesignSystem {
   const now = Date.now();
@@ -154,6 +158,37 @@ export function XDesignBrandPanel() {
     setOpen(true);
   };
 
+  // URL → brand: fetch a site (no LLM) and derive a coherent design system from
+  // its colors/fonts/name via the token engine.
+  const handleFromUrl = async () => {
+    const url = await promptText({
+      title: "Brand from a website",
+      label: "Paste a site URL — its colors, fonts, and name become a design system.",
+      placeholder: "linear.app",
+      confirmLabel: "Extract",
+    });
+    if (url === null) return;
+    const u = url.trim();
+    if (!u) return;
+    const loadingId = toast.info("Extracting brand…", { durationMs: 0, body: u });
+    try {
+      const html = await ipc.xdesignFetchUrl(u);
+      const ds = brandFromSite(html, u, `ds-${ulid()}`);
+      await save(ds);
+      await setActive(ds.id);
+      setEditingId(null);
+      setOpen(true);
+      useToasts.getState().dismiss(loadingId);
+      toast.success("Brand extracted", { body: `"${ds.name}" is now active` });
+    } catch (e) {
+      useToasts.getState().dismiss(loadingId);
+      toast.error("Couldn't extract brand", {
+        body: e instanceof Error ? e.message : String(e),
+      });
+      log.warn("xdesign brand-from-url failed", e);
+    }
+  };
+
   const handleDuplicate = (src: DesignSystem) => {
     const now = Date.now();
     const ds: DesignSystem = {
@@ -201,6 +236,14 @@ export function XDesignBrandPanel() {
           <Palette size={11} />
           <span>Brand</span>
           {active && <span className="xd-brand-active-name">{active.name}</span>}
+        </button>
+        <button
+          type="button"
+          className="xd-vars-add"
+          title="Brand from a website URL"
+          onClick={() => void handleFromUrl()}
+        >
+          <Globe size={11} />
         </button>
         <button
           type="button"

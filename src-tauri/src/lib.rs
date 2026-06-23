@@ -28,6 +28,7 @@ mod terminal;
 mod ui_bridge;
 mod wallpaper;
 mod xdesign_image;
+mod xdesign_web;
 
 use tauri::Manager;
 use tauri_plugin_sql::{Migration, MigrationKind};
@@ -341,6 +342,7 @@ pub fn run() {
             asset::asset_delete_file,
             asset::xdesign_snapshot_write,
             xdesign_image::xdesign_image_gen,
+            xdesign_web::xdesign_fetch_url,
             fs_watch::fs_watch_set_root,
             wallpaper::wallpaper_store_file,
             wallpaper::wallpaper_clear_file,

@@ -442,6 +442,8 @@ export const ipc = {
     size: string,
   ): Promise<{ b64: string; mime: string }> =>
     invoke("xdesign_image_gen", { providerKind, baseUrl, keyRef, model, prompt, size }),
+  xdesignFetchUrl: (url: string): Promise<string> =>
+    invoke("xdesign_fetch_url", { url }),
   fsWatchSetRoot: (path: string | null): Promise<void> =>
     invoke("fs_watch_set_root", { path }),
   uiBridgeRespond: (
