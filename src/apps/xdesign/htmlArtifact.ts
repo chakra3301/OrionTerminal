@@ -44,12 +44,17 @@ export function stripHtmlArtifact(text: string): string {
     .trim();
 }
 
-const SHARED_RULES = `Hard requirements:
+const imageryRule = (imagesAvailable: boolean): string =>
+  imagesAvailable
+    ? `- Imagery: for HERO and FEATURE photography/illustration, set the src (or background-image url()) to a placeholder token of the exact form {{IMG: a concise vivid description}} — we replace each with a REAL generated image. Use at most 4 such tokens, only where a genuine image belongs. Use CSS gradients / solid brand blocks / inline SVG for decorative shapes and icons. Do NOT reference external image URLs.`
+    : `- Imagery: use CSS gradients, solid brand-color blocks, or inline SVG as placeholders. Do NOT reference external image URLs (they 404 in the sandbox). Inline any icons as SVG.`;
+
+const sharedRules = (imagesAvailable: boolean): string => `Hard requirements:
 - Output a COMPLETE, self-contained single-file HTML document: <!doctype html>, <head> with a <title> and a <meta name="viewport">, and all CSS in ONE inline <style> block. No external CSS files.
 - Fonts: use a Google Fonts <link> if you need a specific family, otherwise a clean system stack. Honor the brand's fonts.
 - Production-quality, RESPONSIVE layout (CSS grid/flex) with at least one mobile breakpoint. Semantic HTML5 (header/nav/main/section/footer), real accessible markup, alt text, and AA contrast.
 - Real, specific product copy with a genuine voice — NEVER lorem ipsum.
-- Imagery: use CSS gradients, solid brand-color blocks, or inline SVG as placeholders. Do NOT reference external image URLs (they 404 in the sandbox). Inline any icons as SVG.
+${imageryRule(imagesAvailable)}
 - Any interactivity must be vanilla JS inside one <script> tag (optional). No build step, no npm.
 - Make it genuinely polished — the kind of page that could ship. Strong hierarchy, generous spacing, considered details.`;
 
@@ -59,6 +64,7 @@ export function buildWebpagePrompt(
   brief: string,
   brand: DesignSystem | null,
   craftBrief: string,
+  imagesAvailable = false,
 ): string {
   const brandPart = brand
     ? `\n\n${designSystemToPrompt(brand)}\n\nBuild the page strictly within this brand contract: use its color values, fonts, type scale, spacing, radii, voice, and principles.`
@@ -67,7 +73,7 @@ export function buildWebpagePrompt(
 
 ${craftBrief}${brandPart}
 
-${SHARED_RULES}
+${sharedRules(imagesAvailable)}
 
 Write ONE short sentence describing the page, then return exactly one fenced \`\`\`html code block containing the full document, and nothing after it.
 
@@ -82,13 +88,14 @@ export function buildRefinePrompt(
   currentHtml: string,
   instruction: string,
   brand: DesignSystem | null,
+  imagesAvailable = false,
 ): string {
   const brandPart = brand
     ? `\n\nStay within the brand contract:\n${designSystemToPrompt(brand)}`
     : "";
   return `Here is the current web page. Apply the requested change and return the COMPLETE updated document (not a diff, not a fragment).
 
-${SHARED_RULES}${brandPart}
+${sharedRules(imagesAvailable)}${brandPart}
 
 CHANGE REQUESTED: ${instruction}
 

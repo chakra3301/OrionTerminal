@@ -21,6 +21,11 @@ import {
   sizeAspect,
   styleImagePrompt,
 } from "@/apps/xdesign/imageGen";
+import {
+  hasImageSlots,
+  extractImageRequests,
+  inlineGeneratedImages,
+} from "@/apps/xdesign/imageSlots";
 import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
 import { xdesignClaude, COMPOSER_PROMPT, composerVariationsPrompt } from "@/apps/xdesign/claude";
@@ -188,15 +193,12 @@ export function XDesignClaudeRail() {
       }
       return;
     }
-    // HTML-artifact turn: consume the produced document into the live preview.
+    // HTML-artifact turn: consume the produced document into the live preview
+    // (resolving any {{IMG: …}} slots into real generated images first).
     if (pendingArtifactRef.current) {
       pendingArtifactRef.current = false;
       const doc = extractHtmlArtifact(last.content);
-      if (doc) {
-        const title = (doc.match(/<title>([^<]*)<\/title>/i)?.[1] ?? "").trim();
-        useHtmlArtifact.getState().setArtifact(doc, title || undefined);
-        log.info("xdesign claude: rendered HTML artifact");
-      }
+      if (doc) void renderArtifact(doc);
       return;
     }
     // An extract-brand reply (one ```xd-designsystem block) becomes a new,
@@ -465,9 +467,15 @@ export function XDesignClaudeRail() {
     if (brief === null) return;
     const b = brief.trim() || "a clean, modern landing page";
     pendingArtifactRef.current = true;
+    const imagesAvailable = !!pickImageProvider(useProvidersStore.getState().providers);
     await sendTurn(
       `🌐 Build webpage — ${b}`,
-      buildWebpagePrompt(b, useDesignSystems.getState().active(), composeCraftBrief(lensesForBrief(b))),
+      buildWebpagePrompt(
+        b,
+        useDesignSystems.getState().active(),
+        composeCraftBrief(lensesForBrief(b)),
+        imagesAvailable,
+      ),
     );
   };
 
@@ -481,9 +489,10 @@ export function XDesignClaudeRail() {
     const cur = useHtmlArtifact.getState().html;
     if (!cur) return;
     pendingArtifactRef.current = true;
+    const imagesAvailable = !!pickImageProvider(useProvidersStore.getState().providers);
     void sendTurn(
       `Refine webpage — ${instruction}`,
-      buildRefinePrompt(cur, instruction, useDesignSystems.getState().active()),
+      buildRefinePrompt(cur, instruction, useDesignSystems.getState().active(), imagesAvailable),
     );
   };
 
@@ -584,6 +593,53 @@ export function XDesignClaudeRail() {
       });
       log.error("xdesign image gen failed", e);
     }
+  };
+
+  // Render a produced HTML document into the live preview. When an image
+  // provider exists and the page used {{IMG: …}} slots, generate a real raster
+  // per slot and inline it as a data: URL (sandboxed srcdoc can't load
+  // asset://; data URLs also make the exported file self-contained). Failed /
+  // uncovered slots fall back to a gradient so the layout never breaks.
+  const renderArtifact = async (doc: string) => {
+    const title = (doc.match(/<title>([^<]*)<\/title>/i)?.[1] ?? "").trim();
+    const provider = pickImageProvider(useProvidersStore.getState().providers);
+    const requests = provider ? extractImageRequests(doc) : [];
+    if (provider && requests.length > 0) {
+      const loadingId = toast.info(
+        `Generating ${requests.length} image${requests.length > 1 ? "s" : ""}…`,
+        { durationMs: 0, body: provider.name },
+      );
+      const model = resolveImageModel(provider.kind, getImageModelOverride(provider.id));
+      const brand = useDesignSystems.getState().active();
+      const map = new Map<string, string>();
+      await Promise.all(
+        requests.map(async (desc) => {
+          try {
+            const { b64, mime } = await ipc.xdesignImageGen(
+              provider.kind,
+              provider.baseUrl,
+              provider.keyRef,
+              model,
+              styleImagePrompt(desc, brand),
+              defaultSize(),
+            );
+            map.set(desc, `data:${mime};base64,${b64}`);
+          } catch (e) {
+            log.warn("html artifact image slot failed", desc, e);
+          }
+        }),
+      );
+      useToasts.getState().dismiss(loadingId);
+      useHtmlArtifact.getState().setArtifact(inlineGeneratedImages(doc, map), title || undefined);
+      log.info(
+        `xdesign claude: rendered HTML artifact (${map.size}/${requests.length} images)`,
+      );
+      return;
+    }
+    // No provider / no slots — swap any stray tokens for the gradient fallback.
+    const safe = hasImageSlots(doc) ? inlineGeneratedImages(doc, new Map()) : doc;
+    useHtmlArtifact.getState().setArtifact(safe, title || undefined);
+    log.info("xdesign claude: rendered HTML artifact");
   };
 
   const handleCancel = () => {
