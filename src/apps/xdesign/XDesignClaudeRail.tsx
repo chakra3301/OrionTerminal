@@ -26,6 +26,7 @@ import {
   extractImageRequests,
   inlineGeneratedImages,
 } from "@/apps/xdesign/imageSlots";
+import { designTurnModel } from "@/apps/xdesign/designModel";
 import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
 import { xdesignClaude, COMPOSER_PROMPT, composerVariationsPrompt } from "@/apps/xdesign/claude";
@@ -330,7 +331,9 @@ export function XDesignClaudeRail() {
 
   // `visibleText` shows in the transcript; `sentText` is what Claude receives.
   // They differ for the composer (short brief shown, full prompt sent).
-  const sendTurn = async (visibleText: string, sentText: string) => {
+  // `modelOverride` lets the labelled creative buttons force the strongest
+  // model (Tier 0); plain chat omits it and keeps the user's dropdown choice.
+  const sendTurn = async (visibleText: string, sentText: string, modelOverride?: string) => {
     appendUser("xdesign", visibleText);
     const chatId = thread.threadId;
     registerStream(chatId, "xdesign");
@@ -354,7 +357,7 @@ export function XDesignClaudeRail() {
       // dropped on --resume turns). Null path → plain text-only send.
       await dispatchSend({
         chatId,
-        value: useModelPrefs.getState().modelFor("xdesign"),
+        value: modelOverride ?? useModelPrefs.getState().modelFor("xdesign"),
         prompt,
         history: toRuntimeHistory(useAppChat.getState().threads.xdesign.messages),
         projectRoot: null,
@@ -369,6 +372,10 @@ export function XDesignClaudeRail() {
   };
 
   const handleSend = (text: string) => sendTurn(text, text);
+
+  // The strongest model for a labelled creative turn (Tier 0). Plain chat
+  // (handleSend) deliberately stays on the user's dropdown choice.
+  const bestModel = () => designTurnModel(useModelPrefs.getState().modelFor("xdesign"));
 
   // ✦ Generate — compose a full design from a brief. Shows a short brief in the
   // transcript but sends the composer prompt; the reply's xd-design block is
@@ -390,6 +397,7 @@ export function XDesignClaudeRail() {
     await sendTurn(
       `✦ Generate a design — ${b}`,
       `${COMPOSER_PROMPT}${brandNote}${craft}\n\n---\n\nBRIEF: ${b}`,
+      bestModel(),
     );
   };
 
@@ -403,6 +411,7 @@ export function XDesignClaudeRail() {
     await sendTurn(
       "◈ Extract a design system from this canvas",
       EXTRACT_SYSTEM_PROMPT,
+      bestModel(),
     );
   };
 
@@ -416,6 +425,7 @@ export function XDesignClaudeRail() {
     await sendTurn(
       "◉ Critique & refine",
       buildCritiquePrompt(useDesignSystems.getState().active()),
+      bestModel(),
     );
   };
 
@@ -431,7 +441,7 @@ export function XDesignClaudeRail() {
       toast.info("Nothing to restyle", { body: "The canvas is empty." });
       return;
     }
-    await sendTurn(`◈ Apply brand — ${brand.name}`, buildApplyBrandPrompt(brand));
+    await sendTurn(`◈ Apply brand — ${brand.name}`, buildApplyBrandPrompt(brand), bestModel());
   };
 
   // ⧉ Variations — generate N distinct directions side-by-side to choose from.
@@ -452,6 +462,7 @@ export function XDesignClaudeRail() {
     await sendTurn(
       `⧉ Generate 3 directions — ${b}`,
       `${composerVariationsPrompt(3)}${brandNote}${craft}\n\n---\n\nBRIEF: ${b}`,
+      bestModel(),
     );
   };
 
@@ -476,6 +487,7 @@ export function XDesignClaudeRail() {
         composeCraftBrief(lensesForBrief(b)),
         imagesAvailable,
       ),
+      bestModel(),
     );
   };
 
@@ -493,6 +505,7 @@ export function XDesignClaudeRail() {
     void sendTurn(
       `Refine webpage — ${instruction}`,
       buildRefinePrompt(cur, instruction, useDesignSystems.getState().active(), imagesAvailable),
+      bestModel(),
     );
   };
 
@@ -520,6 +533,7 @@ export function XDesignClaudeRail() {
     await sendTurn(
       `◈ Illustrate — ${d}`,
       buildIllustrationPrompt(d, useDesignSystems.getState().active()),
+      bestModel(),
     );
   };
 
