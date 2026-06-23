@@ -433,6 +433,15 @@ export const ipc = {
     invoke("asset_delete_file", { filePath }),
   xdesignSnapshotWrite: (bytes: number[]): Promise<string> =>
     invoke("xdesign_snapshot_write", { bytes }),
+  xdesignImageGen: (
+    providerKind: string,
+    baseUrl: string,
+    keyRef: string,
+    model: string,
+    prompt: string,
+    size: string,
+  ): Promise<{ b64: string; mime: string }> =>
+    invoke("xdesign_image_gen", { providerKind, baseUrl, keyRef, model, prompt, size }),
   fsWatchSetRoot: (path: string | null): Promise<void> =>
     invoke("fs_watch_set_root", { path }),
   uiBridgeRespond: (
