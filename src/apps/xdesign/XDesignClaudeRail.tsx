@@ -27,6 +27,11 @@ import {
   inlineGeneratedImages,
 } from "@/apps/xdesign/imageSlots";
 import { designTurnModel } from "@/apps/xdesign/designModel";
+import {
+  inspectArtifact,
+  summarizeIssues,
+  buildRepairPrompt,
+} from "@/apps/xdesign/artifactGuard";
 import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
 import { xdesignClaude, COMPOSER_PROMPT, composerVariationsPrompt } from "@/apps/xdesign/claude";
@@ -162,6 +167,11 @@ export function XDesignClaudeRail() {
   // When true, the next finished reply is an SVG illustration to place on the
   // canvas as an image layer (data: URL).
   const pendingSvgRef = useRef(false);
+  // True while a 🌐 turn is a REFINE of the current page (vs a fresh build) —
+  // the guard only stub-checks refines. Reset per user action.
+  const refiningRef = useRef(false);
+  // One silent auto-repair budget per user-initiated build/refine.
+  const repairAttemptRef = useRef(0);
 
   // Whenever the latest assistant message in this thread finishes streaming
   // (pending=false), parse any <canvas-command> blocks and run them. Single
@@ -478,6 +488,8 @@ export function XDesignClaudeRail() {
     if (brief === null) return;
     const b = brief.trim() || "a clean, modern landing page";
     pendingArtifactRef.current = true;
+    refiningRef.current = false;
+    repairAttemptRef.current = 0;
     const imagesAvailable = !!pickImageProvider(useProvidersStore.getState().providers);
     await sendTurn(
       `🌐 Build webpage — ${b}`,
@@ -501,6 +513,8 @@ export function XDesignClaudeRail() {
     const cur = useHtmlArtifact.getState().html;
     if (!cur) return;
     pendingArtifactRef.current = true;
+    refiningRef.current = true;
+    repairAttemptRef.current = 0;
     const imagesAvailable = !!pickImageProvider(useProvidersStore.getState().providers);
     void sendTurn(
       `Refine webpage — ${instruction}`,
@@ -644,15 +658,33 @@ export function XDesignClaudeRail() {
         }),
       );
       useToasts.getState().dismiss(loadingId);
-      useHtmlArtifact.getState().setArtifact(inlineGeneratedImages(doc, map), title || undefined);
-      log.info(
-        `xdesign claude: rendered HTML artifact (${map.size}/${requests.length} images)`,
-      );
+      log.info(`xdesign claude: ${map.size}/${requests.length} slot image(s) generated`);
+      finishArtifact(inlineGeneratedImages(doc, map), title);
       return;
     }
     // No provider / no slots — swap any stray tokens for the gradient fallback.
     const safe = hasImageSlots(doc) ? inlineGeneratedImages(doc, new Map()) : doc;
-    useHtmlArtifact.getState().setArtifact(safe, title || undefined);
+    finishArtifact(safe, title);
+  };
+
+  // Lever 3 — quality guard. Inspect the final document; on issues run ONE
+  // silent auto-repair turn, else publish (warning if still imperfect).
+  const finishArtifact = (finalHtml: string, title: string) => {
+    const prior = useHtmlArtifact.getState().html;
+    const issues = inspectArtifact(finalHtml, { prior, isRefine: refiningRef.current });
+    if (issues.length > 0 && repairAttemptRef.current < 1) {
+      repairAttemptRef.current += 1;
+      pendingArtifactRef.current = true;
+      toast.info("Polishing the page…", { body: summarizeIssues(issues) });
+      log.info(`xdesign artifact guard: repairing — ${summarizeIssues(issues)}`);
+      void sendTurn("Polish & fix the page", buildRepairPrompt(issues, finalHtml), bestModel());
+      return;
+    }
+    if (issues.length > 0) {
+      toast.warning("Page may need a tweak", { body: summarizeIssues(issues) });
+      log.warn(`xdesign artifact guard: shipped with issues — ${summarizeIssues(issues)}`);
+    }
+    useHtmlArtifact.getState().setArtifact(finalHtml, title || undefined);
     log.info("xdesign claude: rendered HTML artifact");
   };
 
