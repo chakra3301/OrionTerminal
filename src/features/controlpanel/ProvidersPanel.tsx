@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react";
 import { ulid } from "ulid";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { RefreshCw, CheckCircle2, LogIn, Download } from "lucide-react";
+import { RefreshCw, CheckCircle2, LogIn, Download, ImageIcon } from "lucide-react";
 import { useProvidersStore } from "@/store/providersStore";
 import { ipc } from "@/lib/ipc";
 import type { Provider, ProviderKind } from "@/features/agents/agentTypes";
+import {
+  isImageProvider,
+  defaultImageModel,
+  getImageModelOverride,
+  setImageModelOverride,
+} from "@/apps/xdesign/imageGen";
 import {
   PROVIDER_PRESETS,
   requiresBaseUrl,
@@ -77,7 +83,13 @@ export function ProvidersPanel() {
                 <div className="cp-card-sub">{p.kind}{p.models.length ? ` · ${p.models.length} models` : ""}</div>
                 {isCli && <CliEngineStatus engine={p.kind as "codex_cli" | "gemini_cli"} />}
                 {p.kind === "nous_oauth" && <NousProviderStatus keyRef={p.keyRef} />}
+                {isImageProvider(p) && <ImageModelField provider={p} />}
               </div>
+              {isImageProvider(p) && (
+                <span className="cp-badge live" title="Usable by XDesign 🖼️ Generate image">
+                  <ImageIcon size={12} /> image
+                </span>
+              )}
               {p.builtin
                 ? <span className="cp-badge live">built-in</span>
                 : <span className="cp-badge wait">chat ready</span>}
@@ -164,6 +176,24 @@ function AddProvider({ onDone, onSave }: { onDone: () => void; onSave: (p: Provi
         <button className="cp-btn ghost" onClick={onDone}>Cancel</button>
         <button className="cp-btn" onClick={submit}>Add</button>
       </div>
+    </div>
+  );
+}
+
+function ImageModelField({ provider }: { provider: Provider }) {
+  const [val, setVal] = useState(() => getImageModelOverride(provider.id));
+  const fallback = defaultImageModel(provider.kind);
+  return (
+    <div className="cp-cli-status">
+      <span className="cp-card-sub">Image model</span>
+      <input
+        className="cp-input"
+        style={{ maxWidth: 240 }}
+        placeholder={fallback}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={() => setImageModelOverride(provider.id, val)}
+      />
     </div>
   );
 }

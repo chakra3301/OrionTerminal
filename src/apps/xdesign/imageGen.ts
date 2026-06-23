@@ -36,6 +36,34 @@ export function defaultImageModel(kind: ProviderKind): string {
   return kind === "google" ? "imagen-4.0-generate-001" : "gpt-image-1";
 }
 
+/** Resolve the image model: a user override (Control Panel) wins, else the
+ * per-kind default. */
+export function resolveImageModel(kind: ProviderKind, override: string): string {
+  return override.trim() || defaultImageModel(kind);
+}
+
+// Per-provider image-model override (no migration — a tiny localStorage pref,
+// mirroring htmlArtifactStore). Lets a user pick dall-e-3 vs gpt-image-1 or a
+// specific Imagen snapshot without guessing.
+const IMG_MODEL_KEY = "xdesign:imageModel:";
+
+export function getImageModelOverride(providerId: string): string {
+  try {
+    return localStorage.getItem(IMG_MODEL_KEY + providerId) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function setImageModelOverride(providerId: string, model: string): void {
+  try {
+    if (model.trim()) localStorage.setItem(IMG_MODEL_KEY + providerId, model.trim());
+    else localStorage.removeItem(IMG_MODEL_KEY + providerId);
+  } catch {
+    /* localStorage unavailable — fall back to per-kind default */
+  }
+}
+
 /** Choose the provider to generate with. Prefers the first OpenAI-ish provider
  * (broadest model support), else the first capable one. Null when none. */
 export function pickImageProvider(providers: Provider[]): Provider | null {

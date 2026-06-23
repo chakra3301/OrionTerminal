@@ -14,7 +14,8 @@ import { useAssetsStore } from "@/store/assetsStore";
 import { useToasts } from "@/store/toastStore";
 import {
   pickImageProvider,
-  defaultImageModel,
+  resolveImageModel,
+  getImageModelOverride,
   defaultSize,
   base64ToBytes,
   sizeAspect,
@@ -535,7 +536,7 @@ export function XDesignClaudeRail() {
     if (desc === null) return;
     const d = desc.trim();
     if (!d) return;
-    const model = defaultImageModel(provider.kind);
+    const model = resolveImageModel(provider.kind, getImageModelOverride(provider.id));
     const size = defaultSize();
     const styled = styleImagePrompt(d, useDesignSystems.getState().active());
     const loadingId = toast.info("Generating image…", {

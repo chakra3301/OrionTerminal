@@ -4,6 +4,7 @@ import {
   isImageProvider,
   imageCapableProviders,
   defaultImageModel,
+  resolveImageModel,
   pickImageProvider,
   base64ToBytes,
   sizeAspect,
@@ -62,6 +63,14 @@ describe("defaultImageModel", () => {
     expect(defaultImageModel("openai")).toBe("gpt-image-1");
     expect(defaultImageModel("openai_compat")).toBe("gpt-image-1");
     expect(defaultImageModel("google")).toBe("imagen-4.0-generate-001");
+  });
+});
+
+describe("resolveImageModel", () => {
+  it("prefers a non-empty override, else the kind default", () => {
+    expect(resolveImageModel("openai", "dall-e-3")).toBe("dall-e-3");
+    expect(resolveImageModel("openai", "  ")).toBe("gpt-image-1");
+    expect(resolveImageModel("google", "")).toBe("imagen-4.0-generate-001");
   });
 });
 
