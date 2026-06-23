@@ -199,3 +199,14 @@ Node = { "type": "frame"|"text"|"rect"|"ellipse"|"image", "name"?, "w"?, "h"?,
   "layout"?: { same shape as screen.layout }, "children"?: [ Node ] }
 
 Write ONE sentence describing the design before the code block, and nothing after it. Output valid JSON only inside the block.`;
+
+/** Variations flow — N visually DISTINCT directions, each a full xd-design
+ * block, laid side-by-side on the canvas for the user to choose from. */
+export function composerVariationsPrompt(count: number): string {
+  const n = Math.max(2, Math.min(4, Math.round(count)));
+  return `${COMPOSER_PROMPT}
+
+---
+
+VARIATIONS MODE: produce ${n} genuinely DISTINCT design directions for the SAME brief, each as its own complete fenced xd-design block (so ${n} blocks total, back to back). Make them feel like ${n} different studios pitched the work — vary the aesthetic, layout structure, type treatment, and color emphasis meaningfully (do NOT just recolor the same layout). Each screen MUST use the same width so they line up side-by-side. Precede each block with one short sentence naming that direction's point of view (e.g. "Direction 1 — brutalist editorial:"). Output the ${n} blocks and nothing else after the last one.`;
+}

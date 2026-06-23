@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parseDesignPlan,
+  parseDesignPlans,
   planToShapes,
   resolveColorRefs,
   stripDesignPlan,
@@ -112,6 +113,36 @@ describe("resolveColorRefs", () => {
     const out = resolveColorRefs(shapes, new Map([["brand", "VAR1"]]));
     expect(out[0]!.fill).toBe("var:VAR1");
     expect(out[1]!.fill).toBe("#fff"); // literal untouched
+  });
+});
+
+describe("parseDesignPlans", () => {
+  const blk = (name: string, w = 1440) =>
+    "```xd-design\n" +
+    `{"screen":{"name":"${name}","w":${w},"h":900,"children":[]}}` +
+    "\n```";
+
+  it("parses multiple blocks in order", () => {
+    const reply = `Direction 1:\n${blk("A")}\nDirection 2:\n${blk("B")}\nDirection 3:\n${blk("C")}`;
+    const plans = parseDesignPlans(reply);
+    expect(plans.map((p) => p.screen.name)).toEqual(["A", "B", "C"]);
+  });
+
+  it("skips malformed blocks but keeps valid ones", () => {
+    const reply = `${blk("A")}\n\`\`\`xd-design\n{ not json\n\`\`\`\n${blk("C")}`;
+    const plans = parseDesignPlans(reply);
+    expect(plans.map((p) => p.screen.name)).toEqual(["A", "C"]);
+  });
+
+  it("returns [] when no blocks", () => {
+    expect(parseDesignPlans("no blocks here")).toEqual([]);
+  });
+
+  it("planToShapes honors a custom origin", () => {
+    const plan = parseDesignPlan(blk("A"))!;
+    const { shapes } = planToShapes(plan, (() => { let i = 0; return () => `id${i++}`; })(), { x: 5000, y: 200 });
+    expect(shapes[0]!.x).toBe(5000);
+    expect(shapes[0]!.y).toBe(200);
   });
 });
 

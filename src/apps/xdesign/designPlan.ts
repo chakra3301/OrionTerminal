@@ -54,15 +54,14 @@ export type DesignPlan = {
 };
 
 const FENCE = /```xd-design\s*\n([\s\S]*?)```/;
+const FENCE_G = /```xd-design\s*\n([\s\S]*?)```/g;
 
-/** Extract + parse the fenced design block. Fails soft (null) on no block,
- * malformed JSON, or a missing screen — never throws. */
-export function parseDesignPlan(text: string): DesignPlan | null {
-  const m = text.match(FENCE);
-  if (!m) return null;
+/** Parse one already-extracted JSON string into a DesignPlan. Null on bad
+ * JSON or a missing screen. */
+function parsePlanJson(jsonText: string): DesignPlan | null {
   let raw: unknown;
   try {
-    raw = JSON.parse(m[1]!.trim());
+    raw = JSON.parse(jsonText.trim());
   } catch {
     return null;
   }
@@ -87,6 +86,26 @@ export function parseDesignPlan(text: string): DesignPlan | null {
         : [],
     },
   };
+}
+
+/** Extract + parse the FIRST fenced design block. Fails soft (null). */
+export function parseDesignPlan(text: string): DesignPlan | null {
+  const m = text.match(FENCE);
+  if (!m) return null;
+  return parsePlanJson(m[1]!);
+}
+
+/** Extract + parse ALL fenced design blocks (variations flow). Skips any
+ * malformed block; returns [] when none parse. */
+export function parseDesignPlans(text: string): DesignPlan[] {
+  const out: DesignPlan[] = [];
+  let m: RegExpExecArray | null;
+  FENCE_G.lastIndex = 0;
+  while ((m = FENCE_G.exec(text)) !== null) {
+    const plan = parsePlanJson(m[1]!);
+    if (plan) out.push(plan);
+  }
+  return out;
 }
 
 /** Remove the fenced design block from a reply for the visible transcript. */
@@ -135,16 +154,19 @@ function kindFor(t: PlanNode["type"]): Shape["kind"] {
 export function planToShapes(
   plan: DesignPlan,
   newId: () => string,
+  origin?: { x: number; y: number },
 ): { shapes: Shape[]; variables: { name: string; value: string }[] } {
   const shapes: Shape[] = [];
+  const ox = origin?.x ?? ROOT_X;
+  const oy = origin?.y ?? ROOT_Y;
 
   const rootId = newId();
   shapes.push({
     id: rootId,
     name: plan.screen.name,
     kind: "frame",
-    x: ROOT_X,
-    y: ROOT_Y,
+    x: ox,
+    y: oy,
     w: plan.screen.w,
     h: plan.screen.h,
     radius: 0,
@@ -162,8 +184,8 @@ export function planToShapes(
       id,
       name: node.name ?? kind,
       kind,
-      x: ROOT_X,
-      y: ROOT_Y,
+      x: ox,
+      y: oy,
       w: node.w ?? 100,
       h: node.h ?? 40,
       parentId,

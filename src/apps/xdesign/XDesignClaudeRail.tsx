@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, X, Wand2, Palette, Eye, Paintbrush } from "lucide-react";
+import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle } from "lucide-react";
 import { ulid } from "ulid";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
@@ -11,7 +11,7 @@ import { ipc } from "@/lib/ipc";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
-import { xdesignClaude, COMPOSER_PROMPT } from "@/apps/xdesign/claude";
+import { xdesignClaude, COMPOSER_PROMPT, composerVariationsPrompt } from "@/apps/xdesign/claude";
 import { useDesignSystems } from "@/store/designSystemStore";
 import {
   designSystemToPrompt,
@@ -27,8 +27,8 @@ import {
   runCanvasCommands,
   stripCanvasCommands,
 } from "@/apps/xdesign/claudeCommands";
-import { parseDesignPlan, stripDesignPlan } from "@/apps/xdesign/designPlan";
-import { ingestDesignPlan } from "@/apps/xdesign/ingestDesignPlan";
+import { parseDesignPlans, stripDesignPlan } from "@/apps/xdesign/designPlan";
+import { ingestDesignPlan, ingestDesignPlans } from "@/apps/xdesign/ingestDesignPlan";
 import { promptText } from "@/components/PromptModal";
 import { computeExportBounds, renderPngBytes } from "@/apps/xdesign/exportXD";
 import { clamp } from "@/lib/time";
@@ -142,12 +142,18 @@ export function XDesignClaudeRail() {
       log.info("xdesign claude: extracted design system");
       return;
     }
-    // A composer reply (one ```xd-design block) ingests as a whole design;
-    // otherwise fall through to the low-level canvas-command path.
-    const plan = parseDesignPlan(last.content);
-    if (plan) {
-      ingestDesignPlan(plan);
+    // A composer reply ingests as whole design(s): one block → single design,
+    // several blocks → variations laid side-by-side. Otherwise fall through to
+    // the low-level canvas-command path.
+    const plans = parseDesignPlans(last.content);
+    if (plans.length === 1) {
+      ingestDesignPlan(plans[0]!);
       log.info("xdesign claude: ingested design plan");
+      return;
+    }
+    if (plans.length > 1) {
+      ingestDesignPlans(plans);
+      log.info(`xdesign claude: ingested ${plans.length} variations`);
       return;
     }
     const cmds = parseCanvasCommands(last.content);
@@ -358,6 +364,26 @@ export function XDesignClaudeRail() {
     await sendTurn(`◈ Apply brand — ${brand.name}`, buildApplyBrandPrompt(brand));
   };
 
+  // ⧉ Variations — generate N distinct directions side-by-side to choose from.
+  const handleVariations = async () => {
+    const brief = await promptText({
+      title: "Generate variations",
+      label: "Describe what to design — Claude pitches 3 distinct directions side-by-side.",
+      placeholder: "a pricing page for a dev tool, dark & bold",
+      confirmLabel: "Generate 3",
+    });
+    if (brief === null) return;
+    const b = brief.trim() || "a clean, modern landing page";
+    const brand = brandBlock();
+    const brandNote = brand
+      ? `${brand}\nUse the brand contract above as the shared design system across all directions: same color tokens, fonts, type scale, spacing, radii, voice.\n`
+      : "";
+    await sendTurn(
+      `⧉ Generate 3 directions — ${b}`,
+      `${composerVariationsPrompt(3)}${brandNote}\n\n---\n\nBRIEF: ${b}`,
+    );
+  };
+
   const handleCancel = () => {
     void dispatchCancel(thread.threadId, useModelPrefs.getState().modelFor("xdesign"));
   };
@@ -422,6 +448,16 @@ export function XDesignClaudeRail() {
         >
           <Wand2 size={12} />
           <span>Generate</span>
+        </button>
+        <button
+          type="button"
+          className="xd-rail-icon"
+          data-no-drag
+          onClick={handleVariations}
+          disabled={thread.running}
+          title="Variations — 3 distinct directions side-by-side"
+        >
+          <Shuffle size={13} />
         </button>
         <button
           type="button"
