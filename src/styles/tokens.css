@@ -7898,22 +7898,28 @@ summary:focus-visible,
 .xd-claude-rail.collapsed .xd-claude-rail-head { border-bottom: none; }
 /* Compact: narrow floating panel — let the header icons wrap. */
 .xd-claude-rail.compact .xd-claude-rail-head { flex-wrap: wrap; }
-/* Docked: a clean full-height right column anchored to the XDesign window. */
+/* Docked: a clean full-height column flush to the window's LEFT edge — a real
+   flex child of .xd-shell (portaled there), pulled ahead of the tool rail with
+   order:-1 so it mirrors the Properties rail on the opposite side. */
 .xd-claude-rail.dock {
-  position: absolute;
-  inset: 0 0 0 auto;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: min(440px, 64%);
-  min-width: 320px;
-  height: 100%;
+  position: relative;
+  inset: auto;
+  order: -1;
+  flex: 0 0 auto;
+  align-self: stretch;
+  /* Track the XDesign window: % resolves against the shell width (the in-canvas
+     window, not the OS viewport), floored/capped so it stays usable but never
+     hogs the canvas on a wide window. */
+  width: clamp(300px, 28%, 400px);
+  min-width: 0;
+  height: auto;
+  min-height: 0;
   max-height: none;
   border-radius: 0;
   border: none;
-  border-left: 1px solid rgba(var(--xd-accent-rgb), 0.3);
+  border-right: 1px solid rgba(var(--xd-accent-rgb), 0.3);
   background: rgba(8, 5, 12, 0.92);
-  box-shadow: -24px 0 60px -30px rgba(0, 0, 0, 0.7);
+  box-shadow: 24px 0 60px -30px rgba(0, 0, 0, 0.7);
   z-index: 30;
   animation: none;
 }
@@ -7938,6 +7944,19 @@ summary:focus-visible,
   user-select: none;
 }
 .xd-claude-rail-head .title { color: var(--neon-magenta); }
+/* The toolbar group (Generate + action icons) fills the space between the
+   title and the window controls and wraps onto extra rows when the panel is
+   too narrow to fit them — so docking small never clips a tool. Right-aligned
+   so it stays tucked against the controls like the old single-row layout. */
+.xd-rail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .xd-rail-generate {
   display: inline-flex;
   align-items: center;

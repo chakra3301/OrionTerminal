@@ -112,7 +112,7 @@ function loadRailUi(): RailUi {
   return { placement: "float", box: null, collapsed: false };
 }
 
-export function XDesignClaudeRail() {
+export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | null }) {
   const [open, setOpen] = useState(false);
   // Floating placement, size, and collapsed state — persisted so the partner
   // stays where you parked it across close/reopen and app restarts. box is in
@@ -893,33 +893,34 @@ export function XDesignClaudeRail() {
       >
         <Sparkles size={12} color="var(--xd-accent)" />
         {!collapsed && <span className="title">{xdesignClaude.name}</span>}
-        <div style={{ flex: 1 }} />
-        <button
-          type="button"
-          className="xd-rail-generate xd-rail-tip"
-          data-no-drag
-          onClick={handleGenerate}
-          disabled={thread.running}
-          aria-label="Generate a full design from a brief"
-          data-tip="Generate a full design from a brief"
-        >
-          <Wand2 size={12} />
-          {!iconsOnly && <span>Generate</span>}
-        </button>
-        {actions.map((a, i) => (
+        <div className="xd-rail-actions">
           <button
-            key={i}
             type="button"
-            className="xd-rail-icon xd-rail-tip"
+            className="xd-rail-generate xd-rail-tip"
             data-no-drag
-            onClick={a.onClick}
-            disabled={a.disabled}
-            aria-label={a.tip}
-            data-tip={a.tip}
+            onClick={handleGenerate}
+            disabled={thread.running}
+            aria-label="Generate a full design from a brief"
+            data-tip="Generate a full design from a brief"
           >
-            <a.icon size={13} />
+            <Wand2 size={12} />
+            {!iconsOnly && <span>Generate</span>}
           </button>
-        ))}
+          {actions.map((a, i) => (
+            <button
+              key={i}
+              type="button"
+              className="xd-rail-icon xd-rail-tip"
+              data-no-drag
+              onClick={a.onClick}
+              disabled={a.disabled}
+              aria-label={a.tip}
+              data-tip={a.tip}
+            >
+              <a.icon size={13} />
+            </button>
+          ))}
+        </div>
         {floating && (
           <button
             type="button"
@@ -986,6 +987,10 @@ export function XDesignClaudeRail() {
   );
 
   // Floating → portal to <body> so it escapes the canvas-stage clip and can
-  // move anywhere in the terminal. Docked → render in place as a right column.
-  return floating ? createPortal(rail, document.body) : rail;
+  // move anywhere in the terminal. Docked → portal up to the XDesign shell so
+  // it sits as a real flex column flush to the window's LEFT edge (CSS order:-1),
+  // a mirror of the Properties rail on the right. Falls back to nothing for the
+  // one frame before the shell element is captured (placement persisted as dock).
+  if (floating) return createPortal(rail, document.body);
+  return dockTarget ? createPortal(rail, dockTarget) : null;
 }

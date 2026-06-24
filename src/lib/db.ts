@@ -33,6 +33,8 @@ export type AppStateKey =
   | "wallpaper"
   | "preview"
   | "xdesign.doc"
+  | "xdesign.projects"
+  | `xdesign.project.${string}`
   | "shell.focusedWindowId"
   | "rosie.ttsEnabled"
   | "voice.listenMode"

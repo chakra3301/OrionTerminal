@@ -102,6 +102,9 @@ async function handleImageDrop(paths: string[]): Promise<void> {
 
 export function XDesignApp() {
   const stageRef = useRef<HTMLDivElement>(null);
+  // Captured via callback ref → state so the docked Design Partner can portal
+  // up to the shell and live as a real flex column (see XDesignClaudeRail).
+  const [shellEl, setShellEl] = useState<HTMLDivElement | null>(null);
   const [dropOver, setDropOver] = useState(false);
   const hasFrames = useXDesign((s) => topLevelFrames(s.shapes).length > 0);
 
@@ -115,7 +118,7 @@ export function XDesignApp() {
   });
 
   return (
-    <div className="xd-shell">
+    <div className="xd-shell" ref={setShellEl}>
       <XDesignToolRail />
       <XDesignLayersPanel />
       <div
@@ -124,7 +127,7 @@ export function XDesignApp() {
       >
         <XDesignAlignBar />
         <XDesignCanvas />
-        <XDesignClaudeRail />
+        <XDesignClaudeRail dockTarget={shellEl} />
         {hasFrames && (
           <button
             type="button"

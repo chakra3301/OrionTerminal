@@ -31,13 +31,11 @@ import { useThemeStore } from "@/store/themeStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { useWallpaperStore, type WallpaperState } from "@/store/wallpaperStore";
 import { usePreviewStore, type PreviewState } from "@/store/previewStore";
+import { useXDesign } from "@/apps/xdesign/store";
 import {
-  useXDesign,
-  type Shape as XDesignShape,
-  type Page as XDesignPage,
-  type Variable as XDesignVariable,
-  type Mode as XDesignMode,
-} from "@/apps/xdesign/store";
+  useXDProjects,
+  flushActive as flushActiveXDProject,
+} from "@/apps/xdesign/projectsStore";
 import {
   setAppState,
   getWorkspaceLayout,
@@ -106,7 +104,6 @@ async function hydrate() {
     terminalHeight,
     wallpaper,
     preview,
-    xdesignDoc,
     modelPrefs,
     reduceGlass,
     tabAutocomplete,
@@ -123,16 +120,6 @@ async function hydrate() {
     getAppState<number>("terminal_height"),
     getAppState<WallpaperState>("wallpaper"),
     getAppState<PreviewState>("preview"),
-    getAppState<
-      | XDesignShape[]
-      | {
-          pages: XDesignPage[];
-          activePageId: string;
-          variables?: XDesignVariable[];
-          modes?: XDesignMode[];
-          activeModeId?: string;
-        }
-    >("xdesign.doc"),
     getAppState<Record<string, string>>("models"),
     getAppState<boolean>("reduce_glass"),
     getAppState<boolean>("tab_autocomplete"),
@@ -143,7 +130,7 @@ async function hydrate() {
   useAutocomplete.getState().hydrate(tabAutocomplete);
   if (wallpaper) useWallpaperStore.getState().hydrate(wallpaper);
   if (preview) usePreviewStore.getState().hydrate(preview);
-  if (xdesignDoc) useXDesign.getState().hydrate(xdesignDoc);
+  void useXDProjects.getState().init();
   useModelPrefs.getState().hydrate(modelPrefs);
 
   useLayoutStore.getState().hydrate({
@@ -400,21 +387,11 @@ function useXDesignPersistence() {
     // so it shouldn't show up as activity.
     let firstFlush = true;
     const flush = () => {
+      // Edits only persist when a project is open. On the Home screen there's
+      // no active project, so there's nothing to write to.
+      if (!useXDProjects.getState().activeId) return;
       const s = useXDesign.getState();
-      // Persist the full document — snapshot the active page's live shapes
-      // back into pages first, and drop per-page undo stacks (transient).
-      const pages = s.pages.map((p) => ({
-        id: p.id,
-        name: p.name,
-        shapes: p.id === s.activePageId ? s.shapes : p.shapes,
-      }));
-      void setAppState("xdesign.doc", {
-        pages,
-        activePageId: s.activePageId,
-        variables: s.variables,
-        modes: s.modes,
-        activeModeId: s.activeModeId,
-      });
+      void flushActiveXDProject();
       if (firstFlush) {
         firstFlush = false;
       } else {
