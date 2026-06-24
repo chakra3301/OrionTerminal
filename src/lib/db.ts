@@ -244,6 +244,13 @@ export async function listProjects(): Promise<ProjectRow[]> {
   );
 }
 
+/** Remove a project from the recents list. Only forgets the entry — the
+ * folder on disk is untouched. */
+export async function deleteProject(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM projects WHERE id = $1", [id]);
+}
+
 export async function getProjectById(id: string): Promise<ProjectRow | null> {
   const db = await getDb();
   const rows = await db.select<ProjectRow[]>(

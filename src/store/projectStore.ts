@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { ulid } from "ulid";
 import {
+  deleteProject,
   getProjectById,
   getProjectByPath,
   listProjects,
@@ -23,6 +24,11 @@ type ProjectState = {
   /** Open a project by row — same effect as openProjectAtPath but skips the
    * path lookup when the caller already has the row. */
   switchToProject: (project: ProjectRow) => Promise<void>;
+  /** Return to the Home / start screen without forgetting recents. */
+  goHome: () => Promise<void>;
+  /** Forget a project from recents (folder on disk is untouched). If it's the
+   * active project, drops back to Home. */
+  removeRecent: (id: string) => Promise<void>;
 };
 
 function deriveName(rootPath: string): string {
@@ -67,6 +73,23 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     } catch (e) {
       log.warn("loadRecents failed", e);
     }
+  },
+  goHome: async () => {
+    set({ active: null });
+    await setAppState("last_project_id", null);
+    void get().loadRecents();
+  },
+  removeRecent: async (id) => {
+    try {
+      await deleteProject(id);
+    } catch (e) {
+      log.warn("removeRecent failed", e);
+    }
+    if (get().active?.id === id) {
+      set({ active: null });
+      await setAppState("last_project_id", null);
+    }
+    void get().loadRecents();
   },
   switchToProject: async (project) => {
     // No-op if already active. Bumps last_opened_at so it sticks at the

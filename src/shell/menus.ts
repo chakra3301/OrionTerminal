@@ -2,6 +2,7 @@ import type { MenuItem } from "@/components/ContextMenu";
 import { registry } from "@/commands/registry";
 import { useShell, type AppId } from "@/shell/store/useShell";
 import { useArchives } from "@/apps/archives/useArchives";
+import { useProjectStore } from "@/store/projectStore";
 import { useXDesign } from "@/apps/xdesign/store";
 import {
   useXDProjects,
@@ -199,6 +200,10 @@ export function buildMenu(app: AppId | null, name: string): MenuItem[] {
         return [
           cmd("file.openFile", "Open File…"),
           cmd("file.openProject", "Open Project…"),
+          {
+            label: "Go to Start",
+            onClick: () => void useProjectStore.getState().goHome(),
+          },
           sep,
           cmd("file.save", "Save"),
           cmd("file.saveAll", "Save All"),
