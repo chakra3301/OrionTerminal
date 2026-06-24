@@ -33,6 +33,7 @@
     "highlight.js": "^11.11.1",
     "lucide-react": "^0.475.0",
     "polygon-clipping": "^0.15.7",
+    "pptxgenjs": "^4.0.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-hotkeys-hook": "^4.6.1",

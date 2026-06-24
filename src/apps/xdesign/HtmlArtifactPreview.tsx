@@ -9,9 +9,13 @@ import {
   RefreshCw,
   Send,
   Loader2,
+  Presentation,
 } from "lucide-react";
 import { useHtmlArtifact, type ArtifactViewport } from "@/apps/xdesign/htmlArtifactStore";
 import { useAppChat } from "@/store/appChatStore";
+import { useDesignSystems } from "@/store/designSystemStore";
+import { isDeckHtml, deckToPptxBase64 } from "@/apps/xdesign/deckToPptx";
+import { base64ToBytes } from "@/apps/xdesign/imageGen";
 import { ipc } from "@/lib/ipc";
 import { toast } from "@/store/toastStore";
 import { log } from "@/lib/log";
@@ -53,6 +57,24 @@ export function HtmlArtifactPreview() {
     }
   };
 
+  const isDeck = isDeckHtml(html);
+
+  const handleExportPptx = async () => {
+    try {
+      const path = await save({
+        defaultPath: `${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "deck"}.pptx`,
+        filters: [{ name: "PowerPoint", extensions: ["pptx"] }],
+      });
+      if (!path) return;
+      const b64 = await deckToPptxBase64(html, useDesignSystems.getState().active(), title);
+      await ipc.xdesignSaveBytes(path, Array.from(base64ToBytes(b64)));
+      toast.success("Exported PPTX", { body: path });
+    } catch (e) {
+      log.error("pptx export failed", e);
+      toast.error("PPTX export failed", { body: e instanceof Error ? e.message : String(e) });
+    }
+  };
+
   const submitRefine = () => {
     const t = instruction.trim();
     if (!t || running || !refiner) return;
@@ -89,8 +111,13 @@ export function HtmlArtifactPreview() {
             <RefreshCw size={12} /> Regenerate
           </button>
         )}
+        {isDeck && (
+          <button type="button" className="xd-artifact-btn" onClick={() => void handleExportPptx()} title="Export editable .pptx">
+            <Presentation size={12} /> PPTX
+          </button>
+        )}
         <button type="button" className="xd-artifact-btn" onClick={handleExport} title="Export .html">
-          <Download size={12} /> Export
+          <Download size={12} /> {isDeck ? "HTML" : "Export"}
         </button>
         <button type="button" className="xd-artifact-btn icon" onClick={close} title="Close">
           <X size={14} />
