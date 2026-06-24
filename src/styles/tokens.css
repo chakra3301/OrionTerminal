@@ -8000,6 +8000,53 @@ summary:focus-visible,
 .xd-artifact-btn:hover:not(:disabled) { color: var(--t-primary); border-color: rgba(var(--xd-accent-rgb), 0.4); }
 .xd-artifact-btn.icon { padding: 5px; }
 .xd-artifact-btn:disabled { opacity: 0.5; cursor: default; }
+.xd-artifact-btn.active {
+  background: rgba(var(--xd-accent-rgb), 0.18);
+  color: var(--xd-accent);
+  border-color: rgba(var(--xd-accent-rgb), 0.5);
+}
+.xd-edit-toolbar {
+  position: absolute;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 5px;
+  background: var(--bg-2);
+  border: 1px solid rgba(var(--xd-accent-rgb), 0.4);
+  border-radius: 8px;
+  box-shadow: var(--shadow-window);
+}
+.xd-edit-toolbar button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  color: var(--t-secondary);
+  cursor: pointer;
+}
+.xd-edit-toolbar button:hover { background: rgba(255,255,255,0.08); color: var(--t-primary); }
+.xd-edit-icon { color: var(--t-tertiary); }
+.xd-edit-color {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 22px;
+  border-radius: 5px;
+  color: var(--t-secondary);
+  cursor: pointer;
+}
+.xd-edit-color:hover { background: rgba(255,255,255,0.08); color: var(--t-primary); }
+.xd-edit-color input[type="color"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
 .xd-artifact-stage {
   flex: 1;
   overflow: auto;

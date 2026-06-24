@@ -49,6 +49,16 @@ const imageryRule = (imagesAvailable: boolean): string =>
     ? `- Imagery: for HERO and FEATURE photography/illustration, set the src (or background-image url()) to a placeholder token of the exact form {{IMG: a concise vivid description}} — we replace each with a REAL generated image. Use at most 4 such tokens, only where a genuine image belongs. Use CSS gradients / solid brand blocks / inline SVG for decorative shapes and icons. Do NOT reference external image URLs.`
     : `- Imagery: use CSS gradients, solid brand-color blocks, or inline SVG as placeholders. Do NOT reference external image URLs (they 404 in the sandbox). Inline any icons as SVG.`;
 
+// Rules that keep generative / cursor-reactive hero visuals from rendering as a
+// frozen, half-initialized, or hard-seam mess in the static preview.
+const INTERACTIVE_VISUAL_RULES = `Interactive & animated visuals (read carefully — these prevent broken-looking heroes):
+- Every visual effect MUST paint a complete, tasteful STATIC first frame immediately on load — before any mouse move, scroll, or animation tick. Never show a blank, half-initialized, or single-color frame waiting for interaction.
+- Cursor-reactive effects must degrade gracefully when NO pointer is present (e.g. animate around the canvas center, or settle to the resting first frame). Never depend on a mousemove to look finished.
+- Honor prefers-reduced-motion: when set, render the polished static frame and do not animate.
+- Do NOT use a hard conic-gradient for organic / "tie-dye" / mesh looks: a conic-gradient whose first and last color stops differ creates an ugly seam at 0°/360°. If you must use conic-gradient, make the first and last stops IDENTICAL. Prefer layered radial-gradients, a blurred multi-stop mesh (several offset radial-gradients with blur), or an inline <svg> with gradient/turbulence filters for smooth organic color. A soft grain or blur overlay sells the effect.
+- Keep the NATIVE cursor — never replace it with a custom div/element that follows the pointer inside the page (it reads as broken/stuck in preview).
+- Any <canvas>/WebGL: guard for a failed context (if (!ctx) return after painting a solid brand fallback fill), size to devicePixelRatio, and draw a good first frame synchronously before starting requestAnimationFrame.`;
+
 const sharedRules = (imagesAvailable: boolean): string => `Hard requirements:
 - Output a COMPLETE, self-contained single-file HTML document: <!doctype html>, <head> with a <title> and a <meta name="viewport">, and all CSS in ONE inline <style> block. No external CSS files.
 - Fonts: use a Google Fonts <link> if you need a specific family, otherwise a clean system stack. Honor the brand's fonts.
@@ -56,7 +66,8 @@ const sharedRules = (imagesAvailable: boolean): string => `Hard requirements:
 - Real, specific product copy with a genuine voice — NEVER lorem ipsum.
 ${imageryRule(imagesAvailable)}
 - Any interactivity must be vanilla JS inside one <script> tag (optional). No build step, no npm.
-- Make it genuinely polished — the kind of page that could ship. Strong hierarchy, generous spacing, considered details.`;
+- Make it genuinely polished — the kind of page that could ship. Strong hierarchy, generous spacing, considered details.
+${INTERACTIVE_VISUAL_RULES}`;
 
 /** Build the webpage-generation prompt: a complete HTML page from a brief,
  * shaped by the active brand contract and craft brief. */
@@ -92,7 +103,8 @@ const deckRules = (imagesAvailable: boolean): string => `Hard requirements:
 - Presentation typography: large and confident, readable from across a room. ONE idea per slide — a headline plus a few short points, NEVER paragraphs. Real, specific copy, never lorem ipsum.
 - ${imagesAvailable ? "Imagery: for a hero/feature visual use a {{IMG: a concise vivid description}} token (we replace it with a real image); inline icons as SVG; no external URLs." : "Imagery: CSS gradients, solid brand-color blocks, or inline SVG; no external image URLs; inline icons as SVG."}
 - Consistent master layout: same margins + a footer slide number on every slide; honor the brand's derived tokens; accent budget (loudest accent on the title + closing slides).
-- Genuinely polished — the kind of deck you would actually present.`;
+- Genuinely polished — the kind of deck you would actually present.
+${INTERACTIVE_VISUAL_RULES}`;
 
 /** Build the deck-generation prompt: a presentable, self-contained HTML slide
  * deck from a brief, shaped by the brand + a deck blueprint. Flows through the

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import {
   X,
@@ -11,6 +11,14 @@ import {
   Loader2,
   Presentation,
   Film,
+  Pencil,
+  Bold,
+  Trash2,
+  Copy,
+  Plus,
+  Minus,
+  Type,
+  PaintBucket,
 } from "lucide-react";
 import { useHtmlArtifact, type ArtifactViewport } from "@/apps/xdesign/htmlArtifactStore";
 import { useAppChat } from "@/store/appChatStore";
@@ -19,6 +27,14 @@ import { useDesignSystems } from "@/store/designSystemStore";
 import { isDeckHtml, deckToPptxBase64 } from "@/apps/xdesign/deckToPptx";
 import { recordCanvasToFile } from "@/apps/xdesign/recordCanvas";
 import { base64ToBytes } from "@/apps/xdesign/imageGen";
+import {
+  EDITOR_STYLE_ID,
+  pathOf,
+  elementAt,
+  mergeInlineStyle,
+  parseInlineStyle,
+  serializeForSave,
+} from "@/apps/xdesign/htmlEditor";
 import { ipc } from "@/lib/ipc";
 import { toast } from "@/store/toastStore";
 import { log } from "@/lib/log";
@@ -28,6 +44,13 @@ const VIEWPORTS: { id: ArtifactViewport; icon: typeof Monitor; w: number | null;
   { id: "tablet", icon: Tablet, w: 834, label: "Tablet" },
   { id: "mobile", icon: Smartphone, w: 390, label: "Mobile" },
 ];
+
+const SELECTED_ATTR = "data-xd-selected";
+const EDITOR_CSS = `[${SELECTED_ATTR}]{outline:2px solid #ff3ea5 !important;outline-offset:1px;}
+[${SELECTED_ATTR}][contenteditable]{outline:2px dashed #ff3ea5 !important;}
+*{cursor:default;}`;
+
+type ToolbarPos = { top: number; left: number };
 
 export function HtmlArtifactPreview() {
   const open = useHtmlArtifact((s) => s.open);
@@ -43,9 +66,211 @@ export function HtmlArtifactPreview() {
   const [recording, setRecording] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  // --- In-place visual editor state ---
+  const [editMode, setEditMode] = useState(false);
+  const [selPath, setSelPath] = useState<number[] | null>(null);
+  const [toolbarPos, setToolbarPos] = useState<ToolbarPos | null>(null);
+  const editModeRef = useRef(editMode);
+  editModeRef.current = editMode;
+  const selPathRef = useRef<number[] | null>(null);
+  selPathRef.current = selPath;
+  const stageRef = useRef<HTMLDivElement>(null);
+  const listenersRef = useRef<{ doc: Document; click: EventListener; dbl: EventListener } | null>(
+    null,
+  );
+
+  // liveHtml drives the iframe srcDoc. We mutate the iframe's contentDocument in
+  // place during editing and persist back to the store WITHOUT reloading the
+  // iframe: selfSavedRef remembers what we wrote so the sync effect can tell our
+  // own echo from a genuine external change (regenerate / refine).
+  const [liveHtml, setLiveHtml] = useState<string | null>(html);
+  const selfSavedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (html !== null && html !== selfSavedRef.current) {
+      setLiveHtml(html);
+      setSelPath(null);
+      setToolbarPos(null);
+    }
+  }, [html]);
+
   if (!open || !html) return null;
 
   const vp = VIEWPORTS.find((v) => v.id === viewport)!;
+  const isDeck = isDeckHtml(html);
+  const hasCanvas = !isDeck && /<canvas/i.test(html);
+  const canEdit = !hasCanvas; // editing a pure motion canvas is meaningless
+
+  // --- Editor wiring (thin DOM-bridge side-effect layer) ---
+
+  const getDoc = (): Document | null => iframeRef.current?.contentDocument ?? null;
+
+  const persistEdits = () => {
+    const doc = getDoc();
+    if (!doc) return;
+    try {
+      const serialized = serializeForSave(doc);
+      selfSavedRef.current = serialized;
+      useHtmlArtifact.getState().setArtifact(serialized, title);
+    } catch (e) {
+      log.warn("html editor persist failed", e);
+    }
+  };
+
+  const positionToolbar = (el: Element) => {
+    const frame = iframeRef.current;
+    const stage = stageRef.current;
+    if (!frame || !stage) return;
+    const r = el.getBoundingClientRect();
+    const fr = frame.getBoundingClientRect();
+    const sr = stage.getBoundingClientRect();
+    const top = fr.top - sr.top + r.top - 42;
+    const left = fr.left - sr.left + r.left;
+    setToolbarPos({ top: Math.max(2, top), left: Math.max(2, left) });
+  };
+
+  const selectElement = (el: Element) => {
+    const doc = getDoc();
+    if (!doc) return;
+    for (const prev of Array.from(doc.querySelectorAll(`[${SELECTED_ATTR}]`)))
+      prev.removeAttribute(SELECTED_ATTR);
+    el.setAttribute(SELECTED_ATTR, "1");
+    setSelPath(pathOf(el));
+    positionToolbar(el);
+  };
+
+  const selectedEl = (): Element | null => {
+    const doc = getDoc();
+    if (!doc || !selPathRef.current) return null;
+    return elementAt(doc.documentElement, selPathRef.current);
+  };
+
+  const teardownEditor = () => {
+    const l = listenersRef.current;
+    if (l) {
+      l.doc.removeEventListener("click", l.click, true);
+      l.doc.removeEventListener("dblclick", l.dbl, true);
+      listenersRef.current = null;
+    }
+    const doc = getDoc();
+    if (doc) {
+      doc.getElementById(EDITOR_STYLE_ID)?.remove();
+      for (const el of Array.from(doc.querySelectorAll(`[${SELECTED_ATTR}]`)))
+        el.removeAttribute(SELECTED_ATTR);
+      for (const el of Array.from(doc.querySelectorAll("[contenteditable]")))
+        el.removeAttribute("contenteditable");
+    }
+    setSelPath(null);
+    setToolbarPos(null);
+  };
+
+  const setupEditor = () => {
+    const doc = getDoc();
+    if (!doc || !doc.body) return;
+    if (listenersRef.current) return; // already wired
+    let style = doc.getElementById(EDITOR_STYLE_ID) as HTMLStyleElement | null;
+    if (!style) {
+      style = doc.createElement("style");
+      style.id = EDITOR_STYLE_ID;
+      style.textContent = EDITOR_CSS;
+      doc.head?.appendChild(style);
+    }
+    const click: EventListener = (e) => {
+      const el = e.target as Element | null;
+      if (!el || el.nodeType !== 1) return;
+      if (el === doc.documentElement || el === doc.body) return;
+      e.preventDefault();
+      e.stopPropagation();
+      selectElement(el);
+    };
+    const dbl: EventListener = (e) => {
+      const el = e.target as HTMLElement | null;
+      if (!el || el.nodeType !== 1) return;
+      e.preventDefault();
+      e.stopPropagation();
+      selectElement(el);
+      el.setAttribute("contenteditable", "true");
+      el.focus();
+      const finish = () => {
+        el.removeAttribute("contenteditable");
+        persistEdits();
+      };
+      el.addEventListener("blur", finish, { once: true });
+    };
+    doc.addEventListener("click", click, true);
+    doc.addEventListener("dblclick", dbl, true);
+    listenersRef.current = { doc, click, dbl };
+  };
+
+  // Re-wire whenever edit mode flips or the iframe reloads (liveHtml change).
+  useEffect(() => {
+    if (!editMode) {
+      teardownEditor();
+      return;
+    }
+    const frame = iframeRef.current;
+    if (!frame) return;
+    const wire = () => setupEditor();
+    // contentDocument may already be ready; also re-wire on reload.
+    wire();
+    frame.addEventListener("load", wire);
+    return () => {
+      frame.removeEventListener("load", wire);
+      teardownEditor();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editMode, liveHtml]);
+
+  // --- Toolbar actions (operate on the resolved selected element) ---
+
+  const patchStyle = (patch: Record<string, string | null>) => {
+    const el = selectedEl() as HTMLElement | null;
+    if (!el) return;
+    el.setAttribute("style", mergeInlineStyle(el.getAttribute("style"), patch));
+    positionToolbar(el);
+    persistEdits();
+  };
+
+  const bumpFontSize = (delta: number) => {
+    const el = selectedEl() as HTMLElement | null;
+    if (!el) return;
+    const doc = getDoc();
+    const cur = parseInlineStyle(el.getAttribute("style"))["font-size"];
+    const base = cur ? parseFloat(cur) : parseFloat(doc?.defaultView?.getComputedStyle(el).fontSize ?? "16");
+    const next = Math.max(8, Math.round((isNaN(base) ? 16 : base) + delta));
+    patchStyle({ "font-size": `${next}px` });
+  };
+
+  const toggleBold = () => {
+    const el = selectedEl() as HTMLElement | null;
+    if (!el) return;
+    const cur = parseInlineStyle(el.getAttribute("style"))["font-weight"];
+    const isBold = cur === "700" || cur === "bold";
+    patchStyle({ "font-weight": isBold ? null : "700" });
+  };
+
+  const deleteSelected = () => {
+    const el = selectedEl();
+    if (!el) return;
+    el.remove();
+    setSelPath(null);
+    setToolbarPos(null);
+    persistEdits();
+  };
+
+  const duplicateSelected = () => {
+    const el = selectedEl();
+    if (!el) return;
+    const clone = el.cloneNode(true) as Element;
+    clone.removeAttribute(SELECTED_ATTR);
+    el.after(clone);
+    selectElement(clone);
+    persistEdits();
+  };
+
+  const toggleEdit = () => {
+    if (editMode) persistEdits();
+    setEditMode((v) => !v);
+  };
 
   const handleExport = async () => {
     try {
@@ -61,9 +286,6 @@ export function HtmlArtifactPreview() {
       toast.error("Export failed", { body: e instanceof Error ? e.message : String(e) });
     }
   };
-
-  const isDeck = isDeckHtml(html);
-  const hasCanvas = !isDeck && /<canvas/i.test(html);
 
   // Record the artifact's <canvas> animation to a video file (MediaRecorder on
   // the in-iframe canvas stream — same trick voice capture uses).
@@ -139,6 +361,16 @@ export function HtmlArtifactPreview() {
           ))}
         </div>
         <div style={{ flex: 1 }} />
+        {canEdit && (
+          <button
+            type="button"
+            className={`xd-artifact-btn${editMode ? " active" : ""}`}
+            onClick={toggleEdit}
+            title="Edit elements directly — click to select, double-click text to edit"
+          >
+            <Pencil size={12} /> {editMode ? "Editing" : "Edit"}
+          </button>
+        )}
         {builder && (
           <button
             type="button"
@@ -168,7 +400,7 @@ export function HtmlArtifactPreview() {
         </button>
       </header>
 
-      <div className="xd-artifact-stage">
+      <div className="xd-artifact-stage" ref={stageRef}>
         <div
           className="xd-artifact-frame"
           style={vp.w ? { width: vp.w, maxWidth: "100%" } : { width: "100%" }}
@@ -177,10 +409,48 @@ export function HtmlArtifactPreview() {
             ref={iframeRef}
             className="xd-artifact-iframe"
             title="Webpage preview"
-            srcDoc={html}
+            srcDoc={liveHtml ?? html}
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
           />
         </div>
+        {editMode && selPath && toolbarPos && (
+          <div
+            className="xd-edit-toolbar"
+            style={{ top: toolbarPos.top, left: toolbarPos.left }}
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            <button type="button" onClick={() => bumpFontSize(-2)} title="Smaller">
+              <Minus size={12} />
+            </button>
+            <Type size={12} className="xd-edit-icon" />
+            <button type="button" onClick={() => bumpFontSize(2)} title="Bigger">
+              <Plus size={12} />
+            </button>
+            <button type="button" onClick={toggleBold} title="Bold">
+              <Bold size={12} />
+            </button>
+            <label className="xd-edit-color" title="Text color">
+              <Type size={11} />
+              <input
+                type="color"
+                onChange={(e) => patchStyle({ color: e.target.value })}
+              />
+            </label>
+            <label className="xd-edit-color" title="Background color">
+              <PaintBucket size={11} />
+              <input
+                type="color"
+                onChange={(e) => patchStyle({ background: e.target.value })}
+              />
+            </label>
+            <button type="button" onClick={duplicateSelected} title="Duplicate">
+              <Copy size={12} />
+            </button>
+            <button type="button" onClick={deleteSelected} title="Delete">
+              <Trash2 size={12} />
+            </button>
+          </div>
+        )}
       </div>
 
       <footer className="xd-artifact-refine">

@@ -68,6 +68,17 @@ describe("prompts", () => {
     expect(p).toContain("BRAND CONTRACT");
   });
 
+  it("webpage + refine prompts carry the interactive-visual rules (no conic seam, static first frame)", () => {
+    const build = buildWebpagePrompt("a bold landing page", null, "# craft");
+    const refine = buildRefinePrompt("<html>OLD</html>", "x", null);
+    for (const p of [build, refine]) {
+      expect(p).toContain("STATIC first frame");
+      expect(p).toContain("conic-gradient");
+      expect(p).toContain("prefers-reduced-motion");
+      expect(p).toContain("NATIVE cursor");
+    }
+  });
+
   it("refine prompt embeds current html and the instruction", () => {
     const p = buildRefinePrompt("<html>OLD</html>", "make the hero bigger", null);
     expect(p).toContain("<html>OLD</html>");
