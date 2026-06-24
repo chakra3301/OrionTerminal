@@ -100,11 +100,12 @@ export function HtmlArtifactPreview() {
     }
   }, [html]);
 
-  if (!open || !html) return null;
-
+  // NOTE: no early return before the hooks below — all hooks (incl. the editor
+  // wiring useEffect) must run unconditionally every render. The render guard
+  // lives just before the JSX return.
   const vp = VIEWPORTS.find((v) => v.id === viewport)!;
-  const isDeck = isDeckHtml(html);
-  const hasCanvas = !isDeck && /<canvas/i.test(html);
+  const isDeck = !!html && isDeckHtml(html);
+  const hasCanvas = !isDeck && !!html && /<canvas/i.test(html);
   const canEdit = !hasCanvas; // editing a pure motion canvas is meaningless
 
   // --- Editor wiring (thin DOM-bridge side-effect layer) ---
@@ -301,6 +302,7 @@ export function HtmlArtifactPreview() {
   };
 
   const handleExport = async () => {
+    if (!html) return;
     try {
       const path = await save({
         defaultPath: `${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "page"}.html`,
@@ -349,6 +351,7 @@ export function HtmlArtifactPreview() {
   };
 
   const handleExportPptx = async () => {
+    if (!html) return;
     try {
       const path = await save({
         defaultPath: `${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "deck"}.pptx`,
@@ -370,6 +373,8 @@ export function HtmlArtifactPreview() {
     refiner(t);
     setInstruction("");
   };
+
+  if (!open || !html) return null;
 
   return (
     <div className="xd-artifact-overlay">
