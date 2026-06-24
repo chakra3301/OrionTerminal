@@ -11,6 +11,7 @@ export type ArtifactIssue =
   | { code: "stub"; detail: string }
   | { code: "placeholder"; detail: string }
   | { code: "external-image"; detail: string }
+  | { code: "gradient-seam"; detail: string }
   | { code: "malformed"; detail: string };
 
 export type InspectOptions = {
@@ -55,6 +56,68 @@ export function externalImageRefs(html: string): string[] {
   return out;
 }
 
+// Pull each conic-gradient(...) body out with balanced-paren matching (rgb()/
+// hsl() color args contain nested parens).
+function extractConicGradients(css: string): string[] {
+  const out: string[] = [];
+  const re = /conic-gradient\s*\(/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(css)) !== null) {
+    let i = m.index + m[0].length;
+    const start = i;
+    let depth = 1;
+    while (i < css.length && depth > 0) {
+      const c = css[i]!;
+      if (c === "(") depth++;
+      else if (c === ")") depth--;
+      i++;
+    }
+    if (depth === 0) out.push(css.slice(start, i - 1));
+  }
+  return out;
+}
+
+function splitTopLevel(s: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let cur = "";
+  for (const c of s) {
+    if (c === "(") depth++;
+    else if (c === ")") depth--;
+    if (c === "," && depth === 0) {
+      parts.push(cur.trim());
+      cur = "";
+    } else cur += c;
+  }
+  if (cur.trim()) parts.push(cur.trim());
+  return parts;
+}
+
+// The color token of a gradient stop (drops a trailing angle/position).
+function stopColor(stop: string): string | null {
+  const s = stop.trim();
+  const fn = s.match(/^(rgba?|hsla?)\([^)]*\)/i);
+  if (fn) return fn[0].toLowerCase().replace(/\s+/g, "");
+  const tok = s.split(/\s+/)[0];
+  return tok ? tok.toLowerCase() : null;
+}
+
+/** Conic gradients whose first and last color stops differ — these render a
+ * hard seam at the 0°/360° wrap. Conservative: only flags clearly-mismatched
+ * endpoints. Returns a short snippet per offending gradient. */
+export function conicGradientSeams(html: string): string[] {
+  const seams: string[] = [];
+  for (const g of extractConicGradients(html)) {
+    let parts = splitTopLevel(g);
+    if (parts.length > 0 && /^(from|at)\b/i.test(parts[0]!)) parts = parts.slice(1);
+    if (parts.length < 2) continue;
+    const first = stopColor(parts[0]!);
+    const last = stopColor(parts[parts.length - 1]!);
+    if (first && last && first !== last) seams.push(g.trim().slice(0, 60));
+  }
+  return seams;
+}
+
 export function inspectArtifact(html: string, opts: InspectOptions = {}): ArtifactIssue[] {
   const issues: ArtifactIssue[] = [];
   const lower = html.toLowerCase();
@@ -74,6 +137,11 @@ export function inspectArtifact(html: string, opts: InspectOptions = {}): Artifa
   const ext = externalImageRefs(html);
   if (ext.length > 0) {
     issues.push({ code: "external-image", detail: ext.slice(0, 2).join(", ") });
+  }
+
+  const seams = conicGradientSeams(html);
+  if (seams.length > 0) {
+    issues.push({ code: "gradient-seam", detail: seams[0]! });
   }
 
   if (opts.isRefine && opts.prior && opts.prior.length >= STUB_MIN_PRIOR) {
@@ -106,6 +174,8 @@ export function buildRepairPrompt(issues: ArtifactIssue[], currentHtml: string):
         return `- Remove placeholder/template content (${i.detail}) and write real, specific copy.`;
       case "external-image":
         return `- Replace external image URL(s) (${i.detail}) — they 404 in the sandbox. Use a {{IMG: description}} token, inline SVG, or a CSS gradient instead.`;
+      case "gradient-seam":
+        return `- A conic-gradient has mismatched first/last color stops (${i.detail}…), creating a hard seam at 0°/360°. Make the first and last color stops IDENTICAL, or replace it with layered radial-gradients / a blurred multi-stop mesh / inline SVG for a smooth organic look.`;
       case "malformed":
         return `- Fix the document scaffolding (${i.detail}).`;
     }

@@ -20,6 +20,8 @@ import {
   Type,
   PaintBucket,
   Sparkles,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { useHtmlArtifact, type ArtifactViewport } from "@/apps/xdesign/htmlArtifactStore";
 import { useAppChat } from "@/store/appChatStore";
@@ -272,6 +274,18 @@ export function HtmlArtifactPreview() {
     persistEdits();
   };
 
+  const moveSelected = (dir: -1 | 1) => {
+    const el = selectedEl();
+    if (!el) return;
+    const sib = dir < 0 ? el.previousElementSibling : el.nextElementSibling;
+    if (!sib) return;
+    if (dir < 0) sib.before(el);
+    else sib.after(el);
+    setSelPath(pathOf(el));
+    positionToolbar(el);
+    persistEdits();
+  };
+
   const submitElementRefine = () => {
     const t = aiText.trim();
     const el = selectedEl();
@@ -414,6 +428,7 @@ export function HtmlArtifactPreview() {
         </button>
       </header>
 
+      <div className="xd-artifact-main">
       <div className="xd-artifact-stage" ref={stageRef}>
         <div
           className="xd-artifact-frame"
@@ -499,6 +514,20 @@ export function HtmlArtifactPreview() {
           </div>
         )}
       </div>
+      {editMode && selPath && (() => {
+        const el = selectedEl() as HTMLElement | null;
+        return el ? (
+          <ElementInspector
+            key={selPath.join("-")}
+            el={el}
+            onPatch={patchStyle}
+            onMove={moveSelected}
+            onDuplicate={duplicateSelected}
+            onDelete={deleteSelected}
+          />
+        ) : null;
+      })()}
+      </div>
 
       <footer className="xd-artifact-refine">
         {running ? (
@@ -529,5 +558,101 @@ export function HtmlArtifactPreview() {
         )}
       </footer>
     </div>
+  );
+}
+
+function rgbToHex(v: string): string {
+  const m = v.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (!m) return /^#[0-9a-f]{3,8}$/i.test(v.trim()) ? v.trim() : "#000000";
+  const h = (n: string) => Number(n).toString(16).padStart(2, "0");
+  return `#${h(m[1]!)}${h(m[2]!)}${h(m[3]!)}`;
+}
+
+type InspectorProps = {
+  el: HTMLElement;
+  onPatch: (patch: Record<string, string | null>) => void;
+  onMove: (dir: -1 | 1) => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+};
+
+// Right-rail inspector for the selected element. Keyed by selection path so it
+// remounts (fresh initial values) whenever the selection changes; edits write
+// inline styles via onPatch.
+function ElementInspector({ el, onPatch, onMove, onDuplicate, onDelete }: InspectorProps) {
+  const cs = el.ownerDocument.defaultView?.getComputedStyle(el);
+  const inline = parseInlineStyle(el.getAttribute("style"));
+  const init = (prop: string): string => inline[prop] ?? cs?.getPropertyValue(prop) ?? "";
+  const px = (prop: string): string => {
+    const v = init(prop);
+    const n = parseFloat(v);
+    return isNaN(n) ? "" : String(Math.round(n));
+  };
+  const tag = `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.trim().split(/\s+/)[0] : ""}`;
+
+  return (
+    <aside className="xd-inspector">
+      <div className="xd-insp-tag">{tag}</div>
+
+      <div className="xd-insp-section">Typography</div>
+      <label className="xd-insp-row">
+        <span>Size</span>
+        <input type="number" defaultValue={px("font-size")} onChange={(e) => onPatch({ "font-size": e.target.value ? `${e.target.value}px` : null })} />
+      </label>
+      <label className="xd-insp-row">
+        <span>Weight</span>
+        <select defaultValue={init("font-weight") || "400"} onChange={(e) => onPatch({ "font-weight": e.target.value })}>
+          {["300", "400", "500", "600", "700", "800"].map((w) => (
+            <option key={w} value={w}>{w}</option>
+          ))}
+        </select>
+      </label>
+      <label className="xd-insp-row">
+        <span>Line</span>
+        <input defaultValue={inline["line-height"] ?? ""} placeholder="1.5" onChange={(e) => onPatch({ "line-height": e.target.value || null })} />
+      </label>
+      <label className="xd-insp-row">
+        <span>Tracking</span>
+        <input defaultValue={inline["letter-spacing"] ?? ""} placeholder="0" onChange={(e) => onPatch({ "letter-spacing": e.target.value || null })} />
+      </label>
+
+      <div className="xd-insp-section">Color</div>
+      <label className="xd-insp-row">
+        <span>Text</span>
+        <input type="color" defaultValue={rgbToHex(init("color"))} onChange={(e) => onPatch({ color: e.target.value })} />
+      </label>
+      <label className="xd-insp-row">
+        <span>Background</span>
+        <input type="color" defaultValue={rgbToHex(init("background-color"))} onChange={(e) => onPatch({ "background-color": e.target.value })} />
+      </label>
+
+      <div className="xd-insp-section">Spacing</div>
+      <label className="xd-insp-row">
+        <span>Padding</span>
+        <input defaultValue={inline["padding"] ?? ""} placeholder={cs?.padding ?? "0"} onChange={(e) => onPatch({ padding: e.target.value || null })} />
+      </label>
+      <label className="xd-insp-row">
+        <span>Margin</span>
+        <input defaultValue={inline["margin"] ?? ""} placeholder={cs?.margin ?? "0"} onChange={(e) => onPatch({ margin: e.target.value || null })} />
+      </label>
+
+      <div className="xd-insp-section">Border</div>
+      <label className="xd-insp-row">
+        <span>Border</span>
+        <input defaultValue={inline["border"] ?? ""} placeholder="1px solid #000" onChange={(e) => onPatch({ border: e.target.value || null })} />
+      </label>
+      <label className="xd-insp-row">
+        <span>Radius</span>
+        <input type="number" defaultValue={px("border-radius")} onChange={(e) => onPatch({ "border-radius": e.target.value ? `${e.target.value}px` : null })} />
+      </label>
+
+      <div className="xd-insp-section">Arrange</div>
+      <div className="xd-insp-actions">
+        <button type="button" onClick={() => onMove(-1)} title="Move up"><ChevronUp size={13} /></button>
+        <button type="button" onClick={() => onMove(1)} title="Move down"><ChevronDown size={13} /></button>
+        <button type="button" onClick={onDuplicate} title="Duplicate"><Copy size={13} /></button>
+        <button type="button" onClick={onDelete} title="Delete"><Trash2 size={13} /></button>
+      </div>
+    </aside>
   );
 }

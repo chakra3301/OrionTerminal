@@ -3,6 +3,7 @@ import {
   inspectArtifact,
   isShippable,
   externalImageRefs,
+  conicGradientSeams,
   summarizeIssues,
   buildRepairPrompt,
 } from "./artifactGuard";
@@ -46,6 +47,24 @@ describe("inspectArtifact", () => {
     expect(inspectArtifact(tiny, { isRefine: false, prior }).some((i) => i.code === "stub")).toBe(false);
     // small prior → ignored
     expect(inspectArtifact(tiny, { isRefine: true, prior: "x".repeat(100) }).some((i) => i.code === "stub")).toBe(false);
+  });
+});
+
+describe("conicGradientSeams", () => {
+  it("flags a conic-gradient with mismatched first/last stops", () => {
+    expect(conicGradientSeams(`background: conic-gradient(red, blue)`)).toHaveLength(1);
+    expect(
+      conicGradientSeams(`background: conic-gradient(from 90deg at 50% 50%, #f00 0%, #0f0 50%, #00f 100%)`),
+    ).toHaveLength(1);
+    expect(inspectArtifact(`${GOOD}<div style="background:conic-gradient(red,blue)"></div>`).some((i) => i.code === "gradient-seam")).toBe(true);
+  });
+
+  it("does NOT flag a seamless conic-gradient (matched endpoints)", () => {
+    expect(conicGradientSeams(`conic-gradient(red, blue, red)`)).toHaveLength(0);
+    expect(
+      conicGradientSeams(`conic-gradient(from 0deg, rgb(255,0,0) 0%, rgb(0,0,255) 50%, rgb(255,0,0) 100%)`),
+    ).toHaveLength(0);
+    expect(conicGradientSeams(`linear-gradient(red, blue)`)).toHaveLength(0);
   });
 });
 
