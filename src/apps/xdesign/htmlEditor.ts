@@ -92,6 +92,14 @@ export function stripEditorChrome(root: Element): void {
   }
 }
 
+/** Outer HTML of an element with all editor chrome stripped (for sending to the
+ * model in an element-scoped refine). Clones so the live DOM is untouched. */
+export function cleanOuterHTML(el: Element): string {
+  const clone = el.cloneNode(true) as Element;
+  stripEditorChrome(clone);
+  return clone.outerHTML;
+}
+
 /** Produce the persistable HTML for a document, stripping editor chrome first.
  * Clones documentElement so the live (edited) DOM keeps its chrome. */
 export function serializeForSave(doc: Document): string {

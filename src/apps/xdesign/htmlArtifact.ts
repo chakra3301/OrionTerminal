@@ -178,3 +178,36 @@ CURRENT DOCUMENT:
 ${currentHtml}
 \`\`\``;
 }
+
+/** Build an element-scoped refinement prompt: the user selected ONE element;
+ * change only that element (and its descendants), leaving the rest of the
+ * document untouched, and return the COMPLETE updated document so it flows back
+ * through the same render/guard pipeline. */
+export function buildElementRefinePrompt(
+  currentHtml: string,
+  elementHtml: string,
+  instruction: string,
+  brand: DesignSystem | null,
+  imagesAvailable = false,
+): string {
+  const brandPart = brand
+    ? `\n\nStay within the brand contract:\n${designSystemToPrompt(brand, { withRamps: true })}`
+    : "";
+  return `Here is the current web page. The user selected ONE element to change. Apply the requested change to ONLY that element (and its descendants) — leave the rest of the document essentially identical — and return the COMPLETE updated document.
+
+${sharedRules(imagesAvailable)}${brandPart}
+
+SELECTED ELEMENT (change only this one):
+\`\`\`html
+${elementHtml}
+\`\`\`
+
+CHANGE REQUESTED: ${instruction}
+
+Return one short sentence, then exactly one fenced \`\`\`html block with the full updated document.
+
+CURRENT DOCUMENT:
+\`\`\`html
+${currentHtml}
+\`\`\``;
+}

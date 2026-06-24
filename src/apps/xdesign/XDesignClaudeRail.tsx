@@ -44,6 +44,7 @@ import {
   buildDeckPrompt,
   buildMotionPrompt,
   buildRefinePrompt,
+  buildElementRefinePrompt,
 } from "@/apps/xdesign/htmlArtifact";
 import { useHtmlArtifact } from "@/apps/xdesign/htmlArtifactStore";
 import {
@@ -579,11 +580,36 @@ export function XDesignClaudeRail() {
     );
   };
 
+  // Element-scoped refine: the preview hands us the selected element's clean
+  // outerHTML + an instruction; we ask the model to change only that element
+  // and return the full document (so it flows back through the render/guard
+  // pipeline → the iframe reloads with the surgical fix applied).
+  const refineElement = (elementHtml: string, instruction: string) => {
+    const cur = useHtmlArtifact.getState().html;
+    if (!cur) return;
+    pendingArtifactRef.current = true;
+    refiningRef.current = true;
+    repairAttemptRef.current = 0;
+    const imagesAvailable = !!pickImageProvider(useProvidersStore.getState().providers);
+    void sendTurn(
+      `Refine element — ${instruction}`,
+      buildElementRefinePrompt(
+        cur,
+        elementHtml,
+        instruction,
+        useDesignSystems.getState().active(),
+        imagesAvailable,
+      ),
+      bestModel(),
+    );
+  };
+
   // Let the preview overlay drive build/refine without coupling components.
   useEffect(() => {
     useHtmlArtifact.getState().setActions({
       builder: () => void handleBuildWebpage(),
       refiner: refineWebpage,
+      elementRefiner: refineElement,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

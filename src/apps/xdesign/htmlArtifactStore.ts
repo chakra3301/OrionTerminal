@@ -35,6 +35,8 @@ type HtmlArtifactState = {
   /** Set by the rail so the preview can request build/refine without coupling. */
   builder: (() => void) | null;
   refiner: ((instruction: string) => void) | null;
+  /** Element-scoped AI refine: rewrite only the given element's markup. */
+  elementRefiner: ((elementHtml: string, instruction: string) => void) | null;
   setArtifact: (html: string, title?: string) => void;
   openPreview: () => void;
   close: () => void;
@@ -42,6 +44,7 @@ type HtmlArtifactState = {
   setActions: (a: {
     builder: () => void;
     refiner: (instruction: string) => void;
+    elementRefiner: (elementHtml: string, instruction: string) => void;
   }) => void;
 };
 
@@ -54,6 +57,7 @@ export const useHtmlArtifact = create<HtmlArtifactState>((set) => ({
   viewport: "desktop",
   builder: null,
   refiner: null,
+  elementRefiner: null,
   setArtifact: (html, title) =>
     set((s) => {
       const t = title ?? s.title;
@@ -63,5 +67,6 @@ export const useHtmlArtifact = create<HtmlArtifactState>((set) => ({
   openPreview: () => set({ open: true }),
   close: () => set({ open: false }),
   setViewport: (viewport) => set({ viewport }),
-  setActions: ({ builder, refiner }) => set({ builder, refiner }),
+  setActions: ({ builder, refiner, elementRefiner }) =>
+    set({ builder, refiner, elementRefiner }),
 }));

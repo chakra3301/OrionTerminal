@@ -19,6 +19,7 @@ import {
   Minus,
   Type,
   PaintBucket,
+  Sparkles,
 } from "lucide-react";
 import { useHtmlArtifact, type ArtifactViewport } from "@/apps/xdesign/htmlArtifactStore";
 import { useAppChat } from "@/store/appChatStore";
@@ -34,6 +35,7 @@ import {
   mergeInlineStyle,
   parseInlineStyle,
   serializeForSave,
+  cleanOuterHTML,
 } from "@/apps/xdesign/htmlEditor";
 import { ipc } from "@/lib/ipc";
 import { toast } from "@/store/toastStore";
@@ -61,8 +63,11 @@ export function HtmlArtifactPreview() {
   const close = useHtmlArtifact((s) => s.close);
   const builder = useHtmlArtifact((s) => s.builder);
   const refiner = useHtmlArtifact((s) => s.refiner);
+  const elementRefiner = useHtmlArtifact((s) => s.elementRefiner);
   const running = useAppChat((s) => s.threads.xdesign.running);
   const [instruction, setInstruction] = useState("");
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiText, setAiText] = useState("");
   const [recording, setRecording] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -267,6 +272,15 @@ export function HtmlArtifactPreview() {
     persistEdits();
   };
 
+  const submitElementRefine = () => {
+    const t = aiText.trim();
+    const el = selectedEl();
+    if (!t || !el || running || !elementRefiner) return;
+    elementRefiner(cleanOuterHTML(el), t);
+    setAiText("");
+    setAiOpen(false);
+  };
+
   const toggleEdit = () => {
     if (editMode) persistEdits();
     setEditMode((v) => !v);
@@ -448,6 +462,39 @@ export function HtmlArtifactPreview() {
             </button>
             <button type="button" onClick={deleteSelected} title="Delete">
               <Trash2 size={12} />
+            </button>
+            {elementRefiner && (
+              <button
+                type="button"
+                className={aiOpen ? "active" : ""}
+                onClick={() => setAiOpen((v) => !v)}
+                title="AI: rewrite this element"
+              >
+                <Sparkles size={12} />
+              </button>
+            )}
+          </div>
+        )}
+        {editMode && selPath && toolbarPos && aiOpen && (
+          <div
+            className="xd-edit-ai"
+            style={{ top: toolbarPos.top + 30, left: toolbarPos.left }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <Sparkles size={12} className="xd-edit-icon" />
+            <input
+              autoFocus
+              value={aiText}
+              placeholder={running ? "Working…" : "Fix this element — e.g. 'smooth radial gradient, no seam'"}
+              onChange={(e) => setAiText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitElementRefine();
+                if (e.key === "Escape") setAiOpen(false);
+              }}
+              disabled={running}
+            />
+            <button type="button" onClick={submitElementRefine} disabled={!aiText.trim() || running} title="Apply">
+              <Send size={12} />
             </button>
           </div>
         )}

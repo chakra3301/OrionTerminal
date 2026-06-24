@@ -7,6 +7,7 @@ import {
   buildDeckPrompt,
   buildMotionPrompt,
   buildRefinePrompt,
+  buildElementRefinePrompt,
 } from "./htmlArtifact";
 import { BUILTIN_DESIGN_SYSTEMS } from "./designSystem";
 
@@ -83,6 +84,20 @@ describe("prompts", () => {
     const p = buildRefinePrompt("<html>OLD</html>", "make the hero bigger", null);
     expect(p).toContain("<html>OLD</html>");
     expect(p).toContain("make the hero bigger");
+    expect(p).toContain("COMPLETE updated document");
+  });
+
+  it("element-refine prompt scopes to the selected element + full doc", () => {
+    const p = buildElementRefinePrompt(
+      "<html>DOC</html>",
+      '<div class="hero">x</div>',
+      "smooth radial gradient, no seam",
+      null,
+    );
+    expect(p).toContain("<html>DOC</html>");
+    expect(p).toContain('<div class="hero">x</div>');
+    expect(p).toContain("smooth radial gradient, no seam");
+    expect(p).toContain("ONLY that element");
     expect(p).toContain("COMPLETE updated document");
   });
 });

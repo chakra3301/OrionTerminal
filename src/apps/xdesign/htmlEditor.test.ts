@@ -6,6 +6,7 @@ import {
   serializeInlineStyle,
   mergeInlineStyle,
   serializeForSave,
+  cleanOuterHTML,
   EDITOR_STYLE_ID,
 } from "./htmlEditor";
 
@@ -61,6 +62,19 @@ describe("serializeForSave / stripEditorChrome", () => {
     expect(out).not.toContain("contenteditable");
     expect(out).toContain("color:red"); // genuine inline style preserved
     expect(out).toContain("<title>T</title>");
+  });
+
+  it("cleanOuterHTML strips chrome without mutating the live element", () => {
+    const doc = docFrom(
+      `<!doctype html><html><body><div data-xd-selected="1" contenteditable="true" style="color:red"><span>x</span></div></body></html>`,
+    );
+    const el = doc.querySelector("div")!;
+    const out = cleanOuterHTML(el);
+    expect(out).not.toContain("data-xd-");
+    expect(out).not.toContain("contenteditable");
+    expect(out).toContain("color:red");
+    expect(out).toContain("<span>x</span>");
+    expect(el.getAttribute("data-xd-selected")).toBe("1"); // live untouched
   });
 
   it("does not mutate the live document", () => {
