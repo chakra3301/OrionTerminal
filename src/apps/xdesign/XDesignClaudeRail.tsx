@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle, Globe, ImagePlus, Image as ImageIcon } from "lucide-react";
+import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle, Globe, ImagePlus, Image as ImageIcon, Presentation } from "lucide-react";
 import { ulid } from "ulid";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
@@ -27,7 +27,7 @@ import {
   inlineGeneratedImages,
 } from "@/apps/xdesign/imageSlots";
 import { designTurnModel } from "@/apps/xdesign/designModel";
-import { blueprintForLenses, buildBlueprintPrompt } from "@/apps/xdesign/htmlBlueprints";
+import { blueprintForLenses, buildBlueprintPrompt, BLUEPRINTS } from "@/apps/xdesign/htmlBlueprints";
 import {
   inspectArtifact,
   summarizeIssues,
@@ -41,6 +41,7 @@ import {
   extractHtmlArtifact,
   stripHtmlArtifact,
   buildWebpagePrompt,
+  buildDeckPrompt,
   buildRefinePrompt,
 } from "@/apps/xdesign/htmlArtifact";
 import { useHtmlArtifact } from "@/apps/xdesign/htmlArtifactStore";
@@ -509,6 +510,33 @@ export function XDesignClaudeRail() {
     );
   };
 
+  // 🖥️ Build deck — a presentable HTML slide deck (self-contained nav + print-
+  // to-PDF CSS) from a brief, via the same artifact pipeline + preview.
+  const handleBuildDeck = async () => {
+    const brief = await promptText({
+      title: "Build a slide deck",
+      label: "Describe the deck — Claude builds presentable HTML slides you can preview & export.",
+      placeholder: "a seed pitch deck for an AI design tool",
+      confirmLabel: "Build deck",
+    });
+    if (brief === null) return;
+    const b = brief.trim() || "a concise pitch deck";
+    pendingArtifactRef.current = true;
+    refiningRef.current = false;
+    repairAttemptRef.current = 0;
+    const imagesAvailable = !!pickImageProvider(useProvidersStore.getState().providers);
+    await sendTurn(
+      `🖥️ Build deck — ${b}`,
+      buildDeckPrompt(
+        b,
+        useDesignSystems.getState().active(),
+        buildBlueprintPrompt(BLUEPRINTS.deck),
+        imagesAvailable,
+      ),
+      bestModel(),
+    );
+  };
+
   // Open the preview if we already have a page; otherwise build a new one.
   const handleWebpageButton = () => {
     if (useHtmlArtifact.getState().html) useHtmlArtifact.getState().openPreview();
@@ -782,6 +810,16 @@ export function XDesignClaudeRail() {
           title="Build webpage — real, shippable HTML you can preview & export"
         >
           <Globe size={13} />
+        </button>
+        <button
+          type="button"
+          className="xd-rail-icon"
+          data-no-drag
+          onClick={handleBuildDeck}
+          disabled={thread.running}
+          title="Build deck — a presentable HTML slide deck (export to PDF/HTML)"
+        >
+          <Presentation size={13} />
         </button>
         <button
           type="button"

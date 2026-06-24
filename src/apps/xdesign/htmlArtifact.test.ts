@@ -4,6 +4,7 @@ import {
   hasHtmlArtifact,
   stripHtmlArtifact,
   buildWebpagePrompt,
+  buildDeckPrompt,
   buildRefinePrompt,
 } from "./htmlArtifact";
 import { BUILTIN_DESIGN_SYSTEMS } from "./designSystem";
@@ -45,6 +46,16 @@ describe("prompts", () => {
     expect(p).toContain("DESIGN CRAFT");
     expect(p).toContain("a pricing page");
     expect(p).toContain("self-contained single-file HTML");
+  });
+
+  it("deck prompt asks for slides + nav + print CSS", () => {
+    const p = buildDeckPrompt("a seed pitch deck", BUILTIN_DESIGN_SYSTEMS[0]!, "# PAGE BLUEPRINT", true);
+    expect(p).toContain("slide deck");
+    expect(p).toContain('class="slide"');
+    expect(p).toContain("break-after: page");
+    expect(p).toContain("{{IMG");
+    expect(p).toContain("a seed pitch deck");
+    expect(p).toContain("BRAND CONTRACT");
   });
 
   it("refine prompt embeds current html and the instruction", () => {

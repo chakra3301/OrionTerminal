@@ -84,6 +84,41 @@ Write ONE short sentence describing the page, then return exactly one fenced \`\
 BRIEF: ${brief}`;
 }
 
+const deckRules = (imagesAvailable: boolean): string => `Hard requirements:
+- Output a COMPLETE, self-contained single-file HTML document: <!doctype html>, <head> with a <title> and a <meta name="viewport">, all CSS in ONE inline <style> block.
+- Build a SLIDE DECK: each slide is a <section class="slide"> sized to a 16:9 stage that fills the viewport. Show ONE slide at a time; hide the rest.
+- Vanilla JS in ONE <script> for navigation: ArrowRight / Space / click → next, ArrowLeft → prev (no wrap); render a slide counter (e.g. "3 / 9") and clickable dot indicators; start on slide 1.
+- Print CSS: @media print { reveal EVERY slide, each on its own page (break-after: page), hide the nav chrome } so the exported file prints one-slide-per-page to PDF.
+- Presentation typography: large and confident, readable from across a room. ONE idea per slide — a headline plus a few short points, NEVER paragraphs. Real, specific copy, never lorem ipsum.
+- ${imagesAvailable ? "Imagery: for a hero/feature visual use a {{IMG: a concise vivid description}} token (we replace it with a real image); inline icons as SVG; no external URLs." : "Imagery: CSS gradients, solid brand-color blocks, or inline SVG; no external image URLs; inline icons as SVG."}
+- Consistent master layout: same margins + a footer slide number on every slide; honor the brand's derived tokens; accent budget (loudest accent on the title + closing slides).
+- Genuinely polished — the kind of deck you would actually present.`;
+
+/** Build the deck-generation prompt: a presentable, self-contained HTML slide
+ * deck from a brief, shaped by the brand + a deck blueprint. Flows through the
+ * same artifact pipeline/preview as a webpage (its nav JS runs in the iframe;
+ * print CSS makes the exported .html a clean PDF). */
+export function buildDeckPrompt(
+  brief: string,
+  brand: DesignSystem | null,
+  blueprint = "",
+  imagesAvailable = false,
+): string {
+  const brandPart = brand
+    ? `\n\n${designSystemToPrompt(brand, { withRamps: true })}\n\nDesign every slide strictly within this brand contract: use its derived tokens (ramps + semantic roles), fonts, type scale, spacing, radii, voice, and principles.`
+    : "";
+  const blueprintPart = blueprint ? `\n\n${blueprint}` : "";
+  return `You are an elite presentation designer. Build a real, presentable slide deck for this brief as a single self-contained HTML file (not a mockup).${brandPart}${blueprintPart}
+
+${deckRules(imagesAvailable)}
+
+Write ONE short sentence describing the deck, then return exactly one fenced \`\`\`html code block containing the full document, and nothing after it.
+
+---
+
+BRIEF: ${brief}`;
+}
+
 /** Build the refinement prompt: given the current document + an instruction,
  * return the COMPLETE updated document. */
 export function buildRefinePrompt(

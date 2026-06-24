@@ -12,7 +12,7 @@
 // Pure data + a compiler. No model calls. The matching token system (Lever 1)
 // is injected separately by the brand contract.
 
-export type ArtifactKind = "landing" | "pricing" | "dashboard" | "mobile";
+export type ArtifactKind = "landing" | "pricing" | "dashboard" | "mobile" | "deck";
 
 export type BlueprintSection = {
   name: string;
@@ -91,6 +91,28 @@ export const BLUEPRINTS: Record<ArtifactKind, Blueprint> = {
       "Muted chrome: surfaces use the elevated/raised background tokens, borders are hairlines; the accent appears only on the primary action + key chart series.",
       "Consistent card padding and gaps from the spacing scale; align everything to the grid.",
       "Numbers right-aligned and tabular; labels in the muted text token.",
+    ],
+  },
+  deck: {
+    kind: "deck",
+    title: "Pitch deck",
+    framework: "Narrative arc: hook → problem → solution → proof → ask. One idea per slide; the headline carries the point, the body supports it.",
+    sections: [
+      { name: "Title", intent: "Open with the promise.", slots: ["product name / wordmark", "one-line promise", "presenter or context line"], layout: "Full-bleed title slide; the boldest type in the deck; accent backdrop or mark." },
+      { name: "Problem", intent: "Make the pain vivid and real.", slots: ["problem headline", "2–3 short supporting points or a stat"], layout: "One big statement + minimal support; restrained." },
+      { name: "Solution", intent: "What you built, in one sentence.", slots: ["solution headline", "one-line description", "hero visual ({{IMG: …}})"], layout: "Headline + supporting visual; the accent appears here." },
+      { name: "How it works", intent: "Show it's simple.", slots: ["3 numbered steps with a verb-led title + one line each"], layout: "3 columns or a numbered row drawn with CSS/SVG." },
+      { name: "Why now / market", intent: "The wedge or the size of the prize.", slots: ["market headline", "1–2 sizing or timing points"], layout: "A big number or a tight statement." },
+      { name: "Proof / traction", intent: "Evidence it's working.", slots: ["3–4 big metric numbers + labels", "optional logo wall or 1 testimonial"], layout: "Stat band with large numerals; muted support." },
+      { name: "Product", intent: "The few features that matter.", slots: ["3 feature titles (benefit-led) + one line each"], layout: "3-up cards or a clean grid." },
+      { name: "Business model", intent: "How it makes money.", slots: ["model in one line OR 3 pricing tiers (middle highlighted)"], layout: "Compact tiers or a single clear statement." },
+      { name: "The ask / close", intent: "The single strongest ask.", slots: ["closing headline", "the ask", "contact line"], layout: "Full-bleed accent close mirroring the title slide." },
+    ],
+    rules: [
+      "ONE idea per slide; the headline carries it. Never paragraphs of prose — a headline + a few short points.",
+      "Consistent master layout: same margins, a footer with the slide number, the same type scale across slides.",
+      "Accent budget: reserve the loudest accent for the title and the closing slide.",
+      "Big, confident presentation typography — readable from across a room.",
     ],
   },
   mobile: {
