@@ -63,7 +63,7 @@ export function snapshotActiveDoc(): XDDoc {
   };
 }
 
-async function loadDoc(id: string): Promise<XDDoc | null> {
+export async function loadDoc(id: string): Promise<XDDoc | null> {
   return getAppState<XDDoc>(docKey(id));
 }
 

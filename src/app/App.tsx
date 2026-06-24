@@ -383,18 +383,18 @@ function useShellWindowsPersistence() {
 function useXDesignPersistence() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
-    // The first flush is the post-hydrate idempotent write — not a real edit,
-    // so it shouldn't show up as activity.
-    let firstFlush = true;
+    // Opening / switching projects hydrates the store, which fires this
+    // subscription — but that's a load, not an edit. Track the last project we
+    // logged for so a fresh activeId is treated as a load (persist, don't log).
+    let lastLoggedId: string | null = null;
     const flush = () => {
       // Edits only persist when a project is open. On the Home screen there's
       // no active project, so there's nothing to write to.
-      if (!useXDProjects.getState().activeId) return;
+      const activeId = useXDProjects.getState().activeId;
+      if (!activeId) return;
       const s = useXDesign.getState();
       void flushActiveXDProject();
-      if (firstFlush) {
-        firstFlush = false;
-      } else {
+      if (activeId === lastLoggedId) {
         const page = s.pages.find((p) => p.id === s.activePageId);
         void logActivity({
           source: "xdesign",
@@ -403,6 +403,8 @@ function useXDesignPersistence() {
           summary: `${s.shapes.length} layer${s.shapes.length === 1 ? "" : "s"}`,
           refId: s.activePageId,
         });
+      } else {
+        lastLoggedId = activeId;
       }
     };
     const unsubscribe = useXDesign.subscribe(() => {

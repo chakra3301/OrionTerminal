@@ -14,6 +14,9 @@ import { initialScreen, topLevelFrames } from "@/apps/xdesign/prototype";
 import { useFileDropZone } from "@/lib/fileDrop";
 import { useAssetsStore } from "@/store/assetsStore";
 import { useXDesign } from "@/apps/xdesign/store";
+import { useXDProjects } from "@/apps/xdesign/projectsStore";
+import { XDesignHome } from "@/apps/xdesign/XDesignHome";
+import { XDesignTabs } from "@/apps/xdesign/XDesignTabs";
 import { log } from "@/lib/log";
 
 /** Enter present mode on the selected top-level frame, else the first screen. */
@@ -107,6 +110,7 @@ export function XDesignApp() {
   const [shellEl, setShellEl] = useState<HTMLDivElement | null>(null);
   const [dropOver, setDropOver] = useState(false);
   const hasFrames = useXDesign((s) => topLevelFrames(s.shapes).length > 0);
+  const activeId = useXDProjects((s) => s.activeId);
 
   useFileDropZone(stageRef, "xdesign-canvas", (e) => {
     if (e.type === "enter") setDropOver(true);
@@ -117,8 +121,18 @@ export function XDesignApp() {
     }
   });
 
+  if (activeId === null) {
+    return (
+      <div className="xd-root xd-root-home">
+        <XDesignHome />
+      </div>
+    );
+  }
+
   return (
-    <div className="xd-shell" ref={setShellEl}>
+    <div className="xd-root">
+      <XDesignTabs />
+      <div className="xd-shell" ref={setShellEl}>
       <XDesignToolRail />
       <XDesignLayersPanel />
       <div
@@ -142,6 +156,7 @@ export function XDesignApp() {
         <HtmlArtifactPreview />
       </div>
       <XDesignInspector />
+      </div>
     </div>
   );
 }

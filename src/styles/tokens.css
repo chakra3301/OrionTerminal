@@ -6473,12 +6473,13 @@ summary:focus-visible,
    XDesign stub
    ============================================================ */
 
-.xd-shell {
+.xd-root {
   display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
   min-width: 0;
-  overflow: auto;
+  overflow: hidden;
 
   /* ── Figma-dark scoped theme ─────────────────────────────────────────
      XDesign renders entirely inside this subtree, so a local token scope
@@ -6519,6 +6520,292 @@ summary:focus-visible,
   --t-tertiary: var(--xd-text-3);
   --t-faint: #6f6f6f;
 }
+
+/* Editor row — tool rail · layers · canvas · inspector · (portaled Claude
+   rail). Lives below the tab bar. Token scope is inherited from .xd-root. */
+.xd-shell {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+.xd-root-home {
+  overflow: auto;
+  background: var(--xd-bg);
+}
+
+/* ── Tab bar ─────────────────────────────────────────────────────────── */
+.xd-tabs {
+  display: flex;
+  align-items: stretch;
+  height: 36px;
+  flex-shrink: 0;
+  background: var(--xd-panel);
+  border-bottom: 1px solid var(--xd-border);
+  padding: 0 6px;
+  gap: 4px;
+}
+.xd-tab-home,
+.xd-tab-new {
+  flex-shrink: 0;
+  width: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--t-tertiary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  margin: 4px 0;
+}
+.xd-tab-home:hover,
+.xd-tab-new:hover { color: var(--xd-text); background: var(--xd-hover); }
+.xd-tabs-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+.xd-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  min-width: 90px;
+  padding: 0 8px 0 12px;
+  margin: 4px 0;
+  border-radius: 6px;
+  color: var(--t-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  user-select: none;
+  flex-shrink: 0;
+}
+.xd-tab:hover { background: var(--xd-hover); }
+.xd-tab.active {
+  background: var(--xd-raised);
+  color: var(--xd-text);
+}
+.xd-tab-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.xd-tab-rename {
+  flex: 1;
+  min-width: 0;
+  background: var(--xd-bg);
+  border: 1px solid var(--xd-accent);
+  border-radius: 4px;
+  color: var(--xd-text);
+  font-size: 12px;
+  padding: 1px 4px;
+  outline: none;
+}
+.xd-tab-close {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: none;
+  background: none;
+  color: var(--t-tertiary);
+  cursor: pointer;
+  opacity: 0;
+}
+.xd-tab:hover .xd-tab-close,
+.xd-tab.active .xd-tab-close { opacity: 1; }
+.xd-tab-close:hover { background: var(--xd-hover); color: var(--xd-text); }
+
+/* ── Home / start screen ─────────────────────────────────────────────── */
+.xd-home {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 48px 40px 64px;
+}
+.xd-home-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 36px;
+}
+.xd-home-title {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--xd-text);
+  margin: 0;
+}
+.xd-home-sub {
+  font-size: 13px;
+  color: var(--t-secondary);
+  margin: 4px 0 0;
+}
+.xd-home-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  background: var(--xd-accent);
+  color: #fff;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.xd-home-new:hover { filter: brightness(1.08); }
+.xd-home-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 16px;
+}
+.xd-home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 20px;
+}
+.xd-home-card { display: flex; flex-direction: column; }
+.xd-home-card-preview {
+  aspect-ratio: 4 / 3;
+  border-radius: 10px;
+  border: 1px solid var(--xd-border);
+  background: var(--xd-bg);
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  display: block;
+  transition: border-color 0.12s;
+}
+.xd-home-card-preview:hover { border-color: var(--xd-accent); }
+.xd-thumb-svg { width: 100%; height: 100%; display: block; }
+.xd-thumb-empty {
+  width: 100%;
+  height: 100%;
+  background:
+    repeating-linear-gradient(45deg, var(--xd-raised) 0 10px, transparent 10px 20px);
+  opacity: 0.5;
+}
+.xd-home-card-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 2px 0;
+}
+.xd-home-card-info { min-width: 0; flex: 1; }
+.xd-home-card-name {
+  display: block;
+  max-width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--xd-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.xd-home-card-name:hover { color: var(--xd-accent); }
+.xd-home-rename-input {
+  width: 100%;
+  background: var(--xd-bg);
+  border: 1px solid var(--xd-accent);
+  border-radius: 4px;
+  color: var(--xd-text);
+  font-size: 13px;
+  padding: 2px 5px;
+  outline: none;
+}
+.xd-home-card-time {
+  display: block;
+  font-size: 11px;
+  color: var(--t-tertiary);
+  margin-top: 2px;
+}
+.xd-home-card-actions { position: relative; flex-shrink: 0; }
+.xd-home-card-menu-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--t-tertiary);
+  cursor: pointer;
+  opacity: 0;
+}
+.xd-home-card:hover .xd-home-card-menu-btn { opacity: 1; }
+.xd-home-card-menu-btn:hover { background: var(--xd-hover); color: var(--xd-text); }
+.xd-home-menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.xd-home-menu {
+  position: absolute;
+  top: 26px;
+  right: 0;
+  z-index: 41;
+  min-width: 130px;
+  background: var(--xd-panel);
+  border: 1px solid var(--xd-border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+}
+.xd-home-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--xd-text);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.xd-home-menu button:hover { background: var(--xd-hover); }
+.xd-home-menu button.danger { color: #ff6470; }
+.xd-home-empty {
+  display: grid;
+  place-items: center;
+  padding: 60px 0;
+}
+.xd-home-empty-new {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 64px;
+  border-radius: 14px;
+  border: 1.5px dashed var(--xd-border);
+  background: none;
+  color: var(--t-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+.xd-home-empty-new:hover { border-color: var(--xd-accent); color: var(--xd-text); }
+
 .xd-toolrail {
   width: 48px;
   flex-shrink: 0;
