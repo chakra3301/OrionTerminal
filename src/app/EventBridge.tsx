@@ -137,6 +137,7 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
       radius?: number;
     };
     useShell.getState().openApp("xdesign");
+    await (await import("@/apps/xdesign/projectsStore")).useXDProjects.getState().ensureActive();
     const { useXDesign } = await import("@/apps/xdesign/store");
     useXDesign.getState().addShape({
       kind: "rect",
@@ -156,6 +157,7 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
       x: number; y: number; w: number; h: number; fill?: string;
     };
     useShell.getState().openApp("xdesign");
+    await (await import("@/apps/xdesign/projectsStore")).useXDProjects.getState().ensureActive();
     const { useXDesign } = await import("@/apps/xdesign/store");
     useXDesign.getState().addShape({
       kind: "ellipse",
@@ -174,6 +176,7 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
       x: number; y: number; w: number; h: number; fill?: string;
     };
     useShell.getState().openApp("xdesign");
+    await (await import("@/apps/xdesign/projectsStore")).useXDProjects.getState().ensureActive();
     const { useXDesign } = await import("@/apps/xdesign/store");
     useXDesign.getState().addShape({
       kind: "frame",
@@ -197,6 +200,7 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
       fill?: string;
     };
     useShell.getState().openApp("xdesign");
+    await (await import("@/apps/xdesign/projectsStore")).useXDProjects.getState().ensureActive();
     const { useXDesign } = await import("@/apps/xdesign/store");
     useXDesign.getState().addShape({
       kind: "text",
@@ -294,6 +298,7 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
     const ops = (action.payload as { ops?: unknown }).ops;
     if (!Array.isArray(ops)) throw new Error("xdesign_apply: ops must be an array");
     useShell.getState().openApp("xdesign");
+    await (await import("@/apps/xdesign/projectsStore")).useXDProjects.getState().ensureActive();
     const { runCanvasCommands } = await import("@/apps/xdesign/claudeCommands");
     // Whole array applies as ONE undo step; returns new ids + per-op status.
     const outcome = runCanvasCommands(

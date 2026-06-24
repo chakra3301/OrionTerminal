@@ -3,6 +3,11 @@ import { registry } from "@/commands/registry";
 import { useShell, type AppId } from "@/shell/store/useShell";
 import { useArchives } from "@/apps/archives/useArchives";
 import { useXDesign } from "@/apps/xdesign/store";
+import {
+  useXDProjects,
+  flushActive as flushActiveXDProject,
+} from "@/apps/xdesign/projectsStore";
+import { toast } from "@/store/toastStore";
 import { useHermes } from "@/store/hermesStore";
 
 // Menubar dropdown definitions. Every item maps to a REAL action — a registry
@@ -280,12 +285,59 @@ export function buildMenu(app: AppId | null, name: string): MenuItem[] {
 
   if (app === "xdesign") {
     switch (name) {
-      case "File":
+      case "File": {
+        const xp = useXDProjects.getState();
+        const onHome = xp.activeId === null;
+        const recent = [...xp.registry]
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .slice(0, 6)
+          .map<MenuItem>((m) => ({
+            label: m.name,
+            checked: m.id === xp.activeId,
+            onClick: () => void useXDProjects.getState().openProject(m.id),
+          }));
         return [
-          { label: "New Page", onClick: () => useXDesign.getState().newPage() },
+          {
+            label: "New Project",
+            hint: "⌘N",
+            onClick: () => void useXDProjects.getState().newProject(),
+          },
+          {
+            label: "New Page",
+            disabled: onHome,
+            onClick: () => useXDesign.getState().newPage(),
+          },
+          sep,
+          ...(recent.length
+            ? ([{ label: "Open Recent", disabled: true } as MenuItem, ...recent, sep])
+            : []),
+          {
+            label: "Save",
+            hint: "⌘S",
+            disabled: onHome,
+            onClick: () => {
+              void flushActiveXDProject();
+              toast.success("Project saved");
+            },
+          },
+          {
+            label: "Close Project",
+            hint: "⌘W",
+            disabled: onHome,
+            onClick: () => {
+              const id = useXDProjects.getState().activeId;
+              if (id) void useXDProjects.getState().closeTab(id);
+            },
+          },
+          {
+            label: "Go to Home",
+            disabled: onHome,
+            onClick: () => void useXDProjects.getState().goHome(),
+          },
           sep,
           cmd("settings.open", "Settings…"),
         ];
+      }
       case "Edit":
         return xdesignEdit();
       case "Object":

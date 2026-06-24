@@ -113,6 +113,15 @@ describe("xdesign projectsStore", () => {
     expect(useXDesign.getState().shapes).toHaveLength(1);
   });
 
+  it("ensureActive creates a project when on Home, else reuses the active one", async () => {
+    await useXDProjects.getState().init();
+    const created = await useXDProjects.getState().ensureActive();
+    expect(useXDProjects.getState().activeId).toBe(created);
+    const again = await useXDProjects.getState().ensureActive();
+    expect(again).toBe(created);
+    expect(useXDProjects.getState().registry).toHaveLength(1);
+  });
+
   it("deletes a project and removes its doc slot", async () => {
     await useXDProjects.getState().init();
     const a = await useXDProjects.getState().newProject("A");

@@ -80,6 +80,9 @@ type XDProjectsState = {
   ready: boolean;
 
   init: () => Promise<void>;
+  /** Guarantee a project is open before a canvas mutation. Returns the active
+   * id, creating a fresh project if currently on Home. */
+  ensureActive: () => Promise<string>;
   newProject: (name?: string) => Promise<string>;
   openProject: (id: string) => Promise<void>;
   switchTo: (id: string) => Promise<void>;
@@ -145,6 +148,12 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
     }
 
     set({ registry, openTabs: [], activeId: null, ready: true });
+  },
+
+  ensureActive: async () => {
+    const id = get().activeId;
+    if (id) return id;
+    return get().newProject();
   },
 
   newProject: async (name) => {
