@@ -7885,7 +7885,7 @@ summary:focus-visible,
 /* Floating: portaled to <body>, free to move anywhere in the terminal. */
 .xd-claude-rail.floating {
   position: fixed;
-  z-index: 1200;
+  z-index: 4000;
 }
 /* Collapsed: a compact icon strip (no chat). Width hugs the icons. */
 .xd-claude-rail.collapsed {

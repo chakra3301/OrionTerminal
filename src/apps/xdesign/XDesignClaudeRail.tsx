@@ -91,6 +91,8 @@ type RailUi = { placement: Placement; box: Box | null; collapsed: boolean };
 
 const MIN_W = 300;
 const MIN_H = 280;
+// How much of the panel must stay reachable when parked past a viewport edge.
+const GRAB_MARGIN = 120;
 // Below this floating width the Generate label collapses to its icon and the
 // action icons wrap.
 const COMPACT_W = 360;
@@ -132,6 +134,23 @@ export function XDesignClaudeRail() {
   const railRef = useRef<HTMLDivElement>(null);
   const dragOrigin = useRef<Box | null>(null);
 
+  // Keep the panel sane + on-screen-ish: cap its size to the viewport but let
+  // it hang PAST any edge (over the inspector, tool rail, or off the window /
+  // onto the desktop) as long as a grab margin stays reachable. This is what
+  // lets it leave the canvas entirely.
+  const clampBox = (b: Box): Box => {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const w = clamp(b.w, MIN_W, W);
+    const h = clamp(b.h, MIN_H, H);
+    return {
+      w,
+      h,
+      left: clamp(b.left, GRAB_MARGIN - w, W - GRAB_MARGIN),
+      top: clamp(b.top, 0, H - GRAB_MARGIN),
+    };
+  };
+
   // Snapshot the rail's current viewport geometry for the move/resize gestures.
   const captureGeometry = (): Box | null => {
     const el = railRef.current;
@@ -149,11 +168,7 @@ export function XDesignClaudeRail() {
     onDrag: (dx, dy) => {
       const o = dragOrigin.current;
       if (!o) return;
-      setBox({
-        ...o,
-        left: clamp(o.left + dx, 0, Math.max(0, window.innerWidth - o.w)),
-        top: clamp(o.top + dy, 0, Math.max(0, window.innerHeight - o.h)),
-      });
+      setBox(clampBox({ ...o, left: o.left + dx, top: o.top + dy }));
     },
   });
 
@@ -166,11 +181,7 @@ export function XDesignClaudeRail() {
     onDrag: (dx, dy) => {
       const o = dragOrigin.current;
       if (!o) return;
-      setBox({
-        ...o,
-        w: clamp(o.w + dx, MIN_W, Math.max(MIN_W, window.innerWidth - o.left)),
-        h: clamp(o.h + dy, MIN_H, Math.max(MIN_H, window.innerHeight - o.top)),
-      });
+      setBox(clampBox({ ...o, w: o.w + dx, h: o.h + dy }));
     },
   });
 
@@ -848,15 +859,21 @@ export function XDesignClaudeRail() {
   const isCompact = floating && !collapsed && box != null && box.w < COMPACT_W;
   const iconsOnly = collapsed || isCompact;
 
+  const cb = floating && box ? clampBox(box) : null;
   const railStyle =
-    floating && box
+    floating && cb
       ? collapsed
-        ? { left: box.left, top: box.top, right: "auto" as const, bottom: "auto" as const }
+        ? {
+            left: clamp(cb.left, 0, window.innerWidth - 120),
+            top: clamp(cb.top, 0, window.innerHeight - 40),
+            right: "auto" as const,
+            bottom: "auto" as const,
+          }
         : {
-            left: box.left,
-            top: box.top,
-            width: box.w,
-            height: box.h,
+            left: cb.left,
+            top: cb.top,
+            width: cb.w,
+            height: cb.h,
             right: "auto" as const,
             bottom: "auto" as const,
             maxHeight: "none" as const,
