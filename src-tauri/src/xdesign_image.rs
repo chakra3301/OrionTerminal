@@ -59,19 +59,24 @@ pub fn openai_image_body(model: &str, prompt: &str, size: &str) -> Value {
 }
 
 /// Pull the base64 PNG out of an OpenAI image response. Surfaces an `error`
-/// envelope as a readable message.
+/// envelope as a readable message. [P-AUTH] tolerant of the documented shapes:
+/// b64_json (what we request) and, as a clear failure, a returned `url`.
 pub fn parse_openai_image(v: &Value) -> Result<GeneratedImage, String> {
     if let Some(msg) = v.pointer("/error/message").and_then(|x| x.as_str()) {
         return Err(msg.to_string());
     }
-    let b64 = v
-        .pointer("/data/0/b64_json")
-        .and_then(|x| x.as_str())
-        .ok_or_else(|| "no image data in response (expected data[0].b64_json)".to_string())?;
-    Ok(GeneratedImage {
-        b64: b64.to_string(),
-        mime: "image/png".to_string(),
-    })
+    if let Some(b64) = v.pointer("/data/0/b64_json").and_then(|x| x.as_str()) {
+        return Ok(GeneratedImage { b64: b64.to_string(), mime: "image/png".to_string() });
+    }
+    // Some models/params return a hosted URL instead of base64. We requested
+    // b64; tell the user plainly rather than failing opaquely.
+    if let Some(url) = v.pointer("/data/0/url").and_then(|x| x.as_str()) {
+        return Err(format!(
+            "provider returned an image URL instead of base64 ({}). Set the model's image format to b64_json, or try gpt-image-1.",
+            url
+        ));
+    }
+    Err("no image data in response (expected data[0].b64_json)".to_string())
 }
 
 // ---- Google Imagen ---------------------------------------------------------
@@ -131,13 +136,18 @@ pub fn parse_imagen(v: &Value) -> Result<GeneratedImage, String> {
     let pred = v
         .pointer("/predictions/0")
         .ok_or_else(|| "no predictions in response".to_string())?;
+    // Imagen :predict uses bytesBase64Encoded; some Gemini image variants nest
+    // it under image.imageBytes / inlineData.data. Accept all.
     let b64 = pred
         .get("bytesBase64Encoded")
         .and_then(|x| x.as_str())
-        .ok_or_else(|| "no bytesBase64Encoded in prediction".to_string())?;
+        .or_else(|| pred.pointer("/image/imageBytes").and_then(|x| x.as_str()))
+        .or_else(|| pred.pointer("/inlineData/data").and_then(|x| x.as_str()))
+        .ok_or_else(|| "no image bytes in prediction (expected bytesBase64Encoded)".to_string())?;
     let mime = pred
         .get("mimeType")
         .and_then(|x| x.as_str())
+        .or_else(|| pred.pointer("/image/mimeType").and_then(|x| x.as_str()))
         .unwrap_or("image/png")
         .to_string();
     Ok(GeneratedImage {
@@ -298,6 +308,22 @@ mod tests {
     fn imagen_defaults_mime_when_absent() {
         let v = json!({ "predictions": [{ "bytesBase64Encoded": "CCCC" }] });
         assert_eq!(parse_imagen(&v).unwrap().mime, "image/png");
+    }
+
+    #[test]
+    fn openai_url_response_is_a_clear_error() {
+        let v = json!({ "data": [{ "url": "https://x/y.png" }] });
+        let e = parse_openai_image(&v).unwrap_err();
+        assert!(e.contains("url") || e.contains("URL"));
+        assert!(e.contains("https://x/y.png"));
+    }
+
+    #[test]
+    fn imagen_accepts_nested_image_bytes() {
+        let v = json!({ "predictions": [{ "image": { "imageBytes": "DDDD", "mimeType": "image/jpeg" } }] });
+        let g = parse_imagen(&v).unwrap();
+        assert_eq!(g.b64, "DDDD");
+        assert_eq!(g.mime, "image/jpeg");
     }
 
     #[test]

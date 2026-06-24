@@ -44,6 +44,13 @@ pub async fn xdesign_fetch_url(url: String) -> Result<String, String> {
     Ok(String::from_utf8_lossy(capped).to_string())
 }
 
+/// Write raw bytes to a user-chosen path (PPTX / video export). The path comes
+/// from the save dialog; we just persist the bytes.
+#[tauri::command]
+pub fn xdesign_save_bytes(path: String, bytes: Vec<u8>) -> Result<(), String> {
+    std::fs::write(&path, &bytes).map_err(|e| format!("write {path}: {e}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::normalize_url;

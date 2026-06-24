@@ -343,6 +343,7 @@ pub fn run() {
             asset::xdesign_snapshot_write,
             xdesign_image::xdesign_image_gen,
             xdesign_web::xdesign_fetch_url,
+            xdesign_web::xdesign_save_bytes,
             fs_watch::fs_watch_set_root,
             wallpaper::wallpaper_store_file,
             wallpaper::wallpaper_clear_file,
