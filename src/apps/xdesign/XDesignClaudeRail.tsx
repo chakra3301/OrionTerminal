@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle, Globe, ImagePlus, Image as ImageIcon, Presentation, Film } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle, Globe, ImagePlus, Image as ImageIcon, Presentation, Film, Minimize2, Maximize2, PanelRight, PanelRightClose, type LucideIcon } from "lucide-react";
 import { ulid } from "ulid";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
@@ -85,31 +86,58 @@ const SHAPE_SUMMARY_LIMIT = 40;
 const knownIds = new Set<string>();
 
 type Box = { left: number; top: number; w: number; h: number };
+type Placement = "float" | "dock";
+type RailUi = { placement: Placement; box: Box | null; collapsed: boolean };
 
 const MIN_W = 300;
 const MIN_H = 280;
+// Below this floating width the Generate label collapses to its icon and the
+// action icons wrap.
+const COMPACT_W = 360;
+const RAIL_UI_KEY = "xd-rail-ui";
+
+function loadRailUi(): RailUi {
+  try {
+    const raw = localStorage.getItem(RAIL_UI_KEY);
+    if (raw) {
+      const o = JSON.parse(raw) as RailUi;
+      if (o && (o.placement === "float" || o.placement === "dock"))
+        return { placement: o.placement, box: o.box ?? null, collapsed: !!o.collapsed };
+    }
+  } catch {
+    /* ignore corrupt persisted ui */
+  }
+  return { placement: "float", box: null, collapsed: false };
+}
 
 export function XDesignClaudeRail() {
   const [open, setOpen] = useState(false);
-  // null = anchored bottom-right via CSS; once dragged/resized we switch to
-  // explicit stage-relative coords so the panel floats wherever the user
-  // parks it. Lives in component state (the rail is always mounted; `open`
-  // only toggles FAB vs panel), so the placement survives close/reopen.
-  const [box, setBox] = useState<Box | null>(null);
+  // Floating placement, size, and collapsed state — persisted so the partner
+  // stays where you parked it across close/reopen and app restarts. box is in
+  // VIEWPORT coords (the floating rail is portaled to <body> with position:
+  // fixed) so it can move anywhere in the terminal, not just over the canvas.
+  const [ui, setUiState] = useState<RailUi>(loadRailUi);
+  const { placement, box, collapsed } = ui;
+  const setUi = (patch: Partial<RailUi>) =>
+    setUiState((u) => {
+      const next = { ...u, ...patch };
+      try {
+        localStorage.setItem(RAIL_UI_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore quota */
+      }
+      return next;
+    });
+  const setBox = (b: Box) => setUi({ box: b });
   const railRef = useRef<HTMLDivElement>(null);
   const dragOrigin = useRef<Box | null>(null);
-  const stageSize = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
 
-  // Snapshot the rail's current geometry (relative to the canvas stage) and
-  // the stage bounds, used by both the move and resize gestures to clamp.
+  // Snapshot the rail's current viewport geometry for the move/resize gestures.
   const captureGeometry = (): Box | null => {
     const el = railRef.current;
-    const stage = el?.parentElement;
-    if (!el || !stage) return null;
+    if (!el) return null;
     const r = el.getBoundingClientRect();
-    const s = stage.getBoundingClientRect();
-    stageSize.current = { w: s.width, h: s.height };
-    return { left: r.left - s.left, top: r.top - s.top, w: r.width, h: r.height };
+    return { left: r.left, top: r.top, w: r.width, h: r.height };
   };
 
   const drag = useDraggable({
@@ -121,11 +149,10 @@ export function XDesignClaudeRail() {
     onDrag: (dx, dy) => {
       const o = dragOrigin.current;
       if (!o) return;
-      const { w: sw, h: sh } = stageSize.current;
       setBox({
         ...o,
-        left: clamp(o.left + dx, 0, Math.max(0, sw - o.w)),
-        top: clamp(o.top + dy, 0, Math.max(0, sh - o.h)),
+        left: clamp(o.left + dx, 0, Math.max(0, window.innerWidth - o.w)),
+        top: clamp(o.top + dy, 0, Math.max(0, window.innerHeight - o.h)),
       });
     },
   });
@@ -139,11 +166,10 @@ export function XDesignClaudeRail() {
     onDrag: (dx, dy) => {
       const o = dragOrigin.current;
       if (!o) return;
-      const { w: sw, h: sh } = stageSize.current;
       setBox({
         ...o,
-        w: clamp(o.w + dx, MIN_W, Math.max(MIN_W, sw - o.left)),
-        h: clamp(o.h + dy, MIN_H, Math.max(MIN_H, sh - o.top)),
+        w: clamp(o.w + dx, MIN_W, Math.max(MIN_W, window.innerWidth - o.left)),
+        h: clamp(o.h + dy, MIN_H, Math.max(MIN_H, window.innerHeight - o.top)),
       });
     },
   });
@@ -792,6 +818,18 @@ export function XDesignClaudeRail() {
     [thread.messages],
   );
 
+  const actions: { icon: LucideIcon; tip: string; onClick: () => void; disabled?: boolean }[] = [
+    { icon: Shuffle, tip: "Variations — 3 distinct directions side-by-side", onClick: handleVariations, disabled: thread.running },
+    { icon: Globe, tip: "Build webpage — real, shippable HTML you can preview & export", onClick: handleWebpageButton, disabled: thread.running },
+    { icon: Presentation, tip: "Build deck — a presentable HTML slide deck (export to PDF/HTML)", onClick: handleBuildDeck, disabled: thread.running },
+    { icon: Film, tip: "Motion — a looping canvas motion graphic you can record to video", onClick: handleBuildMotion, disabled: thread.running },
+    { icon: ImagePlus, tip: "Illustrate — generate a vector SVG illustration", onClick: handleIllustrate, disabled: thread.running },
+    { icon: ImageIcon, tip: "Generate image — real raster from a prompt (needs an image key)", onClick: handleGenerateImage },
+    { icon: Eye, tip: "Critique & refine — self-critique the canvas, then fix it", onClick: handleCritique, disabled: thread.running },
+    { icon: Paintbrush, tip: "Apply brand — restyle the canvas to the active design system", onClick: handleApplyBrand, disabled: thread.running },
+    { icon: Palette, tip: "Extract brand — distill the canvas into a reusable design system", onClick: handleExtractBrand, disabled: thread.running },
+  ];
+
   if (!open) {
     return (
       <button
@@ -806,163 +844,131 @@ export function XDesignClaudeRail() {
     );
   }
 
-  return (
+  const floating = placement === "float";
+  const isCompact = floating && !collapsed && box != null && box.w < COMPACT_W;
+  const iconsOnly = collapsed || isCompact;
+
+  const railStyle =
+    floating && box
+      ? collapsed
+        ? { left: box.left, top: box.top, right: "auto" as const, bottom: "auto" as const }
+        : {
+            left: box.left,
+            top: box.top,
+            width: box.w,
+            height: box.h,
+            right: "auto" as const,
+            bottom: "auto" as const,
+            maxHeight: "none" as const,
+          }
+      : undefined;
+
+  const rail = (
     <div
-      className="xd-claude-rail"
+      className={`xd-claude-rail ${floating ? "floating" : "dock"}${collapsed && floating ? " collapsed" : ""}${isCompact ? " compact" : ""}`}
       ref={railRef}
-      style={
-        box
-          ? {
-              left: box.left,
-              top: box.top,
-              width: box.w,
-              height: box.h,
-              right: "auto",
-              bottom: "auto",
-              maxHeight: "none",
-            }
-          : undefined
-      }
+      style={railStyle}
     >
-      <header className="xd-claude-rail-head" onMouseDown={drag.onMouseDown}>
+      <header
+        className="xd-claude-rail-head"
+        onMouseDown={floating ? drag.onMouseDown : undefined}
+        style={floating ? undefined : { cursor: "default" }}
+      >
         <Sparkles size={12} color="var(--xd-accent)" />
-        <span className="title">{xdesignClaude.name}</span>
+        {!collapsed && <span className="title">{xdesignClaude.name}</span>}
         <div style={{ flex: 1 }} />
         <button
           type="button"
-          className="xd-rail-generate"
+          className="xd-rail-generate xd-rail-tip"
           data-no-drag
           onClick={handleGenerate}
           disabled={thread.running}
-          title="Generate a full design from a brief"
+          aria-label="Generate a full design from a brief"
+          data-tip="Generate a full design from a brief"
         >
           <Wand2 size={12} />
-          <span>Generate</span>
+          {!iconsOnly && <span>Generate</span>}
         </button>
+        {actions.map((a, i) => (
+          <button
+            key={i}
+            type="button"
+            className="xd-rail-icon xd-rail-tip"
+            data-no-drag
+            onClick={a.onClick}
+            disabled={a.disabled}
+            aria-label={a.tip}
+            data-tip={a.tip}
+          >
+            <a.icon size={13} />
+          </button>
+        ))}
+        {floating && (
+          <button
+            type="button"
+            className="icon-btn xd-rail-tip"
+            data-no-drag
+            onClick={() => setUi({ collapsed: !collapsed })}
+            aria-label={collapsed ? "Expand" : "Collapse to icons"}
+            data-tip={collapsed ? "Expand" : "Collapse to icons"}
+          >
+            {collapsed ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
+          </button>
+        )}
         <button
           type="button"
-          className="xd-rail-icon"
+          className="icon-btn xd-rail-tip"
           data-no-drag
-          onClick={handleVariations}
-          disabled={thread.running}
-          title="Variations — 3 distinct directions side-by-side"
+          onClick={() => setUi({ placement: floating ? "dock" : "float", collapsed: false })}
+          aria-label={floating ? "Dock as a panel" : "Float over the canvas"}
+          data-tip={floating ? "Dock as a panel" : "Float over the canvas"}
         >
-          <Shuffle size={13} />
+          {floating ? <PanelRight size={13} /> : <PanelRightClose size={13} />}
         </button>
         <button
           type="button"
-          className="xd-rail-icon"
-          data-no-drag
-          onClick={handleWebpageButton}
-          disabled={thread.running}
-          title="Build webpage — real, shippable HTML you can preview & export"
-        >
-          <Globe size={13} />
-        </button>
-        <button
-          type="button"
-          className="xd-rail-icon"
-          data-no-drag
-          onClick={handleBuildDeck}
-          disabled={thread.running}
-          title="Build deck — a presentable HTML slide deck (export to PDF/HTML)"
-        >
-          <Presentation size={13} />
-        </button>
-        <button
-          type="button"
-          className="xd-rail-icon"
-          data-no-drag
-          onClick={handleBuildMotion}
-          disabled={thread.running}
-          title="Motion — a looping canvas motion graphic you can record to video"
-        >
-          <Film size={13} />
-        </button>
-        <button
-          type="button"
-          className="xd-rail-icon"
-          data-no-drag
-          onClick={handleIllustrate}
-          disabled={thread.running}
-          title="Illustrate — generate a vector SVG illustration"
-        >
-          <ImagePlus size={13} />
-        </button>
-        <button
-          type="button"
-          className="xd-rail-icon"
-          data-no-drag
-          onClick={handleGenerateImage}
-          title="Generate image — real raster image from a text prompt (needs an image key)"
-        >
-          <ImageIcon size={13} />
-        </button>
-        <button
-          type="button"
-          className="xd-rail-icon"
-          data-no-drag
-          onClick={handleCritique}
-          disabled={thread.running}
-          title="Critique & refine — self-critique the canvas, then fix it"
-        >
-          <Eye size={13} />
-        </button>
-        <button
-          type="button"
-          className="xd-rail-icon"
-          data-no-drag
-          onClick={handleApplyBrand}
-          disabled={thread.running}
-          title="Apply brand — restyle the canvas to the active design system"
-        >
-          <Paintbrush size={13} />
-        </button>
-        <button
-          type="button"
-          className="xd-rail-icon"
-          data-no-drag
-          onClick={handleExtractBrand}
-          disabled={thread.running}
-          title="Extract brand — distill the canvas into a reusable design system"
-        >
-          <Palette size={13} />
-        </button>
-        <button
-          type="button"
-          className="icon-btn"
+          className="icon-btn xd-rail-tip"
           data-no-drag
           onClick={() => setOpen(false)}
-          title="Hide"
+          aria-label="Hide"
+          data-tip="Hide"
         >
           <X size={13} />
         </button>
       </header>
-      <div className="xd-claude-rail-body">
-        <ClaudeChat
-          appId="xdesign"
-          name={xdesignClaude.name}
-          subtitle={xdesignClaude.subtitle}
-          accentColor={xdesignClaude.accentColor}
-          systemPrompt={xdesignClaude.systemPrompt}
-          openingLine={
-            thread.messages.length === 0 ? xdesignClaude.openingLine : undefined
-          }
-          suggestionChips={xdesignClaude.suggestionChips}
-          placeholder={thread.error ?? "Talk to your design partner…"}
-          messages={chatMessages}
-          running={thread.running}
-          cost={thread.totalCostUsd}
-          onSend={handleSend}
-          onCancel={handleCancel}
-          onNewChat={() => newThread("xdesign")}
+      {!collapsed && (
+        <div className="xd-claude-rail-body">
+          <ClaudeChat
+            appId="xdesign"
+            name={xdesignClaude.name}
+            subtitle={xdesignClaude.subtitle}
+            accentColor={xdesignClaude.accentColor}
+            systemPrompt={xdesignClaude.systemPrompt}
+            openingLine={
+              thread.messages.length === 0 ? xdesignClaude.openingLine : undefined
+            }
+            suggestionChips={xdesignClaude.suggestionChips}
+            placeholder={thread.error ?? "Talk to your design partner…"}
+            messages={chatMessages}
+            running={thread.running}
+            cost={thread.totalCostUsd}
+            onSend={handleSend}
+            onCancel={handleCancel}
+            onNewChat={() => newThread("xdesign")}
+          />
+        </div>
+      )}
+      {floating && !collapsed && (
+        <div
+          className="xd-claude-resize"
+          onMouseDown={resize.onMouseDown}
+          title="Drag to resize"
         />
-      </div>
-      <div
-        className="xd-claude-resize"
-        onMouseDown={resize.onMouseDown}
-        title="Drag to resize"
-      />
+      )}
     </div>
   );
+
+  // Floating → portal to <body> so it escapes the canvas-stage clip and can
+  // move anywhere in the terminal. Docked → render in place as a right column.
+  return floating ? createPortal(rail, document.body) : rail;
 }
