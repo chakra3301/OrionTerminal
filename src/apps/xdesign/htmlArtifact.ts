@@ -119,6 +119,29 @@ Write ONE short sentence describing the deck, then return exactly one fenced \`\
 BRIEF: ${brief}`;
 }
 
+/** Build the motion-generation prompt: a self-contained, canvas-based looping
+ * motion graphic. Canvas-based on purpose so the preview can record it to video
+ * via captureStream. Flows through the same artifact pipeline/preview. */
+export function buildMotionPrompt(brief: string, brand: DesignSystem | null): string {
+  const brandPart = brand
+    ? `\n\n${designSystemToPrompt(brand, { withRamps: true })}\n\nUse the brand's derived tokens (ramps + semantic roles) as the motion's palette.`
+    : "";
+  return `You are a generative motion designer. Create a self-contained, looping motion graphic for this brief as a single HTML file.${brandPart}
+
+Hard requirements:
+- Output a COMPLETE self-contained single-file HTML document: <!doctype html>, <head> with a <title> and a <meta name="viewport">, all CSS in ONE inline <style> block.
+- The motion is drawn entirely on ONE full-viewport <canvas id="scene"> that fills the window and resizes with it (devicePixelRatio-aware). ALL animation runs via requestAnimationFrame on that canvas so it can be recorded to video. No external libraries, fonts, or URLs.
+- A smooth, SEAMLESS loop of ~6–10 seconds with on-brand colors and genuinely tasteful motion — a flowing gradient field, a particle/constellation system, kinetic typography, or generative waves. Commit to ONE strong idea.
+- Honor prefers-reduced-motion: when set, paint a single static frame instead of animating.
+- Gallery-quality: considered composition, easing, and color. Never lorem.
+
+Write ONE short sentence describing the motion, then return exactly one fenced \`\`\`html code block containing the full document, and nothing after it.
+
+---
+
+BRIEF: ${brief}`;
+}
+
 /** Build the refinement prompt: given the current document + an instruction,
  * return the COMPLETE updated document. */
 export function buildRefinePrompt(

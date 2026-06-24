@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle, Globe, ImagePlus, Image as ImageIcon, Presentation } from "lucide-react";
+import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle, Globe, ImagePlus, Image as ImageIcon, Presentation, Film } from "lucide-react";
 import { ulid } from "ulid";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
@@ -42,6 +42,7 @@ import {
   stripHtmlArtifact,
   buildWebpagePrompt,
   buildDeckPrompt,
+  buildMotionPrompt,
   buildRefinePrompt,
 } from "@/apps/xdesign/htmlArtifact";
 import { useHtmlArtifact } from "@/apps/xdesign/htmlArtifactStore";
@@ -537,6 +538,27 @@ export function XDesignClaudeRail() {
     );
   };
 
+  // 🎥 Motion — a self-contained, canvas-based looping motion graphic; plays in
+  // the preview and can be recorded to video there.
+  const handleBuildMotion = async () => {
+    const brief = await promptText({
+      title: "Generate motion",
+      label: "Describe the motion graphic — Claude builds a looping canvas animation you can preview & record.",
+      placeholder: "a flowing aurora gradient with drifting particles",
+      confirmLabel: "Animate",
+    });
+    if (brief === null) return;
+    const b = brief.trim() || "an on-brand looping motion graphic";
+    pendingArtifactRef.current = true;
+    refiningRef.current = false;
+    repairAttemptRef.current = 0;
+    await sendTurn(
+      `🎥 Motion — ${b}`,
+      buildMotionPrompt(b, useDesignSystems.getState().active()),
+      bestModel(),
+    );
+  };
+
   // Open the preview if we already have a page; otherwise build a new one.
   const handleWebpageButton = () => {
     if (useHtmlArtifact.getState().html) useHtmlArtifact.getState().openPreview();
@@ -820,6 +842,16 @@ export function XDesignClaudeRail() {
           title="Build deck — a presentable HTML slide deck (export to PDF/HTML)"
         >
           <Presentation size={13} />
+        </button>
+        <button
+          type="button"
+          className="xd-rail-icon"
+          data-no-drag
+          onClick={handleBuildMotion}
+          disabled={thread.running}
+          title="Motion — a looping canvas motion graphic you can record to video"
+        >
+          <Film size={13} />
         </button>
         <button
           type="button"

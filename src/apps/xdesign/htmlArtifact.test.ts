@@ -5,6 +5,7 @@ import {
   stripHtmlArtifact,
   buildWebpagePrompt,
   buildDeckPrompt,
+  buildMotionPrompt,
   buildRefinePrompt,
 } from "./htmlArtifact";
 import { BUILTIN_DESIGN_SYSTEMS } from "./designSystem";
@@ -55,6 +56,15 @@ describe("prompts", () => {
     expect(p).toContain("break-after: page");
     expect(p).toContain("{{IMG");
     expect(p).toContain("a seed pitch deck");
+    expect(p).toContain("BRAND CONTRACT");
+  });
+
+  it("motion prompt asks for a recordable canvas loop", () => {
+    const p = buildMotionPrompt("an aurora field", BUILTIN_DESIGN_SYSTEMS[0]!);
+    expect(p).toContain('<canvas id="scene">');
+    expect(p).toContain("requestAnimationFrame");
+    expect(p).toContain("prefers-reduced-motion");
+    expect(p).toContain("an aurora field");
     expect(p).toContain("BRAND CONTRACT");
   });
 

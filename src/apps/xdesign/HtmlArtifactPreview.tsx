@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import {
   X,
@@ -10,11 +10,14 @@ import {
   Send,
   Loader2,
   Presentation,
+  Film,
 } from "lucide-react";
 import { useHtmlArtifact, type ArtifactViewport } from "@/apps/xdesign/htmlArtifactStore";
 import { useAppChat } from "@/store/appChatStore";
+import { useToasts } from "@/store/toastStore";
 import { useDesignSystems } from "@/store/designSystemStore";
 import { isDeckHtml, deckToPptxBase64 } from "@/apps/xdesign/deckToPptx";
+import { recordCanvasToFile } from "@/apps/xdesign/recordCanvas";
 import { base64ToBytes } from "@/apps/xdesign/imageGen";
 import { ipc } from "@/lib/ipc";
 import { toast } from "@/store/toastStore";
@@ -37,6 +40,8 @@ export function HtmlArtifactPreview() {
   const refiner = useHtmlArtifact((s) => s.refiner);
   const running = useAppChat((s) => s.threads.xdesign.running);
   const [instruction, setInstruction] = useState("");
+  const [recording, setRecording] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   if (!open || !html) return null;
 
@@ -58,6 +63,40 @@ export function HtmlArtifactPreview() {
   };
 
   const isDeck = isDeckHtml(html);
+  const hasCanvas = !isDeck && /<canvas/i.test(html);
+
+  // Record the artifact's <canvas> animation to a video file (MediaRecorder on
+  // the in-iframe canvas stream — same trick voice capture uses).
+  const handleExportVideo = async () => {
+    const doc = iframeRef.current?.contentDocument;
+    const canvas = (doc?.querySelector("canvas#scene") ??
+      doc?.querySelector("canvas")) as HTMLCanvasElement | null;
+    if (!canvas) {
+      toast.error("No canvas to record", { body: "This artifact has no <canvas> animation." });
+      return;
+    }
+    setRecording(true);
+    const recId = toast.info("Recording 6s…", { durationMs: 0, body: "Capturing the animation…" });
+    try {
+      const { bytes, ext } = await recordCanvasToFile(canvas, 6000);
+      useToasts.getState().dismiss(recId);
+      const path = await save({
+        defaultPath: `${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "motion"}.${ext}`,
+        filters: [{ name: "Video", extensions: [ext] }],
+      });
+      if (!path) return;
+      await ipc.xdesignSaveBytes(path, Array.from(bytes));
+      toast.success("Exported video", { body: path });
+    } catch (e) {
+      useToasts.getState().dismiss(recId);
+      log.error("video export failed", e);
+      toast.error("Video export unavailable", {
+        body: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setRecording(false);
+    }
+  };
 
   const handleExportPptx = async () => {
     try {
@@ -116,6 +155,11 @@ export function HtmlArtifactPreview() {
             <Presentation size={12} /> PPTX
           </button>
         )}
+        {hasCanvas && (
+          <button type="button" className="xd-artifact-btn" onClick={() => void handleExportVideo()} disabled={recording} title="Record the animation to a video file">
+            <Film size={12} /> {recording ? "Recording…" : "Video"}
+          </button>
+        )}
         <button type="button" className="xd-artifact-btn" onClick={handleExport} title="Export .html">
           <Download size={12} /> {isDeck ? "HTML" : "Export"}
         </button>
@@ -130,6 +174,7 @@ export function HtmlArtifactPreview() {
           style={vp.w ? { width: vp.w, maxWidth: "100%" } : { width: "100%" }}
         >
           <iframe
+            ref={iframeRef}
             className="xd-artifact-iframe"
             title="Webpage preview"
             srcDoc={html}
