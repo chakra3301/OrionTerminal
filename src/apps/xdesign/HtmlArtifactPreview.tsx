@@ -211,15 +211,20 @@ export function HtmlArtifactPreview() {
   };
 
   // Navigation guard. The preview iframe is same-origin (srcDoc inherits the
-  // app's localhost URL), so a plain <a href> click or <form> submit inside
-  // the generated page would navigate the FRAME to the host app URL and boot a
-  // nested, broken copy of the terminal (which trips the global error
-  // boundary). Block all in-frame navigation; real external links open in the
-  // OS browser instead. Runs in every mode, re-binding on each iframe load.
+  // app's localhost URL), so any navigation inside the generated page — a link
+  // click, a form submit, OR a programmatic `location =`/`form.submit()` — would
+  // load the host app's URL into the FRAME and boot a second, broken copy of
+  // the terminal. Two layers:
+  //  1. Cancel the common cases (anchor clicks / form submits) cleanly so the
+  //     preview never even flickers; real external links open in the OS browser.
+  //  2. Catch everything else after the fact: if the frame ever lands on a
+  //     non-srcdoc URL, send genuinely-external links to the browser and
+  //     restore the preview document. Runs in every mode.
   useEffect(() => {
     const frame = iframeRef.current;
     if (!frame) return;
     let bound: Document | null = null;
+    const appOrigin = window.location.origin;
     const onClick = (e: Event) => {
       const t = e.target as Element | null;
       const a =
@@ -233,17 +238,36 @@ export function HtmlArtifactPreview() {
       if (/^https?:\/\//i.test(href)) void openUrl(href).catch(() => {});
     };
     const onSubmit = (e: Event) => e.preventDefault();
-    const wire = () => {
+    const onLoad = () => {
+      // Did the frame navigate off its srcDoc? (srcDoc docs report
+      // about:srcdoc; a navigation lands on http(s)://…).
+      let href = "";
+      try {
+        href = frame.contentWindow?.location?.href ?? "";
+      } catch {
+        href = "";
+      }
+      if (href && !href.startsWith("about:")) {
+        if (/^https?:\/\//i.test(href) && !href.startsWith(appOrigin)) {
+          void openUrl(href).catch(() => {});
+        }
+        const restore = liveHtml ?? html;
+        if (restore) {
+          frame.srcdoc = restore;
+          return; // a fresh load event will fire for the restored doc
+        }
+      }
       const doc = frame.contentDocument;
-      if (!doc || doc === bound) return;
-      bound = doc;
-      doc.addEventListener("click", onClick, true);
-      doc.addEventListener("submit", onSubmit, true);
+      if (doc && doc !== bound) {
+        bound = doc;
+        doc.addEventListener("click", onClick, true);
+        doc.addEventListener("submit", onSubmit, true);
+      }
     };
-    wire();
-    frame.addEventListener("load", wire);
+    onLoad();
+    frame.addEventListener("load", onLoad);
     return () => {
-      frame.removeEventListener("load", wire);
+      frame.removeEventListener("load", onLoad);
       if (bound) {
         bound.removeEventListener("click", onClick, true);
         bound.removeEventListener("submit", onSubmit, true);
