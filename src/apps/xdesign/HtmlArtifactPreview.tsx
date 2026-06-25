@@ -97,6 +97,10 @@ export function HtmlArtifactPreview() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiText, setAiText] = useState("");
   const [recording, setRecording] = useState(false);
+  // Bumping this remounts the iframe element — the only reliable way to force
+  // it back to our content after the generated page navigates itself away
+  // (re-setting srcdoc imperatively is a no-op in WKWebView).
+  const [reloadNonce, setReloadNonce] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // --- In-place visual editor state ---
@@ -274,9 +278,9 @@ export function HtmlArtifactPreview() {
         href = "";
       }
       if (href && !href.startsWith("about:")) {
-        if (/^https?:\/\//i.test(href) && !href.startsWith(appOrigin)) {
-          void openUrl(href).catch(() => {});
-        }
+        const external = /^https?:\/\//i.test(href) && !href.startsWith(appOrigin);
+        if (external) void openUrl(href).catch(() => {});
+        toast.info("Blocked navigation", { body: href });
         const now = Date.now();
         restores = restores.filter((t) => now - t < 2000);
         restores.push(now);
@@ -286,15 +290,9 @@ export function HtmlArtifactPreview() {
           });
           return;
         }
-        const restore = liveHtml ?? html;
-        if (restore) {
-          // The srcdoc attribute still holds `restore` (only the frame's live
-          // document navigated away), so re-assigning the same value is a
-          // no-op. Clear it first to force the browser to reload the doc.
-          frame.srcdoc = "";
-          frame.srcdoc = restore;
-          return; // a fresh load event will fire for the restored doc
-        }
+        // Force a clean remount of the iframe back to our content.
+        setReloadNonce((n) => n + 1);
+        return;
       }
       const doc = frame.contentDocument;
       if (doc && doc !== bound) {
@@ -312,7 +310,7 @@ export function HtmlArtifactPreview() {
         bound.removeEventListener("submit", onSubmit, true);
       }
     };
-  }, [liveHtml, html]);
+  }, [liveHtml, html, reloadNonce]);
 
   // Re-wire whenever edit mode flips or the iframe reloads (liveHtml change).
   useEffect(() => {
@@ -331,7 +329,7 @@ export function HtmlArtifactPreview() {
       teardownEditor();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editMode, liveHtml]);
+  }, [editMode, liveHtml, reloadNonce]);
 
   // --- Toolbar actions (operate on the resolved selected element) ---
 
@@ -545,6 +543,7 @@ export function HtmlArtifactPreview() {
           style={vp.w ? { width: vp.w, maxWidth: "100%" } : { width: "100%" }}
         >
           <iframe
+            key={reloadNonce}
             ref={iframeRef}
             className="xd-artifact-iframe"
             title="Webpage preview"
