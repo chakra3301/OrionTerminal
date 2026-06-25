@@ -57,7 +57,11 @@ const VIEWPORTS: { id: ArtifactViewport; icon: typeof Monitor; w: number | null;
 // stripEditorChrome (#xd-nav-guard).
 const NAV_GUARD_SCRIPT =
   `<script id="${NAV_GUARD_ID}">(function(){try{` +
-  `document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[href]');if(a){var h=a.getAttribute('href')||'';if(h&&h.charAt(0)!=='#'){e.preventDefault();}}},true);` +
+  // Intercept ALL anchor clicks. In a srcdoc iframe the base URL is the host
+  // app's, so even "#section" links resolve to localhost/#section and would
+  // navigate AWAY from the page — so we scroll to the target ourselves and
+  // cancel the navigation; non-hash links are just cancelled.
+  `document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[href]');if(!a)return;var h=a.getAttribute('href')||'';if(!h)return;e.preventDefault();if(h.charAt(0)==='#'){var id=h.slice(1);if(id){var t=document.getElementById(id)||document.querySelector('a[name="'+id+'"]');if(t&&t.scrollIntoView){t.scrollIntoView({behavior:'smooth',block:'start'});}}}},true);` +
   `document.addEventListener('submit',function(e){e.preventDefault();},true);` +
   `try{HTMLFormElement.prototype.submit=function(){};}catch(_e){}` +
   `try{window.open=function(){return null;};}catch(_e){}` +
@@ -263,8 +267,17 @@ export function HtmlArtifactPreview() {
           : null;
       if (!a) return;
       const href = a.getAttribute("href") ?? "";
-      if (href === "" || href.startsWith("#")) return; // in-page anchors are fine
+      if (href === "") return;
       e.preventDefault();
+      if (href.startsWith("#")) {
+        // Scroll within the frame instead of navigating to host/#id.
+        const id = href.slice(1);
+        const doc = a.ownerDocument;
+        const t =
+          (id && (doc.getElementById(id) || doc.querySelector(`a[name="${id}"]`))) || null;
+        t?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
       if (/^https?:\/\//i.test(href)) void openUrl(href).catch(() => {});
     };
     const onSubmit = (e: Event) => e.preventDefault();
