@@ -7,6 +7,7 @@ import {
   type Variable,
   type Mode,
 } from "./store";
+import { useHtmlArtifact, migrateLegacyArtifactTo } from "./htmlArtifactStore";
 
 /** A persisted XDesign document — the same shape `useXDesign.hydrate` accepts
  * and `useXDesignPersistence` writes. One per project. */
@@ -142,11 +143,13 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
           ? { ...emptyDoc(), pages: [{ id: DEFAULT_PAGE_ID, name: "Page 1", shapes: legacy as never, past: [], future: [] }] }
           : (legacy as XDDoc);
         await saveDoc(id, doc);
+        migrateLegacyArtifactTo(id);
         registry = [{ id, name: "Untitled", createdAt: now, updatedAt: now }];
         persistRegistry(registry);
       }
     }
 
+    useHtmlArtifact.getState().setProject(null);
     set({ registry, openTabs: [], activeId: null, ready: true });
   },
 
@@ -168,6 +171,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
     };
     await saveDoc(id, emptyDoc());
     useXDesign.getState().hydrate(emptyDoc());
+    useHtmlArtifact.getState().setProject(id);
     const registry = [meta, ...get().registry];
     set((s) => ({
       registry,
@@ -183,6 +187,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
     await flushActive();
     const doc = (await loadDoc(id)) ?? emptyDoc();
     useXDesign.getState().hydrate(doc);
+    useHtmlArtifact.getState().setProject(id);
     set((s) => ({
       openTabs: s.openTabs.includes(id) ? s.openTabs : [...s.openTabs, id],
       activeId: id,
@@ -204,6 +209,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
     }
     // Closing the active tab.
     if (remaining.length === 0) {
+      useHtmlArtifact.getState().setProject(null);
       set({ openTabs: [], activeId: null }); // → Home
       return;
     }
@@ -212,11 +218,13 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
     const nextId = remaining[Math.max(0, closedIdx - 1)]!;
     const doc = (await loadDoc(nextId)) ?? emptyDoc();
     useXDesign.getState().hydrate(doc);
+    useHtmlArtifact.getState().setProject(nextId);
     set({ openTabs: remaining, activeId: nextId });
   },
 
   goHome: async () => {
     await flushActive();
+    useHtmlArtifact.getState().setProject(null);
     set({ activeId: null });
   },
 
@@ -238,11 +246,13 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
     const remaining = openTabs.filter((t) => t !== id);
     if (activeId === id) {
       if (remaining.length === 0) {
+        useHtmlArtifact.getState().setProject(null);
         set({ registry, openTabs: [], activeId: null });
       } else {
         const nextId = remaining[remaining.length - 1]!;
         const doc = (await loadDoc(nextId)) ?? emptyDoc();
         useXDesign.getState().hydrate(doc);
+        useHtmlArtifact.getState().setProject(nextId);
         set({ registry, openTabs: remaining, activeId: nextId });
       }
     } else {

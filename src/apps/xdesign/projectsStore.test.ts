@@ -15,6 +15,7 @@ vi.mock("@/lib/db", () => {
 import * as db from "@/lib/db";
 import { useXDProjects, emptyDoc } from "./projectsStore";
 import { useXDesign } from "./store";
+import { useHtmlArtifact } from "./htmlArtifactStore";
 
 const mem = (db as unknown as { __mem: Map<string, unknown> }).__mem;
 
@@ -120,6 +121,22 @@ describe("xdesign projectsStore", () => {
     const again = await useXDProjects.getState().ensureActive();
     expect(again).toBe(created);
     expect(useXDProjects.getState().registry).toHaveLength(1);
+  });
+
+  it("scopes the HTML webpage artifact per project", async () => {
+    localStorage.clear();
+    await useXDProjects.getState().init();
+    const a = await useXDProjects.getState().newProject("A");
+    useHtmlArtifact.getState().setArtifact("<h1>A page</h1>", "A");
+    expect(useHtmlArtifact.getState().html).toContain("A page");
+    // New project B must start with no page.
+    await useXDProjects.getState().newProject("B");
+    expect(useHtmlArtifact.getState().html).toBeNull();
+    // Back to A restores its page; Home clears it.
+    await useXDProjects.getState().openProject(a);
+    expect(useHtmlArtifact.getState().html).toContain("A page");
+    await useXDProjects.getState().goHome();
+    expect(useHtmlArtifact.getState().html).toBeNull();
   });
 
   it("deletes a project and removes its doc slot", async () => {

@@ -1,15 +1,25 @@
 import { create } from "zustand";
 import { log } from "@/lib/log";
 
-const LS_KEY = "xd-html-artifact";
+/** Legacy global key (pre per-project scoping). Kept only so the migrated
+ * "Untitled" project can adopt whatever page was last generated. */
+const LEGACY_LS_KEY = "xd-html-artifact";
 
 export type ArtifactViewport = "desktop" | "tablet" | "mobile";
 
 type Persisted = { html: string; title: string };
 
-function loadPersisted(): Persisted | null {
+/** The project the artifact store is currently bound to. Null = Home / no
+ * project, in which case there is no page to show or persist. */
+let activeProjectId: string | null = null;
+
+function keyFor(id: string): string {
+  return `xd-html-artifact.${id}`;
+}
+
+function loadPersistedFrom(key: string): Persisted | null {
   try {
-    const raw = localStorage.getItem(LS_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const o = JSON.parse(raw) as Persisted;
     if (o && typeof o.html === "string") return o;
@@ -20,10 +30,25 @@ function loadPersisted(): Persisted | null {
 }
 
 function persist(html: string, title: string): void {
+  if (!activeProjectId) return;
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify({ html, title }));
+    localStorage.setItem(keyFor(activeProjectId), JSON.stringify({ html, title }));
   } catch (e) {
     log.warn("html artifact persist failed", e);
+  }
+}
+
+/** One-time migration: copy the old global page into a project's slot the
+ * first time we adopt it, then drop the legacy key. */
+export function migrateLegacyArtifactTo(projectId: string): void {
+  try {
+    const raw = localStorage.getItem(LEGACY_LS_KEY);
+    if (!raw) return;
+    if (!localStorage.getItem(keyFor(projectId)))
+      localStorage.setItem(keyFor(projectId), raw);
+    localStorage.removeItem(LEGACY_LS_KEY);
+  } catch (e) {
+    log.warn("html artifact legacy migration failed", e);
   }
 }
 
@@ -46,13 +71,14 @@ type HtmlArtifactState = {
     refiner: (instruction: string) => void;
     elementRefiner: (elementHtml: string, instruction: string) => void;
   }) => void;
+  /** Bind the store to a project (or null for Home). Loads that project's
+   * saved page, or clears when the project has none. Closes the preview. */
+  setProject: (projectId: string | null) => void;
 };
 
-const initial = loadPersisted();
-
 export const useHtmlArtifact = create<HtmlArtifactState>((set) => ({
-  html: initial?.html ?? null,
-  title: initial?.title ?? "Untitled page",
+  html: null,
+  title: "Untitled page",
   open: false,
   viewport: "desktop",
   builder: null,
@@ -69,4 +95,13 @@ export const useHtmlArtifact = create<HtmlArtifactState>((set) => ({
   setViewport: (viewport) => set({ viewport }),
   setActions: ({ builder, refiner, elementRefiner }) =>
     set({ builder, refiner, elementRefiner }),
+  setProject: (projectId) => {
+    activeProjectId = projectId;
+    const p = projectId ? loadPersistedFrom(keyFor(projectId)) : null;
+    set({
+      html: p?.html ?? null,
+      title: p?.title ?? "Untitled page",
+      open: false,
+    });
+  },
 }));
