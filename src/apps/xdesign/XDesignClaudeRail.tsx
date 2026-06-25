@@ -72,7 +72,6 @@ import {
 } from "@/apps/xdesign/claudeCommands";
 import { parseDesignPlans, stripDesignPlan } from "@/apps/xdesign/designPlan";
 import { ingestDesignPlan, ingestDesignPlans } from "@/apps/xdesign/ingestDesignPlan";
-import { promptText } from "@/components/PromptModal";
 import { computeExportBounds, renderPngBytes } from "@/apps/xdesign/exportXD";
 import { clamp } from "@/lib/time";
 
@@ -88,6 +87,49 @@ const knownIds = new Set<string>();
 type Box = { left: number; top: number; w: number; h: number };
 type Placement = "float" | "dock";
 type RailUi = { placement: Placement; box: Box | null; collapsed: boolean };
+
+// Brief-based tools. Arming one swaps the composer into that tool's flow: the
+// chip + placeholder below tell the user what to type, and their next message
+// is routed to the matching prompt builder (see TOOL_MODE_RUN in the rail).
+type ToolModeId =
+  | "generate"
+  | "variations"
+  | "webpage"
+  | "deck"
+  | "motion"
+  | "illustrate"
+  | "image";
+
+const TOOL_MODES: Record<ToolModeId, { label: string; placeholder: string }> = {
+  generate: {
+    label: "Generate a design",
+    placeholder: "Describe a design — e.g. a pricing page for a dev tool, dark & bold",
+  },
+  variations: {
+    label: "3 directions",
+    placeholder: "Describe a design — Claude pitches 3 distinct directions",
+  },
+  webpage: {
+    label: "Build a webpage",
+    placeholder: "Describe the page — e.g. a landing page for a privacy-first email app",
+  },
+  deck: {
+    label: "Build a slide deck",
+    placeholder: "Describe the deck — e.g. a seed pitch deck for an AI design tool",
+  },
+  motion: {
+    label: "Generate motion",
+    placeholder: "Describe the motion — e.g. a flowing aurora gradient with drifting particles",
+  },
+  illustrate: {
+    label: "Illustrate (vector SVG)",
+    placeholder: "Describe the illustration — e.g. an abstract aurora wave, depth, brand colors",
+  },
+  image: {
+    label: "Generate an image",
+    placeholder: "Describe the image — e.g. a dark moody mountain range at dusk, cinematic",
+  },
+};
 
 const MIN_W = 300;
 const MIN_H = 280;
@@ -114,6 +156,11 @@ function loadRailUi(): RailUi {
 
 export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | null }) {
   const [open, setOpen] = useState(false);
+  // Active tool "mode". Clicking a brief-based tool button arms a mode instead
+  // of popping a modal: the composer placeholder + a chip above the input show
+  // what's armed, and the next chat message is routed through that tool's
+  // prompt builder. Cleared after send or via the chip's ✕.
+  const [toolMode, setToolMode] = useState<ToolModeId | null>(null);
   // Floating placement, size, and collapsed state — persisted so the partner
   // stays where you parked it across close/reopen and app restarts. box is in
   // VIEWPORT coords (the floating rail is portaled to <body> with position:
@@ -422,7 +469,25 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     }
   };
 
-  const handleSend = (text: string) => sendTurn(text, text);
+  // Arm a tool mode: surface the rail, expand it, and remember which tool the
+  // next message routes to.
+  const enterMode = (id: ToolModeId) => {
+    setOpen(true);
+    if (collapsed) setUi({ collapsed: false });
+    setToolMode(id);
+  };
+
+  // A typed message either runs the armed tool (then disarms) or is a plain
+  // chat turn.
+  const handleSend = (text: string) => {
+    if (toolMode) {
+      const id = toolMode;
+      setToolMode(null);
+      void TOOL_MODE_RUN[id](text);
+      return;
+    }
+    void sendTurn(text, text);
+  };
 
   // The strongest model for a labelled creative turn (Tier 0). Plain chat
   // (handleSend) deliberately stays on the user's dropdown choice.
@@ -431,14 +496,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
   // ✦ Generate — compose a full design from a brief. Shows a short brief in the
   // transcript but sends the composer prompt; the reply's xd-design block is
   // ingested by the effect above.
-  const handleGenerate = async () => {
-    const brief = await promptText({
-      title: "Generate a design",
-      label: "Describe what to design — Claude builds it as editable layers.",
-      placeholder: "a pricing page for a dev tool, dark & bold",
-      confirmLabel: "Generate",
-    });
-    if (brief === null) return;
+  const runGenerate = async (brief: string) => {
     const b = brief.trim() || "a clean, modern landing page";
     const brand = brandBlock();
     const brandNote = brand
@@ -496,14 +554,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
   };
 
   // ⧉ Variations — generate N distinct directions side-by-side to choose from.
-  const handleVariations = async () => {
-    const brief = await promptText({
-      title: "Generate variations",
-      label: "Describe what to design — Claude pitches 3 distinct directions side-by-side.",
-      placeholder: "a pricing page for a dev tool, dark & bold",
-      confirmLabel: "Generate 3",
-    });
-    if (brief === null) return;
+  const runVariations = async (brief: string) => {
     const b = brief.trim() || "a clean, modern landing page";
     const brand = brandBlock();
     const brandNote = brand
@@ -519,14 +570,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
 
   // 🌐 Build webpage — generate a real, shippable single-file HTML page from a
   // brief (brand- + craft-aware), rendered live in the sandboxed preview.
-  const handleBuildWebpage = async () => {
-    const brief = await promptText({
-      title: "Build a webpage",
-      label: "Describe the page — Claude builds real, shippable HTML/CSS you can preview & export.",
-      placeholder: "a landing page for a privacy-first email app",
-      confirmLabel: "Build",
-    });
-    if (brief === null) return;
+  const runWebpage = async (brief: string) => {
     const b = brief.trim() || "a clean, modern landing page";
     pendingArtifactRef.current = true;
     refiningRef.current = false;
@@ -551,14 +595,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
 
   // 🖥️ Build deck — a presentable HTML slide deck (self-contained nav + print-
   // to-PDF CSS) from a brief, via the same artifact pipeline + preview.
-  const handleBuildDeck = async () => {
-    const brief = await promptText({
-      title: "Build a slide deck",
-      label: "Describe the deck — Claude builds presentable HTML slides you can preview & export.",
-      placeholder: "a seed pitch deck for an AI design tool",
-      confirmLabel: "Build deck",
-    });
-    if (brief === null) return;
+  const runDeck = async (brief: string) => {
     const b = brief.trim() || "a concise pitch deck";
     pendingArtifactRef.current = true;
     refiningRef.current = false;
@@ -578,14 +615,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
 
   // 🎥 Motion — a self-contained, canvas-based looping motion graphic; plays in
   // the preview and can be recorded to video there.
-  const handleBuildMotion = async () => {
-    const brief = await promptText({
-      title: "Generate motion",
-      label: "Describe the motion graphic — Claude builds a looping canvas animation you can preview & record.",
-      placeholder: "a flowing aurora gradient with drifting particles",
-      confirmLabel: "Animate",
-    });
-    if (brief === null) return;
+  const runMotion = async (brief: string) => {
     const b = brief.trim() || "an on-brand looping motion graphic";
     pendingArtifactRef.current = true;
     refiningRef.current = false;
@@ -597,10 +627,11 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     );
   };
 
-  // Open the preview if we already have a page; otherwise build a new one.
+  // Open the preview if we already have a page; otherwise arm webpage mode so
+  // the user describes it in the chat (no modal).
   const handleWebpageButton = () => {
     if (useHtmlArtifact.getState().html) useHtmlArtifact.getState().openPreview();
-    else void handleBuildWebpage();
+    else enterMode("webpage");
   };
 
   const refineWebpage = (instruction: string) => {
@@ -644,7 +675,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
   // Let the preview overlay drive build/refine without coupling components.
   useEffect(() => {
     useHtmlArtifact.getState().setActions({
-      builder: () => void handleBuildWebpage(),
+      builder: () => enterMode("webpage"),
       refiner: refineWebpage,
       elementRefiner: refineElement,
     });
@@ -653,14 +684,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
 
   // ◈ Illustrate — generate a vector SVG illustration (brand-colored) and drop
   // it on the canvas as an editable image layer.
-  const handleIllustrate = async () => {
-    const desc = await promptText({
-      title: "Generate an illustration",
-      label: "Describe the illustration — Claude draws it as scalable vector art.",
-      placeholder: "an abstract aurora wave, depth, brand colors",
-      confirmLabel: "Illustrate",
-    });
-    if (desc === null) return;
+  const runIllustrate = async (desc: string) => {
     const d = desc.trim() || "an abstract brand-colored hero graphic";
     pendingSvgRef.current = true;
     await sendTurn(
@@ -675,7 +699,9 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
   // asset library, then placed as an editable image layer (real filePath, not
   // an embedded data URL — keeps the document light). Direct API call, not a
   // chat turn.
-  const handleGenerateImage = async () => {
+  // Arming the image tool needs a configured provider; check up front so the
+  // user isn't told "no provider" only after typing a prompt.
+  const handleImageButton = () => {
     const provider = pickImageProvider(useProvidersStore.getState().providers);
     if (!provider) {
       toast.info("No image provider", {
@@ -683,13 +709,17 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
       });
       return;
     }
-    const desc = await promptText({
-      title: "Generate an image",
-      label: `Describe the image — ${provider.name} renders it as a real raster image.`,
-      placeholder: "a dark moody mountain range at dusk, cinematic",
-      confirmLabel: "Generate",
-    });
-    if (desc === null) return;
+    enterMode("image");
+  };
+
+  const runImage = async (desc: string) => {
+    const provider = pickImageProvider(useProvidersStore.getState().providers);
+    if (!provider) {
+      toast.info("No image provider", {
+        body: "Add an image-capable key (OpenAI or Google) in Control Panel → Providers.",
+      });
+      return;
+    }
     const d = desc.trim();
     if (!d) return;
     const model = resolveImageModel(provider.kind, getImageModelOverride(provider.id));
@@ -829,13 +859,24 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     [thread.messages],
   );
 
+  // Route an armed tool's typed brief to its prompt builder.
+  const TOOL_MODE_RUN: Record<ToolModeId, (brief: string) => void> = {
+    generate: (b) => void runGenerate(b),
+    variations: (b) => void runVariations(b),
+    webpage: (b) => void runWebpage(b),
+    deck: (b) => void runDeck(b),
+    motion: (b) => void runMotion(b),
+    illustrate: (b) => void runIllustrate(b),
+    image: (b) => void runImage(b),
+  };
+
   const actions: { icon: LucideIcon; tip: string; onClick: () => void; disabled?: boolean }[] = [
-    { icon: Shuffle, tip: "Variations — 3 distinct directions side-by-side", onClick: handleVariations, disabled: thread.running },
+    { icon: Shuffle, tip: "Variations — 3 distinct directions side-by-side", onClick: () => enterMode("variations"), disabled: thread.running },
     { icon: Globe, tip: "Build webpage — real, shippable HTML you can preview & export", onClick: handleWebpageButton, disabled: thread.running },
-    { icon: Presentation, tip: "Build deck — a presentable HTML slide deck (export to PDF/HTML)", onClick: handleBuildDeck, disabled: thread.running },
-    { icon: Film, tip: "Motion — a looping canvas motion graphic you can record to video", onClick: handleBuildMotion, disabled: thread.running },
-    { icon: ImagePlus, tip: "Illustrate — generate a vector SVG illustration", onClick: handleIllustrate, disabled: thread.running },
-    { icon: ImageIcon, tip: "Generate image — real raster from a prompt (needs an image key)", onClick: handleGenerateImage },
+    { icon: Presentation, tip: "Build deck — a presentable HTML slide deck (export to PDF/HTML)", onClick: () => enterMode("deck"), disabled: thread.running },
+    { icon: Film, tip: "Motion — a looping canvas motion graphic you can record to video", onClick: () => enterMode("motion"), disabled: thread.running },
+    { icon: ImagePlus, tip: "Illustrate — generate a vector SVG illustration", onClick: () => enterMode("illustrate"), disabled: thread.running },
+    { icon: ImageIcon, tip: "Generate image — real raster from a prompt (needs an image key)", onClick: handleImageButton },
     { icon: Eye, tip: "Critique & refine — self-critique the canvas, then fix it", onClick: handleCritique, disabled: thread.running },
     { icon: Paintbrush, tip: "Apply brand — restyle the canvas to the active design system", onClick: handleApplyBrand, disabled: thread.running },
     { icon: Palette, tip: "Extract brand — distill the canvas into a reusable design system", onClick: handleExtractBrand, disabled: thread.running },
@@ -898,7 +939,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
             type="button"
             className="xd-rail-generate xd-rail-tip"
             data-no-drag
-            onClick={handleGenerate}
+            onClick={() => enterMode("generate")}
             disabled={thread.running}
             aria-label="Generate a full design from a brief"
             data-tip="Generate a full design from a brief"
@@ -956,6 +997,21 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
       </header>
       {!collapsed && (
         <div className="xd-claude-rail-body">
+          {toolMode && (
+            <div className="xd-tool-mode-bar">
+              <Sparkles size={11} />
+              <span className="xd-tool-mode-label">{TOOL_MODES[toolMode].label}</span>
+              <span className="xd-tool-mode-hint">— describe it below</span>
+              <button
+                type="button"
+                className="xd-tool-mode-clear"
+                onClick={() => setToolMode(null)}
+                aria-label="Cancel tool"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
           <ClaudeChat
             appId="xdesign"
             name={xdesignClaude.name}
@@ -966,7 +1022,11 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
               thread.messages.length === 0 ? xdesignClaude.openingLine : undefined
             }
             suggestionChips={xdesignClaude.suggestionChips}
-            placeholder={thread.error ?? "Talk to your design partner…"}
+            placeholder={
+              toolMode
+                ? TOOL_MODES[toolMode].placeholder
+                : thread.error ?? "Talk to your design partner…"
+            }
             messages={chatMessages}
             running={thread.running}
             cost={thread.totalCostUsd}

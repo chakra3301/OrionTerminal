@@ -8806,8 +8806,40 @@ summary:focus-visible,
   flex: 1;
   min-height: 0;
   display: flex;
+  flex-direction: column;
 }
 .xd-claude-rail-body > * { flex: 1; min-height: 0; }
+
+/* Armed-tool chip above the composer — tells the user what their next message
+   will build, with a ✕ to disarm. */
+.xd-tool-mode-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 8px 10px 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(var(--xd-accent-rgb), 0.12);
+  border: 1px solid rgba(var(--xd-accent-rgb), 0.4);
+  color: var(--xd-accent);
+  font-size: 12px;
+}
+.xd-tool-mode-label { font-weight: 600; }
+.xd-tool-mode-hint { color: var(--xd-text-2); font-weight: 400; }
+.xd-tool-mode-clear {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: none;
+  background: none;
+  color: var(--xd-accent);
+  cursor: pointer;
+}
+.xd-tool-mode-clear:hover { background: rgba(var(--xd-accent-rgb), 0.2); }
 
 /* Resize grip — bottom-right corner. Two faint diagonal strokes hint at the
    affordance without a heavy chrome. */
