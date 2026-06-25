@@ -7,7 +7,7 @@ const LEGACY_LS_KEY = "xd-html-artifact";
 
 export type ArtifactViewport = "desktop" | "tablet" | "mobile";
 
-type Persisted = { html: string; title: string };
+type Persisted = { html: string; title: string; open?: boolean };
 
 /** The project the artifact store is currently bound to. Null = Home / no
  * project, in which case there is no page to show or persist. */
@@ -29,10 +29,13 @@ function loadPersistedFrom(key: string): Persisted | null {
   return null;
 }
 
-function persist(html: string, title: string): void {
+function persist(html: string, title: string, open: boolean): void {
   if (!activeProjectId) return;
   try {
-    localStorage.setItem(keyFor(activeProjectId), JSON.stringify({ html, title }));
+    localStorage.setItem(
+      keyFor(activeProjectId),
+      JSON.stringify({ html, title, open }),
+    );
   } catch (e) {
     log.warn("html artifact persist failed", e);
   }
@@ -87,11 +90,19 @@ export const useHtmlArtifact = create<HtmlArtifactState>((set) => ({
   setArtifact: (html, title) =>
     set((s) => {
       const t = title ?? s.title;
-      persist(html, t);
+      persist(html, t, true);
       return { html, title: t, open: true };
     }),
-  openPreview: () => set({ open: true }),
-  close: () => set({ open: false }),
+  openPreview: () =>
+    set((s) => {
+      if (s.html) persist(s.html, s.title, true);
+      return { open: true };
+    }),
+  close: () =>
+    set((s) => {
+      if (s.html) persist(s.html, s.title, false);
+      return { open: false };
+    }),
   setViewport: (viewport) => set({ viewport }),
   setActions: ({ builder, refiner, elementRefiner }) =>
     set({ builder, refiner, elementRefiner }),
@@ -101,7 +112,8 @@ export const useHtmlArtifact = create<HtmlArtifactState>((set) => ({
     set({
       html: p?.html ?? null,
       title: p?.title ?? "Untitled page",
-      open: false,
+      // Reopen the preview if it was showing when this project was last left.
+      open: !!(p?.html && p.open),
     });
   },
 }));
