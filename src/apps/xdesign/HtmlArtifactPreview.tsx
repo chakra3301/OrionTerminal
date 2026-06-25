@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   X,
   Monitor,
@@ -208,6 +209,47 @@ export function HtmlArtifactPreview() {
     doc.addEventListener("dblclick", dbl, true);
     listenersRef.current = { doc, click, dbl };
   };
+
+  // Navigation guard. The preview iframe is same-origin (srcDoc inherits the
+  // app's localhost URL), so a plain <a href> click or <form> submit inside
+  // the generated page would navigate the FRAME to the host app URL and boot a
+  // nested, broken copy of the terminal (which trips the global error
+  // boundary). Block all in-frame navigation; real external links open in the
+  // OS browser instead. Runs in every mode, re-binding on each iframe load.
+  useEffect(() => {
+    const frame = iframeRef.current;
+    if (!frame) return;
+    let bound: Document | null = null;
+    const onClick = (e: Event) => {
+      const t = e.target as Element | null;
+      const a =
+        t && t.nodeType === 1
+          ? (t.closest?.("a[href]") as HTMLAnchorElement | null)
+          : null;
+      if (!a) return;
+      const href = a.getAttribute("href") ?? "";
+      if (href === "" || href.startsWith("#")) return; // in-page anchors are fine
+      e.preventDefault();
+      if (/^https?:\/\//i.test(href)) void openUrl(href).catch(() => {});
+    };
+    const onSubmit = (e: Event) => e.preventDefault();
+    const wire = () => {
+      const doc = frame.contentDocument;
+      if (!doc || doc === bound) return;
+      bound = doc;
+      doc.addEventListener("click", onClick, true);
+      doc.addEventListener("submit", onSubmit, true);
+    };
+    wire();
+    frame.addEventListener("load", wire);
+    return () => {
+      frame.removeEventListener("load", wire);
+      if (bound) {
+        bound.removeEventListener("click", onClick, true);
+        bound.removeEventListener("submit", onSubmit, true);
+      }
+    };
+  }, [liveHtml, html]);
 
   // Re-wire whenever edit mode flips or the iframe reloads (liveHtml change).
   useEffect(() => {
