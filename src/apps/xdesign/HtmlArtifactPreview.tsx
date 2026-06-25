@@ -224,6 +224,7 @@ export function HtmlArtifactPreview() {
     const frame = iframeRef.current;
     if (!frame) return;
     let bound: Document | null = null;
+    let restores: number[] = []; // timestamps, to stop redirect loops
     const appOrigin = window.location.origin;
     const onClick = (e: Event) => {
       const t = e.target as Element | null;
@@ -251,8 +252,21 @@ export function HtmlArtifactPreview() {
         if (/^https?:\/\//i.test(href) && !href.startsWith(appOrigin)) {
           void openUrl(href).catch(() => {});
         }
+        const now = Date.now();
+        restores = restores.filter((t) => now - t < 2000);
+        restores.push(now);
+        if (restores.length > 4) {
+          toast.warning("Preview paused", {
+            body: "This page keeps redirecting. Edit or regenerate it.",
+          });
+          return;
+        }
         const restore = liveHtml ?? html;
         if (restore) {
+          // The srcdoc attribute still holds `restore` (only the frame's live
+          // document navigated away), so re-assigning the same value is a
+          // no-op. Clear it first to force the browser to reload the doc.
+          frame.srcdoc = "";
           frame.srcdoc = restore;
           return; // a fresh load event will fire for the restored doc
         }
