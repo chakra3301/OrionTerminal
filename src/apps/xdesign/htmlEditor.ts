@@ -9,6 +9,8 @@
 
 /** Marker id of the editor's injected <style> (outline/selection chrome). */
 export const EDITOR_STYLE_ID = "xd-editor-style";
+/** Marker id of the injected navigation-guard <script> (preview only). */
+export const NAV_GUARD_ID = "xd-nav-guard";
 /** Attribute prefix for all editor-injected attributes. */
 export const EDITOR_ATTR_PREFIX = "data-xd-";
 
@@ -80,6 +82,8 @@ export function mergeInlineStyle(
 export function stripEditorChrome(root: Element): void {
   const injected = root.querySelector(`#${EDITOR_STYLE_ID}`);
   if (injected) injected.remove();
+  const guard = root.querySelector(`#${NAV_GUARD_ID}`);
+  if (guard) guard.remove();
   const all = [root, ...Array.from(root.querySelectorAll("*"))];
   for (const el of all) {
     for (const attr of Array.from(el.attributes)) {

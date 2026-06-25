@@ -33,6 +33,7 @@ import { recordCanvasToFile } from "@/apps/xdesign/recordCanvas";
 import { base64ToBytes } from "@/apps/xdesign/imageGen";
 import {
   EDITOR_STYLE_ID,
+  NAV_GUARD_ID,
   pathOf,
   elementAt,
   mergeInlineStyle,
@@ -49,6 +50,30 @@ const VIEWPORTS: { id: ArtifactViewport; icon: typeof Monitor; w: number | null;
   { id: "tablet", icon: Tablet, w: 834, label: "Tablet" },
   { id: "mobile", icon: Smartphone, w: 390, label: "Mobile" },
 ];
+
+// Injected into the preview's <head> so it runs before the page's own scripts.
+// Neutralizes in-frame navigation at the source (the iframe is same-origin, so
+// a navigation would load the host app's URL and break). Stripped on save by
+// stripEditorChrome (#xd-nav-guard).
+const NAV_GUARD_SCRIPT =
+  `<script id="${NAV_GUARD_ID}">(function(){try{` +
+  `document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[href]');if(a){var h=a.getAttribute('href')||'';if(h&&h.charAt(0)!=='#'){e.preventDefault();}}},true);` +
+  `document.addEventListener('submit',function(e){e.preventDefault();},true);` +
+  `try{HTMLFormElement.prototype.submit=function(){};}catch(_e){}` +
+  `try{window.open=function(){return null;};}catch(_e){}` +
+  `try{Location.prototype.assign=function(){};Location.prototype.replace=function(){};}catch(_e){}` +
+  `}catch(_e){}})();<\/script>`;
+
+/** Insert the navigation guard as the first thing in the document so it runs
+ * before any page script can wire up a redirect. */
+function withNavGuard(html: string | null): string | undefined {
+  if (!html) return undefined;
+  const head = html.match(/<head[^>]*>/i);
+  if (head) return html.replace(head[0], head[0] + NAV_GUARD_SCRIPT);
+  const htmlTag = html.match(/<html[^>]*>/i);
+  if (htmlTag) return html.replace(htmlTag[0], htmlTag[0] + NAV_GUARD_SCRIPT);
+  return NAV_GUARD_SCRIPT + html;
+}
 
 const SELECTED_ATTR = "data-xd-selected";
 const EDITOR_CSS = `[${SELECTED_ATTR}]{outline:2px solid #ff3ea5 !important;outline-offset:1px;}
@@ -523,7 +548,7 @@ export function HtmlArtifactPreview() {
             ref={iframeRef}
             className="xd-artifact-iframe"
             title="Webpage preview"
-            srcDoc={liveHtml ?? html}
+            srcDoc={withNavGuard(liveHtml ?? html)}
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
           />
         </div>
