@@ -103,7 +103,7 @@ const POST_FRAG = /* glsl */ `
     float wch = waterHeight(wuv, uTime);
     float wdx = waterHeight(wuv + vec2(eps, 0.0), uTime) - wch;
     float wdy = waterHeight(wuv + vec2(0.0, eps), uTime) - wch;
-    coord += vec2(wdx, wdy) * 80.0;
+    coord += vec2(wdx, wdy) * 190.0;
 
     // Chromatic aberration — strong at the rim, a little everywhere.
     float edge = smoothstep(0.0, 0.05, inv);
