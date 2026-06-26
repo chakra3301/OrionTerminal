@@ -44,7 +44,10 @@ export type AppStateKey =
   | "reduce_glass"
   | "tab_autocomplete"
   | "repolens"
-  | "learn_scratchpad";
+  | "learn_scratchpad"
+  | "auth.user"
+  | "auth.session"
+  | "onboarding.completed";
 
 export async function getAppState<T = unknown>(
   key: AppStateKey,
@@ -73,6 +76,33 @@ export async function setAppState<T = unknown>(
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
     [key, JSON.stringify(value)],
   );
+}
+
+/** Delete a single app_state key. Used by the auth reset escape hatch to wipe
+ * ONLY `auth.user` / `auth.session` — never any user-data table. Row delete,
+ * not a schema change (append-only migration rule untouched). */
+export async function deleteAppState(key: AppStateKey): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM app_state WHERE key = $1", [key]);
+}
+
+/** True if the vault already holds any user content. Drives the gate decision
+ * for accountless installs: existing data + no `auth.user` ⇒ stay unlocked
+ * (opt-in to sign-in via Settings), never force account creation. */
+export async function hasAnyUserData(): Promise<boolean> {
+  const db = await getDb();
+  // Hardcoded table list — no user input interpolated.
+  for (const table of ["notes", "assets", "chats", "projects", "mood_boards"]) {
+    try {
+      const rows = await db.select<{ n: number }[]>(
+        `SELECT COUNT(*) AS n FROM ${table}`,
+      );
+      if ((rows[0]?.n ?? 0) > 0) return true;
+    } catch {
+      /* table may not exist on an ancient schema — ignore and keep checking */
+    }
+  }
+  return false;
 }
 
 export type ActivitySource = "hermes" | "archives" | "orion" | "xdesign";

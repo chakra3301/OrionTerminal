@@ -25,6 +25,7 @@ import { toast } from "@/store/toastStore";
 import { useLinkPaletteStore } from "@/features/notes/LinkInsertPalette";
 import { getActiveNoteEditor } from "@/features/notes/editorBridge";
 import { useShell } from "@/shell/store/useShell";
+import { useAuth } from "@/features/auth/authStore";
 import { ipc } from "@/lib/ipc";
 import { listChatsForProject, logActivity } from "@/lib/db";
 import { log } from "@/lib/log";
@@ -439,6 +440,17 @@ export function installBuiltinCommands() {
     label: "Open Settings",
     group: "View",
     run: () => useControlPanel.getState().show("theme"),
+  });
+
+  // Sign out — drops the remembered session and returns to the lock screen.
+  // Only surfaced once sign-in is enabled (an account exists).
+  registry.register({
+    id: "auth.lock",
+    label: "Lock Orion Terminal",
+    keywords: ["lock", "sign out", "log out", "logout", "secure", "session"],
+    group: "View",
+    when: () => useAuth.getState().hasAccount,
+    run: () => void useAuth.getState().lock(),
   });
 
   registry.register({

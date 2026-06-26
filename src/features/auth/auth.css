@@ -1,0 +1,259 @@
+/* Soft-lock auth surfaces — glass card over the calm idle energy core.
+   Magenta accent to harmonize with the red core (token: --neon-magenta). */
+
+.ot-auth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9010;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(
+    circle at center,
+    rgba(2, 4, 8, 0.1) 0%,
+    rgba(2, 4, 8, 0.55) 100%
+  );
+}
+
+.ot-auth-card {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 30px 28px 22px;
+  border-radius: var(--r-lg, 16px);
+  background: var(--glass-bg-strong, rgba(8, 13, 18, 0.92));
+  border: 1px solid var(--glass-border, rgba(160, 220, 200, 0.1));
+  box-shadow:
+    0 30px 80px -20px rgba(0, 0, 0, 0.7),
+    0 0 40px -10px rgba(255, 62, 165, 0.25);
+  backdrop-filter: blur(18px);
+  animation: ot-auth-in 0.4s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+.ot-auth-card.wide {
+  max-width: 420px;
+}
+
+.ot-auth-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md, 10px);
+  display: grid;
+  place-items: center;
+  color: var(--neon-magenta, #ff3ea5);
+  background: rgba(255, 62, 165, 0.1);
+  border: 1px solid rgba(255, 62, 165, 0.3);
+  box-shadow: 0 0 22px -6px rgba(255, 62, 165, 0.6);
+  margin-bottom: 4px;
+}
+
+.ot-auth-title {
+  font-family: var(--f-display, "Space Grotesk", sans-serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--t-primary, #e6f4ec);
+  letter-spacing: -0.01em;
+}
+.ot-auth-sub {
+  font-size: 12.5px;
+  color: var(--t-secondary, #9ab0a8);
+  margin-top: -6px;
+}
+
+.ot-auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ot-auth-field > span {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t-tertiary, #5a706a);
+}
+.ot-auth-row {
+  display: flex;
+  gap: 10px;
+}
+.ot-auth-row .ot-auth-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.ot-auth-field input,
+.ot-auth-input {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: var(--r-sm, 6px);
+  background: var(--bg-2, #0a1015);
+  border: 1px solid var(--glass-border, rgba(160, 220, 200, 0.1));
+  color: var(--t-primary, #e6f4ec);
+  font-family: var(--f-display, sans-serif);
+  font-size: 13.5px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.ot-auth-input {
+  padding: 0 6px 0 12px;
+}
+.ot-auth-input input {
+  flex: 1;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  outline: none;
+  min-width: 0;
+}
+.ot-auth-field input:focus,
+.ot-auth-input:focus-within {
+  border-color: rgba(255, 62, 165, 0.6);
+  box-shadow: 0 0 0 3px rgba(255, 62, 165, 0.18);
+  outline: none;
+}
+
+.ot-auth-reveal {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--t-tertiary, #5a706a);
+  cursor: pointer;
+  border-radius: var(--r-sm, 6px);
+}
+.ot-auth-reveal:hover {
+  color: var(--t-secondary, #9ab0a8);
+}
+
+.ot-auth-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--t-secondary, #9ab0a8);
+  cursor: pointer;
+  user-select: none;
+}
+.ot-auth-remember input {
+  accent-color: var(--neon-magenta, #ff3ea5);
+}
+
+.ot-auth-error {
+  font-size: 12px;
+  color: var(--neon-magenta, #ff3ea5);
+  background: rgba(255, 62, 165, 0.08);
+  border: 1px solid rgba(255, 62, 165, 0.22);
+  border-radius: var(--r-sm, 6px);
+  padding: 7px 10px;
+}
+
+.ot-auth-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  margin-top: 4px;
+  border: none;
+  border-radius: var(--r-sm, 6px);
+  background: var(--neon-magenta, #ff3ea5);
+  color: #1a0410;
+  font-family: var(--f-display, sans-serif);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 0 24px -6px rgba(255, 62, 165, 0.6);
+  transition:
+    transform 0.1s ease,
+    filter 0.15s ease,
+    opacity 0.15s ease;
+}
+.ot-auth-submit:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.ot-auth-submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.ot-auth-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.ot-auth-reset {
+  margin-top: 6px;
+  border-top: 1px solid var(--glass-border, rgba(160, 220, 200, 0.08));
+  padding-top: 12px;
+}
+.ot-auth-reset-link {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--t-tertiary, #5a706a);
+  font-size: 11.5px;
+  cursor: pointer;
+  text-align: center;
+  transition: color 0.15s ease;
+}
+.ot-auth-reset-link:hover {
+  color: var(--t-secondary, #9ab0a8);
+}
+.ot-auth-reset-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--t-secondary, #9ab0a8);
+}
+.ot-auth-reset-confirm > svg {
+  color: var(--neon-yellow, #e6ff3a);
+}
+.ot-auth-reset-actions {
+  display: flex;
+  gap: 8px;
+}
+.ot-auth-reset-actions button {
+  padding: 6px 14px;
+  border-radius: var(--r-sm, 6px);
+  border: 1px solid var(--glass-border, rgba(160, 220, 200, 0.12));
+  background: transparent;
+  color: var(--t-secondary, #9ab0a8);
+  font-size: 12px;
+  cursor: pointer;
+}
+.ot-auth-reset-actions button.danger {
+  border-color: rgba(255, 62, 165, 0.4);
+  color: var(--neon-magenta, #ff3ea5);
+}
+.ot-auth-reset-actions button:hover {
+  filter: brightness(1.15);
+}
+
+.ot-auth-fineprint {
+  margin-top: 8px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--t-tertiary, #5a706a);
+  text-align: center;
+}
+
+@keyframes ot-auth-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

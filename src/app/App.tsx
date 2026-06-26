@@ -50,6 +50,9 @@ import { useAutocomplete } from "@/store/autocompleteStore";
 import { startGitWatch } from "@/store/gitStore";
 import { Shell } from "@/shell/Shell";
 import { SplashScreen } from "@/shell/Splash/SplashScreen";
+import { useAuth } from "@/features/auth/authStore";
+import { LockScreen } from "@/features/auth/LockScreen";
+import { FirstRunSetup } from "@/features/auth/FirstRunSetup";
 import { useShell, type WindowState } from "@/shell/store/useShell";
 import { ensureOrionTheme } from "@/apps/orion/monacoTheme";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
@@ -563,9 +566,31 @@ function useArchivesLiveRefresh() {
   }, []);
 }
 
+/** Minimal boot placeholder shown before the gate resolves and during a warm
+ * hydrate (no splash). Deliberately quiet — bg-0 with a faint pulse. */
+function BootBlank() {
+  return (
+    <div
+      style={{
+        height: "100%",
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--bg-0)",
+      }}
+    >
+      <div className="ot-claude-orb" style={{ width: 22, height: 22, opacity: 0.5 }} />
+    </div>
+  );
+}
+
 export default function App() {
   const [hydrated, setHydrated] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
+  const [probed, setProbed] = useState(false);
+  const authPhase = useAuth((s) => s.phase);
+  const warm = useAuth((s) => s.warm);
   useWindowSizePersistence();
   useShellWindowsPersistence();
   useXDesignPersistence();
@@ -575,6 +600,13 @@ export default function App() {
   useFinderDropOrchestrator();
 
   useEffect(() => {
+    // Resolve the auth gate in parallel with hydrate. The probe decides cold
+    // (splash) vs warm (skip splash) and fails OPEN, so a gate bug can never
+    // trap the owner behind the lock.
+    void useAuth
+      .getState()
+      .probe()
+      .finally(() => setProbed(true));
     hydrate()
       .catch((err) => {
         log.error("hydrate failed", err);
@@ -587,20 +619,7 @@ export default function App() {
       .finally(() => setHydrated(true));
   }, []);
 
-  // Cold-start splash: the chaotic red energy core plays while hydrate() runs,
-  // then cross-fades into the shell. It fully unmounts once dismissed, so the
-  // R3F context costs nothing during normal use.
-  if (!splashDone) {
-    return (
-      <SplashScreen
-        mode="launch"
-        ready={hydrated}
-        onDone={() => setSplashDone(true)}
-      />
-    );
-  }
-
-  return (
+  const shellTree = (
     <ErrorBoundary>
       <HotkeyHost />
       <EventBridge />
@@ -611,4 +630,33 @@ export default function App() {
       <LinkInsertPalette />
     </ErrorBoundary>
   );
+
+  // Gate not yet resolved — brief blank so we don't flash the splash before we
+  // know whether this is a cold start or a warm (valid-session) unlock.
+  if (!probed) return <BootBlank />;
+
+  // Warm unlock: a valid, unexpired session skips the splash entirely (an HMR
+  // reload with a live session lands here too).
+  if (warm) return hydrated ? shellTree : <BootBlank />;
+
+  // Cold start: the chaotic red energy core plays while hydrate() runs, then
+  // cross-fades out. It fully unmounts once we move on — zero GPU after.
+  if (!splashDone) {
+    return (
+      <SplashScreen
+        mode="launch"
+        ready={hydrated}
+        onDone={() => setSplashDone(true)}
+      />
+    );
+  }
+
+  // Post-splash gate. LockScreen / FirstRunSetup keep the calm idle core behind
+  // them; both unmount the R3F context the moment the shell takes over.
+  if (authPhase === "locked") return <LockScreen />;
+  if (authPhase === "first-run") return <FirstRunSetup />;
+
+  // Unlocked (account present + valid session, or accountless install with
+  // existing data — never gated).
+  return hydrated ? shellTree : <BootBlank />;
 }
