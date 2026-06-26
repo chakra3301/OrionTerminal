@@ -455,6 +455,22 @@ export function installBuiltinCommands() {
     run: () => void useAuth.getState().lock(),
   });
 
+  // Dev-only: scrutinize the boot splash without relaunching. Never registered
+  // in the bundled .app (import.meta.env.DEV is statically false there).
+  if (import.meta.env.DEV) {
+    registry.register({
+      id: "dev.splashPreview",
+      label: "Preview Boot Splash (dev)",
+      keywords: ["splash", "boot", "energy", "core", "launch", "preview", "dev"],
+      group: "Dev",
+      run: () => {
+        void import("@/shell/Splash/splashPreviewStore").then((m) =>
+          m.useSplashPreview.getState().show(),
+        );
+      },
+    });
+  }
+
   registry.register({
     id: "onboarding.show",
     label: "Show Walkthrough",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { EventBridge } from "@/app/EventBridge";
@@ -26,6 +26,16 @@ import { LinkInsertPalette } from "@/features/notes/LinkInsertPalette";
 import { HelpWindow } from "@/features/help/HelpWindow";
 import { Walkthrough } from "@/features/onboarding/Walkthrough";
 import { useOnboarding } from "@/features/onboarding/onboardingStore";
+
+// Dev-only boot-splash preview harness. import.meta.env.DEV is statically false
+// in the bundled .app, so this lazy chunk is dead-code-eliminated there.
+const SplashPreview = import.meta.env.DEV
+  ? lazy(() =>
+      import("@/shell/Splash/SplashPreview").then((m) => ({
+        default: m.SplashPreview,
+      })),
+    )
+  : null;
 import { purgeEmptyNotes } from "@/lib/db";
 import { ipc } from "@/lib/ipc";
 import { startFileDropOrchestrator } from "@/lib/fileDrop";
@@ -642,6 +652,11 @@ export default function App() {
       <LinkInsertPalette />
       <HelpWindow />
       <Walkthrough />
+      {SplashPreview && (
+        <Suspense fallback={null}>
+          <SplashPreview />
+        </Suspense>
+      )}
     </ErrorBoundary>
   );
 
