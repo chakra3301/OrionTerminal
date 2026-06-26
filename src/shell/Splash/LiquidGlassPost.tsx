@@ -27,6 +27,7 @@ const POST_FRAG = /* glsl */ `
   uniform float uGlassRadius;
   uniform float uActive;
   uniform float uSpark;
+  uniform float uTime;
   varying vec2 vUv;
 
   float sdRoundRect(vec2 p, vec2 b, float r){
@@ -57,6 +58,22 @@ const POST_FRAG = /* glsl */ `
     return c / 16.0;
   }
 
+  // Summed-wave height field (à la ShojiWM water-terminal.frag). Its gradient
+  // warps the sample and lights the crests → the liquid, rippling surface.
+  float waterHeight(vec2 c, float t){
+    const float PI = 3.14159265;
+    float dTheta = 2.0 * PI / 7.0;
+    float h = 0.0;
+    for (int i = 0; i < 8; i++){
+      float th = dTheta * float(i);
+      vec2 a = c;
+      a.x += cos(th) * t * 0.16;
+      a.y -= sin(th) * t * 0.13;
+      h += cos((a.x * cos(th) - a.y * sin(th)) * 5.5) * 0.55;
+    }
+    return cos(h);
+  }
+
   void main(){
     vec2 fragPx = vec2(vUv.x, 1.0 - vUv.y) * uResolution; // top-left CSS px
     vec3 base = bg(fragPx);
@@ -79,6 +96,15 @@ const POST_FRAG = /* glsl */ `
     vec2 edgeOffset = distortion * dir * uGlassSize * 0.5 * 0.34;
     vec2 coord = zoomed - edgeOffset;
 
+    // Liquid water ripple — animated wave height; its gradient warps the
+    // sample (and lights the crests below).
+    vec2 wuv = (fragPx - (uGlassCenter - uGlassSize * 0.5)) / max(uGlassSize, vec2(1.0));
+    float eps = 0.004;
+    float wch = waterHeight(wuv, uTime);
+    float wdx = waterHeight(wuv + vec2(eps, 0.0), uTime) - wch;
+    float wdy = waterHeight(wuv + vec2(0.0, eps), uTime) - wch;
+    coord += vec2(wdx, wdy) * 80.0;
+
     // Chromatic aberration — strong at the rim, a little everywhere.
     float edge = smoothstep(0.0, 0.05, inv);
     vec2 shift = dir * ((1.0 - edge) * (13.0 + uSpark * 6.0) + 2.5);
@@ -93,6 +119,11 @@ const POST_FRAG = /* glsl */ `
     col *= vec3(0.96, 0.99, 1.06);
     col = mix(col, vec3(0.05, 0.06, 0.09), 0.08);
     col *= 1.18;
+
+    // Ripple crests catch a cool light.
+    vec2 wgrad = vec2(wdx, wdy);
+    float ripple = clamp(dot(normalize(wgrad + 1e-4), normalize(vec2(-0.4, -0.8))), 0.0, 1.0);
+    col += ripple * vec3(0.10, 0.16, 0.22) * 0.5;
 
     // Bevel specular: bright at the rim, brightest along the top edge.
     float rim = 1.0 - smoothstep(0.0, 0.05, inv);
@@ -142,6 +173,7 @@ export function LiquidGlassPost() {
           uGlassRadius: { value: 16 },
           uActive: { value: 0 },
           uSpark: { value: 0 },
+          uTime: { value: 0 },
         },
       }),
     [],
@@ -186,6 +218,7 @@ export function LiquidGlassPost() {
     u.uGlassSize!.value.set(rect.w, rect.h);
     u.uGlassRadius!.value = rect.r;
     u.uActive!.value = 1;
+    u.uTime!.value = performance.now() * 0.001;
     // Reuse the particle spark envelope so the glass flares with typing.
     u.uSpark!.value = Math.min(1, (scene.userData.spark as number) ?? 0);
 
