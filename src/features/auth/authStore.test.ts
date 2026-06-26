@@ -130,3 +130,21 @@ describe("authStore reset escape hatch (recovery)", () => {
     expect(useAuth.getState().phase).toBe("first-run");
   });
 });
+
+describe("authStore changePassword", () => {
+  beforeEach(reset);
+
+  it("rejects a wrong current password and accepts the new one after change", async () => {
+    await useAuth.getState().createAccount("luca", "oldpw", "Luca");
+
+    const wrongCurrent = await useAuth.getState().changePassword("WRONG", "newpw");
+    expect(wrongCurrent).toBe(false);
+
+    const ok = await useAuth.getState().changePassword("oldpw", "newpw");
+    expect(ok).toBe(true);
+
+    await useAuth.getState().lock();
+    expect(await useAuth.getState().unlock("luca", "oldpw", true)).toBe(false);
+    expect(await useAuth.getState().unlock("luca", "newpw", true)).toBe(true);
+  });
+});

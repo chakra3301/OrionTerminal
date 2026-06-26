@@ -57,6 +57,9 @@ type AuthState = {
     password: string,
     displayName: string,
   ) => Promise<void>;
+  /** Change the password (verifies the current one first). Keeps username +
+   * display name; rotates salt + session. */
+  changePassword: (current: string, next: string) => Promise<boolean>;
   /** Sign out: drop the session and return to the locked screen. */
   lock: () => Promise<void>;
   /** Escape hatch: wipe ONLY auth.user + auth.session, never user data. */
@@ -176,6 +179,35 @@ export const useAuth = create<AuthState>((set) => ({
       log.error("createAccount failed", e);
       set({ busy: false, error: "Couldn't create the account." });
       throw e;
+    }
+  },
+
+  changePassword: async (current, next) => {
+    set({ busy: true, error: null });
+    try {
+      const user = await getAppState<AuthUser>("auth.user");
+      if (!user) {
+        set({ busy: false, error: "No account to update." });
+        return false;
+      }
+      const curHash = await deriveHash(current, user.salt);
+      if (!constantTimeEqual(curHash, user.hash)) {
+        set({ busy: false, error: "Current password is incorrect." });
+        return false;
+      }
+      const salt = randomSalt();
+      const hash = await deriveHash(next, salt);
+      await setAppState("auth.user", { ...user, salt, hash });
+      await setAppState("auth.session", {
+        token: randomToken(),
+        expiresAt: Date.now() + SESSION_MS,
+      });
+      set({ busy: false, error: null });
+      return true;
+    } catch (e) {
+      log.error("changePassword failed", e);
+      set({ busy: false, error: "Couldn't change the password." });
+      return false;
     }
   },
 

@@ -5,13 +5,15 @@ import { ProvidersPanel } from "./ProvidersPanel";
 import { SkillLibraryPanel } from "./SkillLibraryPanel";
 import { AgentForge } from "./AgentForge";
 import { APIKeySection, ThemeSection, WallpaperSection, McpSection, ShortcutsSection, AboutSection } from "@/features/settings/SettingsPanel";
-import { X, Cpu, Hammer, Sparkles, KeyRound, Palette, Image as ImageIcon, Plug, Keyboard, Info } from "lucide-react";
+import { AccountSection } from "@/features/auth/AccountSection";
+import { X, Cpu, Hammer, Sparkles, KeyRound, Palette, Image as ImageIcon, Plug, Keyboard, Info, ShieldCheck } from "lucide-react";
 import "./controlpanel.css";
 
 const NAV: { key: CpSection; label: string; Icon: LucideIcon }[] = [
   { key: "providers", label: "Providers", Icon: Cpu },
   { key: "agents", label: "Agent Forge", Icon: Hammer },
   { key: "skills", label: "Skill Library", Icon: Sparkles },
+  { key: "account", label: "Account", Icon: ShieldCheck },
   { key: "key", label: "API Keys", Icon: KeyRound },
   { key: "theme", label: "Appearance", Icon: Palette },
   { key: "wallpaper", label: "Wallpaper", Icon: ImageIcon },
@@ -34,7 +36,7 @@ export function ControlPanel() {
           <div className="cp-rail-title">Control Panel</div>
           {NAV.map((n) => (
             <Fragment key={n.key}>
-              {n.key === "key" && <div className="cp-rail-divider" />}
+              {n.key === "account" && <div className="cp-rail-divider" />}
               <button
                 className={`cp-rail-item${section === n.key ? " active" : ""}`}
                 onClick={() => setSection(n.key)}
@@ -53,6 +55,7 @@ export function ControlPanel() {
             {section === "providers" && <ProvidersPanel />}
             {section === "agents" && <AgentForge />}
             {section === "skills" && <SkillLibraryPanel />}
+            {section === "account" && <AccountSection />}
             {section === "key" && <APIKeySection />}
             {section === "theme" && <ThemeSection />}
             {section === "wallpaper" && <WallpaperSection />}

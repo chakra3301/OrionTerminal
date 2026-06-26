@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type CpSection = "providers" | "agents" | "skills" | "key" | "theme" | "wallpaper" | "mcp" | "shortcuts" | "about";
+export type CpSection = "providers" | "agents" | "skills" | "account" | "key" | "theme" | "wallpaper" | "mcp" | "shortcuts" | "about";
 
 type CpState = {
   open: boolean;
