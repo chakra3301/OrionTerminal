@@ -49,6 +49,7 @@ import { toast } from "@/store/toastStore";
 import { useAutocomplete } from "@/store/autocompleteStore";
 import { startGitWatch } from "@/store/gitStore";
 import { Shell } from "@/shell/Shell";
+import { SplashScreen } from "@/shell/Splash/SplashScreen";
 import { useShell, type WindowState } from "@/shell/store/useShell";
 import { ensureOrionTheme } from "@/apps/orion/monacoTheme";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
@@ -564,6 +565,7 @@ function useArchivesLiveRefresh() {
 
 export default function App() {
   const [hydrated, setHydrated] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
   useWindowSizePersistence();
   useShellWindowsPersistence();
   useXDesignPersistence();
@@ -585,25 +587,16 @@ export default function App() {
       .finally(() => setHydrated(true));
   }, []);
 
-  if (!hydrated) {
+  // Cold-start splash: the chaotic red energy core plays while hydrate() runs,
+  // then cross-fades into the shell. It fully unmounts once dismissed, so the
+  // R3F context costs nothing during normal use.
+  if (!splashDone) {
     return (
-      <div
-        style={{
-          height: "100%",
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--bg-0)",
-          color: "var(--t-tertiary)",
-          fontFamily: "var(--f-mono)",
-          fontSize: 12,
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-        }}
-      >
-        starting…
-      </div>
+      <SplashScreen
+        mode="launch"
+        ready={hydrated}
+        onDone={() => setSplashDone(true)}
+      />
     );
   }
 
