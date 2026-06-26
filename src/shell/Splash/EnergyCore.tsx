@@ -2,6 +2,7 @@ import { useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { SNOISE_GLSL } from "./snoise";
+import { useCoreReactions, sparkEnvelope } from "./coreReactions";
 
 export type CoreMode = "launch" | "idle";
 
@@ -57,6 +58,7 @@ const PT_VERT = /* glsl */ `
   uniform float uAssemble;
   uniform float uMode;      // 0 launch, 1 idle
   uniform float uSize;
+  uniform float uSpark;     // keystroke envelope
   attribute vec3 aFar;
   attribute float aSeed;
   varying float vVis;
@@ -64,26 +66,31 @@ const PT_VERT = /* glsl */ `
     float stream = fract(aSeed * 13.0 + uTime * (0.05 + aSeed * 0.09));
     float prog = mix(uAssemble, stream, uMode);
     vec3 pos = mix(aFar, position, prog);
+    // a spark nudges particles outward, like the core throwing off energy
+    pos += normalize(position) * uSpark * (0.12 + aSeed * 0.18);
     float vis = (uMode > 0.5)
       ? smoothstep(0.0, 0.18, stream) * (1.0 - smoothstep(0.82, 1.0, stream))
       : prog;
     vVis = vis;
     vec4 mv = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mv;
-    gl_PointSize = uSize * (0.5 + aSeed) / max(0.1, -mv.z);
+    gl_PointSize = uSize * (0.5 + aSeed) / max(0.1, -mv.z) * (1.0 + uSpark * 1.3);
   }
 `;
 const PT_FRAG = /* glsl */ `
   precision mediump float;
   uniform vec3 uColor;
   uniform float uOpacity;
+  uniform float uSpark;
   varying float vVis;
   void main(){
     vec2 c = gl_PointCoord - 0.5;
     float d = length(c);
     float a = smoothstep(0.5, 0.0, d) * vVis * uOpacity;
     if (a < 0.01) discard;
-    gl_FragColor = vec4(uColor, a);
+    // sparks flash toward white-hot and brighten
+    vec3 col = mix(uColor, vec3(1.0, 0.86, 0.86), clamp(uSpark * 0.6, 0.0, 1.0));
+    gl_FragColor = vec4(col, a * (1.0 + uSpark * 0.6));
   }
 `;
 
@@ -164,6 +171,7 @@ function Scene({
       uAssemble: { value: mode === "idle" ? 1 : 0 },
       uMode: { value: mode === "idle" ? 1 : 0 },
       uSize: { value: 9.0 },
+      uSpark: { value: 0 },
       uColor: { value: COL_PARTICLE.clone() },
       uOpacity: { value: 0.9 },
     }),
@@ -220,14 +228,24 @@ function Scene({
     if (start.current === 0) start.current = state.clock.elapsedTime;
     const t = state.clock.elapsedTime - start.current;
 
+    // Keystroke spark envelope (login interactivity) — read imperatively so
+    // typing never re-renders the React tree.
+    const env = sparkEnvelope(
+      useCoreReactions.getState().impulses,
+      performance.now(),
+    );
+
     if (reduced) {
-      // Static-ish gentle glow: no assembly burst, minimal churn.
+      // Static-ish gentle glow: no assembly burst, minimal churn. Sparks still
+      // register, but gently (no chaos flailing for reduced-motion users).
       coreUniforms.uTime.value = t * 0.15;
       coreUniforms.uChaos.value = 0.06;
-      coreUniforms.uHeat.value = 0.22;
+      coreUniforms.uHeat.value = 0.22 + env * 0.3;
       shellUniforms.uTime.value = t * 0.12;
+      shellUniforms.uHeat.value = 0.15 + env * 0.2;
       ptUniforms.uTime.value = t;
       ptUniforms.uAssemble.value = 1;
+      ptUniforms.uSpark.value = env * 0.5;
       if (group.current) group.current.rotation.y = t * 0.08;
       return;
     }
@@ -251,9 +269,15 @@ function Scene({
     ptUniforms.uTime.value = t;
     ptUniforms.uAssemble.value = assemble;
     ptUniforms.uOpacity.value = mode === "idle" ? 0.75 : 0.5 + assemble * 0.5;
+    ptUniforms.uSpark.value = env;
+
+    // Each keystroke flares the core (hotter + a touch more chaotic).
+    coreUniforms.uHeat.value += env * 0.5;
+    coreUniforms.uChaos.value += env * 0.1;
+    shellUniforms.uHeat.value += env * 0.35;
 
     const spin = mode === "idle" ? 0.06 : 0.06 + burst * 1.4 + (1 - assemble) * 0.4;
-    if (group.current) group.current.rotation.y += spin * 0.016;
+    if (group.current) group.current.rotation.y += (spin + env * 0.35) * 0.016;
     if (innerSpin.current) {
       innerSpin.current.rotation.x += 0.003 + burst * 0.02;
       innerSpin.current.rotation.z += 0.002;

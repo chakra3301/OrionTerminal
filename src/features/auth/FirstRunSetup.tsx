@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, Sparkles, ArrowRight } from "lucide-react";
 import { SplashScreen } from "@/shell/Splash/SplashScreen";
+import { useCoreReactions } from "@/shell/Splash/coreReactions";
 import { useAuth } from "./authStore";
+import { LiquidGlassCard, GlassFilterDefs } from "./LiquidGlass";
 import "./auth.css";
+
+const spark = () => useCoreReactions.getState().spark();
 
 const MIN_PW = 4;
 
@@ -43,8 +47,9 @@ export function FirstRunSetup() {
   return (
     <>
       <SplashScreen mode="idle" ready={false} />
+      <GlassFilterDefs />
       <div className="ot-auth-overlay">
-        <form className="ot-auth-card wide" onSubmit={submit}>
+        <LiquidGlassCard wide onSubmit={submit}>
           <div className="ot-auth-badge">
             <Sparkles size={18} />
           </div>
@@ -63,6 +68,7 @@ export function FirstRunSetup() {
               spellCheck={false}
               onChange={(e) => {
                 setDisplayName(e.target.value);
+                spark();
                 if (shownErr) {
                   setLocalErr(null);
                   clearError();
@@ -81,6 +87,7 @@ export function FirstRunSetup() {
               spellCheck={false}
               onChange={(e) => {
                 setUsername(e.target.value);
+                spark();
                 if (shownErr) {
                   setLocalErr(null);
                   clearError();
@@ -99,6 +106,7 @@ export function FirstRunSetup() {
                   autoComplete="new-password"
                   onChange={(e) => {
                     setPassword(e.target.value);
+                    spark();
                     if (shownErr) {
                       setLocalErr(null);
                       clearError();
@@ -124,6 +132,7 @@ export function FirstRunSetup() {
                 autoComplete="new-password"
                 onChange={(e) => {
                   setConfirm(e.target.value);
+                  spark();
                   if (shownErr) {
                     setLocalErr(null);
                     clearError();
@@ -147,7 +156,7 @@ export function FirstRunSetup() {
             Local only. The password protects this workstation — it isn't disk
             encryption, and it never leaves this machine.
           </div>
-        </form>
+        </LiquidGlassCard>
       </div>
     </>
   );

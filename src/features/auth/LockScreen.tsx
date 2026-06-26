@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Lock, Eye, EyeOff, LogIn, ShieldAlert } from "lucide-react";
 import { SplashScreen } from "@/shell/Splash/SplashScreen";
+import { useCoreReactions } from "@/shell/Splash/coreReactions";
 import { useAuth } from "./authStore";
+import { LiquidGlassCard, GlassFilterDefs } from "./LiquidGlass";
 import "./auth.css";
+
+const spark = () => useCoreReactions.getState().spark();
 
 /** Soft-lock login. The calmer idle energy core hovers behind. Forgetting the
  * password is non-fatal: "Reset" wipes only the credential and reopens the
@@ -37,8 +41,9 @@ export function LockScreen() {
   return (
     <>
       <SplashScreen mode="idle" ready={false} />
+      <GlassFilterDefs />
       <div className="ot-auth-overlay">
-        <form className="ot-auth-card" onSubmit={submit}>
+        <LiquidGlassCard onSubmit={submit}>
           <div className="ot-auth-badge">
             <Lock size={18} />
           </div>
@@ -57,6 +62,7 @@ export function LockScreen() {
               spellCheck={false}
               onChange={(e) => {
                 setUsername(e.target.value);
+                spark();
                 if (error) clearError();
               }}
             />
@@ -72,6 +78,7 @@ export function LockScreen() {
                 autoComplete="current-password"
                 onChange={(e) => {
                   setPassword(e.target.value);
+                  spark();
                   if (error) clearError();
                 }}
               />
@@ -141,7 +148,7 @@ export function LockScreen() {
               </button>
             )}
           </div>
-        </form>
+        </LiquidGlassCard>
       </div>
     </>
   );
