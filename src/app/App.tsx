@@ -23,6 +23,7 @@ import { useDesignSystems } from "@/store/designSystemStore";
 import { useSkillsStore } from "@/store/skillsStore";
 import { useAgentsStore } from "@/store/agentsStore";
 import { LinkInsertPalette } from "@/features/notes/LinkInsertPalette";
+import { HelpWindow } from "@/features/help/HelpWindow";
 import { purgeEmptyNotes } from "@/lib/db";
 import { ipc } from "@/lib/ipc";
 import { startFileDropOrchestrator } from "@/lib/fileDrop";
@@ -628,6 +629,7 @@ export default function App() {
       <ControlPanel />
       <KeybindingsOverlay />
       <LinkInsertPalette />
+      <HelpWindow />
     </ErrorBoundary>
   );
 

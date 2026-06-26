@@ -1,0 +1,195 @@
+.ot-help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 8500;
+  display: grid;
+  place-items: center;
+  padding: 40px;
+  background: rgba(2, 4, 8, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.ot-help-modal {
+  display: flex;
+  width: min(880px, 92vw);
+  height: min(620px, 86vh);
+  border-radius: var(--r-lg, 16px);
+  overflow: hidden;
+  background: var(--glass-bg-strong, rgba(8, 13, 18, 0.92));
+  border: 1px solid var(--glass-border, rgba(160, 220, 200, 0.1));
+  box-shadow: var(--shadow-window, 0 30px 80px -20px rgba(0, 0, 0, 0.7));
+  backdrop-filter: blur(18px);
+}
+
+.ot-help-nav {
+  width: 184px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 10px;
+  border-right: 1px solid var(--glass-border, rgba(160, 220, 200, 0.08));
+  background: rgba(3, 6, 10, 0.4);
+}
+.ot-help-nav-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 12px;
+  font-family: var(--f-mono, monospace);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--neon-cyan, #00e0ff);
+}
+.ot-help-nav-item {
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: var(--t-secondary, #9ab0a8);
+  font-family: var(--f-display, sans-serif);
+  font-size: 13px;
+  border-radius: var(--r-sm, 6px);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.ot-help-nav-item:hover {
+  background: var(--bg-3, #10171d);
+  color: var(--t-primary, #e6f4ec);
+}
+.ot-help-nav-item.active {
+  background: rgba(0, 224, 255, 0.1);
+  color: var(--t-primary, #e6f4ec);
+}
+
+.ot-help-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ot-help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--glass-border, rgba(160, 220, 200, 0.08));
+  font-family: var(--f-display, sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t-primary, #e6f4ec);
+}
+.ot-help-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--t-tertiary, #5a706a);
+  border-radius: var(--r-sm, 6px);
+  cursor: pointer;
+}
+.ot-help-close:hover {
+  background: var(--bg-3, #10171d);
+  color: var(--t-primary, #e6f4ec);
+}
+.ot-help-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 28px 36px;
+}
+
+/* Markdown typography — compact, on-theme. */
+.ot-help-md {
+  color: var(--t-secondary, #9ab0a8);
+  font-size: 13.5px;
+  line-height: 1.62;
+  max-width: 620px;
+}
+.ot-help-md h1 {
+  font-family: var(--f-display, sans-serif);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--t-primary, #e6f4ec);
+  margin: 0 0 14px;
+  letter-spacing: -0.01em;
+}
+.ot-help-md h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t-primary, #e6f4ec);
+  margin: 22px 0 8px;
+}
+.ot-help-md p {
+  margin: 0 0 12px;
+}
+.ot-help-md ul {
+  margin: 0 0 12px;
+  padding-left: 18px;
+}
+.ot-help-md li {
+  margin: 4px 0;
+}
+.ot-help-md strong {
+  color: var(--t-primary, #e6f4ec);
+  font-weight: 600;
+}
+.ot-help-md em {
+  color: var(--t-tertiary, #5a706a);
+  font-style: normal;
+}
+.ot-help-md a {
+  color: var(--neon-cyan, #00e0ff);
+}
+.ot-help-md code {
+  font-family: var(--f-mono, monospace);
+  font-size: 12px;
+  background: var(--bg-2, #0a1015);
+  border: 1px solid var(--glass-border, rgba(160, 220, 200, 0.08));
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--neon-green, #39ff88);
+}
+.ot-help-md pre {
+  background: var(--bg-0, #03060a);
+  border: 1px solid var(--glass-border, rgba(160, 220, 200, 0.1));
+  border-radius: var(--r-sm, 6px);
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0 0 12px;
+}
+.ot-help-md pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--t-secondary, #9ab0a8);
+  font-size: 12px;
+}
+.ot-help-md table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 14px;
+  font-size: 12.5px;
+}
+.ot-help-md th,
+.ot-help-md td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--glass-border, rgba(160, 220, 200, 0.08));
+}
+.ot-help-md th {
+  color: var(--t-tertiary, #5a706a);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.ot-help-md td:last-child {
+  font-family: var(--f-mono, monospace);
+  color: var(--neon-cyan, #00e0ff);
+  white-space: nowrap;
+}

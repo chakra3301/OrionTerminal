@@ -26,6 +26,7 @@ import { useLinkPaletteStore } from "@/features/notes/LinkInsertPalette";
 import { getActiveNoteEditor } from "@/features/notes/editorBridge";
 import { useShell } from "@/shell/store/useShell";
 import { useAuth } from "@/features/auth/authStore";
+import { useHelp } from "@/features/help/helpStore";
 import { ipc } from "@/lib/ipc";
 import { listChatsForProject, logActivity } from "@/lib/db";
 import { log } from "@/lib/log";
@@ -451,6 +452,14 @@ export function installBuiltinCommands() {
     group: "View",
     when: () => useAuth.getState().hasAccount,
     run: () => void useAuth.getState().lock(),
+  });
+
+  registry.register({
+    id: "help.open",
+    label: "Help: Orion Terminal Guide",
+    keywords: ["help", "docs", "guide", "manual", "how to", "getting started", "about"],
+    group: "View",
+    run: () => useHelp.getState().show(),
   });
 
   registry.register({
