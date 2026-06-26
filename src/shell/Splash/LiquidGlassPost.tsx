@@ -43,13 +43,18 @@ const POST_FRAG = /* glsl */ `
     return vec3(1.0, 0.18, 0.26) * g * (0.42 + uSpark * 0.12);
   }
   vec3 bg(vec2 px){ return scene(px) + glowAt(px); }
+  // 3x3 gaussian — frosts the busy wireframe into smooth glass.
   vec3 bgBlur(vec2 px, float rad){
-    vec3 c = bg(px);
-    c += bg(px + vec2(rad, 0.0));
-    c += bg(px + vec2(-rad, 0.0));
-    c += bg(px + vec2(0.0, rad));
-    c += bg(px + vec2(0.0, -rad));
-    return c / 5.0;
+    vec3 c = bg(px) * 4.0;
+    c += bg(px + vec2(rad, 0.0)) * 2.0;
+    c += bg(px + vec2(-rad, 0.0)) * 2.0;
+    c += bg(px + vec2(0.0, rad)) * 2.0;
+    c += bg(px + vec2(0.0, -rad)) * 2.0;
+    c += bg(px + vec2(rad, rad));
+    c += bg(px + vec2(-rad, rad));
+    c += bg(px + vec2(rad, -rad));
+    c += bg(px + vec2(-rad, -rad));
+    return c / 16.0;
   }
 
   void main(){
@@ -75,16 +80,17 @@ const POST_FRAG = /* glsl */ `
     // Chromatic aberration — strongest at the very edge.
     float edge = smoothstep(0.0, 0.045, inv);
     vec2 shift = dir * (1.0 - edge) * (6.0 + uSpark * 4.0);
-    float frost = 1.4;
+    float frost = 3.0;
     vec3 col = vec3(
       bgBlur(coord - shift, frost).r,
       bgBlur(coord, frost).g,
       bgBlur(coord + shift, frost).b
     );
 
-    // Cool glass tint + slight darken for legible text on top.
+    // Cool glass tint + darken so the panel reads as frosted glass and the
+    // text on top stays legible.
     col *= vec3(0.9, 0.95, 1.02);
-    col = mix(col, vec3(0.03, 0.045, 0.065), 0.16);
+    col = mix(col, vec3(0.04, 0.05, 0.07), 0.26);
 
     // Bevel specular: bright at the rim, brightest along the top edge.
     float rim = 1.0 - smoothstep(0.0, 0.05, inv);

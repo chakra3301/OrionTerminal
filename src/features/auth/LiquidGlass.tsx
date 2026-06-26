@@ -51,7 +51,6 @@ export function LiquidGlassCard({
     >
       <span className="ot-glass-tint" aria-hidden />
       <span className="ot-glass-specular" aria-hidden />
-      <span className="ot-glass-sheen" aria-hidden />
       <div className="ot-glass-body">{children}</div>
     </form>
   );

@@ -38,8 +38,8 @@
 
 /* ── Liquid glass ──────────────────────────────────────────────────────────
    Frosted, refractive, light-catching glass that the live red core glows
-   through. Layered: backdrop frost (card) → animated refraction → tint →
-   specular edge → moving sheen → content. */
+   through. Layered: backdrop frost (card) → WebGL refraction → tint →
+   specular edge → content. */
 .ot-auth-card.ot-glass {
   position: relative;
   overflow: hidden;
@@ -74,70 +74,33 @@
 }
 
 .ot-glass-tint,
-.ot-glass-specular,
-.ot-glass-sheen {
+.ot-glass-specular {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
 }
 
-/* Very light tint — WebGL already darkens the panel for legibility. */
+/* Tint — calms the busy core behind the glass and keeps text legible. */
 .ot-glass-tint {
   z-index: 2;
   background: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.04),
-    rgba(8, 12, 18, 0.05)
+    rgba(6, 10, 15, 0.16)
   );
 }
 
-/* Specular: top-left edge catches the light. */
+/* Specular: a soft, static highlight on the top edge (no animation). */
 .ot-glass-specular {
   z-index: 3;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.45) 0%, transparent 22%),
-    linear-gradient(315deg, rgba(255, 255, 255, 0.1) 0%, transparent 16%);
-  mix-blend-mode: screen;
-  opacity: 0.85;
-}
-
-/* Slow diagonal sheen sweep. */
-.ot-glass-sheen {
-  z-index: 3;
-  overflow: hidden;
-}
-.ot-glass-sheen::before {
-  content: "";
-  position: absolute;
-  top: -50%;
-  left: -60%;
-  width: 45%;
-  height: 200%;
   background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.16),
-    transparent
+    135deg,
+    rgba(255, 255, 255, 0.26) 0%,
+    transparent 16%
   );
-  transform: rotate(18deg);
-  animation: ot-glass-sweep 8s ease-in-out infinite;
-}
-
-@keyframes ot-glass-sweep {
-  0% {
-    left: -60%;
-  }
-  55%,
-  100% {
-    left: 150%;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ot-glass-sheen::before {
-    animation: none;
-  }
+  mix-blend-mode: screen;
+  opacity: 0.7;
 }
 
 .ot-auth-badge {
