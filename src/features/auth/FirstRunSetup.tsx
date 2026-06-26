@@ -3,7 +3,7 @@ import { Eye, EyeOff, Sparkles, ArrowRight } from "lucide-react";
 import { SplashScreen } from "@/shell/Splash/SplashScreen";
 import { useCoreReactions } from "@/shell/Splash/coreReactions";
 import { useAuth } from "./authStore";
-import { LiquidGlassCard, GlassFilterDefs } from "./LiquidGlass";
+import { LiquidGlassCard } from "./LiquidGlass";
 import "./auth.css";
 
 const spark = () => useCoreReactions.getState().spark();
@@ -47,7 +47,6 @@ export function FirstRunSetup() {
   return (
     <>
       <SplashScreen mode="idle" ready={false} />
-      <GlassFilterDefs />
       <div className="ot-auth-overlay">
         <LiquidGlassCard wide onSubmit={submit}>
           <div className="ot-auth-badge">

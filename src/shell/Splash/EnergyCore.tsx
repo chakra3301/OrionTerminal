@@ -3,6 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { SNOISE_GLSL } from "./snoise";
 import { useCoreReactions, sparkEnvelope } from "./coreReactions";
+import { LiquidGlassPost } from "./LiquidGlassPost";
 
 export type CoreMode = "launch" | "idle";
 
@@ -234,6 +235,8 @@ function Scene({
       useCoreReactions.getState().impulses,
       performance.now(),
     );
+    // Publish the envelope so the liquid-glass post pass flares with typing.
+    state.scene.userData.spark = reduced ? env * 0.5 : env;
 
     if (reduced) {
       // Static-ish gentle glow: no assembly burst, minimal churn. Sparks still
@@ -323,6 +326,7 @@ export function EnergyCore({
     >
       <ambientLight intensity={0.4} />
       <Scene mode={mode} reduced={reduced} particleCount={particleCount} />
+      <LiquidGlassPost />
     </Canvas>
   );
 }
