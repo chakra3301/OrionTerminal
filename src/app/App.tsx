@@ -24,6 +24,8 @@ import { useSkillsStore } from "@/store/skillsStore";
 import { useAgentsStore } from "@/store/agentsStore";
 import { LinkInsertPalette } from "@/features/notes/LinkInsertPalette";
 import { HelpWindow } from "@/features/help/HelpWindow";
+import { Walkthrough } from "@/features/onboarding/Walkthrough";
+import { useOnboarding } from "@/features/onboarding/onboardingStore";
 import { purgeEmptyNotes } from "@/lib/db";
 import { ipc } from "@/lib/ipc";
 import { startFileDropOrchestrator } from "@/lib/fileDrop";
@@ -592,6 +594,9 @@ export default function App() {
   const [probed, setProbed] = useState(false);
   const authPhase = useAuth((s) => s.phase);
   const warm = useAuth((s) => s.warm);
+  // True once we're actually displaying the shell (not splash / gate / blank).
+  const inShell =
+    hydrated && (warm || (probed && splashDone && authPhase === "unlocked"));
   useWindowSizePersistence();
   useShellWindowsPersistence();
   useXDesignPersistence();
@@ -620,6 +625,12 @@ export default function App() {
       .finally(() => setHydrated(true));
   }, []);
 
+  // First-run walkthrough — offered once we land in the shell. No-op unless
+  // this is a genuinely fresh, empty vault (existing vaults are marked seen).
+  useEffect(() => {
+    if (inShell) void useOnboarding.getState().maybeAutoStart();
+  }, [inShell]);
+
   const shellTree = (
     <ErrorBoundary>
       <HotkeyHost />
@@ -630,6 +641,7 @@ export default function App() {
       <KeybindingsOverlay />
       <LinkInsertPalette />
       <HelpWindow />
+      <Walkthrough />
     </ErrorBoundary>
   );
 

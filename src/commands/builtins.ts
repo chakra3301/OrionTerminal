@@ -27,6 +27,7 @@ import { getActiveNoteEditor } from "@/features/notes/editorBridge";
 import { useShell } from "@/shell/store/useShell";
 import { useAuth } from "@/features/auth/authStore";
 import { useHelp } from "@/features/help/helpStore";
+import { useOnboarding } from "@/features/onboarding/onboardingStore";
 import { ipc } from "@/lib/ipc";
 import { listChatsForProject, logActivity } from "@/lib/db";
 import { log } from "@/lib/log";
@@ -452,6 +453,14 @@ export function installBuiltinCommands() {
     group: "View",
     when: () => useAuth.getState().hasAccount,
     run: () => void useAuth.getState().lock(),
+  });
+
+  registry.register({
+    id: "onboarding.show",
+    label: "Show Walkthrough",
+    keywords: ["walkthrough", "tour", "onboarding", "coachmarks", "intro", "getting started", "guide"],
+    group: "View",
+    run: () => useOnboarding.getState().start(),
   });
 
   registry.register({

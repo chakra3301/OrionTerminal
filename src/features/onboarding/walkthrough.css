@@ -1,0 +1,145 @@
+.ot-coach {
+  position: fixed;
+  inset: 0;
+  z-index: 8800;
+}
+
+/* Full-screen dim used when a target can't be measured. */
+.ot-coach-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 4, 8, 0.66);
+}
+
+/* Cutout: a transparent box over the target with a huge spread shadow that
+   dims everything around it. Pointer-events off so the dock stays visible. */
+.ot-coach-cutout {
+  position: absolute;
+  border-radius: var(--r-md, 10px);
+  box-shadow:
+    0 0 0 9999px rgba(2, 4, 8, 0.66),
+    0 0 0 1px rgba(0, 224, 255, 0.5) inset;
+  outline: 1.5px solid var(--neon-cyan, #00e0ff);
+  outline-offset: 2px;
+  pointer-events: none;
+  animation: ot-coach-ring 1.8s ease-in-out infinite;
+}
+
+.ot-coach-card {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: var(--r-md, 10px);
+  background: var(--glass-bg-strong, rgba(8, 13, 18, 0.94));
+  border: 1px solid var(--glass-border-bright, rgba(180, 255, 220, 0.18));
+  box-shadow:
+    var(--shadow-window, 0 30px 80px -20px rgba(0, 0, 0, 0.7)),
+    0 0 30px -8px rgba(0, 224, 255, 0.4);
+  backdrop-filter: blur(18px);
+  animation: ot-coach-pop 0.28s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+
+.ot-coach-step {
+  font-family: var(--f-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--neon-cyan, #00e0ff);
+}
+.ot-coach-title {
+  font-family: var(--f-display, sans-serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--t-primary, #e6f4ec);
+}
+.ot-coach-body {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--t-secondary, #9ab0a8);
+}
+
+.ot-coach-dots {
+  display: flex;
+  gap: 6px;
+  margin: 2px 0 4px;
+}
+.ot-coach-dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--t-faint, #324036);
+  transition: background 0.2s ease;
+}
+.ot-coach-dots .dot.on {
+  background: var(--neon-cyan, #00e0ff);
+  box-shadow: 0 0 8px -1px rgba(0, 224, 255, 0.7);
+}
+
+.ot-coach-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.ot-coach-nav {
+  display: flex;
+  gap: 8px;
+}
+.ot-coach-skip,
+.ot-coach-back {
+  background: transparent;
+  border: none;
+  color: var(--t-tertiary, #5a706a);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+.ot-coach-skip:hover,
+.ot-coach-back:hover {
+  color: var(--t-secondary, #9ab0a8);
+}
+.ot-coach-next {
+  padding: 6px 16px;
+  border: none;
+  border-radius: var(--r-sm, 6px);
+  background: var(--neon-cyan, #00e0ff);
+  color: #011018;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 0 18px -5px rgba(0, 224, 255, 0.7);
+}
+.ot-coach-next:hover {
+  filter: brightness(1.08);
+}
+
+@keyframes ot-coach-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes ot-coach-ring {
+  0%,
+  100% {
+    outline-color: rgba(0, 224, 255, 0.85);
+  }
+  50% {
+    outline-color: rgba(0, 224, 255, 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ot-coach-cutout {
+    animation: none;
+  }
+  .ot-coach-card {
+    animation: none;
+  }
+}

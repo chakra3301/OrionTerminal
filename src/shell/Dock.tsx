@@ -127,6 +127,7 @@ export function Dock() {
               cursorX={cursorX}
               active={active}
               title={a.title}
+              coachId={`app-${a.id}`}
               onClick={() => handleDockClick(a.id)}
             >
               <div
@@ -142,6 +143,7 @@ export function Dock() {
         <DockTile
           cursorX={cursorX}
           title="Spotlight (⌘K)"
+          coachId="spotlight"
           onClick={() => openSpotlight()}
         >
           <Search size={18} color="var(--t-primary)" />
@@ -149,6 +151,7 @@ export function Dock() {
         <DockTile
           cursorX={cursorX}
           title="Summon R.O.S.I.E (⌘L)"
+          coachId="rosie"
           onClick={() => useRosie.getState().togglePanel()}
         >
           <div
@@ -174,6 +177,7 @@ function DockTile({
   cursorX,
   active,
   title,
+  coachId,
   onClick,
   interactive = true,
 }: {
@@ -181,6 +185,7 @@ function DockTile({
   cursorX: number | null;
   active?: boolean;
   title: string;
+  coachId?: string;
   onClick?: () => void;
   interactive?: boolean;
 }) {
@@ -208,6 +213,7 @@ function DockTile({
       className={`ot-dock-item${active ? " active" : ""}`}
       onClick={onClick}
       title={title}
+      data-coach={coachId}
       style={{
         transform,
         transformOrigin: "50% 100%",
