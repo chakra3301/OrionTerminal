@@ -22,23 +22,31 @@ export function LiquidGlassCard({
   useEffect(() => {
     const el = formRef.current;
     if (!el) return;
-    const measure = () => {
+    // Track the card's screen rect every frame so the WebGL glass stays locked
+    // to it through entrance animations, resizes and layout shifts (a
+    // ResizeObserver misses transform-driven moves → the glass would drift off
+    // the card and read as a double box). getBoundingClientRect is cheap; we
+    // only push to the store when it actually changes.
+    let raf = 0;
+    let prev = "";
+    const tick = () => {
       const r = el.getBoundingClientRect();
-      useGlassRect.getState().setRect({
-        cx: r.left + r.width / 2,
-        cy: r.top + r.height / 2,
-        w: r.width,
-        h: r.height,
-        r: CARD_RADIUS,
-      });
+      const key = `${r.left}|${r.top}|${r.width}|${r.height}`;
+      if (key !== prev) {
+        prev = key;
+        useGlassRect.getState().setRect({
+          cx: r.left + r.width / 2,
+          cy: r.top + r.height / 2,
+          w: r.width,
+          h: r.height,
+          r: CARD_RADIUS,
+        });
+      }
+      raf = requestAnimationFrame(tick);
     };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    window.addEventListener("resize", measure);
+    tick();
     return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", measure);
+      cancelAnimationFrame(raf);
       useGlassRect.getState().setRect(null);
     };
   }, []);

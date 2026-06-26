@@ -70,36 +70,38 @@ const POST_FRAG = /* glsl */ `
 
     vec2 dir = gc / max(length(gc), 0.0001);
 
-    // Edge-weighted lens: flat in the middle, bends hard near the rounded rim.
-    float depth = 0.16;
+    // Whole-panel magnification (samples toward centre) + a hard edge-lens
+    // bulge near the rounded rim.
+    float depth = 0.22;
     float dfc = 1.0 - clamp(inv / depth, 0.0, 1.0);
     float distortion = 1.0 - sqrt(max(1.0 - dfc * dfc, 0.0));
-    vec2 offset = distortion * dir * uGlassSize * 0.5 * 0.18;
-    vec2 coord = fragPx - offset;
+    vec2 zoomed = uGlassCenter + (fragPx - uGlassCenter) * (1.0 - 0.15);
+    vec2 edgeOffset = distortion * dir * uGlassSize * 0.5 * 0.34;
+    vec2 coord = zoomed - edgeOffset;
 
-    // Chromatic aberration — strongest at the very edge.
-    float edge = smoothstep(0.0, 0.045, inv);
-    vec2 shift = dir * (1.0 - edge) * (6.0 + uSpark * 4.0);
-    float frost = 3.0;
+    // Chromatic aberration — strong at the rim, a little everywhere.
+    float edge = smoothstep(0.0, 0.05, inv);
+    vec2 shift = dir * ((1.0 - edge) * (13.0 + uSpark * 6.0) + 2.5);
+    float frost = 2.6;
     vec3 col = vec3(
       bgBlur(coord - shift, frost).r,
       bgBlur(coord, frost).g,
       bgBlur(coord + shift, frost).b
     );
 
-    // Cool glass tint + darken so the panel reads as frosted glass and the
-    // text on top stays legible.
-    col *= vec3(0.9, 0.95, 1.02);
-    col = mix(col, vec3(0.04, 0.05, 0.07), 0.26);
+    // Bright glass — minimal darkening, slight lift + cool tint.
+    col *= vec3(0.96, 0.99, 1.06);
+    col = mix(col, vec3(0.05, 0.06, 0.09), 0.08);
+    col *= 1.18;
 
     // Bevel specular: bright at the rim, brightest along the top edge.
     float rim = 1.0 - smoothstep(0.0, 0.05, inv);
     float topLight = clamp(-dir.y, 0.0, 1.0);
-    col += rim * (0.10 + 0.26 * topLight);
+    col += rim * (0.12 + 0.30 * topLight);
     // Faint inner light ring just inside the bevel.
     float ring = smoothstep(0.03, 0.055, inv) * (1.0 - smoothstep(0.055, 0.1, inv));
-    col += ring * vec3(0.05, 0.09, 0.13);
-    col += uSpark * 0.05;
+    col += ring * vec3(0.06, 0.10, 0.14);
+    col += uSpark * 0.06;
 
     gl_FragColor = vec4(col, 1.0);
   }
