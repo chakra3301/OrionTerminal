@@ -44,7 +44,11 @@ export function SplashScreen({
   onDone?: () => void;
 }) {
   const [fading, setFading] = useState(false);
-  const reduced = useRef(prefersReducedMotion() || reduceGlassActive()).current;
+  // Only the OS "Reduce Motion" accessibility preference makes the core static.
+  // The app's reduce_glass (a GPU/transparency setting) merely trims particle
+  // count — the one-shot launch animation still plays.
+  const staticCore = useRef(prefersReducedMotion()).current;
+  const lowGpu = useRef(prefersReducedMotion() || reduceGlassActive()).current;
   const mountedAt = useRef(performance.now());
   const doneFired = useRef(false);
 
@@ -52,11 +56,11 @@ export function SplashScreen({
   // elapsed (never just a flash). minMs trimmed when motion is reduced.
   useEffect(() => {
     if (!ready || !onDone || fading) return;
-    const effMin = reduced ? Math.min(minMs, 700) : minMs;
+    const effMin = staticCore ? Math.min(minMs, 800) : minMs;
     const remaining = Math.max(0, effMin - (performance.now() - mountedAt.current));
     const t = setTimeout(() => setFading(true), remaining);
     return () => clearTimeout(t);
-  }, [ready, onDone, fading, minMs, reduced]);
+  }, [ready, onDone, fading, minMs, staticCore]);
 
   // After the fade transition, hand off.
   useEffect(() => {
@@ -69,7 +73,16 @@ export function SplashScreen({
   }, [fading, onDone]);
 
   const count =
-    particleCount ?? (mode === "idle" ? 520 : reduced ? 140 : 1600);
+    particleCount ??
+    (mode === "idle"
+      ? lowGpu
+        ? 220
+        : 520
+      : staticCore
+        ? 140
+        : lowGpu
+          ? 850
+          : 1600);
 
   return (
     <div
@@ -81,7 +94,7 @@ export function SplashScreen({
       <div className="ot-splash-vignette" />
       <div className="ot-splash-canvas">
         <CoreBoundary>
-          <EnergyCore mode={mode} reduced={reduced} particleCount={count} />
+          <EnergyCore mode={mode} reduced={staticCore} particleCount={count} />
         </CoreBoundary>
       </div>
       {mode === "launch" && (
