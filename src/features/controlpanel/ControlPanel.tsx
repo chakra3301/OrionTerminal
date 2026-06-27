@@ -6,13 +6,17 @@ import { SkillLibraryPanel } from "./SkillLibraryPanel";
 import { AgentForge } from "./AgentForge";
 import { APIKeySection, ThemeSection, WallpaperSection, McpSection, ShortcutsSection, AboutSection } from "@/features/settings/SettingsPanel";
 import { AccountSection } from "@/features/auth/AccountSection";
-import { X, Cpu, Hammer, Sparkles, KeyRound, Palette, Image as ImageIcon, Plug, Keyboard, Info, ShieldCheck } from "lucide-react";
+import { OrionSettings, ArchivesSettings, XDesignSettings } from "./AppSettingsPanels";
+import { X, Cpu, Hammer, Sparkles, KeyRound, Palette, Image as ImageIcon, Plug, Keyboard, Info, ShieldCheck, Code2, BookOpen, PenTool } from "lucide-react";
 import "./controlpanel.css";
 
 const NAV: { key: CpSection; label: string; Icon: LucideIcon }[] = [
   { key: "providers", label: "Providers", Icon: Cpu },
   { key: "agents", label: "Agent Forge", Icon: Hammer },
   { key: "skills", label: "Skill Library", Icon: Sparkles },
+  { key: "app-orion", label: "Orion", Icon: Code2 },
+  { key: "app-archives", label: "Archives 47", Icon: BookOpen },
+  { key: "app-xdesign", label: "XDesign", Icon: PenTool },
   { key: "account", label: "Account", Icon: ShieldCheck },
   { key: "key", label: "API Keys", Icon: KeyRound },
   { key: "theme", label: "Appearance", Icon: Palette },
@@ -65,6 +69,9 @@ export function ControlPanel() {
             {section === "providers" && <ProvidersPanel />}
             {section === "agents" && <AgentForge />}
             {section === "skills" && <SkillLibraryPanel />}
+            {section === "app-orion" && <OrionSettings />}
+            {section === "app-archives" && <ArchivesSettings />}
+            {section === "app-xdesign" && <XDesignSettings />}
             {section === "account" && <AccountSection />}
             {section === "key" && <APIKeySection />}
             {section === "theme" && <ThemeSection />}

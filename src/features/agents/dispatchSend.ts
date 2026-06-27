@@ -75,7 +75,29 @@ export type DispatchSendArgs = {
   projectRoot?: string | null;
   sessionId?: string | null;
   imagePath?: string | null;
+  /** Per-app overrides merged into the resolved send (system prompt extras,
+   *  tool restriction) — see appConfigStore. */
+  extra?: SendExtra;
 };
+
+export type SendExtra = {
+  systemAppend?: string | null;
+  /** null leaves the base unrestricted; an array restricts to those tools
+   *  (unioned with any tools the base/agent already grants). */
+  allowedTools?: string[] | null;
+};
+
+/** Fold per-app extras into an already-resolved send. */
+function mergeExtra(r: ResolvedSend, extra?: SendExtra): ResolvedSend {
+  if (!extra) return r;
+  const systemAppend =
+    [r.systemAppend, extra.systemAppend].filter((s) => s && s.trim()).join("\n\n") || null;
+  let allowedTools = r.allowedTools;
+  if (extra.allowedTools) {
+    allowedTools = [...new Set([...(r.allowedTools ?? []), ...extra.allowedTools])];
+  }
+  return { ...r, systemAppend, allowedTools };
+}
 
 export type ResolvedDispatchOpts = {
   projectRoot?: string | null;
@@ -130,7 +152,7 @@ export async function dispatchResolved(
 }
 
 export async function dispatchSend(args: DispatchSendArgs): Promise<void> {
-  const r = resolveSendFromStores(args.value);
+  const r = mergeExtra(resolveSendFromStores(args.value), args.extra);
   return dispatchResolved(args.chatId, r, args.prompt, args.history, {
     projectRoot: args.projectRoot,
     sessionId: args.sessionId,
@@ -155,7 +177,7 @@ export async function dispatchAgentTurn(
   args: DispatchSendArgs,
   hooks?: TwoPassHooks,
 ): Promise<void> {
-  const resolved = resolveSendFromStores(args.value);
+  const resolved = mergeExtra(resolveSendFromStores(args.value), args.extra);
   const opts: ResolvedDispatchOpts = {
     projectRoot: args.projectRoot,
     sessionId: args.sessionId,

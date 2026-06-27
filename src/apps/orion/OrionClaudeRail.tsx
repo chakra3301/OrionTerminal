@@ -11,7 +11,7 @@ import { log } from "@/lib/log";
 import { upsertChat } from "@/lib/db";
 import { scheduleReindex } from "@/lib/embeddingIndexer";
 import { useEffect } from "react";
-import { orionClaude } from "@/apps/orion/claude";
+import { useAppConfig, resolveConfig, appFirstTurnPreamble, appAllowedTools } from "@/store/appConfigStore";
 import {
   searchContextSuggestions,
   resolveContextChips,
@@ -130,6 +130,12 @@ export function OrionClaudeRail() {
     } else {
       appendUserMessage(text);
     }
+    // System prompt + skill instructions ride along on the first turn only;
+    // the CLI's --resume keeps them in context for follow-ups.
+    if (!chat.sessionId) {
+      const preamble = appFirstTurnPreamble("orion");
+      if (preamble) prompt = `${preamble}\n\n---\n\n${prompt}`;
+    }
     setRunning(true);
     try {
       await dispatchAgentTurn(
@@ -141,6 +147,7 @@ export function OrionClaudeRail() {
           projectRoot: project.root_path,
           sessionId: chat.sessionId,
           imagePath: null,
+          extra: { allowedTools: appAllowedTools("orion") },
         },
         {
           capturePlan: () => useChatStore.getState().sealPlanningTurn(),
@@ -159,9 +166,11 @@ export function OrionClaudeRail() {
     void dispatchCancel(active.id, useModelPrefs.getState().modelFor("orion"));
   };
 
+  const orionCfg = useAppConfig((s) => s.configs.orion);
+  const acfg = useMemo(() => resolveConfig("orion", orionCfg), [orionCfg]);
   const subtitle = active?.title
     ? `orix47 · ${active.title}`
-    : orionClaude.subtitle;
+    : acfg.subtitle;
 
   const disabledReason = !project
     ? "Open a project first"
@@ -170,12 +179,12 @@ export function OrionClaudeRail() {
   return (
     <ClaudeChat
       appId="orion"
-      name={orionClaude.name}
+      name={acfg.name}
       subtitle={subtitle}
-      accentColor={orionClaude.accentColor}
-      systemPrompt={orionClaude.systemPrompt}
-      openingLine={!active ? orionClaude.openingLine : undefined}
-      suggestionChips={orionClaude.suggestionChips}
+      accentColor={acfg.accentColor}
+      systemPrompt={acfg.systemPrompt}
+      openingLine={!active && acfg.openingLineEnabled ? acfg.openingLine : undefined}
+      suggestionChips={acfg.chipsEnabled ? acfg.chips : []}
       placeholder={
         running ? "Claude is working… (⌘. cancel)" : "Message Claude (↵ send · ⇧↵ newline)"
       }

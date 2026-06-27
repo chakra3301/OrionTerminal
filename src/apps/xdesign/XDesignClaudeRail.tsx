@@ -36,7 +36,8 @@ import {
 } from "@/apps/xdesign/artifactGuard";
 import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
-import { xdesignClaude, COMPOSER_PROMPT, composerVariationsPrompt } from "@/apps/xdesign/claude";
+import { COMPOSER_PROMPT, composerVariationsPrompt } from "@/apps/xdesign/claude";
+import { useAppConfig, resolveConfig, appFirstTurnPreamble, appAllowedTools } from "@/store/appConfigStore";
 import { composeCraftBrief, lensesForBrief } from "@/apps/xdesign/designKnowledge";
 import {
   extractHtmlArtifact,
@@ -241,6 +242,8 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     activeBrand ? `\n\n${designSystemToPrompt(activeBrand, { withRamps: true })}\n` : "";
 
   const thread = useAppChat((s) => s.threads.xdesign);
+  const xdesignCfg = useAppConfig((s) => s.configs.xdesign);
+  const acfg = useMemo(() => resolveConfig("xdesign", xdesignCfg), [xdesignCfg]);
   const appendUser = useAppChat((s) => s.appendUser);
   const beginAssistant = useAppChat((s) => s.beginAssistant);
   const setError = useAppChat((s) => s.setError);
@@ -447,8 +450,9 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
       const visionNote = snapshotPath
         ? "\n\nThe attached image is a render of the CURRENT canvas. Read it to judge layout, spacing, alignment, color, contrast, and overlap before deciding what to change."
         : "";
+      const preamble = isFirstTurn ? appFirstTurnPreamble("xdesign") : "";
       const prompt = isFirstTurn
-        ? `${xdesignClaude.systemPrompt}${brandBlock()}\n\n${note}${visionNote}\n\n---\n\n${sentText}`
+        ? `${preamble}${brandBlock()}\n\n${note}${visionNote}\n\n---\n\n${sentText}`
         : `${note}${visionNote}\n\n---\n\n${sentText}`;
       // Pass the snapshot path through to claude_send, which attaches it as a
       // real stream-json image block (NOT an `@path` mention — those get
@@ -461,6 +465,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
         projectRoot: null,
         sessionId: thread.sessionId,
         imagePath: snapshotPath,
+        extra: { allowedTools: appAllowedTools("xdesign") },
       });
     } catch (e) {
       log.error("xdesign chat send failed", e);
@@ -888,10 +893,10 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
         type="button"
         className="xd-claude-fab"
         onClick={() => setOpen(true)}
-        title={`${xdesignClaude.name} (⌘L)`}
+        title={`${acfg.name} (⌘L)`}
       >
         <Sparkles size={14} />
-        <span>Ask {xdesignClaude.name}</span>
+        <span>Ask {acfg.name}</span>
       </button>
     );
   }
@@ -933,7 +938,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
         style={floating ? undefined : { cursor: "default" }}
       >
         <Sparkles size={12} color="var(--xd-accent)" />
-        {!collapsed && <span className="title">{xdesignClaude.name}</span>}
+        {!collapsed && <span className="title">{acfg.name}</span>}
         <div className="xd-rail-actions">
           <button
             type="button"
@@ -1014,14 +1019,16 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
           )}
           <ClaudeChat
             appId="xdesign"
-            name={xdesignClaude.name}
-            subtitle={xdesignClaude.subtitle}
-            accentColor={xdesignClaude.accentColor}
-            systemPrompt={xdesignClaude.systemPrompt}
+            name={acfg.name}
+            subtitle={acfg.subtitle}
+            accentColor={acfg.accentColor}
+            systemPrompt={acfg.systemPrompt}
             openingLine={
-              thread.messages.length === 0 ? xdesignClaude.openingLine : undefined
+              thread.messages.length === 0 && acfg.openingLineEnabled
+                ? acfg.openingLine
+                : undefined
             }
-            suggestionChips={xdesignClaude.suggestionChips}
+            suggestionChips={acfg.chipsEnabled ? acfg.chips : []}
             placeholder={
               toolMode
                 ? TOOL_MODES[toolMode].placeholder

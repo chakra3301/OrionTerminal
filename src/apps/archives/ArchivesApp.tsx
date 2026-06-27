@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Panel,
   PanelGroup,
@@ -18,7 +18,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
-import { archivesClaude } from "@/apps/archives/claude";
+import { useAppConfig, resolveConfig, appFirstTurnPreamble, appAllowedTools } from "@/store/appConfigStore";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
@@ -74,6 +74,8 @@ const LIBRARY: NavItem[] = [
 const knownChatIds = new Set<string>();
 
 export function ArchivesApp() {
+  const archivesCfg = useAppConfig((s) => s.configs.archives);
+  const acfg = useMemo(() => resolveConfig("archives", archivesCfg), [archivesCfg]);
   const view = useArchives((s) => s.view);
   const setView = useArchives((s) => s.setView);
   const noteCount = useArchives((s) => s.noteCount);
@@ -225,8 +227,9 @@ export function ArchivesApp() {
     beginAssistant("archives", chatId);
     try {
       const isFirstTurn = !thread.sessionId;
-      const prompt = isFirstTurn
-        ? `${archivesClaude.systemPrompt}\n\n---\n\n${text}`
+      const preamble = appFirstTurnPreamble("archives");
+      const prompt = isFirstTurn && preamble
+        ? `${preamble}\n\n---\n\n${text}`
         : text;
       await dispatchSend({
         chatId,
@@ -236,6 +239,7 @@ export function ArchivesApp() {
         projectRoot: null,
         sessionId: thread.sessionId,
         imagePath: null,
+        extra: { allowedTools: appAllowedTools("archives") },
       });
     } catch (e) {
       log.error("archives chat send failed", e);
@@ -367,14 +371,16 @@ export function ArchivesApp() {
           <div className="ar-claude-pane">
             <ClaudeChat
               appId="archives"
-              name={archivesClaude.name}
+              name={acfg.name}
               subtitle={subtitle}
-              accentColor={archivesClaude.accentColor}
-              systemPrompt={archivesClaude.systemPrompt}
+              accentColor={acfg.accentColor}
+              systemPrompt={acfg.systemPrompt}
               openingLine={
-                thread.messages.length === 0 ? archivesClaude.openingLine : undefined
+                thread.messages.length === 0 && acfg.openingLineEnabled
+                  ? acfg.openingLine
+                  : undefined
               }
-              suggestionChips={archivesClaude.suggestionChips}
+              suggestionChips={acfg.chipsEnabled ? acfg.chips : []}
               placeholder={thread.error ?? "Ask the archive…"}
               messages={chatMessages}
               running={thread.running}

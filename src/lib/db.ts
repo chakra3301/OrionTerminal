@@ -40,6 +40,7 @@ export type AppStateKey =
   | "voice.listenMode"
   | "mcp.servers"
   | "models"
+  | "appconfig"
   | "widget.monitor"
   | "reduce_glass"
   | "tab_autocomplete"

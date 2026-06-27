@@ -42,6 +42,7 @@ import { startFileDropOrchestrator } from "@/lib/fileDrop";
 import { useProjectStore } from "@/store/projectStore";
 import { useThemeStore } from "@/store/themeStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
+import { useAppConfig, type AppConfigsPersist } from "@/store/appConfigStore";
 import { useWallpaperStore, type WallpaperState } from "@/store/wallpaperStore";
 import { usePreviewStore, type PreviewState } from "@/store/previewStore";
 import { useXDesign } from "@/apps/xdesign/store";
@@ -124,6 +125,7 @@ async function hydrate() {
     modelPrefs,
     reduceGlass,
     tabAutocomplete,
+    appConfigs,
   ] = await Promise.all([
     getAppState<{ sidebar: number; main: number; right: number }>("panel_sizes"),
     getAppState<boolean>("sidebar_open"),
@@ -140,6 +142,7 @@ async function hydrate() {
     getAppState<Record<string, string>>("models"),
     getAppState<boolean>("reduce_glass"),
     getAppState<boolean>("tab_autocomplete"),
+    getAppState<AppConfigsPersist>("appconfig"),
   ]);
 
   useThemeStore.getState().hydrate(theme ?? null);
@@ -149,6 +152,7 @@ async function hydrate() {
   if (preview) usePreviewStore.getState().hydrate(preview);
   void useXDProjects.getState().init();
   useModelPrefs.getState().hydrate(modelPrefs);
+  useAppConfig.getState().hydrate(appConfigs);
 
   useLayoutStore.getState().hydrate({
     ...(panelSizes ? { sizes: panelSizes } : {}),
