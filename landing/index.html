@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Orion Terminal — One terminal. One brain.</title>
+<meta name="description" content="A JARVIS-style personal workstation. A desktop shell with a code editor, a personal Notion, and a design studio — each one Claude-native. Local-first. Yours." />
+<meta name="theme-color" content="#03060a" />
+<meta property="og:title" content="Orion Terminal — One terminal. One brain." />
+<meta property="og:description" content="One desktop shell. One Claude brain. Local-first. Yours." />
+<meta property="og:type" content="website" />
+<link rel="icon" href="icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://esm.sh/three@0.160.1",
+    "gsap": "https://esm.sh/gsap@3.12.5",
+    "gsap/ScrollTrigger": "https://esm.sh/gsap@3.12.5/ScrollTrigger",
+    "lenis": "https://esm.sh/lenis@1.1.20"
+  }
+}
+</script>
+
+<style>
+/* ============================ TOKENS ============================ */
+:root{
+  --bg-0:#03060a; --bg-1:#06070b; --ink:#080608;
+  --red:#ff1830; --red-2:#ff2a40; --crimson:#4a0010; --magenta:#ff3ea5; --hot:#fff2f2;
+  /* app signal accents (used only as 1px tags) */
+  --green:#39ff88; --cyan:#00e0ff; --mag:#ff3ea5;
+  --tx-0:#f6e9eb; --tx-1:#b08b90; --tx-2:#6f545b;
+  --line:rgba(255,42,64,.20);
+  --line-soft:rgba(255,255,255,.07);
+  --line-hot:rgba(255,42,64,.5);
+  --glass:rgba(10,7,9,.5);
+  --ease:cubic-bezier(.22,1,.36,1);
+  --maxw:1240px;
+  --fd:'Space Grotesk',system-ui,sans-serif;
+  --fm:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--fd);background:var(--bg-0);color:var(--tx-0);line-height:1.5;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;position:relative;
+}
+/* blueprint grid + scanline + vignette overlays */
+.bg-grid,.bg-scan,.bg-vig{position:fixed;inset:0;pointer-events:none;z-index:0}
+.bg-grid{
+  background-image:
+    linear-gradient(rgba(255,42,64,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,42,64,.045) 1px,transparent 1px);
+  background-size:48px 48px;
+  mask-image:radial-gradient(circle at 50% 30%,#000 0%,transparent 80%);
+}
+.bg-scan{
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0px,rgba(0,0,0,0) 2px,rgba(255,30,48,.018) 3px,rgba(0,0,0,0) 4px);
+  mix-blend-mode:overlay;
+}
+.bg-vig{background:radial-gradient(circle at 50% 40%,transparent 45%,rgba(2,3,6,.55) 80%,rgba(2,3,6,.95) 100%)}
+/* the three.js core canvas */
+#core-canvas{position:fixed;inset:0;width:100vw;height:100vh;z-index:1;pointer-events:none}
+
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 32px;position:relative;z-index:3}
+a{color:inherit;text-decoration:none}
+h1,h2,h3{line-height:1.02;letter-spacing:-.02em;font-weight:600}
+::selection{background:var(--red);color:#fff}
+:focus-visible{outline:2px solid var(--red-2);outline-offset:3px}
+img{display:block}
+
+.mono{font-family:var(--fm)}
+.eyebrow{
+  font-family:var(--fm);font-size:11px;font-weight:500;letter-spacing:.34em;
+  text-transform:uppercase;color:var(--red-2);display:inline-flex;align-items:center;gap:10px;
+}
+.eyebrow::before{content:"";width:22px;height:1px;background:var(--red-2);opacity:.7}
+
+/* ============================ BOOT ============================ */
+#boot{
+  position:fixed;inset:0;z-index:200;background:var(--bg-0);
+  display:grid;align-items:end;justify-items:center;padding-bottom:12vh;
+  transition:opacity .8s var(--ease),visibility .8s,background-color 1s var(--ease);
+}
+#boot.lit{background:transparent}      /* reveal the live core booting behind the HUD */
+#boot.nogl{background:radial-gradient(circle at center,rgba(255,24,48,.22),var(--bg-0) 60%)}
+#boot.done{opacity:0;visibility:hidden}
+.boot-in{text-align:center;font-family:var(--fm)}
+.boot-label{font-size:12px;letter-spacing:.42em;text-indent:.42em;color:var(--tx-0);text-shadow:0 0 16px rgba(255,40,60,.6)}
+.boot-sub{font-size:9px;letter-spacing:.34em;text-transform:uppercase;color:var(--tx-2);margin-top:9px}
+.boot-bar{width:160px;height:1px;background:var(--line);margin:18px auto 0;position:relative;overflow:hidden}
+.boot-bar i{position:absolute;left:0;top:0;height:100%;width:0;background:var(--red);box-shadow:0 0 10px var(--red);animation:bootbar 1.5s var(--ease) forwards}
+@keyframes bootbar{to{width:100%}}
+
+/* ============================ NAV ============================ */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:90;
+  backdrop-filter:blur(16px) saturate(130%);-webkit-backdrop-filter:blur(16px) saturate(130%);
+  background:linear-gradient(180deg,rgba(3,6,10,.82),rgba(3,6,10,.35));
+  border-bottom:1px solid var(--line);
+}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:66px}
+.brand{display:flex;align-items:center;gap:13px;font-weight:600;letter-spacing:.02em;font-size:15px}
+.brand img{width:30px;height:30px;filter:drop-shadow(0 0 10px rgba(255,30,48,.55))}
+.brand .bd{display:flex;flex-direction:column;line-height:1.05}
+.brand .bd small{font-family:var(--fm);font-size:8.5px;letter-spacing:.3em;color:var(--tx-2);text-transform:uppercase}
+.nav-links{display:flex;align-items:center;gap:30px;font-family:var(--fm);font-size:12px;letter-spacing:.06em;color:var(--tx-1);text-transform:uppercase}
+.nav-links a:not(.btn){transition:color .2s}
+.nav-links a:not(.btn):hover{color:var(--tx-0)}
+@media(max-width:820px){.nav-links a:not(.btn){display:none}}
+
+.btn{
+  font-family:var(--fm);font-weight:500;font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+  padding:10px 20px;color:var(--hot);background:transparent;cursor:pointer;position:relative;
+  border:1px solid var(--line-hot);display:inline-flex;align-items:center;gap:9px;
+  transition:background .25s var(--ease),box-shadow .25s var(--ease),color .25s;
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%);
+}
+.btn::after{content:"";position:absolute;right:0;bottom:0;width:7px;height:7px;background:var(--line-hot)}
+.btn:hover{background:var(--red);color:#fff;box-shadow:0 0 30px -4px rgba(255,30,48,.7)}
+.btn.solid{background:var(--red);color:#fff;border-color:var(--red)}
+.btn.solid:hover{box-shadow:0 0 40px -4px rgba(255,30,48,.9);background:var(--red-2)}
+.btn.lg{padding:15px 30px;font-size:13px}
+
+/* ============================ HERO ============================ */
+header{position:relative;min-height:100svh;display:grid;align-items:center;padding:120px 0 80px;z-index:3}
+.hero{position:relative;text-align:center;display:grid;justify-items:center;gap:30px}
+.hero::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:760px;height:520px;max-width:120vw;z-index:-1;background:radial-gradient(ellipse at center,rgba(3,4,8,.78) 0%,rgba(3,4,8,.45) 45%,transparent 72%);filter:blur(8px);pointer-events:none}
+.hero .status{
+  display:inline-flex;align-items:center;gap:11px;padding:7px 16px;
+  border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(8px);
+  font-family:var(--fm);font-size:11px;letter-spacing:.16em;color:var(--tx-1);text-transform:uppercase;
+}
+.hero .status .dot{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 10px var(--red);animation:blip 1.8s ease-in-out infinite}
+@keyframes blip{0%,100%{opacity:1}50%{opacity:.3}}
+.hero .status.flash{animation:statusflash .7s var(--ease)}
+@keyframes statusflash{0%{border-color:var(--line-hot);color:var(--hot);box-shadow:0 0 26px rgba(255,42,64,.55)}100%{border-color:var(--line);color:var(--tx-1);box-shadow:none}}
+@media(prefers-reduced-motion:reduce){.hero .status.flash{animation:none}}
+h1.title{
+  font-size:clamp(3rem,1.6rem+7vw,8rem);font-weight:700;letter-spacing:-.04em;line-height:.92;
+  text-transform:uppercase;
+}
+h1.title .l2{
+  color:transparent;-webkit-text-stroke:1.4px var(--red-2);text-stroke:1.4px var(--red-2);
+  filter:drop-shadow(0 0 22px rgba(255,30,48,.55));
+}
+.hero .sub{max-width:62ch;font-size:clamp(1.05rem,.95rem+.5vw,1.35rem);color:var(--tx-1);line-height:1.55}
+.hero .sub b{color:var(--tx-0);font-weight:500}
+.hero-cta{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+
+/* corner registration ticks (technical frame) */
+.ticks{position:absolute;inset:88px 24px 24px;z-index:2;pointer-events:none}
+.tick{position:absolute;width:18px;height:18px;border-color:var(--line-hot);opacity:.6}
+.tick.tl{top:0;left:0;border-top:1px solid;border-left:1px solid}
+.tick.tr{top:0;right:0;border-top:1px solid;border-right:1px solid}
+.tick.bl{bottom:0;left:0;border-bottom:1px solid;border-left:1px solid}
+.tick.br{bottom:0;right:0;border-bottom:1px solid;border-right:1px solid}
+.coord{position:absolute;font-family:var(--fm);font-size:9.5px;letter-spacing:.2em;color:var(--tx-2);text-transform:uppercase}
+.coord.c1{top:-3px;left:26px}.coord.c2{bottom:-3px;right:26px}
+
+/* reticle that follows the pointer in hero */
+#reticle{position:fixed;z-index:8;width:46px;height:46px;margin:-23px 0 0 -23px;pointer-events:none;opacity:0;transition:opacity .3s,transform .08s linear;mix-blend-mode:screen}
+#reticle::before,#reticle::after{content:"";position:absolute;background:var(--red-2)}
+#reticle::before{left:50%;top:0;width:1px;height:100%;transform:translateX(-.5px);opacity:.6}
+#reticle::after{top:50%;left:0;height:1px;width:100%;transform:translateY(-.5px);opacity:.6}
+#reticle .b{position:absolute;inset:18px;border:1px solid var(--red);border-radius:50%}
+#reticle .rc{position:absolute;font-family:var(--fm);font-size:8px;color:var(--red-2);left:50px;top:18px;white-space:nowrap;letter-spacing:.1em}
+
+/* ============================ SECTION FRAME ============================ */
+section{position:relative;padding:120px 0;z-index:3}
+.sec-head{max-width:64ch;margin-bottom:60px}
+.sec-head.center{margin-inline:auto;text-align:center}
+.sec-head h2{font-size:clamp(2rem,1.3rem+2.8vw,3.6rem);margin:16px 0 18px;text-transform:uppercase;letter-spacing:-.02em}
+.sec-head p{color:var(--tx-1);font-size:1.12rem;max-width:56ch}
+.sec-head.center p{margin-inline:auto}
+
+/* divider readout strip */
+.strip{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:20px 0;overflow:hidden;position:relative;z-index:3}
+.strip-track{display:flex;gap:54px;white-space:nowrap;font-family:var(--fm);font-size:12px;letter-spacing:.22em;color:var(--tx-2);text-transform:uppercase;animation:march 26s linear infinite}
+.strip-track b{color:var(--red-2);font-weight:500}
+.strip-track span{display:inline-flex;gap:54px}
+@keyframes march{to{transform:translateX(-50%)}}
+
+/* ============================ APP MODULES ============================ */
+.module{
+  display:grid;grid-template-columns:1.05fr 1fr;gap:64px;align-items:center;
+  padding:80px 0;border-top:1px solid var(--line);position:relative;
+}
+.module.flip .m-copy{order:2}
+.module .unit{font-family:var(--fm);font-size:11px;letter-spacing:.3em;color:var(--tx-2);text-transform:uppercase;display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.module .unit .ac{width:9px;height:9px;border-radius:50%}
+.module h3{font-size:clamp(1.8rem,1.2rem+2vw,2.9rem);margin-bottom:18px;text-transform:uppercase;letter-spacing:-.02em}
+.module .lede{color:var(--tx-1);font-size:1.08rem;margin-bottom:26px;max-width:46ch}
+.module .lede b{color:var(--tx-0);font-weight:500}
+.feat{list-style:none;display:grid;gap:12px;font-family:var(--fm);font-size:13px}
+.feat li{display:flex;gap:13px;align-items:baseline;color:var(--tx-1)}
+.feat li .n{color:var(--tx-2);font-size:11px}
+.feat li b{color:var(--tx-0);font-weight:500}
+
+/* schematic panel (CSS wireframe UI) */
+.schem{
+  position:relative;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,30,48,.03),transparent);
+  padding:0;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,.8);
+}
+.schem::before,.schem::after{content:"";position:absolute;width:14px;height:14px;border-color:var(--line-hot);z-index:2}
+.schem::before{top:8px;left:8px;border-top:1px solid;border-left:1px solid}
+.schem::after{bottom:8px;right:8px;border-bottom:1px solid;border-right:1px solid}
+.schem .sbar{display:flex;align-items:center;gap:8px;padding:11px 16px;border-bottom:1px solid var(--line);font-family:var(--fm);font-size:11px;color:var(--tx-1)}
+.schem .sbar i{width:8px;height:8px;border-radius:50%;background:var(--tx-2);display:inline-block}
+.schem .sbar .tt{margin-left:6px;letter-spacing:.06em}
+.schem .sbody{padding:22px;font-family:var(--fm);font-size:12.5px;line-height:1.85;color:var(--tx-1);min-height:230px}
+.wl{color:var(--green)}.kw{color:var(--magenta)}.fn{color:var(--cyan)}.st{color:var(--green)}.ln{color:var(--tx-2);margin-right:12px}
+.ghost{color:var(--tx-2);opacity:.6;border-bottom:1px dashed var(--tx-2)}
+.chip{display:inline-block;padding:2px 10px;border:1px solid var(--line);font-size:10px;letter-spacing:.1em}
+.claude{margin-top:16px;padding:11px 13px;border:1px solid var(--line);background:rgba(0,0,0,.3);font-size:11.5px;color:var(--tx-1)}
+.claude .who{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+.claude .who .o{width:8px;height:8px;border-radius:50%}
+.dbrow{display:flex;gap:12px;padding:7px 0;border-bottom:1px solid var(--line-soft);align-items:center}
+.dbrow .pill{font-size:9.5px;padding:2px 9px;border:1px solid var(--line)}
+.swatches{display:flex;gap:10px;margin:14px 0 8px}
+.swatches span{width:30px;height:30px;border:1px solid rgba(255,255,255,.12)}
+.accent-g{--ac:var(--green)} .accent-c{--ac:var(--cyan)} .accent-m{--ac:var(--mag)}
+.module .ac,.schem.tg .sbar i:first-child{background:var(--ac)}
+.schem.tg{border-color:color-mix(in srgb,var(--ac) 28%,var(--line))}
+.schem.tg .sbar .tt{color:var(--ac)}
+
+@media(max-width:880px){
+  .module{grid-template-columns:1fr;gap:34px}
+  .module.flip .m-copy{order:0}
+}
+
+/* ============================ ONE BRAIN ============================ */
+.brain{
+  position:relative;text-align:center;padding:40px 0;
+}
+.brain .orbit{position:relative;width:min(560px,82vw);aspect-ratio:1;margin:30px auto 44px}
+.brain .orbit .ring{position:absolute;inset:0;border:1px solid var(--line);border-radius:50%}
+.brain .orbit .ring.r2{inset:14%;border-color:var(--line-soft)}
+.brain .orbit .ring.r3{inset:30%;border-style:dashed;border-color:var(--line)}
+.brain .orbit .node{
+  position:absolute;width:auto;padding:9px 14px;border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(8px);
+  font-family:var(--fm);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--tx-1);
+  display:flex;align-items:center;gap:8px;transform:translate(-50%,-50%);white-space:nowrap;
+}
+.brain .orbit .node .d{width:7px;height:7px;border-radius:50%}
+.brain .orbit .n1{left:50%;top:0}
+.brain .orbit .n2{left:6%;top:78%}
+.brain .orbit .n3{left:94%;top:78%}
+.brain .orbit .center{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-family:var(--fm);font-size:11px;letter-spacing:.2em;color:var(--red-2);text-transform:uppercase;text-align:center;
+}
+.brain h2{font-size:clamp(2rem,1.3rem+2.6vw,3.4rem);margin-bottom:18px;text-transform:uppercase}
+.brain p{color:var(--tx-1);max-width:58ch;margin:0 auto 30px;font-size:1.12rem}
+.brain .chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.memchip{font-family:var(--fm);font-size:11px;letter-spacing:.08em;padding:8px 15px;border:1px solid var(--line);background:var(--glass);color:var(--tx-1);display:flex;align-items:center;gap:9px;text-transform:uppercase}
+.memchip .d{width:7px;height:7px;border-radius:50%}
+
+/* ============================ FEATURE GRID ============================ */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line)}
+@media(max-width:980px){.cards{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.cards{grid-template-columns:1fr}}
+.card{
+  position:relative;padding:28px 24px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+  overflow:hidden;transition:background .3s var(--ease);
+}
+.card:hover{background:linear-gradient(180deg,rgba(255,30,48,.07),transparent)}
+.card::after{content:"";position:absolute;left:0;top:0;width:0;height:1px;background:var(--red);box-shadow:0 0 12px var(--red);transition:width .4s var(--ease)}
+.card:hover::after{width:100%}
+.card .idx{font-family:var(--fm);font-size:10px;letter-spacing:.2em;color:var(--tx-2);display:block;margin-bottom:18px}
+.card .ci{width:30px;height:30px;border:1px solid var(--line-hot);margin-bottom:18px;position:relative}
+.card .ci span{position:absolute;inset:8px;background:var(--red-2);opacity:.85}
+.card h4{font-size:1.06rem;font-weight:600;margin-bottom:9px;text-transform:uppercase;letter-spacing:-.01em}
+.card p{font-size:.9rem;color:var(--tx-1);line-height:1.55}
+.card .src{font-family:var(--fm);font-size:9.5px;letter-spacing:.16em;color:var(--tx-2);text-transform:uppercase;margin-top:14px;display:block}
+
+/* ============================ DOWNLOAD ============================ */
+.download{text-align:center}
+.dl{
+  position:relative;max-width:760px;margin:0 auto;padding:64px 44px;
+  border:1px solid var(--line-hot);background:linear-gradient(180deg,rgba(255,30,48,.06),transparent);
+  box-shadow:0 0 80px -30px rgba(255,30,48,.5);
+}
+.dl::before,.dl::after{content:"";position:absolute;width:18px;height:18px;border-color:var(--red);z-index:2}
+.dl::before{top:10px;left:10px;border-top:1px solid;border-left:1px solid}
+.dl::after{bottom:10px;right:10px;border-bottom:1px solid;border-right:1px solid}
+.dl h2{font-size:clamp(2rem,1.4rem+2.4vw,3.4rem);margin-bottom:16px;text-transform:uppercase}
+.dl p{color:var(--tx-1);max-width:48ch;margin:0 auto 30px}
+.dl .hint{
+  margin-top:26px;font-family:var(--fm);font-size:11.5px;letter-spacing:.08em;color:var(--tx-2);
+  display:inline-flex;flex-wrap:wrap;gap:8px 18px;justify-content:center;padding:11px 18px;border:1px solid var(--line);
+}
+.dl .hint b{color:var(--red-2);font-weight:500}
+
+/* ============================ FOOTER ============================ */
+footer{border-top:1px solid var(--line);padding:44px 0;font-family:var(--fm);font-size:12px;color:var(--tx-2);letter-spacing:.06em;z-index:3;position:relative}
+.foot-in{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between}
+.foot-in .fl{display:flex;gap:26px;flex-wrap:wrap;text-transform:uppercase}
+.foot-in a:hover{color:var(--red-2)}
+
+/* ============================ DIVE + CINEMA ============================ */
+#dive-label{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:7;text-align:center;font-family:var(--fm);opacity:0;pointer-events:none;mix-blend-mode:screen;width:260px}
+#dive-label .t{font-size:13px;letter-spacing:.5em;text-indent:.5em;color:var(--hot);text-shadow:0 0 20px rgba(255,30,48,.9)}
+#dive-label .s{font-size:9px;letter-spacing:.34em;text-transform:uppercase;color:var(--red-2);margin-top:9px}
+#dive-label .bar{width:200px;height:1px;background:var(--line);margin:16px auto 0;position:relative;overflow:hidden}
+#dive-label .bar i{position:absolute;inset:0;background:var(--red);box-shadow:0 0 12px var(--red);transform:translateX(-100%)}
+
+.scroll-hint{position:absolute;bottom:34px;left:50%;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:10px;font-family:var(--fm);font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:var(--tx-2)}
+.scroll-hint .ln{width:1px;height:34px;background:linear-gradient(var(--red-2),transparent);animation:hintdrop 1.8s ease-in-out infinite}
+@keyframes hintdrop{0%,100%{opacity:.25;transform:scaleY(.5);transform-origin:top}50%{opacity:1;transform:scaleY(1);transform-origin:top}}
+
+/* horizontal “inside the core” gallery — progressively enhanced */
+.h-pin{position:relative}
+.h-track{display:flex;flex-direction:column}
+.panel{position:relative;padding:64px 0}
+body:not(.cinema) .panel+.panel{border-top:1px solid var(--line)}
+.panel-tag{font-family:var(--fm);font-size:10px;letter-spacing:.3em;color:var(--tx-2);text-transform:uppercase;display:block;margin-bottom:18px}
+/* cinema: the app mock is a real CURVED WebGL screen (drawn in scene.js layer).
+   Panels become absolutely-stacked, cross-faded overlays; the copy sits in a
+   left column and the curved screen renders center-right over the canvas. */
+.cinema .h-pin{height:100vh;overflow:hidden}
+.cinema .h-track{position:absolute;inset:0;display:block;height:100vh;width:100%}
+.cinema .panel{position:absolute;inset:0;width:100%;height:100vh;margin:0;padding:0;
+  display:flex;align-items:center;opacity:0;will-change:opacity,transform;pointer-events:none}
+.cinema .panel.is-on{pointer-events:auto}
+.cinema .panel .wrap{width:100%}
+.cinema .panel .module{display:block;border-top:none;padding:0;width:min(460px,42vw);margin-left:max(40px,7vw)}
+.cinema .panel .schem{display:none}                 /* curved WebGL screen replaces the flat mock */
+.cinema .panel .m-copy{position:relative;z-index:1}
+.cinema .panel .m-copy::before{content:"";position:absolute;inset:-28px -34px;z-index:-1;border-radius:18px;background:radial-gradient(ellipse 96% 100% at 28% 45%,rgba(3,5,9,.94),rgba(3,5,9,.58) 66%,transparent);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.cinema .panel-tag{position:absolute;top:88px;left:max(40px,7vw);margin:0;opacity:.85;z-index:2}
+.cinema .panel.intro{justify-content:center}
+.cinema .panel.intro .wrap{max-width:60ch;margin:0 auto;text-align:center;position:relative;z-index:1}
+.cinema .panel.intro .wrap::before{content:"";position:absolute;inset:-40px -48px;z-index:-1;border-radius:24px;background:radial-gradient(ellipse at center,rgba(3,5,9,.82),rgba(3,5,9,.4) 72%,transparent);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.panel.intro{text-align:center}
+.panel.intro h2{font-size:clamp(2rem,1.3rem+2.8vw,3.6rem);text-transform:uppercase;letter-spacing:-.02em;margin:16px 0 18px}
+.panel.intro p{color:var(--tx-1);font-size:1.12rem;max-width:54ch;margin:0 auto}
+.panel.intro .orbit-hint{margin-top:30px;font-family:var(--fm);font-size:11px;letter-spacing:.32em;color:var(--red-2);text-transform:uppercase}
+@media(max-width:760px){.cinema .panel .module{width:min(86vw,460px)}}
+
+/* ============================ REVEAL ============================ */
+.reveal{opacity:0;transform:translateY(30px);transition:opacity .9s var(--ease),transform .9s var(--ease)}
+.reveal.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms!important;scroll-behavior:auto!important}
+  .reveal{opacity:1;transform:none;transition:none}
+  #reticle{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-scan"></div>
+<canvas id="core-canvas"></canvas>
+<div class="bg-vig"></div>
+
+<!-- ===== BOOT ===== -->
+<div id="boot">
+  <div class="boot-in">
+    <div class="boot-label">ORION&nbsp;TERMINAL</div>
+    <div class="boot-sub" id="boot-sub">initializing core</div>
+    <div class="boot-bar"><i></i></div>
+  </div>
+</div>
+
+<!-- reticle -->
+<div id="reticle"><span class="b"></span><span class="rc" id="rc">X000 Y000</span></div>
+
+<!-- dive readout (appears while flying into the core) -->
+<div id="dive-label">
+  <div class="t">ENTERING&nbsp;CORE</div>
+  <div class="s">depth lock · claude online</div>
+  <div class="bar"><i></i></div>
+</div>
+
+<!-- ===== NAV ===== -->
+<nav>
+  <div class="wrap nav-in">
+    <a class="brand" href="#top">
+      <img src="icon.png" alt="Orion Terminal logo" width="30" height="30" />
+      <span class="bd">Orion Terminal<small>core · online</small></span>
+    </a>
+    <div class="nav-links">
+      <a href="#apps">Apps</a>
+      <a href="#brain">One brain</a>
+      <a href="#features">System</a>
+      <a href="https://github.com/chakra3301/OrionTerminal" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn solid" href="#download">Get the beta</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<header id="top">
+  <div class="ticks">
+    <span class="tick tl"></span><span class="tick tr"></span><span class="tick bl"></span><span class="tick br"></span>
+    <span class="coord c1 mono">SYS://ORION.CORE — 47.0N</span>
+    <span class="coord c2 mono">LOCAL-FIRST / SQLITE / TAURI 2</span>
+  </div>
+  <div class="wrap hero">
+    <span class="status reveal" data-boot><span class="dot"></span>Core: online · listening · ⌘K claude</span>
+    <h1 class="title">
+      <span class="reveal" data-boot>One terminal.</span><br>
+      <span class="l2 reveal" data-boot>One brain.</span>
+    </h1>
+    <p class="sub reveal" data-boot>A desktop shell with a code editor, a personal Notion, and a design studio — <b>each one Claude-native</b>. Local-first. Yours.</p>
+    <div class="hero-cta reveal" data-boot>
+      <a class="btn solid lg" href="#download">Get the beta</a>
+      <a class="btn lg" href="https://github.com/chakra3301/OrionTerminal" target="_blank" rel="noopener">View source ↗</a>
+    </div>
+  </div>
+  <div class="scroll-hint" aria-hidden="true">Scroll to enter<span class="ln"></span></div>
+</header>
+
+<!-- ===== APPS — horizontal “inside the core” gallery ===== -->
+<section id="apps">
+  <div class="h-pin">
+    <div class="h-track">
+
+      <!-- intro panel -->
+      <article class="panel intro">
+        <div class="wrap">
+          <span class="eyebrow" style="justify-content:center">Inside the core</span>
+          <h2>Claude isn't in a sidebar.<br>It's inside every app.</h2>
+          <p>One command registry, one Claude brain, cross-app memory. Three Claude-native apps orbiting a single local core.</p>
+          <div class="orbit-hint">Scroll to orbit →</div>
+        </div>
+      </article>
+
+      <!-- Archives 47 -->
+      <article class="panel accent-g" data-accent="#39ff88">
+        <span class="panel-tag">Unit 01 / 03 · Archives 47</span>
+        <div class="wrap"><div class="module">
+          <div class="m-copy">
+            <div class="unit"><span class="ac"></span>Archives 47 · personal Notion</div>
+            <h3>Your second brain,<br>not a second tab.</h3>
+            <p class="lede">Notes, journal, mood boards, and databases that link with <b>[[wikilinks]]</b>. Local RAG search across everything — Claude reasoning over your own graph.</p>
+            <ul class="feat">
+              <li><span class="n">01</span><span>Wikilinks + automatic <b>backlinks</b></span></li>
+              <li><span class="n">02</span><span>Databases, mood boards & journals</span></li>
+              <li><span class="n">03</span><span>Local <b>RAG search</b> over your whole vault</span></li>
+            </ul>
+          </div>
+          <div class="schem tg">
+            <div class="sbar"><i></i><i></i><i></i><span class="tt">Archives 47 — journal.md</span></div>
+            <div class="sbody">
+              <span class="chip" style="border-color:rgba(57,255,136,.4);color:var(--green)"># field-notes / 2026</span><br><br>
+              Aurora reads as <span class="wl">[[neon]]</span> punctuation —<br>
+              never paint. See <span class="wl">[[Orion]]</span> + <span class="wl">[[XDesign]]</span>.
+              <div class="dbrow"><span class="pill" style="color:var(--green)">idea</span> menubar memory recall</div>
+              <div class="dbrow"><span class="pill" style="color:var(--magenta)">mood</span> focused · nocturnal</div>
+              <div class="claude">
+                <div class="who" style="color:var(--green)"><span class="o" style="background:var(--green)"></span>Claude · in Archives</div>
+                3 backlinks reference this note. Summarise the thread into a brief?
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </article>
+
+      <!-- Orion editor -->
+      <article class="panel accent-c" data-accent="#00e0ff">
+        <span class="panel-tag">Unit 02 / 03 · Orion</span>
+        <div class="wrap"><div class="module flip">
+          <div class="m-copy">
+            <div class="unit"><span class="ac"></span>Orion · AI-first code editor</div>
+            <h3>Edit at the<br>speed of thought.</h3>
+            <p class="lede">Monaco, live preview, an integrated terminal, Git, and a <b>real LSP</b>. Claude edits inline and completes on Tab — the editor inside the terminal, not the whole story.</p>
+            <ul class="feat">
+              <li><span class="n">01</span><span>Inline Claude edits + <b>Tab autocomplete</b></span></li>
+              <li><span class="n">02</span><span>Real LSP, Git & integrated terminal</span></li>
+              <li><span class="n">03</span><span>Live preview beside your code</span></li>
+            </ul>
+          </div>
+          <div class="schem tg">
+            <div class="sbar"><i></i><i></i><i></i><span class="tt">Orion — app.tsx</span></div>
+            <div class="sbody">
+              <span class="ln">01</span><span class="kw">import</span> { claude } <span class="kw">from</span> <span class="st">'@orion/brain'</span><br>
+              <span class="ln">02</span><br>
+              <span class="ln">03</span><span class="kw">export default function</span> <span class="fn">App</span>() {<br>
+              <span class="ln">04</span>&nbsp;&nbsp;<span class="kw">const</span> ctx = <span class="fn">claude</span>.<span class="fn">recall</span>()<br>
+              <span class="ln">05</span>&nbsp;&nbsp;<span class="ghost">return &lt;Terminal brain={ctx} /&gt;  ⇥</span><br>
+              <span class="ln">06</span>}
+              <div class="claude">
+                <div class="who" style="color:var(--cyan)"><span class="o" style="background:var(--cyan)"></span>Claude · inline edit</div>
+                Wired <span style="color:var(--cyan)">recall()</span> to Spotlight memory. Press <b style="color:var(--tx-0)">Tab</b> to accept.
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </article>
+
+      <!-- XDesign -->
+      <article class="panel accent-m" data-accent="#ff3ea5">
+        <span class="panel-tag">Unit 03 / 03 · XDesign</span>
+        <div class="wrap"><div class="module">
+          <div class="m-copy">
+            <div class="unit"><span class="ac"></span>XDesign · design studio</div>
+            <h3>From URL to<br>brand system.</h3>
+            <p class="lede">A generative engine with vector boolean ops, an editable canvas, and one-click deck export. Paste a URL, get a <b>full brand system</b> — Claude designs with you on the canvas.</p>
+            <ul class="feat">
+              <li><span class="n">01</span><span>URL → complete <b>brand systems</b></span></li>
+              <li><span class="n">02</span><span>Vector boolean ops & editable canvas</span></li>
+              <li><span class="n">03</span><span>Export polished decks in a click</span></li>
+            </ul>
+          </div>
+          <div class="schem tg">
+            <div class="sbar"><i></i><i></i><i></i><span class="tt">XDesign — brand.canvas</span></div>
+            <div class="sbody">
+              <span class="chip" style="border-color:rgba(255,62,165,.4);color:var(--magenta)">orionterminal.dev →</span>
+              <div class="swatches">
+                <span style="background:var(--green)"></span><span style="background:var(--cyan)"></span>
+                <span style="background:var(--magenta)"></span><span style="background:#b14cff"></span><span style="background:#e6ff3a"></span>
+              </div>
+              <span style="font-size:11px">Type · Space Grotesk / JetBrains Mono</span>
+              <div class="claude">
+                <div class="who" style="color:var(--magenta)"><span class="o" style="background:var(--magenta)"></span>Claude · on canvas</div>
+                Extracted 5 accents + a type pairing. Export as a 12-slide deck?
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===== TECH STRIP (exit readout) ===== -->
+<div class="strip">
+  <div class="strip-track mono">
+    <span>
+      <span>TAURI&nbsp;2</span><span>/</span><span><b>REACT&nbsp;19</b></span><span>/</span><span>RUST</span><span>/</span><span><b>SQLITE&nbsp;·&nbsp;LOCAL-FIRST</b></span><span>/</span><span>MONACO</span><span>/</span><span><b>CLAUDE&nbsp;NATIVE</b></span><span>/</span><span>⌘K&nbsp;SPOTLIGHT</span><span>/</span>
+    </span>
+    <span aria-hidden="true">
+      <span>TAURI&nbsp;2</span><span>/</span><span><b>REACT&nbsp;19</b></span><span>/</span><span>RUST</span><span>/</span><span><b>SQLITE&nbsp;·&nbsp;LOCAL-FIRST</b></span><span>/</span><span>MONACO</span><span>/</span><span><b>CLAUDE&nbsp;NATIVE</b></span><span>/</span><span>⌘K&nbsp;SPOTLIGHT</span><span>/</span>
+    </span>
+  </div>
+</div>
+
+<!-- ===== ONE BRAIN ===== -->
+<section id="brain">
+  <div class="wrap brain">
+    <span class="eyebrow reveal" style="justify-content:center">Unified ⌘K Spotlight</span>
+    <div class="orbit reveal">
+      <div class="ring"></div><div class="ring r2"></div><div class="ring r3"></div>
+      <div class="center">CORE<br>⌘K</div>
+      <div class="node n1"><span class="d" style="background:var(--green);box-shadow:0 0 8px var(--green)"></span>Archives 47</div>
+      <div class="node n2"><span class="d" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan)"></span>Orion</div>
+      <div class="node n3"><span class="d" style="background:var(--mag);box-shadow:0 0 8px var(--mag)"></span>XDesign</div>
+    </div>
+    <h2 class="reveal">One brain across every app.</h2>
+    <p class="reveal">Cross-app memory lives in Spotlight. Ask once and Claude reasons over your notes, your code, and your canvas — one command registry, one context, no copy-paste.</p>
+    <div class="chips reveal">
+      <span class="memchip"><span class="d" style="background:var(--green);box-shadow:0 0 8px var(--green)"></span>Vault</span>
+      <span class="memchip"><span class="d" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan)"></span>Workspace</span>
+      <span class="memchip"><span class="d" style="background:var(--mag);box-shadow:0 0 8px var(--mag)"></span>Canvas</span>
+      <span class="memchip" style="color:var(--red-2)">Ready when you are.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FEATURES ===== -->
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">System · built for craft</span>
+      <h2>Fast, native, and yours.</h2>
+      <p>No cloud lock-in, no lag. The whole shell is engineered like the product it hosts.</p>
+    </div>
+    <div class="cards">
+      <article class="card reveal"><span class="idx">F.01</span><div class="ci"><span></span></div><h4>In-canvas windowing</h4><p>Drag, snap, and stack app windows on the desktop — buttery at 60fps.</p><span class="src">Shell</span></article>
+      <article class="card reveal"><span class="idx">F.02</span><div class="ci"><span></span></div><h4>Tab autocomplete</h4><p>Claude predicts the next edit. Press Tab to accept, keep typing to ignore.</p><span class="src">Orion</span></article>
+      <article class="card reveal"><span class="idx">F.03</span><div class="ci"><span></span></div><h4>Real LSP</h4><p>Genuine language servers — hovers, diagnostics, go-to-definition, refactors.</p><span class="src">Orion</span></article>
+      <article class="card reveal"><span class="idx">F.04</span><div class="ci"><span></span></div><h4>Wikilinks + backlinks</h4><p>Connect anything with [[links]]; backlinks build your memory graph.</p><span class="src">Archives 47</span></article>
+      <article class="card reveal"><span class="idx">F.05</span><div class="ci"><span></span></div><h4>Generative design</h4><p>URL → brand systems, vector boolean ops, an editable canvas — Claude-native.</p><span class="src">XDesign</span></article>
+      <article class="card reveal"><span class="idx">F.06</span><div class="ci"><span></span></div><h4>Decks export</h4><p>Turn a canvas into a polished, presentation-ready deck in one click.</p><span class="src">XDesign</span></article>
+      <article class="card reveal"><span class="idx">F.07</span><div class="ci"><span></span></div><h4>Local-first SQLite</h4><p>Your data lives on your machine. Fast, private, fully offline-capable.</p><span class="src">Core</span></article>
+      <article class="card reveal"><span class="idx">F.08</span><div class="ci"><span></span></div><h4>5 themes</h4><p>Five built-in looks, including a translucent Liquid glass that frosts the shell.</p><span class="src">Core</span></article>
+    </div>
+  </div>
+</section>
+
+<!-- ===== DOWNLOAD ===== -->
+<section id="download" class="download">
+  <div class="wrap">
+    <div class="dl reveal">
+      <span class="eyebrow" style="justify-content:center">Download · public beta</span>
+      <h2 style="margin-top:14px">Ready when you are.</h2>
+      <p>Get the v0.1.0 beta for macOS on Apple Silicon. One terminal, one brain — running locally on your machine.</p>
+      <div class="hero-cta" style="justify-content:center">
+        <a class="btn solid lg" href="https://github.com/chakra3301/OrionTerminal/releases/tag/v0.1.0-beta.1" target="_blank" rel="noopener" id="dl-btn">Download for macOS</a>
+        <a class="btn lg" href="https://github.com/chakra3301/OrionTerminal/blob/main/BETA.md" target="_blank" rel="noopener">Read the beta guide</a>
+      </div>
+      <div class="hint">
+        <span><b>macOS · Apple Silicon</b></span>
+        <span>Unsigned beta — first launch: <b>right-click → Open</b></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="wrap foot-in">
+    <div class="brand" style="font-family:var(--fd)"><img src="icon.png" alt="" width="26" height="26" /><span>Orion Terminal</span></div>
+    <div class="fl">
+      <a href="https://github.com/chakra3301/OrionTerminal" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/chakra3301/OrionTerminal/releases/tag/v0.1.0-beta.1" target="_blank" rel="noopener">Releases</a>
+      <a href="https://github.com/chakra3301/OrionTerminal/blob/main/BETA.md" target="_blank" rel="noopener">Beta guide</a>
+    </div>
+    <span>⌘K claude · listening — © 2026</span>
+  </div>
+</footer>
+
+<!-- ============================ FALLBACK (no-module browsers) ============================ -->
+<script nomodule>
+  document.getElementById('boot').classList.add('done');
+  document.querySelectorAll('.reveal').forEach(function(e){e.classList.add('in');});
+</script>
+
+<!-- ============================ THE CORE ============================ -->
+<script type="module">
+import * as THREE from 'three';
+import gsap from 'gsap';
+import ScrollTrigger from 'gsap/ScrollTrigger';
+import Lenis from 'lenis';
+gsap.registerPlugin(ScrollTrigger);
+
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const MOBILE  = window.matchMedia('(max-width: 760px)').matches;
+
+/* ---------- simplex noise (Ashima, MIT) ---------- */
+const SNOISE = `
+vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+float snoise(vec3 v){
+  const vec2 C=vec2(1.0/6.0,1.0/3.0);const vec4 D=vec4(0.0,0.5,1.0,2.0);
+  vec3 i=floor(v+dot(v,C.yyy));vec3 x0=v-i+dot(i,C.xxx);
+  vec3 g=step(x0.yzx,x0.xyz);vec3 l=1.0-g;vec3 i1=min(g.xyz,l.zxy);vec3 i2=max(g.xyz,l.zxy);
+  vec3 x1=x0-i1+C.xxx;vec3 x2=x0-i2+C.yyy;vec3 x3=x0-D.yyy;i=mod289(i);
+  vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));
+  float n_=0.142857142857;vec3 ns=n_*D.wyz-D.xzx;
+  vec4 j=p-49.0*floor(p*ns.z*ns.z);vec4 x_=floor(j*ns.z);vec4 y_=floor(j-7.0*x_);
+  vec4 x=x_*ns.x+ns.yyyy;vec4 y=y_*ns.x+ns.yyyy;vec4 h=1.0-abs(x)-abs(y);
+  vec4 b0=vec4(x.xy,y.xy);vec4 b1=vec4(x.zw,y.zw);vec4 s0=floor(b0)*2.0+1.0;vec4 s1=floor(b1)*2.0+1.0;
+  vec4 sh=-step(h,vec4(0.0));vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+  vec3 p0=vec3(a0.xy,h.x);vec3 p1=vec3(a0.zw,h.y);vec3 p2=vec3(a1.xy,h.z);vec3 p3=vec3(a1.zw,h.w);
+  vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+  p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+  vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0);m=m*m;
+  return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+}`;
+
+const CORE_VERT = `
+  uniform float uTime; uniform float uChaos; uniform float uFreq; varying float vDisp;
+  ${SNOISE}
+  void main(){
+    vec3 dir = normalize(position);
+    float n  = snoise(dir*uFreq + uTime*0.45);
+    float n2 = snoise(dir*(uFreq*2.1) - uTime*0.7);
+    float disp = (n*0.7 + n2*0.3); vDisp = disp;
+    vec3 d = position + normal*disp*uChaos;
+    gl_Position = projectionMatrix*modelViewMatrix*vec4(d,1.0);
+  }`;
+const CORE_FRAG = `
+  precision highp float;
+  uniform vec3 uLow; uniform vec3 uMid; uniform vec3 uHot; uniform float uHeat; uniform float uOpacity;
+  varying float vDisp;
+  void main(){
+    float t = clamp(vDisp*0.5+0.5,0.0,1.0);
+    vec3 col = mix(uLow,uMid,smoothstep(0.15,0.75,t));
+    float hot = clamp(t*uHeat,0.0,1.0);
+    col = mix(col,uHot,hot*hot);
+    gl_FragColor = vec4(col,uOpacity);
+  }`;
+const PT_VERT = `
+  uniform float uTime; uniform float uAssemble; uniform float uMode; uniform float uSize; uniform float uSpark;
+  attribute vec3 aFar; attribute float aSeed; varying float vVis;
+  void main(){
+    float stream = fract(aSeed*13.0 + uTime*(0.05+aSeed*0.09));
+    float prog = mix(uAssemble, stream, uMode);
+    vec3 pos = mix(aFar, position, prog);
+    pos += normalize(position)*uSpark*(0.12+aSeed*0.18);
+    float vis = (uMode>0.5) ? smoothstep(0.0,0.18,stream)*(1.0-smoothstep(0.82,1.0,stream)) : prog;
+    vVis = vis;
+    vec4 mv = modelViewMatrix*vec4(pos,1.0);
+    gl_Position = projectionMatrix*mv;
+    gl_PointSize = uSize*(0.5+aSeed)/max(0.1,-mv.z)*(1.0+uSpark*1.3);
+  }`;
+const PT_FRAG = `
+  precision highp float;
+  uniform vec3 uColor; uniform float uOpacity; uniform float uSpark; varying float vVis;
+  void main(){
+    vec2 c = gl_PointCoord-0.5; float d = length(c);
+    float a = smoothstep(0.5,0.0,d)*vVis*uOpacity; if(a<0.01) discard;
+    vec3 col = mix(uColor, vec3(1.0,0.86,0.86), clamp(uSpark*0.6,0.0,1.0));
+    gl_FragColor = vec4(col, a*(1.0+uSpark*0.6));
+  }`;
+
+/* art-direction colors (splash-local red ramp) */
+const C = {
+  low: new THREE.Color('#4a0010'), mid: new THREE.Color('#ff1830'),
+  hot: new THREE.Color('#fff2f2'), magenta: new THREE.Color('#ff3ea5'),
+  particle: new THREE.Color('#ff2a40'),
+};
+const easeInCubic = t => t*t*t;
+const clamp01 = t => Math.min(1, Math.max(0, t));
+
+/* spark impulse channel (pointer interactivity) */
+const impulses = [];
+function spark(n=1){ const now=performance.now(); for(let i=0;i<n;i++) impulses.push(now+i*12); if(impulses.length>40) impulses.splice(0,impulses.length-40); }
+function sparkEnvelope(now, tau=300){ let e=0; for(const t of impulses){ const dt=now-t; if(dt<0||dt>tau*5) continue; e+=Math.exp(-dt/tau);} return Math.min(2.4,e); }
+
+/* ---------- renderer ---------- */
+const canvas = document.getElementById('core-canvas');
+let renderer, scene, camera, group, innerSpin, shellSpin, coreU, shellU, ptU;
+let screens = null, appFloat = -1;
+let started = 0, raf = 0, autoY = 0, curZ = 3.4, curYaw = 0, curPitch = 0, curInside = 0, curFov = 52, booted = false;
+const cam = { z:3.4, yaw:0, pitch:0, chaos:0, inside:0, fov:52, hue:new THREE.Color('#ff1830') };
+const pointer = { x:0, y:0, tx:0, ty:0 };
+
+function buildParticles(count){
+  const near=new Float32Array(count*3), far=new Float32Array(count*3), seed=new Float32Array(count);
+  const v=new THREE.Vector3();
+  for(let i=0;i<count;i++){
+    v.set(Math.random()*2-1,Math.random()*2-1,Math.random()*2-1).normalize();
+    const rN=1.05+Math.random()*0.7;
+    near[i*3]=v.x*rN; near[i*3+1]=v.y*rN; near[i*3+2]=v.z*rN;
+    const rF=5.5+Math.random()*5.5;
+    far[i*3]=v.x*rF+(Math.random()*2-1)*1.6; far[i*3+1]=v.y*rF+(Math.random()*2-1)*1.6; far[i*3+2]=v.z*rF+(Math.random()*2-1)*1.6;
+    seed[i]=Math.random();
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(near,3));
+  g.setAttribute('aFar',new THREE.BufferAttribute(far,3));
+  g.setAttribute('aSeed',new THREE.BufferAttribute(seed,1));
+  return g;
+}
+
+/* ---------- curved screen (real concave display, not a tilted flat card) ---------- */
+// Bend a flat plane along an arc so the panel surface itself curves toward the viewer.
+function bentPlane(w, h, arc, segs){
+  const g = new THREE.PlaneGeometry(w, h, segs, 1);
+  const R = w/arc, p = g.attributes.position;
+  for(let i=0;i<p.count;i++){
+    const x = p.getX(i), th = x/R;
+    p.setX(i, R*Math.sin(th));
+    p.setZ(i, R*(1-Math.cos(th)));   // edges bow toward +z (the viewer) => concave monitor
+  }
+  p.needsUpdate = true; g.computeVertexNormals();
+  return g;
+}
+function rr(x, a, b, w, h, r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+w,b,a+w,b+h,r); x.arcTo(a+w,b+h,a,b+h,r); x.arcTo(a,b+h,a,b,r); x.arcTo(a,b,a+w,b,r); x.closePath(); }
+function hexA(hex, a){ const n=parseInt(hex.slice(1),16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
+const SW=1120, SH=760, MONO='"JetBrains Mono", ui-monospace, monospace';
+// Shared window chrome: dark panel, accent border + sheen, traffic lights, title.
+function drawWindow(title, ac, body){
+  const c=document.createElement('canvas'); c.width=SW; c.height=SH; const x=c.getContext('2d');
+  const acA=a=>hexA(ac,a);
+  x.clearRect(0,0,SW,SH);
+  x.fillStyle='rgba(5,9,12,0.97)'; rr(x,4,4,SW-8,SH-8,26); x.fill();
+  x.lineWidth=2.5; x.strokeStyle=acA(0.45); rr(x,5,5,SW-10,SH-10,25); x.stroke();
+  const sh=x.createLinearGradient(0,0,0,SH); sh.addColorStop(0,acA(0.07)); sh.addColorStop(0.2,acA(0)); x.fillStyle=sh; rr(x,4,4,SW-8,SH-8,26); x.fill();
+  x.fillStyle=acA(0.05); rr(x,4,4,SW-8,84,26); x.fill();
+  x.strokeStyle=acA(0.16); x.lineWidth=1.5; x.beginPath(); x.moveTo(20,88); x.lineTo(SW-20,88); x.stroke();
+  ['#ff5f57','#febc2e','#28c840'].forEach((d,i)=>{ x.fillStyle=d; x.beginPath(); x.arc(48+i*30,46,9,0,7); x.fill(); });
+  x.textBaseline='middle'; x.font='600 30px '+MONO; x.fillStyle=ac; x.fillText(title,160,47);
+  body(x, ac, acA);
+  return c;
+}
+function claudeBlock(x, ac, acA, y, who, l1, l2){
+  x.strokeStyle=acA(0.3); x.lineWidth=2; rr(x,44,y,SW-88,150,16); x.stroke();
+  x.fillStyle=acA(0.05); rr(x,44,y,SW-88,150,16); x.fill();
+  x.fillStyle=ac; x.beginPath(); x.arc(72,y+36,8,0,7); x.fill();
+  x.font='600 24px '+MONO; x.fillText(who,96,y+36);
+  x.font='400 24px '+MONO; x.fillStyle='#dfe7e6';
+  x.fillText(l1,66,y+86); if(l2) x.fillText(l2,66,y+120);
+}
+const segLine=(x,segs,yy,fb)=>{ let cx=46; segs.forEach(s=>{ x.fillStyle=s[1]||fb; x.fillText(s[0],cx,yy); cx+=x.measureText(s[0]).width; }); };
+function bodyArchives(x, ac, acA){
+  const G=ac, M='#ff3ea5', TX='#dfe7e6', DIM='#7e918f';
+  let y=140; x.font='600 26px '+MONO; const chip='# field-notes / 2026', cw=x.measureText(chip).width+44;
+  x.strokeStyle=acA(0.5); x.lineWidth=2; rr(x,44,y-2,cw,52,12); x.stroke(); x.fillStyle=G; x.fillText(chip,66,y+24);
+  y+=104; x.font='400 27px '+MONO;
+  segLine(x,[['Aurora reads as ',TX],['[[neon]]',G],[' punctuation —',TX]],y,TX);
+  segLine(x,[['never paint. See ',TX],['[[Orion]]',G],[' + ',TX],['[[XDesign]]',G],['.',TX]],y+44,TX);
+  y+=120; const pill=(lbl,vy)=>{ x.font='600 22px '+MONO; const pw=x.measureText(lbl).width+28; x.strokeStyle=M; x.lineWidth=2; rr(x,46,vy-22,pw,40,10); x.stroke(); x.fillStyle=M; x.fillText(lbl,60,vy-2); return 46+pw+22; };
+  let vx=pill('idea',y); x.font='400 25px '+MONO; x.fillStyle=DIM; x.fillText('menubar memory recall',vx,y-2);
+  y+=62; vx=pill('mood',y); x.fillStyle=DIM; x.fillText('focused · nocturnal',vx,y-2);
+  y+=72; claudeBlock(x,G,acA,y,'Claude · in Archives','3 backlinks reference this note.','Summarise the thread into a brief?');
+}
+function bodyOrion(x, ac, acA){
+  const TX='#dfe7e6', KW='#ff6b9d', ST='#9be08a', FN=ac, GH='#5a6b78', LN='#465560';
+  let y=150; const lh=46; x.font='400 25px '+MONO;
+  const code=(yy,ln,segs)=>{ x.fillStyle=LN; x.fillText(ln,52,yy); let cx=112; segs.forEach(s=>{ x.fillStyle=s[1]||TX; x.fillText(s[0],cx,yy); cx+=x.measureText(s[0]).width; }); };
+  code(y,'01',[['import ',KW],['{ claude } '],['from ',KW],["'@orion/brain'",ST]]); y+=lh*2;
+  code(y,'03',[['export default function ',KW],['App',FN],['() {']]); y+=lh;
+  code(y,'04',[['  const ',KW],['ctx = '],['claude',FN],['.recall',FN],['()']]); y+=lh;
+  code(y,'05',[['  return <Terminal brain={ctx} />  ⇥',GH]]); y+=lh;
+  code(y,'06',[['}']]); y+=lh+24;
+  claudeBlock(x,ac,acA,y,'Claude · inline edit','Wired recall() to Spotlight memory.','Press Tab to accept.');
+}
+function bodyXDesign(x, ac, acA){
+  const TX='#dfe7e6', DIM='#7e918f';
+  let y=140; x.font='600 26px '+MONO; const chip='orionterminal.dev →', cw=x.measureText(chip).width+44;
+  x.strokeStyle=acA(0.5); x.lineWidth=2; rr(x,44,y-2,cw,52,12); x.stroke(); x.fillStyle=ac; x.fillText(chip,66,y+24);
+  y+=98; ['#39ff88','#00e0ff','#ff3ea5','#b14cff','#e6ff3a'].forEach((col,i)=>{ x.fillStyle=col; rr(x,46+i*80,y,64,64,12); x.fill(); });
+  y+=128; x.font='400 24px '+MONO; x.fillStyle=DIM; x.fillText('Type · Space Grotesk / JetBrains Mono',46,y);
+  y+=46; claudeBlock(x,ac,acA,y,'Claude · on canvas','Extracted 5 accents + a type pairing.','Export as a 12-slide deck?');
+}
+const SCREEN_SPECS=[
+  ['Archives 47 — journal.md','#39ff88',bodyArchives],
+  ['Orion — app.tsx','#00e0ff',bodyOrion],
+  ['XDesign — brand.canvas','#ff3ea5',bodyXDesign],
+];
+function buildScreens(){
+  screens = SCREEN_SPECS.map(([title,ac,body])=>{
+    const make=()=>drawWindow(title,ac,body);
+    const tex=new THREE.CanvasTexture(make());
+    tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+    const mat=new THREE.MeshBasicMaterial({ map:tex, transparent:true, side:THREE.DoubleSide, depthTest:false, depthWrite:false, opacity:0, toneMapped:false });
+    const mesh=new THREE.Mesh(bentPlane(2.55,1.73,0.95,64), mat);
+    mesh.renderOrder=20; mesh.visible=false; scene.add(mesh);
+    return { mesh, mat, tex, make };
+  });
+  // redraw once webfonts load so the mono type is crisp
+  if(document.fonts && document.fonts.ready){
+    document.fonts.ready.then(()=>screens.forEach(s=>{ s.tex.image=s.make(); s.tex.needsUpdate=true; }));
+  }
+}
+
+function initCore(){
+  try{
+    renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:!MOBILE, powerPreference:'high-performance' });
+  }catch(e){ console.warn('WebGL unavailable', e); return false; }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, MOBILE?1.5:1.75));
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(52, innerWidth/innerHeight, 0.05, 100);
+  camera.position.set(0,0,3.4);
+
+  coreU = { uTime:{value:0}, uChaos:{value:0.12}, uFreq:{value:1.7}, uLow:{value:C.low.clone()}, uMid:{value:C.mid.clone()}, uHot:{value:C.hot.clone()}, uHeat:{value:0.2}, uOpacity:{value:0.95} };
+  shellU= { uTime:{value:0}, uChaos:{value:0.08}, uFreq:{value:1.1}, uLow:{value:C.magenta.clone().multiplyScalar(0.5)}, uMid:{value:C.magenta.clone()}, uHot:{value:C.hot.clone()}, uHeat:{value:0.15}, uOpacity:{value:0.4} };
+  ptU   = { uTime:{value:0}, uAssemble:{value:REDUCED?1:0}, uMode:{value:0}, uSize:{value:9.0}, uSpark:{value:0}, uColor:{value:C.particle.clone()}, uOpacity:{value:0.9} };
+
+  const mk = (u, wire) => new THREE.ShaderMaterial({ vertexShader:CORE_VERT, fragmentShader:CORE_FRAG, uniforms:u, wireframe:wire, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending });
+  const coreMat = mk(coreU, true), shellMat = mk(shellU, true);
+  const ptMat = new THREE.ShaderMaterial({ vertexShader:PT_VERT, fragmentShader:PT_FRAG, uniforms:ptU, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending });
+
+  const detail = MOBILE?3:5;
+  const coreGeo = new THREE.IcosahedronGeometry(1, detail);
+  const shellGeo= new THREE.IcosahedronGeometry(1.42, 2);
+  const ptGeo   = buildParticles(REDUCED?160:(MOBILE?700:1600));
+
+  group = new THREE.Group();
+  innerSpin = new THREE.Group(); shellSpin = new THREE.Group();
+  group.add(new THREE.Points(ptGeo, ptMat));
+  innerSpin.add(new THREE.Mesh(coreGeo, coreMat));
+  shellSpin.add(new THREE.Mesh(shellGeo, shellMat));
+  group.add(innerSpin); group.add(shellSpin);
+  scene.add(group);
+  scene.add(new THREE.PointLight(C.mid, 3, 9).translateZ(3));
+  buildScreens();
+
+  resize();
+  addEventListener('resize', resize, { passive:true });
+  return true;
+}
+function resize(){
+  if(!renderer) return;
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+}
+
+function frame(){
+  raf = requestAnimationFrame(frame);
+  if(!renderer) return;
+  const now = performance.now();
+  if(started===0) started = now;
+  const t = (now - started)/1000;
+  const env = REDUCED ? sparkEnvelope(now)*0.5 : sparkEnvelope(now);
+
+  // cinematic camera targets (lerped for smoothness)
+  curZ += (cam.z-curZ)*0.055; curYaw += (cam.yaw-curYaw)*0.06;
+  curPitch += (cam.pitch-curPitch)*0.06; curInside += (cam.inside-curInside)*0.05;
+  curFov += (cam.fov-curFov)*0.06; camera.fov = curFov; camera.updateProjectionMatrix();
+  camera.position.z = curZ + (REDUCED?0:Math.sin(t*0.4)*0.05);
+  coreU.uMid.value.lerp(cam.hue, 0.05);
+
+  if(REDUCED){
+    coreU.uTime.value=t*0.15; coreU.uChaos.value=0.06; coreU.uHeat.value=0.22+env*0.3;
+    shellU.uTime.value=t*0.12; shellU.uHeat.value=0.15+env*0.2;
+    ptU.uTime.value=t; ptU.uAssemble.value=1; ptU.uSpark.value=env*0.5;
+    group.rotation.y=t*0.08;
+    renderer.render(scene,camera); return;
+  }
+
+  // real terminal boot timing: slow build then violent snap at ~0.85s
+  const assemble = easeInCubic(clamp01(t/0.85));
+  const burst = Math.exp(-Math.pow((t-0.85)/0.16,2));
+
+  const flare = flarePulse.v;
+  coreU.uTime.value=t;
+  coreU.uChaos.value=0.12+burst*0.55+(1-assemble)*0.15 + env*0.1 + cam.chaos + curInside*0.12 + flare*0.5;
+  coreU.uHeat.value=0.22+burst*0.95+env*0.5 + flare*1.1;
+  coreU.uOpacity.value=0.4+assemble*0.55;
+
+  shellU.uTime.value=t;
+  shellU.uChaos.value=0.06+burst*0.3 + flare*0.35;
+  shellU.uHeat.value=0.15+burst*0.6+env*0.35 + flare*0.7;
+  shellU.uOpacity.value=0.18+assemble*0.24;
+
+  ptU.uTime.value=t; ptU.uAssemble.value=assemble; ptU.uOpacity.value=0.5+assemble*0.5; ptU.uSpark.value=env+curInside*0.3;
+
+  // inside-the-core intensity
+  coreU.uHeat.value += curInside*0.6;
+  coreU.uOpacity.value = Math.min(1, coreU.uOpacity.value + curInside*0.18);
+  shellU.uOpacity.value += curInside*0.18;
+
+  // pointer parallax + cinematic yaw / pitch
+  pointer.x += (pointer.tx-pointer.x)*0.06; pointer.y += (pointer.ty-pointer.y)*0.06;
+  const spin = 0.05+burst*1.4+(1-assemble)*0.4;
+  autoY += (spin+env*0.35)*0.016*(1-curInside*0.85) + pointer.x*0.0008;
+  group.rotation.y = autoY + curYaw;
+  group.rotation.x = pointer.y*0.18 + curPitch;
+  innerSpin.rotation.x += 0.003+burst*0.02; innerSpin.rotation.z += 0.002;
+  shellSpin.rotation.y -= 0.004+burst*0.015; shellSpin.rotation.x -= 0.0025;
+
+  // curved app screens — concave displays that slide through the core as you orbit
+  if(screens){
+    const live = appFloat>=0 && curInside>0.25;
+    for(let i=0;i<screens.length;i++){
+      const s=screens[i], lp=i-appFloat;
+      const op = live ? clamp01(1-Math.abs(lp)*1.7)*curInside : 0;
+      s.mat.opacity=op; s.mesh.visible=op>0.01;
+      if(s.mesh.visible){
+        s.mesh.position.set(0.95 + lp*3.4, Math.sin(t*0.6+i)*0.03, -1.28);
+        s.mesh.rotation.y = -0.3 - lp*0.14 + pointer.x*0.045;   // face you, tilt as it slides + parallax
+        s.mesh.rotation.x = pointer.y*-0.04 + curPitch*0.4;
+      }
+    }
+  }
+
+  renderer.render(scene,camera);
+}
+
+/* ---------- interactions ---------- */
+const reticle = document.getElementById('reticle');
+const rc = document.getElementById('rc');
+let lastSpark = 0;
+function onMove(e){
+  pointer.tx = (e.clientX/innerWidth - 0.5)*2;
+  pointer.ty = (e.clientY/innerHeight - 0.5)*2;
+  if(performance.now()-lastSpark>60){ spark(1); lastSpark=performance.now(); }
+  if(!REDUCED){
+    reticle.style.opacity = e.clientY < innerHeight*0.92 ? '1':'0';
+    reticle.style.transform = `translate(${e.clientX}px,${e.clientY}px)`;
+    if(rc) rc.textContent = `X${String(Math.round(e.clientX)).padStart(3,'0')} Y${String(Math.round(e.clientY)).padStart(3,'0')}`;
+  }
+}
+addEventListener('pointermove', onMove, { passive:true });
+addEventListener('pointerdown', ()=>spark(6), { passive:true });
+
+// ⌘K / Ctrl+K — flare the core (Spotlight summon cue): big spark burst + a heat/chaos pulse
+function flareCore(){
+  spark(REDUCED?6:20);
+  const st=document.querySelector('.status');
+  if(st){ st.classList.remove('flash'); void st.offsetWidth; st.classList.add('flash'); }
+  if(!REDUCED && coreU){
+    gsap.killTweensOf(flarePulse);
+    flarePulse.v=1; gsap.to(flarePulse,{ v:0, duration:1.1, ease:'expo.out' });
+  }
+}
+const flarePulse={ v:0 };
+addEventListener('keydown', e=>{
+  if((e.metaKey||e.ctrlKey) && (e.key==='k'||e.key==='K')){ e.preventDefault(); flareCore(); }
+});
+addEventListener('visibilitychange', ()=>{ if(document.hidden){ cancelAnimationFrame(raf); } else { started=0; frame(); } });
+
+/* ---------- boot + reveals ---------- */
+function boot(){
+  const bootEl = document.getElementById('boot');
+  const ok = initCore();
+  if(ok){ frame(); } else { bootEl.classList.add('nogl'); }
+
+  const sub = document.getElementById('boot-sub');
+  const seq = ['initializing core','mounting sqlite','waking claude','core: online'];
+  let i=0; const subTimer = setInterval(()=>{ i++; if(sub&&seq[i]) sub.textContent=seq[i]; if(i>=seq.length-1) clearInterval(subTimer); }, 300);
+
+  // reveal the live core booting fullscreen behind the HUD almost immediately
+  if(ok && !REDUCED) setTimeout(()=>bootEl.classList.add('lit'), 220);
+
+  const tl = gsap.timeline({ delay: REDUCED?0.2:1.55 });
+  tl.add(()=>{ bootEl.classList.add('done'); booted = true; });
+  if(!REDUCED){
+    // the core settles back from its fullscreen boot into the contained hero halo
+    if(ok) tl.add(()=>gsap.to(cam, { z:8, duration:1.7, ease:'power2.inOut' }), 0);
+    tl.to('[data-boot]', { opacity:1, y:0, duration:1.0, stagger:0.09, ease:'power3.out' }, 0.25);
+  } else {
+    booted = true;
+    document.querySelectorAll('[data-boot]').forEach(e=>e.classList.add('in'));
+  }
+}
+
+/* cinematic scroll choreography: dive into the core, then orbit the apps */
+function setupScroll(){
+  if(REDUCED){ document.querySelectorAll('.reveal').forEach(e=>e.classList.add('in')); return; }
+  document.body.classList.add('cinema');
+
+  // Lenis smooth scroll, driven by GSAP's ticker and synced to ScrollTrigger
+  const lenis = new Lenis({ lerp:0.092, smoothWheel:true, wheelMultiplier:1 });
+  lenis.on('scroll', ScrollTrigger.update);
+  gsap.ticker.add(time=>lenis.raf(time*1000));
+  gsap.ticker.lagSmoothing(0);
+
+  // reveals for the vertical sections after the core
+  ScrollTrigger.batch('.reveal:not([data-boot])', {
+    start:'top 88%', once:true,
+    onEnter: b => gsap.to(b, { opacity:1, y:0, duration:0.9, stagger:0.08, ease:'power3.out', onStart:()=>b.forEach(el=>el.classList.add('in')) }),
+  });
+
+  const heroEl = document.querySelector('.hero');
+  const dive   = document.getElementById('dive-label');
+  const diveBar= dive ? dive.querySelector('i') : null;
+  const hint   = document.querySelector('.scroll-hint');
+
+  // 1) DIVE — first scroll flies the camera INTO the core
+  ScrollTrigger.create({
+    trigger:'#top', start:'top top', end:'+=180%', pin:true, scrub:1, anticipatePin:1,
+    onUpdate:self=>{
+      if(!booted) return;        // don't hijack the camera during the boot pull-back
+      const p=self.progress;
+      cam.z = 8 - p*7.9;          // 8 -> ~0.1 : fly to the very centre of the core
+      cam.fov = 52 + p*58;        // widen to a 110° fisheye so the sphere wraps around you
+      cam.chaos = p*0.22;
+      cam.pitch = p*0.1;
+      cam.inside = p>0.55 ? (p-0.55)/0.45 : 0;
+      if(heroEl){ heroEl.style.transform=`scale(${1+p*0.8})`; heroEl.style.opacity=`${1-clamp01((p-0.38)/0.42)}`; }
+      if(hint) hint.style.opacity=`${1-clamp01(p*4)}`;
+      if(dive){
+        const inn=clamp01((p-0.45)/0.35), out=1-clamp01((p-0.9)/0.1);
+        dive.style.opacity=`${Math.min(inn,out)}`;
+        if(diveBar) diveBar.style.transform=`translateX(${(-1+p)*100}%)`;
+      }
+    }
+  });
+
+  // 2) ORBIT — the three apps are real CURVED WebGL screens that slide past as you
+  //    look around the inside of the core; the copy cross-fades in a left column.
+  const track = document.querySelector('.h-track');
+  const intro = track.querySelector('.panel.intro');
+  const copyPanels = Array.from(track.querySelectorAll('.panel:not(.intro)'));
+  const appAcc = ['#39ff88','#00e0ff','#ff3ea5'].map(c=>new THREE.Color(c));
+  ScrollTrigger.create({
+    trigger:'#apps', start:'top top', end:'+=340%', pin:'.h-pin', scrub:1, anticipatePin:1,
+    onUpdate:self=>{
+      const p=self.progress;
+      cam.z=0.1; cam.fov=98; cam.inside=1; cam.chaos=0.18;
+      cam.pitch = Math.sin(p*Math.PI*2)*0.06;
+      cam.yaw = -p*2.2;        // wireframe turns behind the screens — looking around the dome
+      // intro fades out over the first 8%; apps occupy the rest
+      const introOp = clamp01(1 - p/0.08);
+      if(intro) intro.style.opacity = introOp;
+      const appP = clamp01((p-0.06)/0.92);
+      appFloat = appP*2;        // 0->Archives, 1->Orion, 2->XDesign (drives the WebGL screens)
+      // cross-fade the copy column to match the active screen
+      for(let i=0;i<copyPanels.length;i++){
+        const lp=i-appFloat, op=clamp01(1-Math.abs(lp)*2.4)*(1-introOp);
+        const el=copyPanels[i];
+        el.style.opacity=op; el.style.transform=`translateX(${lp*90}px)`;
+        el.classList.toggle('is-on', op>0.6);
+      }
+      // hue follows the active app accent
+      const si=Math.min(1,Math.floor(appFloat)), sf=appFloat-si;
+      cam.hue.copy(appAcc[si]).lerp(appAcc[Math.min(2,si+1)],sf);
+    },
+    onLeave:()=>{ cam.inside=0; cam.chaos=0; cam.z=6.2; cam.fov=52; cam.yaw=0; cam.pitch=0; cam.hue.set('#ff1830'); appFloat=-1; },
+    onLeaveBack:()=>{ cam.inside=0; cam.chaos=0.1; appFloat=-1; }
+  });
+  // start the apps stack hidden so nothing flashes before the orbit drives it
+  if(intro) intro.style.opacity='1';
+  copyPanels.forEach(el=>{ el.style.opacity='0'; });
+
+  // 3) SURFACE — pull the camera back out for the overview sections
+  ScrollTrigger.create({
+    trigger:'#brain', start:'top center',
+    onEnter:()=>{ cam.z=6.2; cam.fov=52; cam.yaw=0; cam.pitch=0; cam.inside=0; cam.chaos=0; cam.hue.set('#ff1830'); },
+    onEnterBack:()=>{ cam.z=6.2; cam.fov=52; cam.inside=0; }
+  });
+
+  setTimeout(()=>ScrollTrigger.refresh(), 350);
+  addEventListener('load', ()=>ScrollTrigger.refresh());
+}
+
+/* magnetic CTA */
+function magnetize(el){
+  if(REDUCED||!el) return;
+  el.addEventListener('pointermove', e=>{
+    const r=el.getBoundingClientRect();
+    gsap.to(el,{ x:(e.clientX-r.left-r.width/2)*0.3, y:(e.clientY-r.top-r.height/2)*0.4, duration:0.4, ease:'power3.out' });
+  });
+  el.addEventListener('pointerleave', ()=>gsap.to(el,{ x:0,y:0,duration:0.5,ease:'elastic.out(1,0.4)' }));
+}
+
+boot();
+setupScroll();
+magnetize(document.getElementById('dl-btn'));
+
+// safety: never let a stalled boot trap the page
+setTimeout(()=>{ document.getElementById('boot').classList.add('done'); document.querySelectorAll('[data-boot]').forEach(e=>e.classList.add('in')); }, 4000);
+</script>
+</body>
+</html>
