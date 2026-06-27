@@ -69,6 +69,7 @@ const GLOBAL_VIEW: MenuItem[] = [
   sep,
   cmd("view.toggleTheme", "Toggle Theme"),
   cmd("keybindings.show", "Keyboard Shortcuts"),
+  cmd("help.open", "Help"),
 ];
 
 /** Window menu: act on the focused window + jump to any open one. */
@@ -86,6 +87,12 @@ function windowMenu(): MenuItem[] {
       label: focused?.maximized ? "Restore" : "Zoom",
       disabled: !focused,
       onClick: () => focused && s.toggleMaximize(focused.id),
+    },
+    {
+      label: focused?.fullscreen ? "Exit Full Screen" : "Enter Full Screen",
+      hint: "⌃⌘F",
+      disabled: !focused,
+      onClick: () => focused && s.toggleFullscreen(focused.id),
     },
     {
       label: "Close Window",
@@ -163,6 +170,7 @@ export function appMenu(): MenuItem[] {
     cmd("controlpanel.open", "Control Panel…"),
     cmd("settings.open", "Settings…"),
     cmd("keybindings.show", "Keyboard Shortcuts"),
+    cmd("help.open", "Help"),
     sep,
     cmd("rosie.toggle", "Toggle R.O.S.I.E"),
     cmd("palette.open", "Spotlight"),

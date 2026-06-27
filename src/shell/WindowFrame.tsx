@@ -31,6 +31,7 @@ export function WindowFrame({
   const focusWindow = useShell((s) => s.focusWindow);
   const minimizeWindow = useShell((s) => s.minimizeWindow);
   const toggleMaximize = useShell((s) => s.toggleMaximize);
+  const toggleFullscreen = useShell((s) => s.toggleFullscreen);
 
   const startRef = useRef<{ x: number; y: number }>({ x: w.x, y: w.y });
 
@@ -116,19 +117,24 @@ export function WindowFrame({
     [w.id, w.maximized, w.w, w.h, w.x, w.y, focusWindow, moveWindow, resizeWindow],
   );
 
+  const style: React.CSSProperties = w.fullscreen
+    ? { zIndex: 1700 }
+    : { left: w.x, top: w.y, width: w.w, height: w.h, zIndex: w.z };
+
   return (
     <div
-      className={`ot-window${focused ? "" : " unfocused"}`}
-      style={{
-        left: w.x,
-        top: w.y,
-        width: w.w,
-        height: w.h,
-        zIndex: w.z,
-      }}
+      className={`ot-window${focused ? "" : " unfocused"}${w.fullscreen ? " fullscreen" : ""}`}
+      style={style}
       onMouseDown={() => focusWindow(w.id)}
     >
-      <div className="ot-titlebar" onMouseDown={onMouseDown}>
+      <div
+        className="ot-titlebar"
+        onMouseDown={w.fullscreen ? undefined : onMouseDown}
+        onDoubleClick={(e) => {
+          if ((e.target as HTMLElement).closest("[data-no-drag]")) return;
+          toggleFullscreen(w.id);
+        }}
+      >
         <div className="ot-traffic" data-no-drag>
           <button
             type="button"
@@ -163,6 +169,17 @@ export function WindowFrame({
           {subtitle ? <span> · {subtitle}</span> : null}
         </div>
         <div className="ot-window-tools" data-no-drag>
+          <button
+            type="button"
+            className="ot-fs-btn"
+            title={w.fullscreen ? "Exit Full Screen (Esc)" : "Enter Full Screen"}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFullscreen(w.id);
+            }}
+          >
+            {w.fullscreen ? "⤬" : "⤢"}
+          </button>
           <span className="kbd">⌘K</span>
         </div>
       </div>
@@ -173,7 +190,7 @@ export function WindowFrame({
         {children}
       </div>
 
-      {!w.maximized && (
+      {!w.maximized && !w.fullscreen && (
         <>
           <div className="ot-rh n" onMouseDown={startResize("n")} />
           <div className="ot-rh s" onMouseDown={startResize("s")} />

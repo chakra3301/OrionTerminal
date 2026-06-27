@@ -4,6 +4,7 @@ import { Wallpaper } from "@/shell/Wallpaper";
 import { MenuBar } from "@/shell/MenuBar";
 import { Dock } from "@/shell/Dock";
 import { WindowFrame } from "@/shell/WindowFrame";
+import { FullscreenNav } from "@/shell/FullscreenNav";
 import { Spotlight } from "@/shell/Spotlight";
 import { MonitorWidget } from "@/shell/MonitorWidget";
 import { PromptModalHost } from "@/components/PromptModal";
@@ -125,7 +126,11 @@ export function Shell() {
           // mounted and alive. Never true for a partially-covered window —
           // only a *maximized* window above qualifies.
           const occluded = windows.some(
-            (o) => o.maximized && !o.minimized && o.z > w.z,
+            (o) =>
+              (o.maximized || o.fullscreen) &&
+              !o.minimized &&
+              o.id !== w.id &&
+              o.z > w.z,
           );
           return (
             <WindowFrame
@@ -143,6 +148,7 @@ export function Shell() {
           );
         })}
       </div>
+      <FullscreenNav />
       <Dock />
       <Spotlight />
       <PromptModalHost />

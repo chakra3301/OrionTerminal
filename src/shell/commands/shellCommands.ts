@@ -67,13 +67,45 @@ export function installShellCommands() {
   registry.register({
     id: "window.toggleMaximize",
     label: "Toggle Maximize Focused Window",
-    hotkey: "ctrl+meta+f",
     group: "View",
     when: () => useShell.getState().focusedWindowId !== null,
     run: () => {
       const id = useShell.getState().focusedWindowId;
       if (id) useShell.getState().toggleMaximize(id);
     },
+  });
+
+  registry.register({
+    id: "window.toggleFullscreen",
+    label: "Toggle Full Screen",
+    hotkey: "ctrl+meta+f",
+    keywords: ["fullscreen", "full screen", "present"],
+    group: "View",
+    when: () => useShell.getState().focusedWindowId !== null,
+    run: () => {
+      const id = useShell.getState().focusedWindowId;
+      if (id) useShell.getState().toggleFullscreen(id);
+    },
+  });
+
+  registry.register({
+    id: "window.fullscreenNext",
+    label: "Full Screen: Next App",
+    keywords: ["fullscreen", "switch", "next", "tab"],
+    group: "View",
+    when: () =>
+      useShell.getState().windows.some((w) => w.fullscreen && !w.minimized),
+    run: () => useShell.getState().cycleFullscreen(1),
+  });
+
+  registry.register({
+    id: "window.fullscreenPrev",
+    label: "Full Screen: Previous App",
+    keywords: ["fullscreen", "switch", "previous", "tab"],
+    group: "View",
+    when: () =>
+      useShell.getState().windows.some((w) => w.fullscreen && !w.minimized),
+    run: () => useShell.getState().cycleFullscreen(-1),
   });
 
   registry.register({

@@ -13,6 +13,7 @@ export type WindowState = {
   z: number;
   minimized: boolean;
   maximized: boolean;
+  fullscreen: boolean;
   preMaximize?: { x: number; y: number; w: number; h: number };
 };
 
@@ -26,6 +27,14 @@ type ShellState = {
   closeWindow: (id: string) => void;
   minimizeWindow: (id: string) => void;
   toggleMaximize: (id: string) => void;
+  toggleFullscreen: (id: string) => void;
+  /** Enter fullscreen on `id`, exiting fullscreen on whatever held it. Used
+   * by the fullscreen app-switcher so tabbing swaps the presented app. */
+  enterFullscreen: (id: string) => void;
+  exitFullscreen: () => void;
+  /** Cycle the fullscreen target to the next/prev open app, staying in
+   * fullscreen. No-op when nothing is fullscreen. */
+  cycleFullscreen: (dir: 1 | -1) => void;
   focusWindow: (id: string) => void;
   moveWindow: (id: string, x: number, y: number) => void;
   resizeWindow: (id: string, w: number, h: number) => void;
@@ -93,6 +102,7 @@ export const useShell = create<ShellState>((set, get) => ({
       z: nextZ,
       minimized: false,
       maximized: false,
+      fullscreen: false,
     };
     set((s) => ({
       windows: [...s.windows, next],
@@ -152,6 +162,54 @@ export const useShell = create<ShellState>((set, get) => ({
         };
       }),
     }));
+  },
+
+  toggleFullscreen: (id) => {
+    const w = get().windows.find((x) => x.id === id);
+    if (w?.fullscreen) {
+      get().exitFullscreen();
+    } else {
+      get().enterFullscreen(id);
+    }
+  },
+
+  enterFullscreen: (id) => {
+    const cur = get();
+    if (!cur.windows.some((w) => w.id === id)) return;
+    const nextZ = cur.maxZ + 1;
+    set({
+      maxZ: nextZ,
+      focusedWindowId: id,
+      windows: cur.windows.map((w) =>
+        w.id === id
+          ? { ...w, fullscreen: true, minimized: false, z: nextZ }
+          : w.fullscreen
+            ? { ...w, fullscreen: false }
+            : w,
+      ),
+    });
+  },
+
+  exitFullscreen: () => {
+    set((s) => ({
+      windows: s.windows.map((w) =>
+        w.fullscreen ? { ...w, fullscreen: false } : w,
+      ),
+    }));
+  },
+
+  cycleFullscreen: (dir) => {
+    const cur = get();
+    const fs = cur.windows.find((w) => w.fullscreen);
+    if (!fs) return;
+    // Order by z so the switcher matches the visible app order.
+    const open = cur.windows
+      .filter((w) => !w.minimized)
+      .sort((a, b) => a.z - b.z);
+    if (open.length < 2) return;
+    const i = open.findIndex((w) => w.id === fs.id);
+    const next = open[(i + dir + open.length) % open.length];
+    if (next) get().enterFullscreen(next.id);
   },
 
   focusWindow: (id) => {
@@ -225,6 +283,10 @@ export const useShell = create<ShellState>((set, get) => ({
     return true;
   },
 }));
+
+export function fullscreenWindow(s: ShellState): WindowState | null {
+  return s.windows.find((w) => w.fullscreen && !w.minimized) ?? null;
+}
 
 export function focusedApp(s: ShellState): AppId | null {
   const w = s.windows.find((x) => x.id === s.focusedWindowId);

@@ -671,6 +671,101 @@ summary:focus-visible,
 }
 
 /* ============================================================
+   True fullscreen — window fills the viewport above menubar/dock.
+   Geometry (x/y/w/h) is untouched so exiting restores the prior frame.
+   ============================================================ */
+.ot-window.fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  border: none;
+  animation: none;
+}
+.ot-window.fullscreen .ot-titlebar { cursor: default; }
+
+.ot-fs-btn {
+  background: transparent;
+  border: none;
+  color: var(--t-tertiary);
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+.ot-fs-btn:hover { color: var(--t-primary); background: var(--bg-3); }
+
+/* Fullscreen app-switcher — floats over the fullscreen window. */
+.ot-fsnav {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1720;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: var(--r-pill);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border-bright);
+  box-shadow: var(--shadow-window);
+  backdrop-filter: blur(20px) saturate(1.4);
+  font-family: var(--f-mono);
+}
+.ot-fsnav-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: none;
+  color: var(--t-secondary);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ot-fsnav-tab:hover { color: var(--t-primary); background: var(--bg-3); }
+.ot-fsnav-tab.active {
+  color: var(--t-primary);
+  background: var(--bg-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tab-accent) 45%, transparent);
+}
+.ot-fsnav-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tab-accent);
+  box-shadow: 0 0 8px -1px var(--tab-accent);
+  flex-shrink: 0;
+}
+.ot-fsnav-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--glass-border-bright);
+  margin: 0 2px;
+}
+.ot-fsnav-exit {
+  background: transparent;
+  border: none;
+  color: var(--t-tertiary);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+}
+.ot-fsnav-exit:hover { color: var(--neon-magenta); background: var(--bg-3); }
+
+/* ============================================================
    R.O.S.I.E — central agentic Claude. Floating panel summoned by orb / ⌘L.
    ============================================================ */
 
