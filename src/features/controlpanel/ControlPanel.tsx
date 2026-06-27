@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
 import { useControlPanel, type CpSection } from "@/store/controlPanelStore";
 import { ProvidersPanel } from "./ProvidersPanel";
@@ -27,6 +27,16 @@ export function ControlPanel() {
   const section = useControlPanel((s) => s.section);
   const setSection = useControlPanel((s) => s.setSection);
   const hide = useControlPanel((s) => s.hide);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") hide();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, hide]);
+
   if (!open) return null;
 
   return (
