@@ -94,10 +94,6 @@ fn is_image(name: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn pick_thumbnail(file_names: &[String]) -> Option<String> {
-    file_names.iter().find(|n| is_image(n)).cloned()
-}
-
 /// From `(filename, mtime_millis)` pairs, pick the earliest-saved image whose
 /// name is NOT in `initial` (the scaffold-shipped images, e.g. the placeholder
 /// `comparison.png`). The first screenshot the agent saves is the recon shot of
