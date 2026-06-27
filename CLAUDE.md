@@ -145,12 +145,15 @@ Multi-session rebuild (started 2026-06-10): Orion ≥ Cursor, Archives ≥ Notio
 
 ---
 
-## Current state (2026-06-24)
+## Current state (2026-06-27)
+
+**Beta v1 polish pass (2026-06-27):** landed the uncommitted shell/theme WIP — true fullscreen window mode + ⌃⌘F app-switcher (`46912af`), Liquid frosted-glass theme + LiquidLens WebGL (`7919b4f`); split heavy vendors via vite `manualChunks` (three+xterm out of main — index 1.98MB→1.25MB) + removed dead Rust fn (`0c917c9`). Fresh release bundle rebuilt (was stale from Jun 23): `.app` + `.dmg` (23MB aarch64) carry all 104 commands. ⚠️ manualChunks must only split leaf vendors (three/monaco/xterm) — grouping react/markdown makes a circular chunk. **Remaining human-only:** launch the bundled `.app` and eyeball the auth liquid-glass + 5 themes on real surfaces.
+
 
 **XDesign is feature-complete vs open-design / Claude Design:** generation loop (deterministic token engine · expert slot-template blueprints · output guards · best-model routing), brand contracts + URL→brand + 20 built-in design systems, prototypes, decks (HTML / PDF / PPTX), images (raster + SVG), motion (canvas + video) — plus the editable canvas + Orion integration competitors lack.
 
-**Open / user-owned:** validate raster image-gen on a real key (**[P-AUTH]** — parsers now name exactly what came back; patch `xdesign_image.rs` if fields differ); confirm MediaRecorder video export in the bundled .app (works for voice, likely fine); XDesign multiplayer deliberately not contested. ⚠️ A `tauri dev` restart is needed to pick up the latest Rust commands.
+**Open / user-owned:** validate raster image-gen on a real key (**[P-AUTH]** — parsers now name exactly what came back; patch `xdesign_image.rs` if fields differ); confirm MediaRecorder video export in the bundled .app (works for voice, likely fine); XDesign multiplayer deliberately not contested.
 
-Latest gates (2026-06-24 pt6): tsc clean · vitest 693 · cargo lib 138 · build exit 0. **UI human-unverified.**
+Latest gates (2026-06-27): tsc clean · vitest 725 · cargo lib 0 warnings · build exit 0 · release bundle exit 0. **UI human-unverified.**
 
 Detailed per-session history → [CLAUDE_LOG_ARCHIVE.md](CLAUDE_LOG_ARCHIVE.md).
