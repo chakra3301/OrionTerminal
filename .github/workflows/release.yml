@@ -1,0 +1,78 @@
+name: Build & Release (macOS)
+
+# Builds the macOS Apple Silicon .dmg and attaches it to a GitHub Release.
+# - Push a tag like `v0.1.0-beta.2` -> builds and publishes to that release.
+# - Or run manually (Actions tab -> Run workflow) and pass a tag name.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish to (e.g. v0.1.0-beta.2)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-14 # Apple Silicon runner (aarch64)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: tag
+        run: echo "value=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install JS deps
+        run: npm ci
+
+      - name: Build app (.app + .dmg)
+        run: npm run tauri build -- --target aarch64-apple-darwin
+
+      - name: Stage release asset (stable name)
+        id: asset
+        run: |
+          set -euo pipefail
+          src="$(find src-tauri/target -path '*/release/bundle/dmg/*.dmg' | head -n1)"
+          if [ -z "$src" ]; then echo "No .dmg found"; exit 1; fi
+          stable="Orion-Terminal_aarch64.dmg"
+          cp "$src" "$stable"
+          echo "Built: $src -> $stable"
+          echo "stable=$stable" >> "$GITHUB_OUTPUT"
+          echo "versioned=$src" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.value }}
+          name: ${{ steps.tag.outputs.value }}
+          # Must be false so /releases/latest/download/... resolves.
+          # GitHub's "latest" endpoint ignores prereleases. The -beta tag
+          # name + the site copy still communicate that this is a beta.
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: |
+            ${{ steps.asset.outputs.stable }}
+            ${{ steps.asset.outputs.versioned }}

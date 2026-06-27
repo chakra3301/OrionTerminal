@@ -12,7 +12,26 @@
 [![Rust](https://img.shields.io/badge/Rust-stable-CE412B?logo=rust&logoColor=white)](https://www.rust-lang.org)
 ![Status](https://img.shields.io/badge/status-beta%20v1-39ff88)
 
+### [⬇️ Download for macOS (Apple Silicon)](https://github.com/chakra3301/OrionTerminal/releases/latest)
+
+[![Download](https://img.shields.io/github/v/release/chakra3301/OrionTerminal?include_prereleases&label=download%20.dmg&color=39ff88)](https://github.com/chakra3301/OrionTerminal/releases/latest)
+
 </div>
+
+---
+
+## Download & install (macOS, Apple Silicon)
+
+1. Grab the latest **`.dmg`** from the [**Releases page**](https://github.com/chakra3301/OrionTerminal/releases/latest).
+2. Open the `.dmg` and drag **Orion Terminal** into **Applications**.
+3. The app is **unsigned** (personal beta), so the first launch is blocked by Gatekeeper. To open it:
+   - **Right-click** the app → **Open** → **Open** in the dialog, **or**
+   - run once in Terminal:
+     ```bash
+     xattr -dr com.apple.quarantine "/Applications/Orion Terminal.app"
+     ```
+
+> Currently Apple Silicon (`aarch64`) only. Building from source works on any platform — see [Getting started](#getting-started).
 
 ---
 
