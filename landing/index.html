@@ -599,8 +599,10 @@ body:not(.cinema) .panel+.panel{border-top:1px solid var(--line)}
       </div>
       <div class="hint">
         <span><b>macOS · Apple Silicon</b></span>
-        <span>Unsigned beta — first launch: <b>right-click → Open</b></span>
+        <span>Unsigned beta — macOS will say <b>“damaged”</b> (it isn’t). Fix it once:</span>
       </div>
+      <p style="margin-top:10px;font-size:13px;color:var(--t-secondary,#9ab0a8)">After dragging to Applications, open <b>Terminal</b> and run:</p>
+      <pre style="display:inline-block;margin:8px auto 0;padding:10px 14px;border-radius:8px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);font-family:ui-monospace,Menlo,monospace;font-size:12.5px;overflow-x:auto;max-width:100%"><code>xattr -dr com.apple.quarantine "/Applications/Orion Terminal.app"</code></pre>
     </div>
   </div>
 </section>
