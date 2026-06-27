@@ -10,6 +10,223 @@
    assume a dark canvas.
    ============================================================ */
 
+/* ---------- Liquid — hyperliquid frosted glass, heavy blur, icy edges ----------
+   Inspired by iOS "liquid glass" / ShojiWM's liquid-terminal config. Pure CSS
+   can't do the shader's true refraction + chromatic aberration, so we lean on
+   extreme transparency, a cranked backdrop blur and a bright specular rim to
+   sell the wet-glass read. Keeps the neon accents so app identity survives. */
+[data-theme="liquid"] {
+  /* Surface tokens go translucent so EVERY panel/sidebar/card/input/toolbar
+     that fills with --bg-* becomes glass automatically. They tint over the
+     window's already-frosted backdrop (layered glass) — no per-element blur,
+     so it stays cheap. Alphas climb with depth so stacked layers still build
+     up to a readable surface. */
+  --bg-0: rgba(2, 6, 12, 0.07);
+  --bg-1: rgba(10, 20, 32, 0.06);
+  --bg-2: rgba(16, 30, 46, 0.07);
+  --bg-3: rgba(26, 48, 70, 0.12);
+  /* opaque twins for the rare surface that must not let content bleed
+     through (editor gutters, terminal) — reference as var(--bg-1-solid) */
+  --bg-0-solid: #02060c;
+  --bg-1-solid: #050b14;
+  --bg-2-solid: #08111c;
+  --bg-3-solid: #0d1928;
+
+  /* accents stay vivid — they glow through the frost */
+  --neon-green: #4dffa0;
+  --neon-cyan: #5fe8ff;
+  --neon-yellow: #eaff5c;
+  --neon-magenta: #ff5cb8;
+  --neon-violet: #c07bff;
+
+  --neon-green-rgb: 77, 255, 160;
+  --neon-cyan-rgb: 95, 232, 255;
+  --neon-yellow-rgb: 234, 255, 92;
+  --neon-magenta-rgb: 255, 92, 184;
+  --neon-violet-rgb: 192, 123, 255;
+
+  --t-primary: #f1faff;
+  --t-secondary: #aac6d6;
+  --t-tertiary: #6c8799;
+  --t-faint: #3a4e5c;
+
+  /* glass — barely-there icy tint; the cranked blur (below) does the work */
+  --glass-bg: rgba(120, 180, 230, 0.015);
+  --glass-bg-strong: rgba(90, 155, 210, 0.025);
+  --glass-bg-deep: rgba(60, 120, 175, 0.05);
+  --glass-border: rgba(200, 235, 255, 0.22);
+  --glass-border-bright: rgba(230, 248, 255, 0.45);
+  --glass-highlight: rgba(255, 255, 255, 0.16);
+
+  /* fluid, pill-leaning corners */
+  --r-sm: 8px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 26px;
+
+  --shadow-window: 0 30px 90px -22px rgba(0, 0, 0, 0.72),
+    0 10px 30px -10px rgba(0, 0, 0, 0.5),
+    0 0 60px -30px rgba(95, 232, 255, 0.35);
+  --shadow-glow-green: 0 0 26px -4px rgba(77, 255, 160, 0.5);
+  --shadow-glow-cyan: 0 0 26px -4px rgba(95, 232, 255, 0.55);
+  --shadow-glow-magenta: 0 0 26px -4px rgba(255, 92, 184, 0.5);
+
+  --xd-accent-rgb: 95, 232, 255;
+}
+
+/* Global liquid amplifier — crank the backdrop on every glass surface and add a
+   bright specular rim. Scoped off .ot-reduce-glass so "Reduce transparency"
+   (and the OS accessibility pref) still strips the blur cleanly. */
+html[data-theme="liquid"]:not(.ot-reduce-glass) .ot-window,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .ot-menubar,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .ot-dock,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .ot-spotlight,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .glass {
+  /* light frost — mostly transparent over the clean sky, just enough blur to
+     read as glass (not the old blur(32) that looked like a dark frosted slab) */
+  backdrop-filter: blur(11px) saturate(1.5) brightness(1.04) !important;
+  -webkit-backdrop-filter: blur(11px) saturate(1.5) brightness(1.04) !important;
+}
+
+
+/* Floating containers that overlap other content get their own (lighter) blur
+   so they frost the panels behind them, not just the wallpaper. Bounded list
+   — these are big, few, and already sit on their own stacking layer, so the
+   extra backdrop pass is cheap. */
+html[data-theme="liquid"]:not(.ot-reduce-glass) .or-sidebar,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .or-filetree,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .hm-rail,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .ar-sidebar,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .xd-sidebar,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .or-home-menu,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .ot-context-menu,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .ot-menu-popover,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .ot-modal,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .ot-toast,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .ot-titlebar,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .ot-panel-tabs,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .or-statusbar,
+html[data-theme="liquid"]:not(.ot-reduce-glass) [class*="-toolbar"],
+html[data-theme="liquid"]:not(.ot-reduce-glass) [class*="-popover"] {
+  backdrop-filter: blur(20px) saturate(1.6) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.6) !important;
+}
+
+html[data-theme="liquid"] .ot-window {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(200, 235, 255, 0.10),
+    inset 0 -1px 0 rgba(95, 232, 255, 0.08),
+    var(--shadow-window);
+}
+
+/* === Flood the frost EVERYWHERE ===========================================
+   ~466 surfaces use hardcoded opaque backgrounds (not --bg tokens), so the big
+   page/pane bases stay solid and block the glass. Here we zero those structural
+   container backgrounds so the window's single frosted-wallpaper backdrop shows
+   through the whole interior. Translucent cards/chips then layer on top as real
+   glass. We target only large container name-patterns + an explicit offender
+   list — never buttons/chips/inputs — so accent colours survive.
+   (WKWebView can't do the reference site's SVG displacement refraction
+   — backdrop-filter:url() is a no-op — so this is heavy frost, not lens warp.) */
+html[data-theme="liquid"] [class*="-page"]:not([class*="-page-"]):not(input):not(button),
+html[data-theme="liquid"] [class*="-pane"],
+html[data-theme="liquid"] [class*="-canvas"],
+html[data-theme="liquid"] [class*="-workspace"],
+html[data-theme="liquid"] [class*="-view"]:not(input):not(button),
+html[data-theme="liquid"] .ot-window-body,
+html[data-theme="liquid"] .note-page,
+html[data-theme="liquid"] .ar-main,
+html[data-theme="liquid"] .ar-today,
+html[data-theme="liquid"] .ar-journal-editor,
+html[data-theme="liquid"] .ar-projects-editor,
+html[data-theme="liquid"] .or-app,
+html[data-theme="liquid"] .or-home,
+html[data-theme="liquid"] .or-preview-empty,
+html[data-theme="liquid"] .or-preview-md,
+html[data-theme="liquid"] .ot-panel,
+html[data-theme="liquid"] .ot-panel-empty,
+html[data-theme="liquid"] .learn-tutor-panel {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* Big content cards that were near-opaque dark slabs — turn them into real
+   translucent glass (faint tint + their own blur keeps text readable). */
+html[data-theme="liquid"]:not(.ot-reduce-glass) .note-page .note-editor-body,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .ar-card,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .or-home-card,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .hm-card,
+html[data-theme="liquid"]:not(.ot-reduce-glass) .ar-db-card {
+  background: rgba(120, 180, 230, 0.02) !important;
+  border: 1px solid rgba(220, 245, 255, 0.16) !important;
+  backdrop-filter: blur(14px) saturate(1.5) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.5) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 8px 32px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Inputs/fields go glass too, so nothing reads as a solid box. */
+html[data-theme="liquid"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html[data-theme="liquid"] textarea,
+html[data-theme="liquid"] select,
+html[data-theme="liquid"] .ot-input,
+html[data-theme="liquid"] [class*="-input"],
+html[data-theme="liquid"] [class*="-field"] {
+  background: rgba(140, 195, 235, 0.07) !important;
+  border-color: rgba(220, 245, 255, 0.16) !important;
+}
+
+/* The Liquid Lens (WebGL desktop refraction) sits above the CSS wallpaper and
+   below the windows; its own canvas is opaque and covers the desktop. */
+.ot-liquid-lens {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  /* Fallback sky behind the WebGL canvas: if the lens mounts but the GL canvas
+     renders transparent (or fails), the desktop still reads as the liquid
+     theme's own sky instead of the underlying wallpaper. The canvas paints the
+     real refraction on top of this. Also a mount diagnostic: matrix replaced
+     by this gradient ⇒ the component mounted. */
+  background:
+    radial-gradient(ellipse 1300px 700px at 50% 112%, rgba(192, 123, 255, 0.16), transparent 62%),
+    radial-gradient(ellipse  900px 520px at 16%  96%, rgba(95, 232, 255, 0.09), transparent 60%),
+    radial-gradient(ellipse 1000px 700px at 85%   4%, rgba(77, 255, 160, 0.06), transparent 60%),
+    linear-gradient(to top, #05111e 0%, #03070d 55%, #02050a 100%);
+}
+.ot-liquid-lens canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* While the lens is live it IS the frosted backdrop — drop the window's own
+   CSS backdrop-blur so the crisp shader refraction shows through the
+   translucent window interior instead of being re-blurred. */
+/* When the WebGL lens IS mounted, it paints real refraction at z-index 1; drop
+   the window's CSS blur so that crisp refraction shows through instead of being
+   re-frosted. (No-op when the lens isn't mounted — the light blur above stays.) */
+html.ot-lens .ot-window {
+  backdrop-filter: blur(6px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(6px) saturate(1.4) !important;
+}
+
+/* XDesign scopes its own opaque graphite tokens (--xd-bg #1e1e1e …) on
+   .xd-root and even re-maps --bg-0/1 to them, so it ignores the liquid surface
+   tokens. Re-skin that scope to translucent icy glass so XDesign goes glass too. */
+html[data-theme="liquid"] .xd-root {
+  --xd-bg: rgba(13, 26, 42, 0.06);
+  --xd-panel: rgba(22, 42, 64, 0.09);
+  --xd-raised: rgba(40, 70, 100, 0.14);
+  --xd-border: rgba(220, 245, 255, 0.16);
+  --bg-0: rgba(2, 6, 12, 0.07);
+  --bg-1: rgba(22, 42, 64, 0.09);
+  --bg-2: rgba(40, 70, 100, 0.14);
+  --bg-3: rgba(60, 100, 140, 0.16);
+}
+
 /* ---------- Minimal — calm monochrome, no glow, flatter ---------- */
 [data-theme="minimal"] {
   --bg-0: #0b0c0d;

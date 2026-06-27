@@ -393,6 +393,13 @@ export function ThemeSection() {
             <span className="ot-theme-meta">
               <span className="ot-theme-name">{t.label}</span>
               <span className="ot-theme-blurb">{t.blurb}</span>
+              {t.id === "liquid" && (
+                <span className={`ot-theme-hint${reduceGlass ? " warn" : ""}`}>
+                  {reduceGlass
+                    ? "⚠ Turn off “Reduce transparency” below for the full effect"
+                    : "Best with “Reduce transparency” off"}
+                </span>
+              )}
             </span>
           </button>
         ))}

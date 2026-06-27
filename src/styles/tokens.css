@@ -4385,6 +4385,22 @@ summary:focus-visible,
 .ot-theme-card[data-theme-swatch="neon"] .s-green { background: #39ff88; }
 .ot-theme-card[data-theme-swatch="neon"] .s-cyan { background: #00e0ff; }
 .ot-theme-card[data-theme-swatch="neon"] .s-magenta { background: #ff3ea5; }
+.ot-theme-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--neon-cyan);
+  opacity: 0.85;
+}
+.ot-theme-hint.warn {
+  color: var(--neon-yellow);
+  opacity: 1;
+}
+
+.ot-theme-card[data-theme-swatch="liquid"] .s-green { background: #4dffa0; }
+.ot-theme-card[data-theme-swatch="liquid"] .s-cyan { background: #5fe8ff; }
+.ot-theme-card[data-theme-swatch="liquid"] .s-magenta { background: #ff5cb8; }
 .ot-theme-card[data-theme-swatch="minimal"] .s-green { background: #8ed3b0; }
 .ot-theme-card[data-theme-swatch="minimal"] .s-cyan { background: #9bc7d6; }
 .ot-theme-card[data-theme-swatch="minimal"] .s-magenta { background: #d6a8bf; }
