@@ -46,6 +46,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["../resources/website-cloner-scaffold"]
+    "resources": ["../resources/website-cloner-scaffold"],
+    "macOS": {
+      "signingIdentity": "-"
+    }
   }
 }

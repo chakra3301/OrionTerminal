@@ -6,17 +6,18 @@ Thanks for testing Orion Terminal. This is an early personal-use build — expec
 
 ## Install (macOS, Apple Silicon)
 
-The build is **unsigned** (no Apple notarization), so macOS Gatekeeper will block it on first launch. This is expected.
+The build is **ad-hoc signed but not notarized** (no Apple Developer account on the build), so macOS Gatekeeper warns on first launch. This is expected — it is *not* malware.
 
 1. Open the `.dmg` and drag **Orion Terminal** to **Applications**.
-2. **You'll see “Orion Terminal is damaged and can’t be opened.” This is normal for an unsigned app** — it is *not* actually damaged, and it is *not* malware. macOS just quarantines anything downloaded from the internet that isn't notarized.
-3. To remove the quarantine flag, open **Terminal** (⌘Space → type “Terminal”) and paste:
+2. First launch is blocked with an “unverified developer” warning. To get past it once:
+   - **macOS 14 Sonoma & earlier:** right-click the app → **Open** → confirm **Open**.
+   - **macOS 15 Sequoia & later:** double-click once (it’s blocked), then **System Settings → Privacy & Security** → scroll down → **Open Anyway**.
+3. If either is fiddly, this clears it on any macOS version — open **Terminal** (⌘Space → “Terminal”) and paste:
    ```bash
    xattr -dr com.apple.quarantine "/Applications/Orion Terminal.app"
    ```
-4. Now open the app normally. Done.
 
-> The right-click → **Open** trick only clears the milder “unidentified developer” warning — it does **not** clear the “is damaged” message. Use the `xattr` command above.
+> After the first successful open, it launches normally forever — no warnings.
 
 > **Apple Silicon only.** This DMG is `aarch64` — it will not run on Intel Macs.
 

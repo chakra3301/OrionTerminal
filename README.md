@@ -24,11 +24,13 @@
 
 1. Grab the latest **`.dmg`** from the [**Releases page**](https://github.com/chakra3301/OrionTerminal/releases/latest).
 2. Open the `.dmg` and drag **Orion Terminal** into **Applications**.
-3. The app is **unsigned** (personal beta), so macOS will say **“Orion Terminal is damaged and can’t be opened.”** It is **not** damaged — macOS quarantines unsigned downloads. Clear it once in Terminal:
-   ```bash
-   xattr -dr com.apple.quarantine "/Applications/Orion Terminal.app"
-   ```
-   Then open the app normally. (The right-click → Open trick does **not** clear the “damaged” message — use the command above.)
+3. The app is **ad-hoc signed, not notarized** (personal beta), so on first launch macOS warns it can’t verify the developer. To open it:
+   - **macOS 14 Sonoma & earlier:** right-click the app → **Open** → **Open** in the dialog.
+   - **macOS 15 Sequoia & later:** double-click (it’s blocked once), then go to **System Settings → Privacy & Security** → scroll down → **Open Anyway**.
+   - **Always works (any version):**
+     ```bash
+     xattr -dr com.apple.quarantine "/Applications/Orion Terminal.app"
+     ```
 
 > Currently Apple Silicon (`aarch64`) only. Building from source works on any platform — see [Getting started](#getting-started).
 
