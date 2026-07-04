@@ -14,8 +14,6 @@ import {
   Play,
   Pause,
   RotateCcw,
-  Sparkles,
-  Wand2,
   Zap,
   X,
   Diamond,
@@ -38,6 +36,7 @@ import { useAssetsStore } from "@/store/assetsStore";
 import { useXDesign } from "@/apps/xdesign/store";
 import { useXDProjects } from "@/apps/xdesign/projectsStore";
 import { FxShaderModal } from "./FxShaderModal";
+import { FxEffectBrowser } from "./FxEffectBrowser";
 import { FX_CUSTOM_ID, customCodeOf } from "./fxModel";
 import { useFxStore } from "./fxStore";
 import { createCompositor, type FxCompositor } from "./compositor";
@@ -65,7 +64,7 @@ let fxCanvasEl: HTMLCanvasElement | null = null;
 /** Perf counters the render loop publishes (mutable, non-reactive — the
  * HUD polls). ms is CPU submit time; fps counts presented frames. */
 const fxPerf = { ms: 0, worst: 0, fps: 0, passes: 0, w: 0, h: 0 };
-import { fxEffect, FX_EFFECTS } from "./fxRegistry";
+import { fxEffect } from "./fxRegistry";
 import { rasterizeSource, sourceRasterKey } from "./fxRaster";
 
 // ── Viewport ──────────────────────────────────────────────────────────────
@@ -614,87 +613,21 @@ function FxToolbar() {
 
 // ── Layers panel ──────────────────────────────────────────────────────────
 
-function AddLayerMenu() {
+function AddLayerButton() {
   const [open, setOpen] = useState(false);
-  const groups = useMemo(
-    () => ({
-      source: FX_EFFECTS.filter((s) => s.category === "source"),
-      generator: FX_EFFECTS.filter((s) => s.category === "generator"),
-      effect: FX_EFFECTS.filter((s) => s.category === "effect"),
-    }),
-    [],
-  );
-
   return (
-    <div className="xd-fx-add-wrap">
+    <>
       <button
         type="button"
         className="xd-fx-add"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(true)}
         title="Add layer"
         aria-label="Add layer"
       >
         <Plus size={14} />
       </button>
-      {open && (
-        <>
-          <div className="xd-home-menu-scrim" onClick={() => setOpen(false)} />
-          <div className="xd-fx-add-menu">
-            <div className="xd-fx-add-group">Sources</div>
-            {groups.source.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  useFxStore.getState().addLayer(s.id);
-                }}
-              >
-                <Wand2 size={13} />
-                <span>
-                  <span className="xd-fx-add-label">{s.label}</span>
-                  <span className="xd-fx-add-desc">{s.description}</span>
-                </span>
-              </button>
-            ))}
-            <div className="xd-fx-add-group">Generators</div>
-            {groups.generator.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  useFxStore.getState().addLayer(s.id);
-                }}
-              >
-                <Sparkles size={13} />
-                <span>
-                  <span className="xd-fx-add-label">{s.label}</span>
-                  <span className="xd-fx-add-desc">{s.description}</span>
-                </span>
-              </button>
-            ))}
-            <div className="xd-fx-add-group">Effects</div>
-            {groups.effect.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  useFxStore.getState().addLayer(s.id);
-                }}
-              >
-                <Wand2 size={13} />
-                <span>
-                  <span className="xd-fx-add-label">{s.label}</span>
-                  <span className="xd-fx-add-desc">{s.description}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+      {open && <FxEffectBrowser onClose={() => setOpen(false)} />}
+    </>
   );
 }
 
@@ -796,7 +729,7 @@ function FxLayersPanel() {
     <aside className="xd-fx-layers">
       <div className="xd-fx-panel-head">
         <span>Layers</span>
-        <AddLayerMenu />
+        <AddLayerButton />
       </div>
       <div className="xd-fx-layer-list">
         {display.length === 0 && (

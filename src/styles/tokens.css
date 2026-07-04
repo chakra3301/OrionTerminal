@@ -16215,6 +16215,8 @@ html.ot-reduce-glass .note-page .note-editor-body {
   /* Must clear .xd-home-menu-scrim (z-index 40) or the scrim eats clicks. */
   z-index: 41;
   min-width: 230px;
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
   background: var(--xd-raised);
   border: 1px solid var(--xd-border);
   border-radius: 8px;
@@ -16603,6 +16605,150 @@ html.ot-reduce-glass .note-page .note-editor-body {
   border-color: rgba(var(--xd-accent-rgb), 0.5);
   color: var(--xd-accent);
 }
+/* ── Effect browser (Unicorn-style picker) ── */
+.xd-fx-browser {
+  width: min(860px, 94vw);
+  height: min(620px, 90vh);
+  display: flex;
+  flex-direction: column;
+  background: var(--xd-panel);
+  border: 1px solid var(--xd-border);
+  border-radius: 14px;
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+}
+.xd-fx-browser-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--xd-border);
+}
+.xd-fx-browser-search {
+  flex: 1;
+  background: var(--xd-raised);
+  border: 1px solid var(--xd-border);
+  border-radius: 8px;
+  color: var(--xd-text);
+  font-size: 13px;
+  padding: 8px 12px;
+  outline: none;
+}
+.xd-fx-browser-search:focus { border-color: var(--xd-accent); }
+.xd-fx-browser-close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--xd-text-3);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.xd-fx-browser-close:hover { color: var(--xd-text); background: var(--xd-hover); }
+.xd-fx-browser-body { flex: 1; min-height: 0; display: flex; }
+.xd-fx-browser-rail {
+  width: 128px;
+  flex-shrink: 0;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-right: 1px solid var(--xd-border);
+}
+.xd-fx-browser-rail button {
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--xd-text-2);
+  font-size: 12.5px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.xd-fx-browser-rail button:hover { color: var(--xd-text); background: var(--xd-hover); }
+.xd-fx-browser-rail button.active {
+  color: var(--xd-text);
+  background: rgba(var(--xd-accent-rgb), 0.18);
+}
+.xd-fx-browser-grid-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 14px;
+}
+.xd-fx-browser-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 12px;
+}
+.xd-fx-browser-empty {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--xd-text-3);
+}
+.xd-fx-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--xd-border);
+  border-radius: 10px;
+  background: var(--xd-raised);
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  text-align: left;
+  transition: border-color 0.12s, transform 0.12s;
+}
+.xd-fx-card:hover {
+  border-color: var(--xd-accent);
+  transform: translateY(-1px);
+}
+.xd-fx-card-thumb {
+  display: block;
+  aspect-ratio: 216 / 140;
+  background: #06070d;
+  position: relative;
+}
+.xd-fx-card-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.xd-fx-card-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--xd-text-3);
+}
+.xd-fx-card-loading {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.05) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: xd-fx-shimmer 1.1s linear infinite;
+}
+@keyframes xd-fx-shimmer { to { background-position: -200% 0; } }
+.xd-fx-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px 9px;
+}
+.xd-fx-card-name { font-size: 12px; color: var(--xd-text); font-weight: 600; }
+.xd-fx-card-desc {
+  font-size: 10px;
+  color: var(--xd-text-3);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 .xd-fx-spin { animation: xd-fx-spin 0.9s linear infinite; }
 @keyframes xd-fx-spin { to { transform: rotate(360deg); } }
 
