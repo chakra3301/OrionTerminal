@@ -7,6 +7,8 @@
 import {
   buildFragment,
   isUniformParam,
+  customCodeOf,
+  FX_CUSTOM_ID,
   type FxScene,
 } from "./fxModel";
 import { fxEffect } from "./fxRegistry";
@@ -174,7 +176,7 @@ const EMBED_PLAYER = String.raw`
     for(var i=0;i<scene.layers.length;i++){
       var l=scene.layers[i];
       if(l.hidden||l.opacity<=0) continue;
-      var prog=progs[l.effectId], spec=D.specs[l.effectId];
+      var prog=progs[l.effectId==="custom"?("custom:"+l.id):l.effectId]||progs[l.effectId], spec=D.specs[l.effectId];
       if(!prog||!spec) continue;
       gl.bindFramebuffer(gl.FRAMEBUFFER,pong.f);
       gl.useProgram(prog);
@@ -237,9 +239,16 @@ export function buildEmbedHtml(
   const shaders: Record<string, string> = {};
   const specs: Record<string, EmbedSpec> = {};
   for (const layer of scene.layers) {
-    if (shaders[layer.effectId]) continue;
     const spec = fxEffect(layer.effectId);
     if (!spec) continue;
+    // Custom layers carry their own body — one shader entry per layer.
+    if (layer.effectId === FX_CUSTOM_ID) {
+      shaders[`${FX_CUSTOM_ID}:${layer.id}`] = buildFragment(
+        spec,
+        customCodeOf(layer),
+      );
+    }
+    if (shaders[layer.effectId]) continue;
     shaders[layer.effectId] = buildFragment(spec);
     specs[layer.effectId] = {
       source: !!spec.source,

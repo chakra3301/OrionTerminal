@@ -828,6 +828,53 @@ vec4 fxMain(vec2 uv) {
 `,
 };
 
+const depthParallax: FxEffectSpec = {
+  id: "depthParallax",
+  label: "Depth parallax",
+  category: "effect",
+  description: "Fake 3D — bright areas shift with the mouse",
+  params: [
+    { key: "amount", label: "Amount", type: "number", min: 0, max: 1, step: 0.005, default: 0.35 },
+    { key: "bias", label: "Depth bias", type: "number", min: -0.5, max: 0.5, step: 0.01, default: 0 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  float d = dot(texture(uTex, uv).rgb, vec3(0.299, 0.587, 0.114));
+  vec2 off = (uMouse - 0.5) * u_amount * 0.05 * (d - 0.5 + u_bias);
+  return texture(uTex, clamp(uv + off, 0.0, 1.0));
+}
+`,
+};
+
+export const FX_CUSTOM_STARTER = `vec4 fxMain(vec2 uv) {
+  // Your shader. Available:
+  //   uTex (stack below) · uTime · uMouse (0..1) · uResolution
+  //   u_a u_b u_c u_d (sliders) · u_colorA u_colorB (colors)
+  //   fxHash21(p) · fxNoise2(p) · fxFbm(p) · fxRotate2(a)
+  vec4 below = texture(uTex, uv);
+  float wave = sin(uv.y * 30.0 * u_a + uTime * 2.0) * 0.02 * u_b;
+  vec3 col = texture(uTex, uv + vec2(wave, 0.0)).rgb;
+  col = mix(col, u_colorA, u_c * 0.25);
+  return vec4(col, 1.0);
+}`;
+
+const custom: FxEffectSpec = {
+  id: "custom",
+  label: "Custom shader",
+  category: "effect",
+  description: "Write your own GLSL — or ask Claude to",
+  params: [
+    { key: "code", label: "Code", type: "text", default: FX_CUSTOM_STARTER, hidden: true },
+    { key: "a", label: "A", type: "number", min: 0, max: 1, step: 0.005, default: 0.5 },
+    { key: "b", label: "B", type: "number", min: 0, max: 1, step: 0.005, default: 0.5 },
+    { key: "c", label: "C", type: "number", min: 0, max: 1, step: 0.005, default: 0.5 },
+    { key: "d", label: "D", type: "number", min: 0, max: 1, step: 0.005, default: 0.5 },
+    { key: "colorA", label: "Color A", type: "color", default: "#00e0ff" },
+    { key: "colorB", label: "Color B", type: "color", default: "#ff3ea5" },
+  ],
+  frag: FX_CUSTOM_STARTER,
+};
+
 export const FX_EFFECTS: FxEffectSpec[] = [
   gradient,
   aurora,
@@ -860,6 +907,8 @@ export const FX_EFFECTS: FxEffectSpec[] = [
   gradientMap,
   mirror,
   posterize,
+  depthParallax,
+  custom,
 ];
 
 const byId = new Map(FX_EFFECTS.map((s) => [s.id, s]));

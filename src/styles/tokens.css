@@ -16490,6 +16490,121 @@ html.ot-reduce-glass .note-page .note-editor-body {
 .xd-fx-perf .ok { color: #39ff88; }
 .xd-fx-perf .warn { color: #e6ff3a; }
 .xd-fx-perf .bad { color: #ff3ea5; }
+.xd-fx-modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+}
+.xd-fx-modal {
+  width: min(720px, 92vw);
+  height: min(560px, 88vh);
+  display: flex;
+  flex-direction: column;
+  background: var(--xd-panel);
+  border: 1px solid var(--xd-border);
+  border-radius: 12px;
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+}
+.xd-fx-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--xd-text-2);
+  border-bottom: 1px solid var(--xd-border);
+}
+.xd-fx-modal-head button {
+  display: grid;
+  place-items: center;
+  border: none;
+  background: none;
+  color: var(--xd-text-3);
+  cursor: pointer;
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+}
+.xd-fx-modal-head button:hover { color: var(--xd-text); background: var(--xd-hover); }
+.xd-fx-modal-claude {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--xd-border);
+}
+.xd-fx-modal-gen {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  padding: 0 12px;
+  font-size: 11.5px;
+  background: rgba(var(--xd-accent-rgb), 0.2);
+  color: var(--xd-accent);
+  cursor: pointer;
+}
+.xd-fx-modal-gen:hover:not(:disabled) { background: rgba(var(--xd-accent-rgb), 0.32); }
+.xd-fx-modal-gen:disabled { opacity: 0.45; cursor: default; }
+.xd-fx-modal-editor { flex: 1; min-height: 0; }
+.xd-fx-modal-loading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-size: 12px;
+  color: var(--xd-text-3);
+}
+.xd-fx-modal-err {
+  margin: 0;
+  padding: 8px 12px;
+  max-height: 96px;
+  overflow: auto;
+  font-size: 10.5px;
+  font-family: "JetBrains Mono", monospace;
+  color: #ff3ea5;
+  background: rgba(255, 62, 165, 0.08);
+  border-top: 1px solid var(--xd-border);
+  white-space: pre-wrap;
+}
+.xd-fx-modal-ok {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #39ff88;
+  border-top: 1px solid var(--xd-border);
+}
+.xd-fx-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--xd-border);
+}
+.xd-fx-modal-btn {
+  border: 1px solid var(--xd-border);
+  border-radius: 6px;
+  background: var(--xd-raised);
+  color: var(--xd-text);
+  font-size: 11.5px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.xd-fx-modal-btn:hover { border-color: var(--xd-accent); }
+.xd-fx-modal-btn.primary {
+  background: rgba(var(--xd-accent-rgb), 0.22);
+  border-color: rgba(var(--xd-accent-rgb), 0.5);
+  color: var(--xd-accent);
+}
+.xd-fx-spin { animation: xd-fx-spin 0.9s linear infinite; }
+@keyframes xd-fx-spin { to { transform: rotate(360deg); } }
 
 /* ── Home-card badge ── */
 .xd-fx-badge {

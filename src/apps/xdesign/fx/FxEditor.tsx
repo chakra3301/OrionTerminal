@@ -33,6 +33,12 @@ import {
   buildEmbedHtml,
   renderFxSnapshot,
 } from "./fxExport";
+import { appConfigDir, join } from "@tauri-apps/api/path";
+import { useAssetsStore } from "@/store/assetsStore";
+import { useXDesign } from "@/apps/xdesign/store";
+import { useXDProjects } from "@/apps/xdesign/projectsStore";
+import { FxShaderModal } from "./FxShaderModal";
+import { FX_CUSTOM_ID, customCodeOf } from "./fxModel";
 import { useFxStore } from "./fxStore";
 import { createCompositor, type FxCompositor } from "./compositor";
 import {
@@ -382,6 +388,51 @@ async function exportEmbed(): Promise<void> {
   );
 }
 
+/** Snapshot the scene to a PNG asset and drop it onto a DESIGN project's
+ * canvas (creates one when the active project is this FX scene) — the
+ * design↔FX bridge Unicorn doesn't have. */
+async function placeInDesign(): Promise<void> {
+  const { scene } = useFxStore.getState();
+  const dpi = resolveDpi(scene.dpi);
+  const blob = await renderFxSnapshot(
+    scene,
+    fxClock.time,
+    Math.round(scene.width * dpi),
+    Math.round(scene.height * dpi),
+  );
+  if (!blob) {
+    toast.error("Snapshot failed");
+    return;
+  }
+  const path = await join(await appConfigDir(), `fx-snapshot-${Date.now()}.png`);
+  await ipc.xdesignSaveBytes(
+    path,
+    Array.from(new Uint8Array(await blob.arrayBuffer())),
+  );
+  const assets = await useAssetsStore.getState().ingestPaths([path]);
+  const asset = assets.find((a) => a.kind === "image");
+  if (!asset) {
+    toast.error("Couldn't ingest the snapshot as an asset");
+    return;
+  }
+  await useXDProjects.getState().ensureActive();
+  const w = Math.min(600, scene.width);
+  const h = Math.round((w / scene.width) * scene.height);
+  useXDesign.getState().addShape({
+    kind: "image",
+    x: 500 - w / 2,
+    y: 350 - h / 2,
+    w,
+    h,
+    filePath: asset.filePath,
+    assetId: asset.id,
+    fill: "transparent",
+    stroke: "transparent",
+    strokeWidth: 0,
+  });
+  toast.success("Placed in design canvas");
+}
+
 async function exportJson(): Promise<void> {
   const { scene } = useFxStore.getState();
   await saveBytes(
@@ -431,6 +482,9 @@ function ExportMenu() {
             </button>
             <button type="button" onClick={() => run(exportJson)}>
               <span className="xd-fx-add-label">Scene JSON</span>
+            </button>
+            <button type="button" onClick={() => run(placeInDesign)}>
+              <span className="xd-fx-add-label">Place in design canvas</span>
             </button>
             <div className="xd-fx-add-group">Import</div>
             <button
@@ -1014,6 +1068,7 @@ function MaskSelect({ layer }: { layer: FxLayer }) {
 function FxInspector() {
   const scene = useFxStore((s) => s.scene);
   const selectedId = useFxStore((s) => s.selectedLayerId);
+  const [shaderModal, setShaderModal] = useState(false);
   const layer = scene.layers.find((l) => l.id === selectedId) ?? null;
   const spec = layer ? fxEffect(layer.effectId) : undefined;
 
@@ -1063,8 +1118,17 @@ function FxInspector() {
                 </span>
               </span>
             </label>
+            {layer.effectId === FX_CUSTOM_ID && (
+              <button
+                type="button"
+                className="xd-fx-file"
+                onClick={() => setShaderModal(true)}
+              >
+                Edit shader… (GLSL / Claude)
+              </button>
+            )}
             <MaskSelect layer={layer} />
-            {spec.params.map((p) => (
+            {spec.params.filter((p) => !p.hidden).map((p) => (
               <ParamControl
                 key={p.key}
                 layerId={layer.id}
@@ -1075,6 +1139,13 @@ function FxInspector() {
               />
             ))}
           </div>
+          {shaderModal && layer.effectId === FX_CUSTOM_ID && (
+            <FxShaderModal
+              layerId={layer.id}
+              initialCode={customCodeOf(layer)}
+              onClose={() => setShaderModal(false)}
+            />
+          )}
         </>
       ) : (
         <>

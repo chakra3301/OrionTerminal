@@ -16,7 +16,11 @@ import {
   uniformName,
   blendIndex,
   isUniformParam,
+  fnv1a,
+  customCodeOf,
+  FX_CUSTOM_ID,
   FX_VERTEX_SRC,
+  type FxLayer,
   type FxScene,
 } from "./fxModel";
 import { fxEffect } from "./fxRegistry";
@@ -104,6 +108,34 @@ export type FxCompositor = {
   dispose: () => void;
 };
 
+// ── Shader validation (custom GLSL editor) ────────────────────────
+
+let validateGl: WebGL2RenderingContext | null | undefined;
+
+/** Compile a custom fxMain body against the real wrapper. Returns the
+ * compiler info log on failure, null when it compiles clean. Uses a
+ * dedicated hidden context so validation never touches a live scene. */
+export function validateFxShader(body: string): string | null {
+  if (validateGl === undefined) {
+    validateGl = document.createElement("canvas").getContext("webgl2");
+  }
+  const vgl = validateGl;
+  if (!vgl) return null; // no WebGL2 — nothing useful to report
+  const spec = fxEffect(FX_CUSTOM_ID);
+  if (!spec) return null;
+  if (!body.includes("fxMain")) {
+    return "shader must define: vec4 fxMain(vec2 uv)";
+  }
+  const sh = vgl.createShader(vgl.FRAGMENT_SHADER);
+  if (!sh) return "couldn't create shader";
+  vgl.shaderSource(sh, buildFragment(spec, body));
+  vgl.compileShader(sh);
+  const ok = vgl.getShaderParameter(sh, vgl.COMPILE_STATUS) as boolean;
+  const log0 = ok ? null : vgl.getShaderInfoLog(sh) || "unknown compile error";
+  vgl.deleteShader(sh);
+  return log0;
+}
+
 export function createCompositor(
   canvas: HTMLCanvasElement,
   opts?: { preserveDrawingBuffer?: boolean },
@@ -169,14 +201,33 @@ export function createCompositor(
     }
   }
 
-  function programFor(effectId: string): ProgramEntry {
-    if (programs.has(effectId)) return programs.get(effectId)!;
-    const spec = fxEffect(effectId);
-    const prog = spec ? link(gl!, buildFragment(spec)) : null;
+  /** Program cache key — custom layers key by code hash so edits recompile
+   * while unchanged code hits the cache. Stale custom entries are dropped
+   * whenever the cache grows past a small bound. */
+  function programKeyFor(layer: FxLayer): string {
+    return layer.effectId === FX_CUSTOM_ID
+      ? `${FX_CUSTOM_ID}:${fnv1a(customCodeOf(layer))}`
+      : layer.effectId;
+  }
+
+  function programFor(layer: FxLayer): ProgramEntry {
+    const key = programKeyFor(layer);
+    if (programs.has(key)) return programs.get(key)!;
+    if (programs.size > 96) {
+      for (const [k, e] of programs) {
+        if (!k.startsWith(`${FX_CUSTOM_ID}:`)) continue;
+        if (e) gl!.deleteProgram(e.program);
+        programs.delete(k);
+      }
+    }
+    const spec = fxEffect(layer.effectId);
+    const body =
+      layer.effectId === FX_CUSTOM_ID ? customCodeOf(layer) : undefined;
+    const prog = spec ? link(gl!, buildFragment(spec, body)) : null;
     const entry: ProgramEntry = prog
       ? { program: prog, locs: new Map() }
       : null;
-    programs.set(effectId, entry);
+    programs.set(key, entry);
     return entry;
   }
 
@@ -260,7 +311,7 @@ export function createCompositor(
 
     for (const layer of scene.layers) {
       if (layer.hidden || layer.opacity <= 0) continue;
-      const entry = programFor(layer.effectId);
+      const entry = programFor(layer);
       const spec = fxEffect(layer.effectId);
       if (!entry || !spec) continue;
 

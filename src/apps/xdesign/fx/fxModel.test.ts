@@ -8,6 +8,7 @@ import {
   resolveDpi,
   isUniformParam,
   blendIndex,
+  fnv1a,
   FX_BLEND_MODES,
 } from "./fxModel";
 import { FX_EFFECTS, fxEffect } from "./fxRegistry";
@@ -117,6 +118,28 @@ describe("buildFragment", () => {
     expect(blendIndex("normal")).toBe(0);
     expect(blendIndex("add")).toBe(1);
     expect(blendIndex("darken")).toBe(FX_BLEND_MODES.length - 1);
+  });
+});
+
+describe("custom shader plumbing", () => {
+  it("buildFragment body override replaces the spec frag", () => {
+    const spec = fxEffect("custom")!;
+    const body = "vec4 fxMain(vec2 uv) { return vec4(0.123); }";
+    const src = buildFragment(spec, body);
+    expect(src).toContain("vec4(0.123)");
+    expect(src).not.toContain("Your shader");
+  });
+
+  it("override without fxMain falls back to the spec frag", () => {
+    const spec = fxEffect("custom")!;
+    const src = buildFragment(spec, "garbage");
+    expect(src).toContain("fxMain");
+    expect(src).not.toContain("garbage");
+  });
+
+  it("fnv1a is stable and collision-distinct for edits", () => {
+    expect(fnv1a("abc")).toBe(fnv1a("abc"));
+    expect(fnv1a("abc")).not.toBe(fnv1a("abd"));
   });
 });
 

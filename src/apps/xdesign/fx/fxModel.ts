@@ -6,7 +6,7 @@
  * transform it. Pure module: no WebGL, no DOM — fully unit-testable.
  */
 
-export type FxParamSpec =
+export type FxParamSpec = (
   | {
       key: string;
       label: string;
@@ -27,7 +27,12 @@ export type FxParamSpec =
   /** Free text — drives rasterization (source layers), not a uniform. */
   | { key: string; label: string; type: "text"; default: string }
   /** Image file path — drives rasterization, not a uniform. "" = none. */
-  | { key: string; label: string; type: "image"; default: string };
+  | { key: string; label: string; type: "image"; default: string }
+) & {
+  /** Hidden from the generic inspector (e.g. custom-shader code, which has
+   * its own Monaco modal). */
+  hidden?: boolean;
+};
 
 /** Params that become shader uniforms (text/image drive rasterization). */
 export function isUniformParam(p: FxParamSpec): boolean {
@@ -224,7 +229,25 @@ mat2 fxRotate2(float a) {
  * (uTex/uResolution/uTime/uMouse/uOpacity), one uniform per param, the lib,
  * the effect body, and a main() that opacity-mixes the pass over the
  * below-texture. */
-export function buildFragment(spec: FxEffectSpec): string {
+/** FNV-1a — stable tiny hash for custom-shader program cache keys. */
+export function fnv1a(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+}
+
+/** The effect id whose GLSL body is user-authored per layer. */
+export const FX_CUSTOM_ID = "custom";
+
+export function customCodeOf(layer: FxLayer): string {
+  const v = layer.params.code;
+  return typeof v === "string" ? v : "";
+}
+
+export function buildFragment(spec: FxEffectSpec, bodyOverride?: string): string {
   const decls = spec.params
     .filter(isUniformParam)
     .map((p) =>
@@ -249,7 +272,7 @@ in vec2 vUv;
 out vec4 fragColor;
 ${FX_GLSL_LIB}
 ${FX_BLEND_GLSL}
-${spec.frag}
+${bodyOverride?.includes("fxMain") ? bodyOverride : spec.frag}
 void main() {
   vec4 below = texture(uTex, vUv);
   vec4 res = fxMain(vUv);
