@@ -13,8 +13,11 @@ import {
   ChevronDown,
   Play,
   Pause,
+  RotateCcw,
   Sparkles,
   Wand2,
+  Zap,
+  X,
 } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useFxStore } from "./fxStore";
@@ -22,10 +25,14 @@ import { createCompositor, type FxCompositor } from "./compositor";
 import {
   resolveDpi,
   FX_BLEND_MODES,
+  FX_BIND_SOURCES,
+  type FxBinding,
+  type FxBindSource,
   type FxBlendMode,
   type FxLayer,
   type FxParamSpec,
 } from "./fxModel";
+import { FxBindingRuntime, easeOutCubic, FX_BIND_LABELS } from "./fxBindings";
 import { fxEffect, FX_EFFECTS } from "./fxRegistry";
 import { rasterizeSource, sourceRasterKey } from "./fxRaster";
 
@@ -71,8 +78,13 @@ function FxViewport() {
     let sceneTime = 0;
     let accum = 0;
     let visible = true;
+    let hover = 0;
+    let mouseSpeed = 0;
+    let lastRestartNonce = useFxStore.getState().restartNonce;
+    const bindings = new FxBindingRuntime();
     const mouse: [number, number] = [0.5, 0.5];
     const mouseTarget: [number, number] = [0.5, 0.5];
+    const mousePrev: [number, number] = [0.5, 0.5];
 
     // Source-layer rasterization bookkeeping. Keys are set eagerly (before
     // the async raster lands) so a failed raster doesn't retry every frame.
@@ -109,7 +121,15 @@ function FxViewport() {
       mouseTarget[0] = (e.clientX - r.left) / r.width;
       mouseTarget[1] = 1 - (e.clientY - r.top) / r.height;
     };
+    const onEnter = () => {
+      hover = 1;
+    };
+    const onLeave = () => {
+      hover = 0;
+    };
     canvas.addEventListener("pointermove", onPointer);
+    canvas.addEventListener("pointerenter", onEnter);
+    canvas.addEventListener("pointerleave", onLeave);
 
     const onCtxLost = (e: Event) => {
       e.preventDefault();
@@ -129,7 +149,12 @@ function FxViewport() {
       last = now;
       if (!visible || document.hidden || !compositor) return;
 
-      const { scene, playing } = useFxStore.getState();
+      const { scene, playing, restartNonce } = useFxStore.getState();
+      if (restartNonce !== lastRestartNonce) {
+        lastRestartNonce = restartNonce;
+        sceneTime = 0;
+        bindings.reset();
+      }
 
       // FPS cap: accumulate and only draw when a frame interval elapsed.
       if (scene.fps > 0) {
@@ -144,11 +169,34 @@ function FxViewport() {
       mouse[0] += (mouseTarget[0] - mouse[0]) * k;
       mouse[1] += (mouseTarget[1] - mouse[1]) * k;
 
+      // Pointer speed: normalized uv distance per second, decaying when
+      // still. 2.0 uv/s ≈ a brisk sweep maps to 1.
+      if (dt > 0) {
+        const dx = mouseTarget[0] - mousePrev[0];
+        const dy = mouseTarget[1] - mousePrev[1];
+        const raw = Math.min(1, Math.hypot(dx, dy) / dt / 2.0);
+        mouseSpeed = Math.max(raw, mouseSpeed * Math.exp(-dt * 4));
+      }
+      mousePrev[0] = mouseTarget[0];
+      mousePrev[1] = mouseTarget[1];
+
+      const overrides = bindings.tick(
+        scene,
+        {
+          mouseX: mouse[0],
+          mouseY: mouse[1],
+          mouseSpeed,
+          hover,
+          appear: easeOutCubic(sceneTime / 1.2),
+        },
+        dt,
+      );
+
       const dpi = resolveDpi(scene.dpi);
       const pw = Math.round(scene.width * dpi);
       const ph = Math.round(scene.height * dpi);
       syncSources(pw, ph);
-      compositor.render(scene, { time: sceneTime, mouse }, pw, ph);
+      compositor.render(scene, { time: sceneTime, mouse }, pw, ph, overrides);
     };
     raf = requestAnimationFrame(tick);
 
@@ -156,6 +204,8 @@ function FxViewport() {
       cancelAnimationFrame(raf);
       io.disconnect();
       canvas.removeEventListener("pointermove", onPointer);
+      canvas.removeEventListener("pointerenter", onEnter);
+      canvas.removeEventListener("pointerleave", onLeave);
       canvas.removeEventListener("webglcontextlost", onCtxLost);
       canvas.removeEventListener("webglcontextrestored", onCtxRestored);
       compositor?.dispose();
@@ -199,6 +249,15 @@ function FxToolbar() {
         aria-label={playing ? "Pause" : "Play"}
       >
         {playing ? <Pause size={13} /> : <Play size={13} />}
+      </button>
+      <button
+        type="button"
+        className="xd-fx-play"
+        onClick={() => useFxStore.getState().restart()}
+        title="Restart (re-fires Appear bindings)"
+        aria-label="Restart"
+      >
+        <RotateCcw size={13} />
       </button>
       <span className="xd-fx-toolbar-group">
         <input
@@ -450,14 +509,71 @@ function FxLayersPanel() {
 
 // ── Inspector ─────────────────────────────────────────────────────────────
 
+function BindingRow({
+  layerId,
+  paramKey,
+  binding,
+}: {
+  layerId: string;
+  paramKey: string;
+  binding: FxBinding;
+}) {
+  const patch = (p: Partial<FxBinding>) =>
+    useFxStore.getState().setBinding(layerId, paramKey, { ...binding, ...p });
+  return (
+    <span className="xd-fx-bind-row">
+      <select
+        className="xd-fx-select xd-fx-bind-src"
+        value={binding.source}
+        onChange={(e) => patch({ source: e.target.value as FxBindSource })}
+      >
+        {FX_BIND_SOURCES.map((s) => (
+          <option key={s} value={s}>
+            {FX_BIND_LABELS[s]}
+          </option>
+        ))}
+      </select>
+      <input
+        type="range"
+        min={-1}
+        max={1}
+        step={0.01}
+        value={binding.amount}
+        title={`Amount ${Math.round(binding.amount * 100)}%`}
+        onChange={(e) => patch({ amount: Number(e.target.value) })}
+      />
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={binding.smooth ?? 0.3}
+        className="xd-fx-bind-smooth"
+        title={`Smoothing ${Math.round((binding.smooth ?? 0.3) * 100)}%`}
+        onChange={(e) => patch({ smooth: Number(e.target.value) })}
+      />
+      <button
+        type="button"
+        className="xd-fx-bind-remove"
+        onClick={() => useFxStore.getState().setBinding(layerId, paramKey, null)}
+        aria-label="Remove binding"
+      >
+        <X size={10} />
+      </button>
+    </span>
+  );
+}
+
 function ParamControl({
   layerId,
   spec,
   value,
+  binding,
 }: {
   layerId: string;
   spec: FxParamSpec;
   value: number | string | undefined;
+  binding?: FxBinding;
 }) {
   const set = (v: number | string) =>
     useFxStore.getState().setParam(layerId, spec.key, v);
@@ -555,7 +671,27 @@ function ParamControl({
             if (Number.isFinite(v)) set(Math.min(spec.max, Math.max(spec.min, v)));
           }}
         />
+        <button
+          type="button"
+          className={`xd-fx-bind-btn${binding ? " on" : ""}`}
+          title={binding ? "Edit interaction binding" : "Bind to mouse / hover / appear"}
+          onClick={(e) => {
+            e.preventDefault();
+            useFxStore
+              .getState()
+              .setBinding(
+                layerId,
+                spec.key,
+                binding ? null : { source: "mouseX", amount: 0.5, smooth: 0.3 },
+              );
+          }}
+        >
+          <Zap size={10} />
+        </button>
       </span>
+      {binding && (
+        <BindingRow layerId={layerId} paramKey={spec.key} binding={binding} />
+      )}
     </label>
   );
 }
@@ -618,6 +754,7 @@ function FxInspector() {
                 layerId={layer.id}
                 spec={p}
                 value={layer.params[p.key]}
+                binding={layer.bindings?.[p.key]}
               />
             ))}
           </div>

@@ -71,6 +71,26 @@ export function blendIndex(mode: FxBlendMode | undefined): number {
   return i < 0 ? 0 : i;
 }
 
+export const FX_BIND_SOURCES = [
+  "mouseX",
+  "mouseY",
+  "mouseSpeed",
+  "hover",
+  "appear",
+] as const;
+export type FxBindSource = (typeof FX_BIND_SOURCES)[number];
+
+/** Binds one numeric param to an input source. The bound value is
+ * `clamp(base + amount × (max−min) × source, min, max)` — base stays the
+ * stored param, so removing the binding restores the original look. */
+export type FxBinding = {
+  source: FxBindSource;
+  /** -1..1 — fraction of the param's range the source sweeps. */
+  amount: number;
+  /** 0..1 — exponential smoothing (0 ≈ instant, 1 ≈ lazy drift). */
+  smooth?: number;
+};
+
 export type FxLayer = {
   id: string;
   effectId: string;
@@ -81,6 +101,8 @@ export type FxLayer = {
   /** Blend mode vs the stack below. Default "normal". */
   blend?: FxBlendMode;
   params: Record<string, FxParamValue>;
+  /** Interactivity: param key → input binding. */
+  bindings?: Record<string, FxBinding>;
 };
 
 export type FxDpi = "auto" | 0.5 | 1 | 2;

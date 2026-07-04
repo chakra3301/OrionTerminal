@@ -16392,6 +16392,45 @@ html.ot-reduce-glass .note-page .note-editor-body {
   white-space: nowrap;
 }
 .xd-fx-file:hover { border-color: var(--xd-accent); color: var(--xd-text); }
+.xd-fx-bind-btn {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--xd-text-3);
+  cursor: pointer;
+  border-radius: 4px;
+}
+.xd-fx-bind-btn:hover { color: var(--xd-text); background: var(--xd-hover); }
+.xd-fx-bind-btn.on { color: var(--xd-accent); background: rgba(var(--xd-accent-rgb), 0.16); }
+.xd-fx-bind-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  background: rgba(var(--xd-accent-rgb), 0.08);
+}
+.xd-fx-bind-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--xd-accent); }
+.xd-fx-bind-row .xd-fx-bind-smooth { flex: 0 0 34px; }
+.xd-fx-bind-src { max-width: 88px; font-size: 10.5px; padding: 2px 4px; }
+.xd-fx-bind-remove {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--xd-text-3);
+  cursor: pointer;
+  border-radius: 3px;
+}
+.xd-fx-bind-remove:hover { color: var(--neon-magenta); background: var(--xd-hover); }
 
 /* ── Home-card badge ── */
 .xd-fx-badge {

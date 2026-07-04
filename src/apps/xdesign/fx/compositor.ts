@@ -83,9 +83,19 @@ function link(
   return prog;
 }
 
+export type FxOverrideMap = Map<string, Record<string, number>>;
+
 export type FxCompositor = {
-  /** Render one frame at the given internal resolution (scene px × dpi). */
-  render: (scene: FxScene, frame: FxFrame, pixelW: number, pixelH: number) => void;
+  /** Render one frame at the given internal resolution (scene px × dpi).
+   * `overrides` (layer id → param key → value) wins over stored params —
+   * used by interactivity bindings and the timeline. */
+  render: (
+    scene: FxScene,
+    frame: FxFrame,
+    pixelW: number,
+    pixelH: number,
+    overrides?: FxOverrideMap,
+  ) => void;
   /** Upload / refresh the rasterized texture for a source layer. */
   updateSource: (layerId: string, src: TexImageSource) => void;
   /** Free a source layer's texture (layer deleted). */
@@ -225,6 +235,7 @@ export function createCompositor(
     frame: FxFrame,
     pixelW: number,
     pixelH: number,
+    overrides?: FxOverrideMap,
   ): void {
     const w = Math.max(1, Math.round(pixelW));
     const h = Math.max(1, Math.round(pixelH));
@@ -267,11 +278,12 @@ export function createCompositor(
       gl!.uniform2f(loc(entry, "uMouse"), frame.mouse[0], frame.mouse[1]);
       gl!.uniform1f(loc(entry, "uOpacity"), Math.min(1, Math.max(0, layer.opacity)));
       gl!.uniform1f(loc(entry, "uBlend"), blendIndex(layer.blend));
+      const over = overrides?.get(layer.id);
       for (const p of spec.params) {
         if (!isUniformParam(p)) continue;
         const u = loc(entry, uniformName(p.key));
         if (!u) continue;
-        const v = layer.params[p.key] ?? p.default;
+        const v = over?.[p.key] ?? layer.params[p.key] ?? p.default;
         if (p.type === "color") {
           const [r, g, b] = hexToVec3(String(v));
           gl!.uniform3f(u, r, g, b);

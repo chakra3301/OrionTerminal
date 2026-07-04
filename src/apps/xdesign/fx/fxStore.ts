@@ -10,6 +10,7 @@ import { ulid } from "ulid";
 import {
   emptyScene,
   defaultParams,
+  type FxBinding,
   type FxDoc,
   type FxLayer,
   type FxParamValue,
@@ -26,11 +27,16 @@ type FxState = {
   scene: FxScene;
   selectedLayerId: string | null;
   playing: boolean;
+  /** Bumps to restart scene time (re-fires appear bindings). */
+  restartNonce: number;
 
   addLayer: (effectId: string) => void;
   removeLayer: (id: string) => void;
   patchLayer: (id: string, patch: LayerPatch) => void;
   setParam: (id: string, key: string, value: FxParamValue) => void;
+  /** null removes the binding for that param. */
+  setBinding: (id: string, key: string, binding: FxBinding | null) => void;
+  restart: () => void;
   /** dir +1 moves toward the top of the stack (later in render order). */
   moveLayer: (id: string, dir: 1 | -1) => void;
   selectLayer: (id: string | null) => void;
@@ -48,15 +54,28 @@ function uniqueLayerName(layers: FxLayer[], base: string): string {
   return `${base} ${n}`;
 }
 
-/** Drop layers whose effect no longer exists (registry renames/removals)
- * and backfill any params added since the doc was saved. */
+/** Drop layers whose effect no longer exists (registry renames/removals),
+ * backfill any params added since the doc was saved, and strip bindings
+ * that point at params that are gone or non-numeric. */
 export function sanitizeScene(scene: FxScene): FxScene {
   const layers = scene.layers
     .filter((l) => fxEffect(l.effectId))
-    .map((l) => ({
-      ...l,
-      params: { ...defaultParams(fxEffect(l.effectId)!), ...l.params },
-    }));
+    .map((l) => {
+      const spec = fxEffect(l.effectId)!;
+      let bindings = l.bindings;
+      if (bindings) {
+        const valid = Object.entries(bindings).filter(([key]) => {
+          const p = spec.params.find((q) => q.key === key);
+          return p?.type === "number";
+        });
+        bindings = valid.length > 0 ? Object.fromEntries(valid) : undefined;
+      }
+      return {
+        ...l,
+        params: { ...defaultParams(spec), ...l.params },
+        ...(bindings ? { bindings } : { bindings: undefined }),
+      };
+    });
   return { ...emptyScene(), ...scene, layers };
 }
 
@@ -64,6 +83,7 @@ export const useFxStore = create<FxState>((set, get) => ({
   scene: emptyScene(),
   selectedLayerId: null,
   playing: true,
+  restartNonce: 0,
 
   addLayer: (effectId) => {
     const spec = fxEffect(effectId);
@@ -104,6 +124,25 @@ export const useFxStore = create<FxState>((set, get) => ({
         ),
       },
     })),
+
+  setBinding: (id, key, binding) =>
+    set((s) => ({
+      scene: {
+        ...s.scene,
+        layers: s.scene.layers.map((l) => {
+          if (l.id !== id) return l;
+          const bindings = { ...l.bindings };
+          if (binding) bindings[key] = binding;
+          else delete bindings[key];
+          return {
+            ...l,
+            bindings: Object.keys(bindings).length > 0 ? bindings : undefined,
+          };
+        }),
+      },
+    })),
+
+  restart: () => set((s) => ({ restartNonce: s.restartNonce + 1 })),
 
   moveLayer: (id, dir) =>
     set((s) => {
