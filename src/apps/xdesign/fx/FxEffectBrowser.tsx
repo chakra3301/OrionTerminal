@@ -8,10 +8,12 @@ import { useEffect, useMemo, useState } from "react";
 import { X, ImageIcon } from "lucide-react";
 import { useFxStore } from "./fxStore";
 import { FX_EFFECTS } from "./fxRegistry";
-import { getEffectThumbs } from "./fxThumbs";
+import { getEffectThumbs, getPresetThumbs } from "./fxThumbs";
+import { FX_PRESETS, buildPreset } from "./fxPresets";
 import type { FxEffectSpec } from "./fxModel";
 
 const CATEGORIES = [
+  { id: "presets", label: "✦ Presets" },
   { id: "all", label: "All" },
   { id: "source", label: "Sources" },
   { id: "generator", label: "Generators" },
@@ -33,11 +35,17 @@ export function FxEffectBrowser({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<CatId>("all");
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const [presetThumbs, setPresetThumbs] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
     void getEffectThumbs().then((t) => {
       if (!cancelled) setThumbs(t);
+    });
+    void getPresetThumbs(
+      FX_PRESETS.map((p) => ({ id: p.id, scene: buildPreset(p) })),
+    ).then((t) => {
+      if (!cancelled) setPresetThumbs(t);
     });
     return () => {
       cancelled = true;
@@ -100,7 +108,40 @@ export function FxEffectBrowser({ onClose }: { onClose: () => void }) {
             ))}
           </nav>
           <div className="xd-fx-browser-grid-wrap">
-            {shown.length === 0 ? (
+            {cat === "presets" ? (
+              <div className="xd-fx-browser-grid">
+                {FX_PRESETS.filter(
+                  (p) =>
+                    !query ||
+                    `${p.name} ${p.description}`
+                      .toLowerCase()
+                      .includes(query.toLowerCase()),
+                ).map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="xd-fx-card"
+                    onClick={() => {
+                      useFxStore.getState().hydrateFx({ scene: buildPreset(p) });
+                      onClose();
+                    }}
+                    title={`${p.description} — replaces the current scene`}
+                  >
+                    <span className="xd-fx-card-thumb">
+                      {presetThumbs[p.id] ? (
+                        <img src={presetThumbs[p.id]} alt="" draggable={false} />
+                      ) : (
+                        <span className="xd-fx-card-loading" />
+                      )}
+                    </span>
+                    <span className="xd-fx-card-meta">
+                      <span className="xd-fx-card-name">{p.name}</span>
+                      <span className="xd-fx-card-desc">{p.description}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : shown.length === 0 ? (
               <div className="xd-fx-browser-empty">
                 Nothing matches “{query}”.
               </div>

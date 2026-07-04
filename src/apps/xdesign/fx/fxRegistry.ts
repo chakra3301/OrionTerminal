@@ -1087,6 +1087,321 @@ vec4 fxMain(vec2 uv) {
 `,
 };
 
+// ── Finale pack ────────────────────────────────────────────────
+
+const lightning: FxEffectSpec = {
+  id: "lightning",
+  label: "Lightning",
+  category: "generator",
+  description: "Jagged bolt with flicker — aim it with X",
+  params: [
+    { key: "color", label: "Color", type: "color", default: "#b9e2ff" },
+    { key: "x", label: "X", type: "number", min: 0, max: 1, step: 0.005, default: 0.5 },
+    { key: "wander", label: "Wander", type: "number", min: 0, max: 1, step: 0.01, default: 0.35 },
+    { key: "jag", label: "Jaggedness", type: "number", min: 0.5, max: 8, step: 0.1, default: 3 },
+    { key: "thickness", label: "Thickness", type: "number", min: 0.2, max: 3, step: 0.01, default: 1 },
+    { key: "intensity", label: "Intensity", type: "number", min: 0, max: 3, step: 0.01, default: 1.2 },
+    { key: "speed", label: "Strike rate", type: "number", min: 0, max: 3, step: 0.01, default: 1 },
+  ],
+  frag: `
+float fxBolt(vec2 uv, float seed, float t) {
+  float x = u_x + (fxFbmS(vec2(uv.y * u_jag * 4.0 + seed, t * 13.7 + seed)) - 0.5) * u_wander;
+  float d = abs(uv.x - x);
+  float core = exp(-d * 700.0 / u_thickness);
+  float halo = exp(-d * 60.0 / u_thickness) * 0.35;
+  return core + halo;
+}
+vec4 fxMain(vec2 uv) {
+  float t = floor(uTime * u_speed * 6.0);
+  float flicker = 0.35 + 0.65 * step(0.45, fxHash21(vec2(t, 7.0)));
+  float b = fxBolt(uv, 0.0, t);
+  b += fxBolt(uv, 41.7, t + 13.0) * 0.45 * step(0.7, fxHash21(vec2(t, 3.0)));
+  vec3 col = (u_color * b + vec3(1.0) * b * b * 0.6) * u_intensity * flicker;
+  return vec4(col, clamp(b * flicker, 0.0, 1.0));
+}
+`,
+};
+
+const tunnel: FxEffectSpec = {
+  id: "tunnel",
+  label: "Warp tunnel",
+  category: "generator",
+  description: "Flying down an endless neon tube",
+  params: [
+    { key: "colorA", label: "Rings", type: "color", default: "#00e0ff" },
+    { key: "colorB", label: "Walls", type: "color", default: "#1a0533" },
+    { key: "rings", label: "Rings", type: "number", min: 1, max: 20, step: 0.5, default: 6 },
+    { key: "spokes", label: "Spokes", type: "number", min: 0, max: 24, step: 1, default: 8 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 3, step: 0.01, default: 1 },
+    { key: "spin", label: "Spin", type: "number", min: -2, max: 2, step: 0.01, default: 0.3 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec2 p = (uv - 0.5) * 2.0;
+  p.x *= uResolution.x / uResolution.y;
+  p -= (uMouse - 0.5) * 0.4;
+  float r = length(p);
+  float a = atan(p.y, p.x);
+  float z = 0.25 / max(r, 0.02) + uTime * u_speed;
+  float ring = smoothstep(0.35, 0.5, abs(fract(z * u_rings * 0.3) - 0.5));
+  float spoke = u_spokes < 0.5 ? 1.0 : 0.55 + 0.45 * sin(a * u_spokes + uTime * u_spin * 3.0 + z * 0.5);
+  float depth = smoothstep(0.0, 0.5, r);
+  vec3 col = mix(u_colorB, u_colorA, ring) * spoke * depth;
+  col += u_colorA * exp(-r * 6.0) * 0.4;
+  return vec4(col, 1.0);
+}
+`,
+};
+
+const voronoi: FxEffectSpec = {
+  id: "voronoi",
+  label: "Voronoi cells",
+  category: "generator",
+  description: "Living cellular tiles with glowing borders",
+  params: [
+    { key: "colorA", label: "Cell", type: "color", default: "#0a1015" },
+    { key: "colorB", label: "Center", type: "color", default: "#123a4a" },
+    { key: "line", label: "Border glow", type: "color", default: "#00e0ff" },
+    { key: "scale", label: "Scale", type: "number", min: 1, max: 16, step: 0.1, default: 5 },
+    { key: "width", label: "Border width", type: "number", min: 0.01, max: 0.3, step: 0.005, default: 0.06 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 0.5 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec2 p = uv * u_scale;
+  p.x *= uResolution.x / uResolution.y;
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  float f1 = 8.0;
+  float f2 = 8.0;
+  for (int y = -1; y <= 1; y++)
+  for (int x = -1; x <= 1; x++) {
+    vec2 n = vec2(float(x), float(y));
+    vec2 o = vec2(fxHash21(i + n), fxHash21(i + n + 31.3));
+    o = 0.5 + 0.42 * sin(uTime * u_speed + 6.2831853 * o);
+    float d = length(n + o - f);
+    if (d < f1) { f2 = f1; f1 = d; }
+    else if (d < f2) { f2 = d; }
+  }
+  float border = 1.0 - smoothstep(0.0, u_width * 2.0, f2 - f1);
+  vec3 col = mix(u_colorB, u_colorA, smoothstep(0.0, 0.9, f1));
+  col = mix(col, u_line, border);
+  return vec4(col, 1.0);
+}
+`,
+};
+
+const sunGrid: FxEffectSpec = {
+  id: "sunGrid",
+  label: "Synthwave sun",
+  category: "generator",
+  description: "Striped sunset over a scrolling laser grid",
+  params: [
+    { key: "sunA", label: "Sun top", type: "color", default: "#ffd23e" },
+    { key: "sunB", label: "Sun bottom", type: "color", default: "#ff3ea5" },
+    { key: "gridColor", label: "Grid", type: "color", default: "#ff3ea5" },
+    { key: "sky", label: "Sky", type: "color", default: "#12042e" },
+    { key: "horizon", label: "Horizon", type: "number", min: 0.2, max: 0.7, step: 0.005, default: 0.42 },
+    { key: "sunSize", label: "Sun size", type: "number", min: 0.1, max: 0.5, step: 0.005, default: 0.26 },
+    { key: "speed", label: "Grid speed", type: "number", min: 0, max: 3, step: 0.01, default: 1 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  float asp = uResolution.x / uResolution.y;
+  vec3 col = u_sky * (0.7 + 0.6 * uv.y);
+  if (uv.y > u_horizon) {
+    vec2 sp = vec2((uv.x - 0.5) * asp, uv.y - u_horizon - u_sunSize * 0.85);
+    float d = length(sp);
+    float stripe = smoothstep(0.35, 0.65, 0.5 + 0.5 * sin((uv.y - u_horizon) * 160.0));
+    float cutoff = smoothstep(u_sunSize * 0.45, 0.0, uv.y - u_horizon);
+    float disc = smoothstep(u_sunSize, u_sunSize - 0.008, d) * max(stripe, 1.0 - cutoff);
+    vec3 sun = mix(u_sunB, u_sunA, clamp((sp.y / u_sunSize) * 0.5 + 0.5, 0.0, 1.0));
+    col = mix(col, sun, disc);
+    col += sun * exp(-d * 5.0) * 0.35;
+  } else {
+    float py = max(u_horizon - uv.y, 0.001);
+    float z = 0.03 / py;
+    float gx = abs(fract((uv.x - 0.5) * z * 6.0 + 0.5) - 0.5);
+    float gy = abs(fract(z + uTime * u_speed * 0.5) - 0.5);
+    float lw = 0.04 + py * 0.12;
+    float line = max(smoothstep(lw, 0.0, gx), smoothstep(lw, 0.0, gy));
+    float fade = smoothstep(0.0, 0.12, py);
+    col = mix(col * 0.25, u_gridColor, line * fade * 0.9);
+    col += u_gridColor * 0.12 * (1.0 - fade);
+  }
+  return vec4(col, 1.0);
+}
+`,
+};
+
+const fire: FxEffectSpec = {
+  id: "fire",
+  label: "Fire",
+  category: "generator",
+  description: "Rising flames with a hot ember core",
+  params: [
+    { key: "tint", label: "Tint", type: "color", default: "#ff8c1a" },
+    { key: "height", label: "Height", type: "number", min: 0.2, max: 1.5, step: 0.01, default: 0.7 },
+    { key: "scale", label: "Detail", type: "number", min: 0.5, max: 5, step: 0.1, default: 1.8 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 3, step: 0.01, default: 1.2 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  float n = fxFbmS(vec2(uv.x * u_scale * 4.0, uv.y * u_scale * 2.5 - uTime * u_speed * 1.6));
+  n = n * 0.75 + 0.25 * fxRidge(vec2(uv.x * u_scale * 7.0, uv.y * u_scale * 4.0 - uTime * u_speed * 2.2));
+  float f = clamp((n * 1.5 - uv.y / u_height) * 1.7, 0.0, 1.0);
+  vec3 ramp = vec3(f * 1.7, f * f * 1.5, f * f * f * 1.1);
+  vec3 col = ramp * (u_tint / max(max(u_tint.r, u_tint.g), max(u_tint.b, 0.01)));
+  return vec4(col, smoothstep(0.03, 0.35, f));
+}
+`,
+};
+
+const bokeh: FxEffectSpec = {
+  id: "bokeh",
+  label: "Bokeh",
+  category: "generator",
+  description: "Dreamy out-of-focus light discs drifting by",
+  params: [
+    { key: "color", label: "Tint", type: "color", default: "#ffd9a0" },
+    { key: "size", label: "Size", type: "number", min: 0.2, max: 2, step: 0.01, default: 1 },
+    { key: "density", label: "Density", type: "number", min: 0.3, max: 3, step: 0.05, default: 1 },
+    { key: "speed", label: "Drift", type: "number", min: 0, max: 2, step: 0.01, default: 0.3 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  float asp = uResolution.x / uResolution.y;
+  vec3 col = vec3(0.0);
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i) + 1.0;
+    vec2 p = uv * vec2(asp, 1.0) * u_density * (2.0 + fi) + vec2(uTime * u_speed * (0.12 * fi), fi * 9.7);
+    vec2 id = floor(p);
+    vec2 gv = fract(p) - 0.5;
+    float h = fxHash21(id);
+    if (h > 0.55) {
+      vec2 off = (vec2(fxHash21(id + 1.3), fxHash21(id + 2.7)) - 0.5) * 0.6;
+      float r = (0.12 + 0.22 * fxHash21(id + 5.1)) * u_size;
+      float d = length(gv - off);
+      float disc = smoothstep(r, r * 0.75, d);
+      float ring = smoothstep(r, r * 0.92, d) - smoothstep(r * 0.92, r * 0.8, d);
+      float tw = 0.5 + 0.5 * sin(uTime * (0.4 + h) + h * 30.0);
+      col += u_color * (disc * 0.22 + ring * 0.25) * tw / fi;
+    }
+  }
+  float a = clamp(max(col.r, max(col.g, col.b)) * 1.8, 0.0, 1.0);
+  return vec4(col, a);
+}
+`,
+};
+
+const rainGlass: FxEffectSpec = {
+  id: "rainGlass",
+  label: "Rain on glass",
+  category: "effect",
+  description: "Wobbling droplets refract everything below",
+  params: [
+    { key: "scale", label: "Drop size", type: "number", min: 0.5, max: 4, step: 0.05, default: 1.5 },
+    { key: "refract", label: "Refraction", type: "number", min: 0, max: 1, step: 0.01, default: 0.5 },
+    { key: "amount", label: "Coverage", type: "number", min: 0, max: 1, step: 0.01, default: 0.5 },
+    { key: "speed", label: "Wobble", type: "number", min: 0, max: 2, step: 0.01, default: 0.5 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec2 g = uv * vec2(10.0, 14.0) / u_scale;
+  g.x *= uResolution.x / uResolution.y;
+  vec2 id = floor(g);
+  vec2 f = fract(g);
+  float h = fxHash21(id);
+  vec2 c = vec2(0.3 + 0.4 * fxHash21(id + 1.7), 0.3 + 0.4 * fxHash21(id + 3.1));
+  c += 0.05 * sin(uTime * u_speed * 2.0 + h * 20.0);
+  float r = 0.1 + 0.2 * fxHash21(id + 5.3);
+  float d = length((f - c) * vec2(1.0, 0.8));
+  float inDrop = smoothstep(r, r * 0.7, d) * step(1.0 - u_amount, h);
+  vec2 refr = (f - c) * u_refract * 0.15 * inDrop;
+  vec3 col = texture(uTex, clamp(uv - refr, 0.0, 1.0)).rgb;
+  float spec = smoothstep(0.05, 0.0, length(f - c + vec2(0.04, -0.05))) * inDrop;
+  col += spec * 0.5;
+  col *= 1.0 - inDrop * 0.08;
+  return vec4(col, 1.0);
+}
+`,
+};
+
+const interference: FxEffectSpec = {
+  id: "interference",
+  label: "Interference",
+  category: "generator",
+  description: "Two wave sources — hypnotic moiré rings",
+  params: [
+    { key: "colorA", label: "Crest", type: "color", default: "#00e0ff" },
+    { key: "colorB", label: "Trough", type: "color", default: "#03060a" },
+    { key: "frequency", label: "Frequency", type: "number", min: 2, max: 60, step: 0.5, default: 22 },
+    { key: "separation", label: "Separation", type: "number", min: 0, max: 0.8, step: 0.005, default: 0.35 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 3, step: 0.01, default: 0.8 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec2 p = (uv - 0.5) * 2.0;
+  p.x *= uResolution.x / uResolution.y;
+  vec2 m = (uMouse - 0.5) * 0.6;
+  float d1 = length(p - vec2(u_separation, 0.0) - m);
+  float d2 = length(p + vec2(u_separation, 0.0) + m);
+  float v = sin(d1 * u_frequency - uTime * u_speed * 3.0) + sin(d2 * u_frequency - uTime * u_speed * 3.0);
+  v = v * 0.25 + 0.5;
+  vec3 col = mix(u_colorB, u_colorA, smoothstep(0.25, 0.75, v));
+  return vec4(col, 1.0);
+}
+`,
+};
+
+const crt: FxEffectSpec = {
+  id: "crt",
+  label: "CRT monitor",
+  category: "effect",
+  description: "Barrel curve, aperture grille, corner shadow",
+  params: [
+    { key: "curve", label: "Curvature", type: "number", min: 0, max: 1, step: 0.01, default: 0.4 },
+    { key: "grille", label: "Grille", type: "number", min: 0, max: 1, step: 0.01, default: 0.35 },
+    { key: "corner", label: "Corner shadow", type: "number", min: 0, max: 1, step: 0.01, default: 0.5 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec2 p = uv * 2.0 - 1.0;
+  p *= 1.0 + u_curve * 0.12 * dot(p, p);
+  vec2 q = (p + 1.0) * 0.5;
+  if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0) return vec4(0.0, 0.0, 0.0, 1.0);
+  vec3 col = texture(uTex, q).rgb;
+  float m = mod(floor(q.x * uResolution.x), 3.0);
+  vec3 mask = m < 1.0 ? vec3(1.1, 0.85, 0.85) : m < 2.0 ? vec3(0.85, 1.1, 0.85) : vec3(0.85, 0.85, 1.1);
+  col *= mix(vec3(1.0), mask, u_grille);
+  vec2 e = abs(p);
+  float shadow = smoothstep(1.0, 1.0 - u_corner * 0.5, max(e.x, e.y) + pow(e.x * e.y, 2.0) * u_corner);
+  return vec4(col * shadow, 1.0);
+}
+`,
+};
+
+const sharpen: FxEffectSpec = {
+  id: "sharpen",
+  label: "Sharpen",
+  category: "effect",
+  description: "Crisp up everything below",
+  params: [
+    { key: "amount", label: "Amount", type: "number", min: 0, max: 2, step: 0.01, default: 0.6 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec2 px = 1.0 / uResolution;
+  vec3 c = texture(uTex, uv).rgb;
+  vec3 n = texture(uTex, uv + vec2(0.0, px.y)).rgb
+         + texture(uTex, uv - vec2(0.0, px.y)).rgb
+         + texture(uTex, uv + vec2(px.x, 0.0)).rgb
+         + texture(uTex, uv - vec2(px.x, 0.0)).rgb;
+  return vec4(clamp(c * (1.0 + 4.0 * u_amount) - n * u_amount, 0.0, 1.0), 1.0);
+}
+`,
+};
+
 const depthParallax: FxEffectSpec = {
   id: "depthParallax",
   label: "Depth parallax",
@@ -1166,6 +1481,16 @@ export const FX_EFFECTS: FxEffectSpec[] = [
   gradientMap,
   mirror,
   posterize,
+  lightning,
+  tunnel,
+  voronoi,
+  sunGrid,
+  fire,
+  bokeh,
+  rainGlass,
+  interference,
+  crt,
+  sharpen,
   mouseGlow,
   spotlight,
   lens,

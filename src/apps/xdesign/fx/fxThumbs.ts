@@ -56,6 +56,38 @@ export function demoSceneFor(spec: FxEffectSpec): FxScene {
   return scene;
 }
 
+/** Render arbitrary scenes to thumbnail data URLs on one shared GL context
+ * (per-card canvases would exhaust WebGL contexts past ~16 cards). */
+async function renderThumbs(
+  entries: { id: string; scene: FxScene }[],
+): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const canvas = document.createElement("canvas");
+  const comp = createCompositor(canvas, { preserveDrawingBuffer: true });
+  if (!comp) return out;
+  try {
+    for (const { id, scene } of entries) {
+      const srcIds: string[] = [];
+      for (const l of scene.layers) {
+        if (!fxEffect(l.effectId)?.source) continue;
+        const cnv = await rasterizeSource(l, THUMB_W, THUMB_H);
+        if (cnv) {
+          comp.updateSource(l.id, cnv);
+          srcIds.push(l.id);
+        }
+      }
+      // A time with visible motion phase + a mouse offset so
+      // mouse-reactive effects (metaballs, distortion) don't look dead.
+      comp.render(scene, { time: 2.3, mouse: [0.62, 0.58] }, THUMB_W, THUMB_H);
+      out[id] = canvas.toDataURL("image/png");
+      for (const sid of srcIds) comp.dropSource(sid);
+    }
+  } finally {
+    comp.dispose();
+  }
+  return out;
+}
+
 let cache: Record<string, string> | null = null;
 let pending: Promise<Record<string, string>> | null = null;
 
@@ -63,31 +95,27 @@ let pending: Promise<Record<string, string>> | null = null;
 export function getEffectThumbs(): Promise<Record<string, string>> {
   if (cache) return Promise.resolve(cache);
   if (pending) return pending;
-  pending = (async () => {
-    const out: Record<string, string> = {};
-    const canvas = document.createElement("canvas");
-    const comp = createCompositor(canvas, { preserveDrawingBuffer: true });
-    if (!comp) return out;
-    try {
-      for (const spec of FX_EFFECTS) {
-        const scene = demoSceneFor(spec);
-        for (const l of scene.layers) {
-          if (!fxEffect(l.effectId)?.source) continue;
-          const cnv = await rasterizeSource(l, THUMB_W, THUMB_H);
-          if (cnv) comp.updateSource(l.id, cnv);
-        }
-        // A time with visible motion phase + a mouse offset so
-        // mouse-reactive effects (metaballs, distortion) don't look dead.
-        comp.render(scene, { time: 2.3, mouse: [0.62, 0.58] }, THUMB_W, THUMB_H);
-        out[spec.id] = canvas.toDataURL("image/png");
-        comp.dropSource("demo-base");
-        comp.dropSource("demo-fx");
-      }
-    } finally {
-      comp.dispose();
-    }
+  pending = renderThumbs(
+    FX_EFFECTS.map((spec) => ({ id: spec.id, scene: demoSceneFor(spec) })),
+  ).then((out) => {
     cache = out;
     return out;
-  })();
+  });
   return pending;
+}
+
+let presetCache: Record<string, string> | null = null;
+let presetPending: Promise<Record<string, string>> | null = null;
+
+/** Render (or return cached) thumbnails for preset scenes. */
+export function getPresetThumbs(
+  presets: { id: string; scene: FxScene }[],
+): Promise<Record<string, string>> {
+  if (presetCache) return Promise.resolve(presetCache);
+  if (presetPending) return presetPending;
+  presetPending = renderThumbs(presets).then((out) => {
+    presetCache = out;
+    return out;
+  });
+  return presetPending;
 }
