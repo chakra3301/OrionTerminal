@@ -25,7 +25,7 @@ vec4 fxMain(vec2 uv) {
   float ang = radians(u_angle);
   vec2 dir = vec2(cos(ang), sin(ang));
   float t = dot(p, dir) + 0.5;
-  float w = fxFbm(uv * u_warpScale + uTime * u_speed) - 0.5;
+  float w = fxFbmS(uv * u_warpScale + uTime * u_speed) - 0.5;
   t += w * u_warp;
   vec3 col = mix(u_colorA, u_colorB, smoothstep(0.0, 1.0, t));
   return vec4(col, 1.0);
@@ -300,29 +300,36 @@ vec4 fxMain(vec2 uv) {
 
 const ascii: FxEffectSpec = {
   id: "ascii",
-  label: "ASCII dither",
+  label: "Glyph dither",
   category: "effect",
-  description: "Terminal-style character shading",
+  // Real monospace glyphs from a canvas atlas (uSrc), quantised by per-cell
+  // luminance — the Unicorn Studio glyph dither, done natively.
+  source: true,
+  description: "Real monospace glyphs quantised by luminance",
   params: [
-    { key: "cells", label: "Columns", type: "number", min: 20, max: 240, step: 1, default: 90 },
+    { key: "cells", label: "Columns", type: "number", min: 20, max: 240, step: 1, default: 110 },
+    { key: "ramp", label: "Glyph ramp (dark→bright)", type: "text", default: " .:-=+*?#@" },
+    { key: "font", label: "Font", type: "select", options: [{ value: 0, label: "JetBrains Mono" }, { value: 2, label: "System mono" }], default: 0 },
+    { key: "colorMode", label: "Glyph color", type: "select", options: [{ value: 0, label: "Ink" }, { value: 1, label: "From source" }], default: 0 },
     { key: "color", label: "Ink", type: "color", default: "#39ff88" },
     { key: "background", label: "Paper", type: "color", default: "#03060a" },
+    { key: "boost", label: "Contrast", type: "number", min: 0.5, max: 2.5, step: 0.01, default: 1.15 },
   ],
   frag: `
-float fxGlyph(float lum, vec2 p) {
-  vec2 g = floor(p * 3.0);
-  float idx = clamp(g.y * 3.0 + g.x, 0.0, 8.0);
-  float t = floor(lum * 5.0);
-  float mask = t < 0.5 ? 16.0 : t < 1.5 ? 273.0 : t < 2.5 ? 341.0 : t < 3.5 ? 495.0 : 511.0;
-  return step(0.5, mod(floor(mask / exp2(idx)), 2.0)) * step(0.06, lum);
-}
 vec4 fxMain(vec2 uv) {
   vec2 asp = vec2(uResolution.x / uResolution.y, 1.0);
   vec2 g = uv * asp * u_cells;
   vec2 cell = (floor(g) + 0.5) / u_cells / asp;
-  float lum = dot(texture(uTex, cell).rgb, vec3(0.299, 0.587, 0.114));
-  float on = fxGlyph(lum, fract(g));
-  return vec4(mix(u_background, u_color, on), 1.0);
+  vec3 src = texture(uTex, cell).rgb;
+  float lum = clamp(dot(src, vec3(0.299, 0.587, 0.114)) * u_boost, 0.0, 1.0);
+  float slot = floor(lum * 15.999);
+  vec2 guv = fract(g);
+  // Inset the slot sample so LINEAR filtering never bleeds neighbours.
+  float gx = (slot + 0.06 + guv.x * 0.88) / 16.0;
+  float glyph = texture(uSrc, vec2(gx, guv.y)).r;
+  vec3 ink = u_colorMode < 0.5 ? u_color : src * (1.0 + (1.0 - lum) * 0.8);
+  vec3 col = mix(u_background, ink, glyph);
+  return vec4(col, 1.0);
 }
 `,
 };
@@ -496,28 +503,38 @@ const aurora: FxEffectSpec = {
   id: "aurora",
   label: "Aurora",
   category: "generator",
-  description: "Northern-lights curtains drifting across the sky",
+  description: "Curtains with vertical rays — sharp base, long violet fade",
   params: [
-    { key: "colorA", label: "Base", type: "color", default: "#39ff88" },
-    { key: "colorB", label: "Tip", type: "color", default: "#b14cff" },
-    { key: "intensity", label: "Intensity", type: "number", min: 0, max: 2, step: 0.01, default: 0.9 },
-    { key: "spread", label: "Spread", type: "number", min: 0, max: 1, step: 0.01, default: 0.5 },
-    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 0.4 },
+    { key: "colorA", label: "Base (green)", type: "color", default: "#2aff8f" },
+    { key: "colorB", label: "Tip (violet)", type: "color", default: "#8f4cff" },
+    { key: "intensity", label: "Intensity", type: "number", min: 0, max: 2, step: 0.01, default: 1 },
+    { key: "spread", label: "Height", type: "number", min: 0.1, max: 1, step: 0.01, default: 0.55 },
+    { key: "rays", label: "Ray detail", type: "number", min: 0, max: 1, step: 0.01, default: 0.7 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 0.35 },
   ],
   frag: `
 vec4 fxMain(vec2 uv) {
   vec3 col = vec3(0.0);
+  float t = uTime * u_speed;
   for (int i = 0; i < 3; i++) {
     float fi = float(i);
-    float x = uv.x * (2.0 + fi * 0.8) + uTime * u_speed * (0.15 + fi * 0.07) + fi * 3.3;
-    float band = fxFbm(vec2(x, fi * 7.7));
-    float y = band * 0.5 + 0.22 + fi * 0.09;
-    float d = uv.y - y;
-    float glow = exp(-abs(d) * (22.0 - u_spread * 14.0)) * smoothstep(0.05, 0.35, band);
-    vec3 c = mix(u_colorA, u_colorB, clamp(d * 4.0 + 0.5, 0.0, 1.0));
-    col += c * glow * u_intensity * (1.0 - fi * 0.22);
+    float seed = fi * 17.3;
+    // Curtain sheet: x wanders slowly so the whole sheet folds.
+    float x = uv.x + fxFbmS(vec2(uv.x * 1.4 + seed, t * 0.22 + seed)) * 0.4 - 0.2;
+    // Vertical rays: 1D noise in x only — columns of light, shimmering.
+    float rays = fxFbmS(vec2(x * (6.0 + u_rays * 10.0) + seed * 7.0, t * (0.6 + fi * 0.15)));
+    rays = pow(rays, 2.2 - u_rays);
+    // Lower edge wanders; envelope = sharp bottom, long fade upward.
+    float base = 0.24 + fi * 0.08 + 0.16 * fxSimplex(vec2(x * 1.6 + seed, t * 0.3));
+    float h = (uv.y - base) / max(u_spread, 0.1);
+    float env = exp(-h * 2.2) * smoothstep(-0.04, 0.05, h);
+    float glow = rays * env * (1.0 - fi * 0.22);
+    vec3 c = mix(u_colorA, u_colorB, clamp(h * 1.1, 0.0, 1.0));
+    col += c * glow * u_intensity;
   }
-  float a = clamp(max(col.r, max(col.g, col.b)), 0.0, 1.0);
+  // Faint diffuse haze so curtains sit in atmosphere, not on black.
+  col += u_colorA * 0.03 * u_intensity * smoothstep(0.0, 0.6, uv.y);
+  float a = clamp(max(col.r, max(col.g, col.b)) * 1.4, 0.0, 1.0);
   return vec4(col, a);
 }
 `,
@@ -527,26 +544,58 @@ const nebula: FxEffectSpec = {
   id: "nebula",
   label: "Nebula",
   category: "generator",
-  description: "Domain-warped flowing color clouds",
+  description: "Astro clouds — double domain warp, ridged filaments, stars",
   params: [
-    { key: "colorA", label: "Deep", type: "color", default: "#0a0a2e" },
-    { key: "colorB", label: "Cloud", type: "color", default: "#ff3ea5" },
-    { key: "colorC", label: "Accent", type: "color", default: "#00e0ff" },
-    { key: "scale", label: "Scale", type: "number", min: 0.5, max: 8, step: 0.1, default: 2.2 },
-    { key: "warp", label: "Warp", type: "number", min: 0, max: 4, step: 0.05, default: 1.6 },
-    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 0.3 },
+    { key: "colorA", label: "Deep space", type: "color", default: "#05010f" },
+    { key: "colorB", label: "Cloud", type: "color", default: "#7a2fbf" },
+    { key: "colorC", label: "Hot core", type: "color", default: "#ff7ad9" },
+    { key: "scale", label: "Scale", type: "number", min: 0.5, max: 8, step: 0.1, default: 2.4 },
+    { key: "warp", label: "Warp", type: "number", min: 0, max: 4, step: 0.05, default: 1.8 },
+    { key: "density", label: "Density", type: "number", min: 0, max: 1, step: 0.01, default: 0.55 },
+    { key: "stars", label: "Stars", type: "number", min: 0, max: 1, step: 0.01, default: 0.5 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 0.25 },
   ],
   frag: `
 vec4 fxMain(vec2 uv) {
-  vec2 p = uv * u_scale;
-  vec2 q = vec2(fxFbm(p + uTime * u_speed * 0.10), fxFbm(p + vec2(5.2, 1.3)));
+  vec2 p0 = uv - 0.5;
+  p0.x *= uResolution.x / uResolution.y;
+  vec2 p = p0 * u_scale;
+  float t = uTime * u_speed;
+
+  // Double domain warp — the flow that makes clouds read as gas, not noise.
+  vec2 q = vec2(fxFbmS(p + vec2(0.0, t * 0.10)), fxFbmS(p + vec2(5.2, 1.3) - t * 0.08));
   vec2 r = vec2(
-    fxFbm(p + q * u_warp + vec2(1.7, 9.2) + uTime * u_speed * 0.15),
-    fxFbm(p + q * u_warp + vec2(8.3, 2.8) - uTime * u_speed * 0.12)
+    fxFbmS(p + q * u_warp + vec2(1.7, 9.2) + t * 0.12),
+    fxFbmS(p + q * u_warp + vec2(8.3, 2.8) - t * 0.10)
   );
-  float f = fxFbm(p + r * u_warp);
-  vec3 col = mix(u_colorA, u_colorB, clamp(f * f * 2.4, 0.0, 1.0));
-  col = mix(col, u_colorC, clamp(length(q) * 0.7, 0.0, 1.0) * 0.55);
+  float clouds = fxFbmS(p + r * u_warp);
+  float fil = fxRidge(p * 1.7 + r * u_warp * 0.8);
+
+  // Density shaping: soft threshold keeps true blacks between clouds.
+  float d = smoothstep(0.42 - u_density * 0.3, 0.9, clouds);
+  float core = pow(clamp(clouds * 1.15, 0.0, 1.0), 5.0);
+
+  vec3 col = u_colorA;
+  col = mix(col, u_colorB, d);
+  col += u_colorC * pow(fil, 3.5) * (0.25 + 0.75 * d);   // glowing filaments inside clouds
+  col += u_colorC * core * 0.55;                          // hot core bloom
+  col = mix(col, col * col * 1.6 + col * 0.25, 0.35);    // gentle filmic-ish curve
+
+  // Two star layers behind the gas — dimmed where clouds are dense.
+  float starVis = (1.0 - d * 0.85) * u_stars;
+  for (int i = 0; i < 2; i++) {
+    float fi = float(i) + 1.0;
+    vec2 sp = (p0 + 0.5) * (140.0 * fi);
+    vec2 id = floor(sp);
+    vec2 gv = fract(sp) - 0.5;
+    float h = fxHash21(id + fi * 31.7);
+    if (h > 0.978) {
+      vec2 off = vec2(fxHash21(id + 1.3), fxHash21(id + 2.7)) - 0.5;
+      float sd = length(gv - off * 0.7);
+      float tw = 0.7 + 0.3 * sin(uTime * (0.5 + h * 3.0) + h * 40.0);
+      col += vec3(0.9, 0.95, 1.0) * exp(-sd * sd * 300.0) * tw * starVis / fi;
+    }
+  }
   return vec4(col, 1.0);
 }
 `,
@@ -625,7 +674,7 @@ vec4 fxMain(vec2 uv) {
     float fi = float(i);
     vec2 p = uv;
     p.y += sin(p.x * 3.0 + uTime * u_speed * (0.4 + fi * 0.13) + fi * 2.1) * 0.15;
-    float n = fxFbm(p * vec2(2.0, 6.0) * u_scale + vec2(fi * 13.7, uTime * u_speed * 0.35));
+    float n = fxFbmS(p * vec2(2.0, 6.0) * u_scale + vec2(fi * 13.7, uTime * u_speed * 0.35));
     float band = exp(-abs(uv.y - (0.2 + fi * 0.2)) * 7.0);
     col += u_color * n * n * band * u_intensity * 0.7;
   }
@@ -731,6 +780,9 @@ vec4 fxMain(vec2 uv) {
   }
   float m = smoothstep(1.0, 1.0 + u_soft + 0.02, f);
   vec3 col = mix(u_colorB, u_colorA, clamp(f * 0.3, 0.0, 1.0));
+  // Bright meniscus at the goo boundary — sells the surface tension.
+  float edge = smoothstep(0.92, 1.02, f) - smoothstep(1.05, 1.5 + u_soft, f);
+  col += u_colorB * edge * 0.8;
   return vec4(col, m);
 }
 `,
@@ -816,8 +868,8 @@ vec4 fxMain(vec2 uv) {
   for (int i = 0; i < 3; i++) {
     float fi = float(i);
     vec2 q = p + vec2(
-      fxFbm(p * 0.8 + uTime * u_speed * 0.30 + fi * 3.1),
-      fxFbm(p * 0.8 + vec2(3.1, 7.7) - uTime * u_speed * 0.24 + fi * 1.7)
+      fxFbmS(p * 0.8 + uTime * u_speed * 0.30 + fi * 3.1),
+      fxFbmS(p * 0.8 + vec2(3.1, 7.7) - uTime * u_speed * 0.24 + fi * 1.7)
     ) * 1.6;
     float n = fxNoise2(q);
     c += pow(n, 4.0);

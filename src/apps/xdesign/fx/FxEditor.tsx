@@ -1040,8 +1040,10 @@ function ParamControl({
 
 function MaskSelect({ layer }: { layer: FxLayer }) {
   const layers = useFxStore((s) => s.scene.layers);
+  // Only true source layers (shape/text/image) make sense as masks — not
+  // effects that merely carry an auxiliary texture (glyph dither's atlas).
   const candidates = layers.filter(
-    (l) => l.id !== layer.id && fxEffect(l.effectId)?.source,
+    (l) => l.id !== layer.id && fxEffect(l.effectId)?.category === "source",
   );
   if (candidates.length === 0) return null;
   return (

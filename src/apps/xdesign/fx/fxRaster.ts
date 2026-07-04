@@ -45,6 +45,38 @@ function loadImage(filePath: string): Promise<HTMLImageElement> {
   return p;
 }
 
+/** Glyph-atlas layout shared with the shader: 16 square slots in one row.
+ * The luminance ramp is distributed across the slots so any ramp length
+ * works without a count uniform. */
+export const GLYPH_SLOTS = 16;
+export const DEFAULT_GLYPH_RAMP = " .:-=+*?#@";
+
+/** Real monospace glyphs, white on black — the shader samples .r as the
+ * glyph mask. This is the Unicorn-style glyph dither done properly (canvas
+ * atlas, proven in the NOKIADEMON loader), not a procedural bit pattern. */
+export function buildGlyphAtlas(ramp: string, font: number): HTMLCanvasElement {
+  const cell = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = cell * GLYPH_SLOTS;
+  canvas.height = cell;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return canvas;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const chars = [...(ramp.length > 0 ? ramp : DEFAULT_GLYPH_RAMP)];
+  const family =
+    font >= 1.5 ? "ui-monospace, Menlo, monospace" : '"JetBrains Mono", monospace';
+  ctx.fillStyle = "#fff";
+  ctx.font = `700 ${Math.round(cell * 0.82)}px ${family}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i < GLYPH_SLOTS; i++) {
+    const ch = chars[Math.min(chars.length - 1, Math.floor((i / GLYPH_SLOTS) * chars.length))]!;
+    ctx.fillText(ch, i * cell + cell / 2, cell / 2 + cell * 0.03);
+  }
+  return canvas;
+}
+
 /** Rasterize a source layer at pixel size pw×ph. Returns null when there's
  * nothing to draw yet (e.g., image layer with no file picked). */
 export async function rasterizeSource(
@@ -52,6 +84,13 @@ export async function rasterizeSource(
   pw: number,
   ph: number,
 ): Promise<HTMLCanvasElement | null> {
+  // Glyph dither's "source" is its glyph atlas, not a scene-sized raster.
+  if (layer.effectId === "ascii") {
+    return buildGlyphAtlas(
+      str(layer.params.ramp, DEFAULT_GLYPH_RAMP),
+      num(layer.params.font, 0),
+    );
+  }
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(pw));
   canvas.height = Math.max(1, Math.round(ph));

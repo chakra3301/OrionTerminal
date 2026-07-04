@@ -106,7 +106,8 @@ export function sanitizeScene(scene: FxScene): FxScene {
     const ok =
       l.maskLayerId !== l.id &&
       ids.has(l.maskLayerId) &&
-      fxEffect(layers.find((m) => m.id === l.maskLayerId)!.effectId)?.source;
+      fxEffect(layers.find((m) => m.id === l.maskLayerId)!.effectId)?.category ===
+        "source";
     return ok ? l : { ...l, maskLayerId: undefined };
   });
   return { ...emptyScene(), ...scene, layers: sane };
