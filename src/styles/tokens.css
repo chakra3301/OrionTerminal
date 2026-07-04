@@ -7155,7 +7155,8 @@ summary:focus-visible,
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  z-index: 30;
+  /* Must clear .xd-home-menu-scrim (z-index 40) or the scrim eats clicks. */
+  z-index: 41;
   width: 260px;
   padding: 6px;
   border-radius: 12px;
@@ -16211,7 +16212,8 @@ html.ot-reduce-glass .note-page .note-editor-body {
   position: absolute;
   top: 28px;
   left: 0;
-  z-index: 30;
+  /* Must clear .xd-home-menu-scrim (z-index 40) or the scrim eats clicks. */
+  z-index: 41;
   min-width: 230px;
   background: var(--xd-raised);
   border: 1px solid var(--xd-border);

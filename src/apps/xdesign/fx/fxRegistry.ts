@@ -40,9 +40,9 @@ const noiseDistort: FxEffectSpec = {
   description: "Organic noise displacement of everything below",
   params: [
     { key: "scale", label: "Scale", type: "number", min: 0.5, max: 20, step: 0.1, default: 4 },
-    { key: "strength", label: "Strength", type: "number", min: 0, max: 0.5, step: 0.005, default: 0.06 },
-    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 0.3 },
-    { key: "mouse", label: "Mouse pull", type: "number", min: 0, max: 1, step: 0.01, default: 0.2 },
+    { key: "strength", label: "Strength", type: "number", min: 0, max: 0.5, step: 0.005, default: 0.12 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 0.4 },
+    { key: "mouse", label: "Mouse pull", type: "number", min: 0, max: 1, step: 0.01, default: 0.5 },
   ],
   frag: `
 vec4 fxMain(vec2 uv) {
@@ -51,7 +51,7 @@ vec4 fxMain(vec2 uv) {
     fxFbm(uv * u_scale + vec2(7.3, uTime * u_speed + 3.1))
   ) - 0.5;
   vec2 m = (uMouse - 0.5) * u_mouse;
-  return texture(uTex, uv + n * u_strength + m * 0.05);
+  return texture(uTex, uv + n * u_strength + m * 0.2);
 }
 `,
 };
