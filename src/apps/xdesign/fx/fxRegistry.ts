@@ -56,7 +56,75 @@ vec4 fxMain(vec2 uv) {
 `,
 };
 
-export const FX_EFFECTS: FxEffectSpec[] = [gradient, noiseDistort];
+// ── Source layers — rasterized CPU-side (fxRaster.ts), sampled as uSrc ────
+
+const SRC_FRAG = `
+vec4 fxMain(vec2 uv) {
+  return texture(uSrc, uv);
+}
+`;
+
+const POSITION_PARAMS = [
+  { key: "x", label: "X", type: "number", min: -0.5, max: 1.5, step: 0.005, default: 0.5 },
+  { key: "y", label: "Y", type: "number", min: -0.5, max: 1.5, step: 0.005, default: 0.5 },
+  { key: "rotation", label: "Rotation", type: "number", min: -180, max: 180, step: 1, default: 0 },
+] satisfies FxEffectSpec["params"];
+
+const srcShape: FxEffectSpec = {
+  id: "srcShape",
+  label: "Shape",
+  category: "source",
+  source: true,
+  description: "Rect or ellipse — mask, backdrop, or design element",
+  params: [
+    { key: "shape", label: "Shape", type: "select", options: [{ value: 0, label: "Rectangle" }, { value: 1, label: "Ellipse" }], default: 0 },
+    { key: "color", label: "Color", type: "color", default: "#ffffff" },
+    { key: "width", label: "Width", type: "number", min: 0.01, max: 1.5, step: 0.005, default: 0.4 },
+    { key: "height", label: "Height", type: "number", min: 0.01, max: 1.5, step: 0.005, default: 0.4 },
+    { key: "radius", label: "Corner radius", type: "number", min: 0, max: 1, step: 0.01, default: 0.08 },
+    ...POSITION_PARAMS,
+  ],
+  frag: SRC_FRAG,
+};
+
+const srcText: FxEffectSpec = {
+  id: "srcText",
+  label: "Text",
+  category: "source",
+  source: true,
+  description: "A line of type — effects above distort it",
+  params: [
+    { key: "content", label: "Text", type: "text", default: "ORION FX" },
+    { key: "color", label: "Color", type: "color", default: "#ffffff" },
+    { key: "size", label: "Size", type: "number", min: 0.02, max: 0.6, step: 0.005, default: 0.14 },
+    { key: "weight", label: "Weight", type: "select", options: [{ value: 400, label: "Regular" }, { value: 600, label: "Semibold" }, { value: 800, label: "Bold" }], default: 600 },
+    { key: "font", label: "Font", type: "select", options: [{ value: 0, label: "Space Grotesk" }, { value: 1, label: "JetBrains Mono" }, { value: 2, label: "System" }], default: 0 },
+    ...POSITION_PARAMS,
+  ],
+  frag: SRC_FRAG,
+};
+
+const srcImage: FxEffectSpec = {
+  id: "srcImage",
+  label: "Image",
+  category: "source",
+  source: true,
+  description: "An image file — distort it, mask with it",
+  params: [
+    { key: "file", label: "File", type: "image", default: "" },
+    { key: "scale", label: "Scale", type: "number", min: 0.05, max: 3, step: 0.01, default: 1 },
+    ...POSITION_PARAMS,
+  ],
+  frag: SRC_FRAG,
+};
+
+export const FX_EFFECTS: FxEffectSpec[] = [
+  gradient,
+  srcShape,
+  srcText,
+  srcImage,
+  noiseDistort,
+];
 
 const byId = new Map(FX_EFFECTS.map((s) => [s.id, s]));
 

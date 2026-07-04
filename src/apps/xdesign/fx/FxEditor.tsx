@@ -16,10 +16,18 @@ import {
   Sparkles,
   Wand2,
 } from "lucide-react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useFxStore } from "./fxStore";
 import { createCompositor, type FxCompositor } from "./compositor";
-import { resolveDpi, type FxLayer, type FxParamSpec } from "./fxModel";
+import {
+  resolveDpi,
+  FX_BLEND_MODES,
+  type FxBlendMode,
+  type FxLayer,
+  type FxParamSpec,
+} from "./fxModel";
 import { fxEffect, FX_EFFECTS } from "./fxRegistry";
+import { rasterizeSource, sourceRasterKey } from "./fxRaster";
 
 // ── Viewport ──────────────────────────────────────────────────────────────
 
@@ -65,6 +73,30 @@ function FxViewport() {
     let visible = true;
     const mouse: [number, number] = [0.5, 0.5];
     const mouseTarget: [number, number] = [0.5, 0.5];
+
+    // Source-layer rasterization bookkeeping. Keys are set eagerly (before
+    // the async raster lands) so a failed raster doesn't retry every frame.
+    const rasterKeys = new Map<string, string>();
+    const syncSources = (pw: number, ph: number) => {
+      const { scene } = useFxStore.getState();
+      for (const layer of scene.layers) {
+        if (!fxEffect(layer.effectId)?.source) continue;
+        const key = sourceRasterKey(layer, pw, ph);
+        if (rasterKeys.get(layer.id) === key) continue;
+        rasterKeys.set(layer.id, key);
+        void rasterizeSource(layer, pw, ph).then((cnv) => {
+          if (cnv && rasterKeys.get(layer.id) === key) {
+            compositor?.updateSource(layer.id, cnv);
+          }
+        });
+      }
+      for (const id of [...rasterKeys.keys()]) {
+        if (!scene.layers.some((l) => l.id === id)) {
+          rasterKeys.delete(id);
+          compositor?.dropSource(id);
+        }
+      }
+    };
 
     const io = new IntersectionObserver(([e]) => {
       visible = e?.isIntersecting ?? true;
@@ -113,12 +145,10 @@ function FxViewport() {
       mouse[1] += (mouseTarget[1] - mouse[1]) * k;
 
       const dpi = resolveDpi(scene.dpi);
-      compositor.render(
-        scene,
-        { time: sceneTime, mouse },
-        scene.width * dpi,
-        scene.height * dpi,
-      );
+      const pw = Math.round(scene.width * dpi);
+      const ph = Math.round(scene.height * dpi);
+      syncSources(pw, ph);
+      compositor.render(scene, { time: sceneTime, mouse }, pw, ph);
     };
     raf = requestAnimationFrame(tick);
 
@@ -221,6 +251,7 @@ function AddLayerMenu() {
   const [open, setOpen] = useState(false);
   const groups = useMemo(
     () => ({
+      source: FX_EFFECTS.filter((s) => s.category === "source"),
       generator: FX_EFFECTS.filter((s) => s.category === "generator"),
       effect: FX_EFFECTS.filter((s) => s.category === "effect"),
     }),
@@ -242,6 +273,23 @@ function AddLayerMenu() {
         <>
           <div className="xd-home-menu-scrim" onClick={() => setOpen(false)} />
           <div className="xd-fx-add-menu">
+            <div className="xd-fx-add-group">Sources</div>
+            {groups.source.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  useFxStore.getState().addLayer(s.id);
+                }}
+              >
+                <Wand2 size={13} />
+                <span>
+                  <span className="xd-fx-add-label">{s.label}</span>
+                  <span className="xd-fx-add-desc">{s.description}</span>
+                </span>
+              </button>
+            ))}
             <div className="xd-fx-add-group">Generators</div>
             {groups.generator.map((s) => (
               <button
@@ -426,6 +474,44 @@ function ParamControl({
       </label>
     );
   }
+  if (spec.type === "text") {
+    return (
+      <label className="xd-fx-field">
+        <span>{spec.label}</span>
+        <input
+          type="text"
+          className="xd-fx-text"
+          value={typeof value === "string" ? value : spec.default}
+          onChange={(e) => set(e.target.value)}
+        />
+      </label>
+    );
+  }
+  if (spec.type === "image") {
+    const file = typeof value === "string" ? value : "";
+    const name = file ? file.split("/").pop() : null;
+    return (
+      <label className="xd-fx-field">
+        <span>{spec.label}</span>
+        <button
+          type="button"
+          className="xd-fx-file"
+          onClick={() => {
+            void openDialog({
+              multiple: false,
+              filters: [
+                { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"] },
+              ],
+            }).then((picked) => {
+              if (typeof picked === "string") set(picked);
+            });
+          }}
+        >
+          {name ?? "Choose image…"}
+        </button>
+      </label>
+    );
+  }
   if (spec.type === "select") {
     return (
       <label className="xd-fx-field">
@@ -488,6 +574,24 @@ function FxInspector() {
             <span>{spec.label}</span>
           </div>
           <div className="xd-fx-fields">
+            <label className="xd-fx-field">
+              <span>Blend</span>
+              <select
+                className="xd-fx-select"
+                value={layer.blend ?? "normal"}
+                onChange={(e) =>
+                  useFxStore
+                    .getState()
+                    .patchLayer(layer.id, { blend: e.target.value as FxBlendMode })
+                }
+              >
+                {FX_BLEND_MODES.map((m) => (
+                  <option key={m} value={m}>
+                    {m[0]!.toUpperCase() + m.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="xd-fx-field">
               <span>Opacity</span>
               <span className="xd-fx-slider-row">

@@ -6,6 +6,9 @@ import {
   uniformName,
   emptyScene,
   resolveDpi,
+  isUniformParam,
+  blendIndex,
+  FX_BLEND_MODES,
 } from "./fxModel";
 import { FX_EFFECTS, fxEffect } from "./fxRegistry";
 
@@ -57,23 +60,43 @@ describe("registry", () => {
 });
 
 describe("buildFragment", () => {
-  it("declares one uniform per param with the right type", () => {
+  it("declares one uniform per uniform-param with the right type", () => {
     for (const spec of FX_EFFECTS) {
       const src = buildFragment(spec);
       for (const p of spec.params) {
+        if (!isUniformParam(p)) {
+          expect(src).not.toContain(uniformName(p.key));
+          continue;
+        }
         const type = p.type === "color" ? "vec3" : "float";
         expect(src).toContain(`uniform ${type} ${uniformName(p.key)};`);
       }
     }
   });
 
-  it("includes shared uniforms, lib, body, and opacity mix", () => {
+  it("declares uSrc only for source specs", () => {
+    for (const spec of FX_EFFECTS) {
+      const src = buildFragment(spec);
+      if (spec.source) expect(src).toContain("uniform sampler2D uSrc;");
+      else expect(src).not.toContain("uniform sampler2D uSrc;");
+    }
+  });
+
+  it("includes shared uniforms, lib, body, and blend/opacity compositing", () => {
     const src = buildFragment(FX_EFFECTS[0]!);
     expect(src).toContain("#version 300 es");
     expect(src).toContain("uniform sampler2D uTex;");
     expect(src).toContain("uniform float uOpacity;");
+    expect(src).toContain("uniform float uBlend;");
     expect(src).toContain("float fxFbm(vec2 p)");
-    expect(src).toContain("mix(below, res, uOpacity)");
+    expect(src).toContain("fxBlend(below.rgb");
+  });
+
+  it("blendIndex maps modes to stable uniform values", () => {
+    expect(blendIndex(undefined)).toBe(0);
+    expect(blendIndex("normal")).toBe(0);
+    expect(blendIndex("add")).toBe(1);
+    expect(blendIndex("darken")).toBe(FX_BLEND_MODES.length - 1);
   });
 });
 

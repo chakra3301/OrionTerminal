@@ -14,6 +14,8 @@ import {
   buildFragment,
   hexToVec3,
   uniformName,
+  blendIndex,
+  isUniformParam,
   FX_VERTEX_SRC,
   type FxScene,
 } from "./fxModel";
@@ -84,6 +86,10 @@ function link(
 export type FxCompositor = {
   /** Render one frame at the given internal resolution (scene px × dpi). */
   render: (scene: FxScene, frame: FxFrame, pixelW: number, pixelH: number) => void;
+  /** Upload / refresh the rasterized texture for a source layer. */
+  updateSource: (layerId: string, src: TexImageSource) => void;
+  /** Free a source layer's texture (layer deleted). */
+  dropSource: (layerId: string) => void;
   dispose: () => void;
 };
 
@@ -116,6 +122,40 @@ export function createCompositor(
 
   const programs = new Map<string, ProgramEntry>();
   let copyEntry: ProgramEntry = null;
+
+  // Rasterized source-layer textures (uSrc), keyed by layer id. A 1×1
+  // transparent placeholder keeps passes valid while rasterization is
+  // in flight.
+  const sourceTex = new Map<string, WebGLTexture>();
+  const placeholderTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, placeholderTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+
+  function updateSource(layerId: string, src: TexImageSource): void {
+    let tex = sourceTex.get(layerId);
+    if (!tex) {
+      const t = gl!.createTexture();
+      if (!t) return;
+      tex = t;
+      sourceTex.set(layerId, tex);
+    }
+    gl!.bindTexture(gl!.TEXTURE_2D, tex);
+    gl!.pixelStorei(gl!.UNPACK_FLIP_Y_WEBGL, true);
+    gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, src);
+    gl!.pixelStorei(gl!.UNPACK_FLIP_Y_WEBGL, false);
+    gl!.texParameteri(gl!.TEXTURE_2D, gl!.TEXTURE_MIN_FILTER, gl!.LINEAR);
+    gl!.texParameteri(gl!.TEXTURE_2D, gl!.TEXTURE_MAG_FILTER, gl!.LINEAR);
+    gl!.texParameteri(gl!.TEXTURE_2D, gl!.TEXTURE_WRAP_S, gl!.CLAMP_TO_EDGE);
+    gl!.texParameteri(gl!.TEXTURE_2D, gl!.TEXTURE_WRAP_T, gl!.CLAMP_TO_EDGE);
+  }
+
+  function dropSource(layerId: string): void {
+    const tex = sourceTex.get(layerId);
+    if (tex) {
+      gl!.deleteTexture(tex);
+      sourceTex.delete(layerId);
+    }
+  }
 
   function programFor(effectId: string): ProgramEntry {
     if (programs.has(effectId)) return programs.get(effectId)!;
@@ -216,11 +256,19 @@ export function createCompositor(
       gl!.activeTexture(gl!.TEXTURE0);
       gl!.bindTexture(gl!.TEXTURE_2D, targets![ping].tex);
       gl!.uniform1i(loc(entry, "uTex"), 0);
+      if (spec.source) {
+        gl!.activeTexture(gl!.TEXTURE1);
+        gl!.bindTexture(gl!.TEXTURE_2D, sourceTex.get(layer.id) ?? placeholderTex);
+        gl!.uniform1i(loc(entry, "uSrc"), 1);
+        gl!.activeTexture(gl!.TEXTURE0);
+      }
       gl!.uniform2f(loc(entry, "uResolution"), w, h);
       gl!.uniform1f(loc(entry, "uTime"), frame.time);
       gl!.uniform2f(loc(entry, "uMouse"), frame.mouse[0], frame.mouse[1]);
       gl!.uniform1f(loc(entry, "uOpacity"), Math.min(1, Math.max(0, layer.opacity)));
+      gl!.uniform1f(loc(entry, "uBlend"), blendIndex(layer.blend));
       for (const p of spec.params) {
+        if (!isUniformParam(p)) continue;
         const u = loc(entry, uniformName(p.key));
         if (!u) continue;
         const v = layer.params[p.key] ?? p.default;
@@ -256,11 +304,14 @@ export function createCompositor(
       if (entry) gl!.deleteProgram(entry.program);
     }
     programs.clear();
+    for (const tex of sourceTex.values()) gl!.deleteTexture(tex);
+    sourceTex.clear();
+    if (placeholderTex) gl!.deleteTexture(placeholderTex);
     if (copyEntry) gl!.deleteProgram(copyEntry.program);
     copyEntry = null;
     gl!.deleteBuffer(vbo);
     gl!.deleteVertexArray(vao);
   }
 
-  return { render, dispose };
+  return { render, updateSource, dropSource, dispose };
 }

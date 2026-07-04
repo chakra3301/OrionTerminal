@@ -23,13 +23,25 @@ export type FxParamSpec =
       type: "select";
       options: { value: number; label: string }[];
       default: number;
-    };
+    }
+  /** Free text — drives rasterization (source layers), not a uniform. */
+  | { key: string; label: string; type: "text"; default: string }
+  /** Image file path — drives rasterization, not a uniform. "" = none. */
+  | { key: string; label: string; type: "image"; default: string };
+
+/** Params that become shader uniforms (text/image drive rasterization). */
+export function isUniformParam(p: FxParamSpec): boolean {
+  return p.type === "number" || p.type === "color" || p.type === "select";
+}
 
 export type FxEffectSpec = {
   id: string;
   label: string;
-  category: "generator" | "effect";
+  category: "generator" | "effect" | "source";
   description: string;
+  /** Source layers rasterize CPU-side into a texture the pass samples as
+   * `uSrc` (declared in the wrapper only when this is true). */
+  source?: boolean;
   params: FxParamSpec[];
   /** GLSL ES 3.00 body that defines `vec4 fxMain(vec2 uv)`. Has access to
    * the shared uniforms, the lib helpers, and one float/vec3 uniform per
@@ -39,6 +51,26 @@ export type FxEffectSpec = {
 
 export type FxParamValue = number | string;
 
+/** Blend modes applied between a pass result and the stack below it.
+ * Order matters — the index is the uBlend uniform value. */
+export const FX_BLEND_MODES = [
+  "normal",
+  "add",
+  "screen",
+  "multiply",
+  "overlay",
+  "softlight",
+  "difference",
+  "lighten",
+  "darken",
+] as const;
+export type FxBlendMode = (typeof FX_BLEND_MODES)[number];
+
+export function blendIndex(mode: FxBlendMode | undefined): number {
+  const i = FX_BLEND_MODES.indexOf(mode ?? "normal");
+  return i < 0 ? 0 : i;
+}
+
 export type FxLayer = {
   id: string;
   effectId: string;
@@ -46,6 +78,8 @@ export type FxLayer = {
   hidden?: boolean;
   /** 0..1 — mixes the pass result over the untouched below-texture. */
   opacity: number;
+  /** Blend mode vs the stack below. Default "normal". */
+  blend?: FxBlendMode;
   params: Record<string, FxParamValue>;
 };
 
@@ -92,6 +126,20 @@ export function defaultParams(spec: FxEffectSpec): Record<string, FxParamValue> 
   for (const p of spec.params) out[p.key] = p.default;
   return out;
 }
+
+export const FX_BLEND_GLSL = `
+vec3 fxBlend(vec3 b, vec3 s, float mode) {
+  if (mode < 0.5) return s;
+  if (mode < 1.5) return min(b + s, 1.0);
+  if (mode < 2.5) return 1.0 - (1.0 - b) * (1.0 - s);
+  if (mode < 3.5) return b * s;
+  if (mode < 4.5) return mix(2.0 * b * s, 1.0 - 2.0 * (1.0 - b) * (1.0 - s), step(0.5, b));
+  if (mode < 5.5) return mix(b - (1.0 - 2.0 * s) * b * (1.0 - b), b + (2.0 * s - 1.0) * (sqrt(b) - b), step(0.5, s));
+  if (mode < 6.5) return abs(b - s);
+  if (mode < 7.5) return max(b, s);
+  return min(b, s);
+}
+`;
 
 export const FX_VERTEX_SRC = `#version 300 es
 layout(location = 0) in vec2 aPos;
@@ -142,6 +190,7 @@ mat2 fxRotate2(float a) {
  * below-texture. */
 export function buildFragment(spec: FxEffectSpec): string {
   const decls = spec.params
+    .filter(isUniformParam)
     .map((p) =>
       p.type === "color"
         ? `uniform vec3 ${uniformName(p.key)};`
@@ -151,19 +200,23 @@ export function buildFragment(spec: FxEffectSpec): string {
   return `#version 300 es
 precision highp float;
 uniform sampler2D uTex;
+${spec.source ? "uniform sampler2D uSrc;" : ""}
 uniform vec2 uResolution;
 uniform float uTime;
 uniform vec2 uMouse;
 uniform float uOpacity;
+uniform float uBlend;
 ${decls}
 in vec2 vUv;
 out vec4 fragColor;
 ${FX_GLSL_LIB}
+${FX_BLEND_GLSL}
 ${spec.frag}
 void main() {
   vec4 below = texture(uTex, vUv);
   vec4 res = fxMain(vUv);
-  fragColor = mix(below, res, uOpacity);
+  vec3 blended = fxBlend(below.rgb, clamp(res.rgb, 0.0, 1.0), uBlend);
+  fragColor = vec4(mix(below.rgb, blended, clamp(res.a, 0.0, 1.0) * uOpacity), 1.0);
 }
 `;
 }

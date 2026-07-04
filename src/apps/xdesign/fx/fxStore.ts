@@ -20,7 +20,7 @@ import { fxEffect, FX_EFFECTS } from "./fxRegistry";
 type ScenePatch = Partial<
   Pick<FxScene, "width" | "height" | "background" | "dpi" | "fps">
 >;
-type LayerPatch = Partial<Pick<FxLayer, "name" | "hidden" | "opacity">>;
+type LayerPatch = Partial<Pick<FxLayer, "name" | "hidden" | "opacity" | "blend">>;
 
 type FxState = {
   scene: FxScene;
