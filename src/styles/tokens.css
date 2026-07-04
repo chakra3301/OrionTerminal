@@ -16431,6 +16431,42 @@ html.ot-reduce-glass .note-page .note-editor-body {
   border-radius: 3px;
 }
 .xd-fx-bind-remove:hover { color: var(--neon-magenta); background: var(--xd-hover); }
+.xd-fx-timeline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 12px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--xd-border);
+  background: var(--xd-panel);
+}
+.xd-fx-time {
+  font-size: 10.5px;
+  color: var(--xd-text-2);
+  font-variant-numeric: tabular-nums;
+  min-width: 84px;
+}
+.xd-fx-scrub { flex: 1; accent-color: var(--xd-accent); }
+.xd-fx-dur {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: var(--xd-text-3);
+}
+.xd-fx-keys { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.xd-fx-key-chip {
+  border: none;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 9.5px;
+  background: rgba(var(--xd-accent-rgb), 0.16);
+  color: var(--xd-accent);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.xd-fx-key-chip:hover { background: rgba(var(--xd-accent-rgb), 0.3); text-decoration: line-through; }
 
 /* ── Home-card badge ── */
 .xd-fx-badge {

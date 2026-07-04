@@ -273,6 +273,14 @@ export function createCompositor(
         gl!.uniform1i(loc(entry, "uSrc"), 1);
         gl!.activeTexture(gl!.TEXTURE0);
       }
+      const maskTex = layer.maskLayerId
+        ? sourceTex.get(layer.maskLayerId)
+        : undefined;
+      gl!.activeTexture(gl!.TEXTURE2);
+      gl!.bindTexture(gl!.TEXTURE_2D, maskTex ?? placeholderTex);
+      gl!.uniform1i(loc(entry, "uMask"), 2);
+      gl!.uniform1f(loc(entry, "uHasMask"), maskTex ? 1 : 0);
+      gl!.activeTexture(gl!.TEXTURE0);
       gl!.uniform2f(loc(entry, "uResolution"), w, h);
       gl!.uniform1f(loc(entry, "uTime"), frame.time);
       gl!.uniform2f(loc(entry, "uMouse"), frame.mouse[0], frame.mouse[1]);

@@ -35,13 +35,23 @@ export class FxBindingRuntime {
     this.smoothed.clear();
   }
 
-  tick(scene: FxScene, inputs: FxInputs, dt: number): FxOverrides {
+  /** `base` (e.g. timeline output) is merged in: it seeds the returned map
+   * and bound params offset from it instead of the stored value. */
+  tick(
+    scene: FxScene,
+    inputs: FxInputs,
+    dt: number,
+    base?: FxOverrides,
+  ): FxOverrides {
     const out: FxOverrides = new Map();
+    if (base) {
+      for (const [id, rec] of base) out.set(id, { ...rec });
+    }
     for (const layer of scene.layers) {
       if (!layer.bindings || layer.hidden) continue;
       const spec = fxEffect(layer.effectId);
       if (!spec) continue;
-      let rec: Record<string, number> | null = null;
+      let rec = out.get(layer.id) ?? null;
       for (const [key, b] of Object.entries(layer.bindings)) {
         const p = spec.params.find((q) => q.key === key);
         if (!p || p.type !== "number") continue;
@@ -52,9 +62,9 @@ export class FxBindingRuntime {
         const k = 1 - Math.exp(-dt * (30 - clamp(b.smooth ?? 0.3, 0, 1) * 27));
         const s = prev + (raw - prev) * k;
         this.smoothed.set(sid, s);
-        const stored = layer.params[key];
-        const base = typeof stored === "number" ? stored : p.default;
-        const v = clamp(base + b.amount * (p.max - p.min) * s, p.min, p.max);
+        const stored = rec?.[key] ?? layer.params[key];
+        const baseV = typeof stored === "number" ? stored : p.default;
+        const v = clamp(baseV + b.amount * (p.max - p.min) * s, p.min, p.max);
         (rec ??= {})[key] = v;
       }
       if (rec) out.set(layer.id, rec);

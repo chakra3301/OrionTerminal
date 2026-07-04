@@ -91,6 +91,14 @@ export type FxBinding = {
   smooth?: number;
 };
 
+/** One timeline key for a numeric param. `t` is normalized 0..1 across the
+ * scene duration so re-timing the scene keeps the choreography. */
+export type FxKeyframe = {
+  t: number;
+  v: number;
+  ease?: "linear" | "inOut" | "hold";
+};
+
 export type FxLayer = {
   id: string;
   effectId: string;
@@ -103,6 +111,10 @@ export type FxLayer = {
   params: Record<string, FxParamValue>;
   /** Interactivity: param key → input binding. */
   bindings?: Record<string, FxBinding>;
+  /** Timeline: param key → sorted keyframes. */
+  keyframes?: Record<string, FxKeyframe[]>;
+  /** Mask this layer's contribution by a SOURCE layer's alpha. */
+  maskLayerId?: string;
 };
 
 export type FxDpi = "auto" | 0.5 | 1 | 2;
@@ -116,6 +128,8 @@ export type FxScene = {
   background: string;
   dpi: FxDpi;
   fps: FxFps;
+  /** Timeline loop length in seconds. */
+  duration: number;
   /** Render order: index 0 is the bottom of the stack. */
   layers: FxLayer[];
 };
@@ -223,6 +237,8 @@ export function buildFragment(spec: FxEffectSpec): string {
 precision highp float;
 uniform sampler2D uTex;
 ${spec.source ? "uniform sampler2D uSrc;" : ""}
+uniform sampler2D uMask;
+uniform float uHasMask;
 uniform vec2 uResolution;
 uniform float uTime;
 uniform vec2 uMouse;
@@ -238,7 +254,8 @@ void main() {
   vec4 below = texture(uTex, vUv);
   vec4 res = fxMain(vUv);
   vec3 blended = fxBlend(below.rgb, clamp(res.rgb, 0.0, 1.0), uBlend);
-  fragColor = vec4(mix(below.rgb, blended, clamp(res.a, 0.0, 1.0) * uOpacity), 1.0);
+  float maskA = mix(1.0, texture(uMask, vUv).a, uHasMask);
+  fragColor = vec4(mix(below.rgb, blended, clamp(res.a, 0.0, 1.0) * uOpacity * maskA), 1.0);
 }
 `;
 }
@@ -260,6 +277,7 @@ export function emptyScene(): FxScene {
     background: "#0a0a12",
     dpi: "auto",
     fps: 0,
+    duration: 6,
     layers: [],
   };
 }

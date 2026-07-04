@@ -18,6 +18,7 @@ import {
   Wand2,
   Zap,
   X,
+  Diamond,
 } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useFxStore } from "./fxStore";
@@ -33,6 +34,11 @@ import {
   type FxParamSpec,
 } from "./fxModel";
 import { FxBindingRuntime, easeOutCubic, FX_BIND_LABELS } from "./fxBindings";
+import { evalSceneKeyframes } from "./fxTimeline";
+
+/** Mutable scene clock the viewport publishes each frame — read by the
+ * timeline bar on a slow poll so React isn't re-rendered at 60fps. */
+const fxClock = { time: 0 };
 import { fxEffect, FX_EFFECTS } from "./fxRegistry";
 import { rasterizeSource, sourceRasterKey } from "./fxRaster";
 
@@ -149,12 +155,13 @@ function FxViewport() {
       last = now;
       if (!visible || document.hidden || !compositor) return;
 
-      const { scene, playing, restartNonce } = useFxStore.getState();
+      const { scene, playing, restartNonce, scrubTime } = useFxStore.getState();
       if (restartNonce !== lastRestartNonce) {
         lastRestartNonce = restartNonce;
         sceneTime = 0;
         bindings.reset();
       }
+      if (scrubTime !== null) sceneTime = scrubTime;
 
       // FPS cap: accumulate and only draw when a frame interval elapsed.
       if (scene.fps > 0) {
@@ -164,7 +171,8 @@ function FxViewport() {
         accum %= interval;
       }
 
-      if (playing) sceneTime += dt;
+      if (playing && scrubTime === null) sceneTime += dt;
+      fxClock.time = sceneTime;
       const k = 1 - Math.exp(-dt * 8);
       mouse[0] += (mouseTarget[0] - mouse[0]) * k;
       mouse[1] += (mouseTarget[1] - mouse[1]) * k;
@@ -180,6 +188,7 @@ function FxViewport() {
       mousePrev[0] = mouseTarget[0];
       mousePrev[1] = mouseTarget[1];
 
+      const timeline = evalSceneKeyframes(scene, sceneTime);
       const overrides = bindings.tick(
         scene,
         {
@@ -190,6 +199,7 @@ function FxViewport() {
           appear: easeOutCubic(sceneTime / 1.2),
         },
         dt,
+        timeline,
       );
 
       const dpi = resolveDpi(scene.dpi);
@@ -569,11 +579,13 @@ function ParamControl({
   spec,
   value,
   binding,
+  keyframes,
 }: {
   layerId: string;
   spec: FxParamSpec;
   value: number | string | undefined;
   binding?: FxBinding;
+  keyframes?: { t: number; v: number }[];
 }) {
   const set = (v: number | string) =>
     useFxStore.getState().setParam(layerId, spec.key, v);
@@ -688,10 +700,69 @@ function ParamControl({
         >
           <Zap size={10} />
         </button>
+        <button
+          type="button"
+          className={`xd-fx-bind-btn${keyframes?.length ? " on" : ""}`}
+          title="Add keyframe at the current time"
+          onClick={(e) => {
+            e.preventDefault();
+            const { scene } = useFxStore.getState();
+            const dur = Math.max(0.1, scene.duration);
+            const t01 = (((fxClock.time % dur) + dur) % dur) / dur;
+            useFxStore.getState().addKeyframe(layerId, spec.key, { t: t01, v: num });
+          }}
+        >
+          <Diamond size={9} />
+        </button>
       </span>
       {binding && (
         <BindingRow layerId={layerId} paramKey={spec.key} binding={binding} />
       )}
+      {keyframes && keyframes.length > 0 && (
+        <span className="xd-fx-keys">
+          {keyframes.map((k, i) => (
+            <button
+              key={`${k.t}-${i}`}
+              type="button"
+              className="xd-fx-key-chip"
+              title={`t ${(k.t * 100).toFixed(0)}% · ${k.v} — click to remove`}
+              onClick={(e) => {
+                e.preventDefault();
+                useFxStore.getState().removeKeyframe(layerId, spec.key, i);
+              }}
+            >
+              ◆ {(k.t * 100).toFixed(0)}%
+            </button>
+          ))}
+        </span>
+      )}
+    </label>
+  );
+}
+
+function MaskSelect({ layer }: { layer: FxLayer }) {
+  const layers = useFxStore((s) => s.scene.layers);
+  const candidates = layers.filter(
+    (l) => l.id !== layer.id && fxEffect(l.effectId)?.source,
+  );
+  if (candidates.length === 0) return null;
+  return (
+    <label className="xd-fx-field">
+      <span>Mask (by source layer alpha)</span>
+      <select
+        className="xd-fx-select"
+        value={layer.maskLayerId ?? ""}
+        onChange={(e) =>
+          useFxStore.getState().setMask(layer.id, e.target.value || null)
+        }
+      >
+        <option value="">None</option>
+        {candidates.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.name}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }
@@ -748,6 +819,7 @@ function FxInspector() {
                 </span>
               </span>
             </label>
+            <MaskSelect layer={layer} />
             {spec.params.map((p) => (
               <ParamControl
                 key={p.key}
@@ -755,6 +827,7 @@ function FxInspector() {
                 spec={p}
                 value={layer.params[p.key]}
                 binding={layer.bindings?.[p.key]}
+                keyframes={layer.keyframes?.[p.key]}
               />
             ))}
           </div>
@@ -787,6 +860,60 @@ function FxInspector() {
 
 // ── Shell ─────────────────────────────────────────────────────────────────
 
+// ── Timeline bar ────────────────────────────────────────────────
+
+function FxTimelineBar() {
+  const duration = useFxStore((s) => s.scene.duration);
+  const scrub = useFxStore((s) => s.scrubTime);
+  const [now, setNow] = useState(0);
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setNow(((fxClock.time % duration) + duration) % duration);
+    }, 100);
+    return () => clearInterval(iv);
+  }, [duration]);
+
+  const shown = scrub !== null ? ((scrub % duration) + duration) % duration : now;
+
+  return (
+    <div className="xd-fx-timeline">
+      <span className="xd-fx-time">
+        {shown.toFixed(1)}s / {duration.toFixed(1)}s
+      </span>
+      <input
+        type="range"
+        className="xd-fx-scrub"
+        min={0}
+        max={duration}
+        step={0.01}
+        value={shown}
+        onPointerDown={() => useFxStore.getState().setScrub(shown)}
+        onChange={(e) => useFxStore.getState().setScrub(Number(e.target.value))}
+        onPointerUp={() => useFxStore.getState().setScrub(null)}
+        aria-label="Timeline scrubber"
+      />
+      <label className="xd-fx-dur" title="Loop duration (seconds)">
+        <input
+          className="xd-fx-dim"
+          type="number"
+          min={0.5}
+          max={120}
+          step={0.5}
+          value={duration}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            if (Number.isFinite(v) && v >= 0.5 && v <= 120) {
+              useFxStore.getState().patchScene({ duration: v });
+            }
+          }}
+        />
+        <span>s loop</span>
+      </label>
+    </div>
+  );
+}
+
 export function FxEditor() {
   return (
     <div className="xd-fx-shell">
@@ -794,6 +921,7 @@ export function FxEditor() {
       <div className="xd-fx-stage">
         <FxToolbar />
         <FxViewport />
+        <FxTimelineBar />
       </div>
       <FxInspector />
     </div>

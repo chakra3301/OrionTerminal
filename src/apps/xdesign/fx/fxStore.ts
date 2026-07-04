@@ -12,14 +12,16 @@ import {
   defaultParams,
   type FxBinding,
   type FxDoc,
+  type FxKeyframe,
   type FxLayer,
   type FxParamValue,
   type FxScene,
 } from "./fxModel";
+import { upsertKeyframe } from "./fxTimeline";
 import { fxEffect, FX_EFFECTS } from "./fxRegistry";
 
 type ScenePatch = Partial<
-  Pick<FxScene, "width" | "height" | "background" | "dpi" | "fps">
+  Pick<FxScene, "width" | "height" | "background" | "dpi" | "fps" | "duration">
 >;
 type LayerPatch = Partial<Pick<FxLayer, "name" | "hidden" | "opacity" | "blend">>;
 
@@ -29,6 +31,9 @@ type FxState = {
   playing: boolean;
   /** Bumps to restart scene time (re-fires appear bindings). */
   restartNonce: number;
+  /** Non-null while the user drags the timeline scrubber (seconds). The
+   * viewport pins scene time to it. Transient — never persisted. */
+  scrubTime: number | null;
 
   addLayer: (effectId: string) => void;
   removeLayer: (id: string) => void;
@@ -37,6 +42,12 @@ type FxState = {
   /** null removes the binding for that param. */
   setBinding: (id: string, key: string, binding: FxBinding | null) => void;
   restart: () => void;
+  setScrub: (t: number | null) => void;
+  /** Insert/replace a key for a param at normalized t (0..1). */
+  addKeyframe: (id: string, key: string, kf: FxKeyframe) => void;
+  /** Remove one key by index, or all keys for the param when index is -1. */
+  removeKeyframe: (id: string, key: string, index: number) => void;
+  setMask: (id: string, maskLayerId: string | null) => void;
   /** dir +1 moves toward the top of the stack (later in render order). */
   moveLayer: (id: string, dir: 1 | -1) => void;
   selectLayer: (id: string | null) => void;
@@ -62,21 +73,40 @@ export function sanitizeScene(scene: FxScene): FxScene {
     .filter((l) => fxEffect(l.effectId))
     .map((l) => {
       const spec = fxEffect(l.effectId)!;
+      const numericKey = (key: string) => {
+        const p = spec.params.find((q) => q.key === key);
+        return p?.type === "number";
+      };
       let bindings = l.bindings;
       if (bindings) {
-        const valid = Object.entries(bindings).filter(([key]) => {
-          const p = spec.params.find((q) => q.key === key);
-          return p?.type === "number";
-        });
+        const valid = Object.entries(bindings).filter(([key]) => numericKey(key));
         bindings = valid.length > 0 ? Object.fromEntries(valid) : undefined;
+      }
+      let keyframes = l.keyframes;
+      if (keyframes) {
+        const valid = Object.entries(keyframes)
+          .filter(([key, kfs]) => numericKey(key) && kfs.length > 0)
+          .map(([key, kfs]) => [key, [...kfs].sort((a, b) => a.t - b.t)] as const);
+        keyframes = valid.length > 0 ? Object.fromEntries(valid) : undefined;
       }
       return {
         ...l,
         params: { ...defaultParams(spec), ...l.params },
         ...(bindings ? { bindings } : { bindings: undefined }),
+        ...(keyframes ? { keyframes } : { keyframes: undefined }),
       };
     });
-  return { ...emptyScene(), ...scene, layers };
+  // Masks must point at a still-existing SOURCE layer (and never at self).
+  const ids = new Set(layers.map((l) => l.id));
+  const sane = layers.map((l) => {
+    if (!l.maskLayerId) return l;
+    const ok =
+      l.maskLayerId !== l.id &&
+      ids.has(l.maskLayerId) &&
+      fxEffect(layers.find((m) => m.id === l.maskLayerId)!.effectId)?.source;
+    return ok ? l : { ...l, maskLayerId: undefined };
+  });
+  return { ...emptyScene(), ...scene, layers: sane };
 }
 
 export const useFxStore = create<FxState>((set, get) => ({
@@ -84,6 +114,7 @@ export const useFxStore = create<FxState>((set, get) => ({
   selectedLayerId: null,
   playing: true,
   restartNonce: 0,
+  scrubTime: null,
 
   addLayer: (effectId) => {
     const spec = fxEffect(effectId);
@@ -144,6 +175,55 @@ export const useFxStore = create<FxState>((set, get) => ({
 
   restart: () => set((s) => ({ restartNonce: s.restartNonce + 1 })),
 
+  setScrub: (t) => set({ scrubTime: t }),
+
+  addKeyframe: (id, key, kf) =>
+    set((s) => ({
+      scene: {
+        ...s.scene,
+        layers: s.scene.layers.map((l) =>
+          l.id === id
+            ? {
+                ...l,
+                keyframes: {
+                  ...l.keyframes,
+                  [key]: upsertKeyframe(l.keyframes?.[key], kf),
+                },
+              }
+            : l,
+        ),
+      },
+    })),
+
+  removeKeyframe: (id, key, index) =>
+    set((s) => ({
+      scene: {
+        ...s.scene,
+        layers: s.scene.layers.map((l) => {
+          if (l.id !== id || !l.keyframes?.[key]) return l;
+          const kfs =
+            index < 0 ? [] : l.keyframes[key]!.filter((_, i) => i !== index);
+          const keyframes = { ...l.keyframes };
+          if (kfs.length === 0) delete keyframes[key];
+          else keyframes[key] = kfs;
+          return {
+            ...l,
+            keyframes: Object.keys(keyframes).length > 0 ? keyframes : undefined,
+          };
+        }),
+      },
+    })),
+
+  setMask: (id, maskLayerId) =>
+    set((s) => ({
+      scene: {
+        ...s.scene,
+        layers: s.scene.layers.map((l) =>
+          l.id === id ? { ...l, maskLayerId: maskLayerId ?? undefined } : l,
+        ),
+      },
+    })),
+
   moveLayer: (id, dir) =>
     set((s) => {
       const layers = [...s.scene.layers];
@@ -164,6 +244,7 @@ export const useFxStore = create<FxState>((set, get) => ({
       scene: sanitizeScene(doc.scene),
       selectedLayerId: null,
       playing: true,
+      scrubTime: null,
     }),
 }));
 
