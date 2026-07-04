@@ -53,6 +53,26 @@ describe("registry", () => {
     }
   });
 
+  it("every u_ reference in a frag body has a matching param", () => {
+    for (const spec of FX_EFFECTS) {
+      const declared = new Set(
+        spec.params.filter(isUniformParam).map((p) => uniformName(p.key)),
+      );
+      const used = new Set(spec.frag.match(/u_[A-Za-z0-9]+/g) ?? []);
+      for (const u of used) {
+        expect(declared, `${spec.id} references undeclared ${u}`).toContain(u);
+      }
+    }
+  });
+
+  it("frag bodies have balanced braces", () => {
+    for (const spec of FX_EFFECTS) {
+      const opens = (spec.frag.match(/\{/g) ?? []).length;
+      const closes = (spec.frag.match(/\}/g) ?? []).length;
+      expect(opens, spec.id).toBe(closes);
+    }
+  });
+
   it("fxEffect resolves by id and misses unknowns", () => {
     expect(fxEffect("gradient")?.label).toBe("Gradient");
     expect(fxEffect("nope")).toBeUndefined();
