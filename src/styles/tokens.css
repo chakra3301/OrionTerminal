@@ -16468,6 +16468,28 @@ html.ot-reduce-glass .note-page .note-editor-body {
 }
 .xd-fx-key-chip:hover { background: rgba(var(--xd-accent-rgb), 0.3); text-decoration: line-through; }
 .xd-fx-toolbar-spacer { flex: 1; }
+.xd-fx-play.active { background: rgba(var(--xd-accent-rgb), 0.35); }
+.xd-fx-stage-body { position: relative; flex: 1; min-height: 0; display: flex; }
+.xd-fx-stage-body .xd-fx-viewport { flex: 1; }
+.xd-fx-perf {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid var(--xd-border);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--xd-text-2);
+  pointer-events: none;
+}
+.xd-fx-perf .ok { color: #39ff88; }
+.xd-fx-perf .warn { color: #e6ff3a; }
+.xd-fx-perf .bad { color: #ff3ea5; }
 
 /* ── Home-card badge ── */
 .xd-fx-badge {

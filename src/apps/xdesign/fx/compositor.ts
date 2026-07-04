@@ -88,14 +88,15 @@ export type FxOverrideMap = Map<string, Record<string, number>>;
 export type FxCompositor = {
   /** Render one frame at the given internal resolution (scene px × dpi).
    * `overrides` (layer id → param key → value) wins over stored params —
-   * used by interactivity bindings and the timeline. */
+   * used by interactivity bindings and the timeline. Returns the number of
+   * shader passes drawn (layers + final blit). */
   render: (
     scene: FxScene,
     frame: FxFrame,
     pixelW: number,
     pixelH: number,
     overrides?: FxOverrideMap,
-  ) => void;
+  ) => number;
   /** Upload / refresh the rasterized texture for a source layer. */
   updateSource: (layerId: string, src: TexImageSource) => void;
   /** Free a source layer's texture (layer deleted). */
@@ -237,12 +238,13 @@ export function createCompositor(
     pixelW: number,
     pixelH: number,
     overrides?: FxOverrideMap,
-  ): void {
+  ): number {
     const w = Math.max(1, Math.round(pixelW));
     const h = Math.max(1, Math.round(pixelH));
     if (canvas.width !== w) canvas.width = w;
     if (canvas.height !== h) canvas.height = h;
-    if (!ensureTargets(w, h)) return;
+    if (!ensureTargets(w, h)) return 0;
+    let passes = 0;
 
     gl!.bindVertexArray(vao);
     gl!.viewport(0, 0, w, h);
@@ -301,6 +303,7 @@ export function createCompositor(
         }
       }
       gl!.drawArrays(gl!.TRIANGLES, 0, 3);
+      passes++;
       ping = pong;
     }
 
@@ -308,7 +311,7 @@ export function createCompositor(
     if (!copyEntry) {
       const prog = link(gl!, COPY_FRAG);
       copyEntry = prog ? { program: prog, locs: new Map() } : null;
-      if (!copyEntry) return;
+      if (!copyEntry) return passes;
     }
     gl!.bindFramebuffer(gl!.FRAMEBUFFER, null);
     gl!.viewport(0, 0, w, h);
@@ -317,6 +320,7 @@ export function createCompositor(
     gl!.bindTexture(gl!.TEXTURE_2D, targets![ping].tex);
     gl!.uniform1i(loc(copyEntry, "uTex"), 0);
     gl!.drawArrays(gl!.TRIANGLES, 0, 3);
+    return passes + 1;
   }
 
   function dispose(): void {

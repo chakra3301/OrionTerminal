@@ -34,6 +34,8 @@ type FxState = {
   /** Non-null while the user drags the timeline scrubber (seconds). The
    * viewport pins scene time to it. Transient — never persisted. */
   scrubTime: number | null;
+  /** Perf HUD visibility. Transient. */
+  showPerf: boolean;
 
   addLayer: (effectId: string) => void;
   removeLayer: (id: string) => void;
@@ -43,6 +45,7 @@ type FxState = {
   setBinding: (id: string, key: string, binding: FxBinding | null) => void;
   restart: () => void;
   setScrub: (t: number | null) => void;
+  setShowPerf: (v: boolean) => void;
   /** Insert/replace a key for a param at normalized t (0..1). */
   addKeyframe: (id: string, key: string, kf: FxKeyframe) => void;
   /** Remove one key by index, or all keys for the param when index is -1. */
@@ -115,6 +118,7 @@ export const useFxStore = create<FxState>((set, get) => ({
   playing: true,
   restartNonce: 0,
   scrubTime: null,
+  showPerf: false,
 
   addLayer: (effectId) => {
     const spec = fxEffect(effectId);
@@ -176,6 +180,8 @@ export const useFxStore = create<FxState>((set, get) => ({
   restart: () => set((s) => ({ restartNonce: s.restartNonce + 1 })),
 
   setScrub: (t) => set({ scrubTime: t }),
+
+  setShowPerf: (v) => set({ showPerf: v }),
 
   addKeyframe: (id, key, kf) =>
     set((s) => ({

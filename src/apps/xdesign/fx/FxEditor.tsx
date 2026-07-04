@@ -20,6 +20,7 @@ import {
   X,
   Diamond,
   Download,
+  Activity,
 } from "lucide-react";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { ipc } from "@/lib/ipc";
@@ -54,10 +55,33 @@ const fxClock = { time: 0 };
 /** Live viewport canvas — registered so video export can captureStream it
  * (same pattern as exportXD's setExportSvgRef). */
 let fxCanvasEl: HTMLCanvasElement | null = null;
+
+/** Perf counters the render loop publishes (mutable, non-reactive — the
+ * HUD polls). ms is CPU submit time; fps counts presented frames. */
+const fxPerf = { ms: 0, worst: 0, fps: 0, passes: 0, w: 0, h: 0 };
 import { fxEffect, FX_EFFECTS } from "./fxRegistry";
 import { rasterizeSource, sourceRasterKey } from "./fxRaster";
 
 // ── Viewport ──────────────────────────────────────────────────────────────
+
+function PerfHud() {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => force((n) => n + 1), 500);
+    return () => clearInterval(iv);
+  }, []);
+  const layerCount = useFxStore((s) => s.scene.layers.filter((l) => !l.hidden).length);
+  return (
+    <div className="xd-fx-perf">
+      <span className={fxPerf.fps >= 55 ? "ok" : fxPerf.fps >= 30 ? "warn" : "bad"}>
+        {fxPerf.fps} fps
+      </span>
+      <span>{fxPerf.ms.toFixed(2)} ms avg · {fxPerf.worst.toFixed(1)} worst</span>
+      <span>{fxPerf.passes} passes · {layerCount} layers</span>
+      <span>{fxPerf.w}×{fxPerf.h}</span>
+    </div>
+  );
+}
 
 function FxViewport() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -106,6 +130,10 @@ function FxViewport() {
     const mouse: [number, number] = [0.5, 0.5];
     const mouseTarget: [number, number] = [0.5, 0.5];
     const mousePrev: [number, number] = [0.5, 0.5];
+
+    const frameTimes: number[] = [];
+    let fpsCount = 0;
+    let fpsWindowStart = performance.now();
 
     // Source-layer rasterization bookkeeping. Keys are set eagerly (before
     // the async raster lands) so a failed raster doesn't retry every frame.
@@ -221,7 +249,29 @@ function FxViewport() {
       const pw = Math.round(scene.width * dpi);
       const ph = Math.round(scene.height * dpi);
       syncSources(pw, ph);
-      compositor.render(scene, { time: sceneTime, mouse }, pw, ph, overrides);
+      const t0 = performance.now();
+      const passes = compositor.render(
+        scene,
+        { time: sceneTime, mouse },
+        pw,
+        ph,
+        overrides,
+      );
+      const ms = performance.now() - t0;
+
+      frameTimes.push(ms);
+      if (frameTimes.length > 60) frameTimes.shift();
+      fpsCount++;
+      if (now - fpsWindowStart >= 1000) {
+        fxPerf.fps = Math.round((fpsCount * 1000) / (now - fpsWindowStart));
+        fpsCount = 0;
+        fpsWindowStart = now;
+      }
+      fxPerf.ms = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
+      fxPerf.worst = Math.max(...frameTimes);
+      fxPerf.passes = passes;
+      fxPerf.w = pw;
+      fxPerf.h = ph;
     };
     raf = requestAnimationFrame(tick);
 
@@ -425,6 +475,7 @@ function FxToolbar() {
   const scene = useFxStore((s) => s.scene);
   const playing = useFxStore((s) => s.playing);
   const patchScene = useFxStore((s) => s.patchScene);
+  const showPerf = useFxStore((s) => s.showPerf);
 
   const dim = (v: string, fallback: number) => {
     const n = Math.round(Number(v));
@@ -493,6 +544,15 @@ function FxToolbar() {
         <option value="30">FPS 30</option>
       </select>
       <span className="xd-fx-toolbar-spacer" />
+      <button
+        type="button"
+        className={`xd-fx-play${showPerf ? " active" : ""}`}
+        onClick={() => useFxStore.getState().setShowPerf(!showPerf)}
+        title="Performance HUD"
+        aria-label="Performance HUD"
+      >
+        <Activity size={13} />
+      </button>
       <ExportMenu />
     </div>
   );
@@ -1099,12 +1159,16 @@ function FxTimelineBar() {
 }
 
 export function FxEditor() {
+  const showPerf = useFxStore((s) => s.showPerf);
   return (
     <div className="xd-fx-shell">
       <FxLayersPanel />
       <div className="xd-fx-stage">
         <FxToolbar />
-        <FxViewport />
+        <div className="xd-fx-stage-body">
+          <FxViewport />
+          {showPerf && <PerfHud />}
+        </div>
         <FxTimelineBar />
       </div>
       <FxInspector />
