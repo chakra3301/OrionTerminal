@@ -8,6 +8,8 @@ import {
   type Mode,
 } from "./store";
 import { useHtmlArtifact, migrateLegacyArtifactTo } from "./htmlArtifactStore";
+import { useFxStore, snapshotFxDoc, emptyFxDoc } from "./fx/fxStore";
+import type { FxDoc } from "./fx/fxModel";
 
 /** A persisted XDesign document — the same shape `useXDesign.hydrate` accepts
  * and `useXDesignPersistence` writes. One per project. */
@@ -19,18 +21,30 @@ export type XDDoc = {
   activeModeId?: string;
 };
 
+export type XDProjectKind = "design" | "fx";
+
 export type XDProjectMeta = {
   id: string;
   name: string;
   createdAt: number;
   updatedAt: number;
+  /** Undefined = "design" (pre-FX metas hydrate cleanly). */
+  kind?: XDProjectKind;
 };
+
+export function projectKind(meta: XDProjectMeta | undefined): XDProjectKind {
+  return meta?.kind ?? "design";
+}
 
 const DEFAULT_PAGE_ID = "page-default";
 const DEFAULT_MODE_ID = "mode-default";
 
 function docKey(id: string): `xdesign.project.${string}` {
   return `xdesign.project.${id}`;
+}
+
+function fxDocKey(id: string): `xdesign.fx.${string}` {
+  return `xdesign.fx.${id}`;
 }
 
 /** Fresh, empty single-page document. */
@@ -72,6 +86,32 @@ export async function saveDoc(id: string, doc: XDDoc): Promise<void> {
   await setAppState(docKey(id), doc);
 }
 
+export async function loadFxDoc(id: string): Promise<FxDoc | null> {
+  return getAppState<FxDoc>(fxDocKey(id));
+}
+
+export async function saveFxDoc(id: string, doc: FxDoc): Promise<void> {
+  await setAppState(fxDocKey(id), doc);
+}
+
+/** Load a project's doc into the right live store (design vs fx) and scope
+ * the HTML artifact panel. Single path used by open/close/delete. */
+async function hydrateProjectById(
+  id: string,
+  registry: XDProjectMeta[],
+): Promise<void> {
+  const kind = projectKind(registry.find((m) => m.id === id));
+  if (kind === "fx") {
+    const doc = (await loadFxDoc(id)) ?? emptyFxDoc();
+    useFxStore.getState().hydrateFx(doc);
+    useHtmlArtifact.getState().setProject(null);
+  } else {
+    const doc = (await loadDoc(id)) ?? emptyDoc();
+    useXDesign.getState().hydrate(doc);
+    useHtmlArtifact.getState().setProject(id);
+  }
+}
+
 type XDProjectsState = {
   registry: XDProjectMeta[];
   openTabs: string[];
@@ -81,10 +121,12 @@ type XDProjectsState = {
   ready: boolean;
 
   init: () => Promise<void>;
-  /** Guarantee a project is open before a canvas mutation. Returns the active
-   * id, creating a fresh project if currently on Home. */
+  /** Guarantee a DESIGN project is open before a canvas mutation. Returns
+   * the active id, creating a fresh project if currently on Home or if the
+   * active project is an FX scene (design shapes must never land in an FX
+   * doc slot). */
   ensureActive: () => Promise<string>;
-  newProject: (name?: string) => Promise<string>;
+  newProject: (name?: string, kind?: XDProjectKind) => Promise<string>;
   openProject: (id: string) => Promise<void>;
   switchTo: (id: string) => Promise<void>;
   closeTab: (id: string) => Promise<void>;
@@ -104,7 +146,11 @@ function persistRegistry(registry: XDProjectMeta[]): void {
 export async function flushActive(): Promise<void> {
   const { activeId, registry } = useXDProjects.getState();
   if (!activeId) return;
-  await saveDoc(activeId, snapshotActiveDoc());
+  if (projectKind(registry.find((m) => m.id === activeId)) === "fx") {
+    await saveFxDoc(activeId, snapshotFxDoc());
+  } else {
+    await saveDoc(activeId, snapshotActiveDoc());
+  }
   const next = registry.map((m) =>
     m.id === activeId ? { ...m, updatedAt: Date.now() } : m,
   );
@@ -154,24 +200,34 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
   },
 
   ensureActive: async () => {
-    const id = get().activeId;
-    if (id) return id;
+    const { activeId, registry } = get();
+    if (activeId && projectKind(registry.find((m) => m.id === activeId)) === "design") {
+      return activeId;
+    }
     return get().newProject();
   },
 
-  newProject: async (name) => {
+  newProject: async (name, kind = "design") => {
     await flushActive();
     const id = ulid();
     const now = Date.now();
     const meta: XDProjectMeta = {
       id,
-      name: name?.trim() || uniqueName(get().registry),
+      name: name?.trim() || uniqueName(get().registry, kind === "fx" ? "FX Scene" : "Untitled"),
       createdAt: now,
       updatedAt: now,
+      ...(kind === "fx" ? { kind } : {}),
     };
-    await saveDoc(id, emptyDoc());
-    useXDesign.getState().hydrate(emptyDoc());
-    useHtmlArtifact.getState().setProject(id);
+    if (kind === "fx") {
+      const doc = emptyFxDoc();
+      await saveFxDoc(id, doc);
+      useFxStore.getState().hydrateFx(doc);
+      useHtmlArtifact.getState().setProject(null);
+    } else {
+      await saveDoc(id, emptyDoc());
+      useXDesign.getState().hydrate(emptyDoc());
+      useHtmlArtifact.getState().setProject(id);
+    }
     const registry = [meta, ...get().registry];
     set((s) => ({
       registry,
@@ -185,9 +241,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
   openProject: async (id) => {
     if (get().activeId === id) return;
     await flushActive();
-    const doc = (await loadDoc(id)) ?? emptyDoc();
-    useXDesign.getState().hydrate(doc);
-    useHtmlArtifact.getState().setProject(id);
+    await hydrateProjectById(id, get().registry);
     set((s) => ({
       openTabs: s.openTabs.includes(id) ? s.openTabs : [...s.openTabs, id],
       activeId: id,
@@ -216,9 +270,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
     // Switch to the neighbour (prefer the tab to the left of the closed one).
     const closedIdx = openTabs.indexOf(id);
     const nextId = remaining[Math.max(0, closedIdx - 1)]!;
-    const doc = (await loadDoc(nextId)) ?? emptyDoc();
-    useXDesign.getState().hydrate(doc);
-    useHtmlArtifact.getState().setProject(nextId);
+    await hydrateProjectById(nextId, get().registry);
     set({ openTabs: remaining, activeId: nextId });
   },
 
@@ -242,6 +294,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
     const { activeId, openTabs } = get();
     const registry = get().registry.filter((m) => m.id !== id);
     void setAppState(docKey(id), null);
+    void setAppState(fxDocKey(id), null);
 
     const remaining = openTabs.filter((t) => t !== id);
     if (activeId === id) {
@@ -250,9 +303,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
         set({ registry, openTabs: [], activeId: null });
       } else {
         const nextId = remaining[remaining.length - 1]!;
-        const doc = (await loadDoc(nextId)) ?? emptyDoc();
-        useXDesign.getState().hydrate(doc);
-        useHtmlArtifact.getState().setProject(nextId);
+        await hydrateProjectById(nextId, registry);
         set({ registry, openTabs: remaining, activeId: nextId });
       }
     } else {

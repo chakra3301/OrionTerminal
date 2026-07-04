@@ -31,10 +31,12 @@ export type AppStateKey =
   | "today.weekRead"
   | "shell.windows"
   | "wallpaper"
+  | "characters"
   | "preview"
   | "xdesign.doc"
   | "xdesign.projects"
   | `xdesign.project.${string}`
+  | `xdesign.fx.${string}`
   | "shell.focusedWindowId"
   | "rosie.ttsEnabled"
   | "voice.listenMode"

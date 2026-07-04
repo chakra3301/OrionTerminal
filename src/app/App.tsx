@@ -48,8 +48,10 @@ import { usePreviewStore, type PreviewState } from "@/store/previewStore";
 import { useXDesign } from "@/apps/xdesign/store";
 import {
   useXDProjects,
+  projectKind,
   flushActive as flushActiveXDProject,
 } from "@/apps/xdesign/projectsStore";
+import { useFxStore } from "@/apps/xdesign/fx/fxStore";
 import {
   setAppState,
   getWorkspaceLayout,
@@ -440,6 +442,32 @@ function useXDesignPersistence() {
 }
 
 /**
+ * Debounced auto-persist for FX scenes — the shader-compositor sibling of
+ * `useXDesignPersistence`. Only writes when the active project is kind "fx";
+ * transient state (selection, play/pause) is filtered out by comparing the
+ * scene reference.
+ */
+function useFxPersistence() {
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = useFxStore.subscribe((state, prev) => {
+      if (state.scene === prev.scene) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const { activeId, registry } = useXDProjects.getState();
+        if (!activeId) return;
+        if (projectKind(registry.find((m) => m.id === activeId)) !== "fx") return;
+        void flushActiveXDProject();
+      }, 400);
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe();
+    };
+  }, []);
+}
+
+/**
  * Keeps the workspace layout scoped per project: switching projects saves
  * the prior project's layout (synchronously, no debounce — so the swap is
  * atomic) and loads the new project's layout. Within a single project,
@@ -614,6 +642,7 @@ export default function App() {
   useWindowSizePersistence();
   useShellWindowsPersistence();
   useXDesignPersistence();
+  useFxPersistence();
   useProjectScopedLayout();
   useFsWatcher();
   useArchivesLiveRefresh();

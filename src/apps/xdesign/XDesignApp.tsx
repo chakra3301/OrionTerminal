@@ -14,7 +14,8 @@ import { initialScreen, topLevelFrames } from "@/apps/xdesign/prototype";
 import { useFileDropZone } from "@/lib/fileDrop";
 import { useAssetsStore } from "@/store/assetsStore";
 import { useXDesign } from "@/apps/xdesign/store";
-import { useXDProjects } from "@/apps/xdesign/projectsStore";
+import { useXDProjects, projectKind } from "@/apps/xdesign/projectsStore";
+import { FxEditor } from "@/apps/xdesign/fx/FxEditor";
 import { XDesignHome } from "@/apps/xdesign/XDesignHome";
 import { XDesignTabs } from "@/apps/xdesign/XDesignTabs";
 import { log } from "@/lib/log";
@@ -111,6 +112,9 @@ export function XDesignApp() {
   const [dropOver, setDropOver] = useState(false);
   const hasFrames = useXDesign((s) => topLevelFrames(s.shapes).length > 0);
   const activeId = useXDProjects((s) => s.activeId);
+  const activeKind = useXDProjects((s) =>
+    projectKind(s.registry.find((m) => m.id === s.activeId)),
+  );
 
   useFileDropZone(stageRef, "xdesign-canvas", (e) => {
     if (e.type === "enter") setDropOver(true);
@@ -125,6 +129,15 @@ export function XDesignApp() {
     return (
       <div className="xd-root xd-root-home">
         <XDesignHome />
+      </div>
+    );
+  }
+
+  if (activeKind === "fx") {
+    return (
+      <div className="xd-root">
+        <XDesignTabs />
+        <FxEditor />
       </div>
     );
   }

@@ -1,5 +1,17 @@
 import { useEffect, useState } from "react";
-import { Plus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import {
+  Plus,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  LayoutGrid,
+  Globe,
+  Presentation,
+  Film,
+  ImageIcon,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 import { confirmAction } from "@/components/ConfirmModal";
 import { toast } from "@/store/toastStore";
 import {
@@ -8,7 +20,38 @@ import {
   type XDDoc,
   type XDProjectMeta,
 } from "./projectsStore";
+import { useRailIntent, type RailIntentMode } from "./railIntentStore";
 import { ProjectThumb } from "./ProjectThumb";
+
+// Project start types. "Blank canvas" is the default normal project; the rest
+// create a project then arm the matching AI flow in the Claude rail.
+type StartType = {
+  id: string;
+  label: string;
+  desc: string;
+  Icon: LucideIcon;
+  /** Tool flow to arm after creating the project (null = plain canvas). */
+  intent: RailIntentMode | null;
+  name: string;
+  /** Project kind — "fx" opens the shader compositor instead of the canvas. */
+  kind?: "fx";
+};
+
+const START_TYPES: StartType[] = [
+  { id: "blank", label: "Blank canvas", desc: "Start from an empty board", Icon: LayoutGrid, intent: null, name: "Untitled" },
+  { id: "webpage", label: "Webpage", desc: "Generate a shippable HTML page", Icon: Globe, intent: "webpage", name: "Webpage" },
+  { id: "deck", label: "Slide deck", desc: "Build a presentable deck", Icon: Presentation, intent: "deck", name: "Deck" },
+  { id: "motion", label: "Motion", desc: "A looping motion graphic", Icon: Film, intent: "motion", name: "Motion" },
+  { id: "image", label: "Image generator", desc: "Generate a raster image", Icon: ImageIcon, intent: "image", name: "Image" },
+  { id: "fx", label: "FX scene", desc: "Shader-driven motion graphics", Icon: Sparkles, intent: null, name: "FX Scene", kind: "fx" },
+];
+
+async function startProject(t: StartType): Promise<void> {
+  await useXDProjects
+    .getState()
+    .newProject(t.intent || t.kind ? t.name : undefined, t.kind ?? "design");
+  if (t.intent) useRailIntent.getState().request(t.intent);
+}
 
 function relativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -68,6 +111,7 @@ function ProjectCard({
         title={`Open ${meta.name}`}
       >
         <ProjectThumb doc={doc} />
+        {meta.kind === "fx" && <span className="xd-fx-badge">FX</span>}
       </button>
       <div className="xd-home-card-meta">
         <div className="xd-home-card-info">
@@ -139,6 +183,45 @@ function ProjectCard({
   );
 }
 
+function NewProjectMenu() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="xd-home-new-wrap">
+      <button
+        type="button"
+        className="xd-home-new"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Plus size={16} /> New project
+      </button>
+      {open && (
+        <>
+          <div className="xd-home-menu-scrim" onClick={() => setOpen(false)} />
+          <div className="xd-home-start-menu">
+            {START_TYPES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className="xd-home-start-item"
+                onClick={() => {
+                  setOpen(false);
+                  void startProject(t);
+                }}
+              >
+                <t.Icon size={16} />
+                <span className="xd-home-start-text">
+                  <span className="xd-home-start-label">{t.label}</span>
+                  <span className="xd-home-start-desc">{t.desc}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function XDesignHome() {
   const registry = useXDProjects((s) => s.registry);
   const [docs, setDocs] = useState<Record<string, XDDoc | null>>({});
@@ -166,25 +249,32 @@ export function XDesignHome() {
           <h1 className="xd-home-title">XDesign</h1>
           <p className="xd-home-sub">Your design projects, all in one place.</p>
         </div>
-        <button
-          type="button"
-          className="xd-home-new"
-          onClick={() => void useXDProjects.getState().newProject()}
-        >
-          <Plus size={16} /> New project
-        </button>
+        <NewProjectMenu />
       </header>
+
+      <div className="xd-home-section">
+        <h2 className="xd-home-section-title">Start something new</h2>
+        <div className="xd-home-start-grid">
+          {START_TYPES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className="xd-home-start-card"
+              onClick={() => void startProject(t)}
+            >
+              <t.Icon size={20} />
+              <span className="xd-home-start-label">{t.label}</span>
+              <span className="xd-home-start-desc">{t.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {sorted.length === 0 ? (
         <div className="xd-home-empty">
-          <button
-            type="button"
-            className="xd-home-empty-new"
-            onClick={() => void useXDProjects.getState().newProject()}
-          >
-            <Plus size={28} />
-            <span>Create your first project</span>
-          </button>
+          <span className="xd-home-empty-hint">
+            No projects yet — pick a starting point above.
+          </span>
         </div>
       ) : (
         <div className="xd-home-section">
