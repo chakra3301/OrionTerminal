@@ -19,8 +19,19 @@ import {
   Zap,
   X,
   Diamond,
+  Download,
 } from "lucide-react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { ipc } from "@/lib/ipc";
+import { toast, useToasts } from "@/store/toastStore";
+import { log } from "@/lib/log";
+import { recordCanvasToFile } from "@/apps/xdesign/recordCanvas";
+import {
+  sceneToJson,
+  sceneFromJson,
+  buildEmbedHtml,
+  renderFxSnapshot,
+} from "./fxExport";
 import { useFxStore } from "./fxStore";
 import { createCompositor, type FxCompositor } from "./compositor";
 import {
@@ -39,6 +50,10 @@ import { evalSceneKeyframes } from "./fxTimeline";
 /** Mutable scene clock the viewport publishes each frame — read by the
  * timeline bar on a slow poll so React isn't re-rendered at 60fps. */
 const fxClock = { time: 0 };
+
+/** Live viewport canvas — registered so video export can captureStream it
+ * (same pattern as exportXD's setExportSvgRef). */
+let fxCanvasEl: HTMLCanvasElement | null = null;
 import { fxEffect, FX_EFFECTS } from "./fxRegistry";
 import { rasterizeSource, sourceRasterKey } from "./fxRaster";
 
@@ -228,11 +243,178 @@ function FxViewport() {
         <div className="xd-fx-gl-lost">WebGL2 unavailable</div>
       ) : (
         <canvas
-          ref={canvasRef}
+          ref={(el) => {
+            canvasRef.current = el;
+            fxCanvasEl = el;
+          }}
           className="xd-fx-canvas"
           style={{ width: fit.w || undefined, height: fit.h || undefined }}
         />
       )}
+    </div>
+  );
+}
+
+// ── Export ──────────────────────────────────────────────────────
+
+async function saveBytes(
+  bytes: Uint8Array,
+  defaultName: string,
+  filterName: string,
+  ext: string,
+): Promise<boolean> {
+  const path = await saveDialog({
+    defaultPath: defaultName,
+    filters: [{ name: filterName, extensions: [ext] }],
+  });
+  if (!path) return false;
+  await ipc.xdesignSaveBytes(path, Array.from(bytes));
+  toast.success("Exported", { body: path });
+  return true;
+}
+
+async function exportPng(): Promise<void> {
+  const { scene } = useFxStore.getState();
+  const dpi = resolveDpi(scene.dpi);
+  const blob = await renderFxSnapshot(
+    scene,
+    fxClock.time,
+    Math.round(scene.width * dpi),
+    Math.round(scene.height * dpi),
+  );
+  if (!blob) {
+    toast.error("PNG export failed", { body: "Couldn't render the scene offscreen." });
+    return;
+  }
+  await saveBytes(
+    new Uint8Array(await blob.arrayBuffer()),
+    "fx-scene.png",
+    "PNG image",
+    "png",
+  );
+}
+
+async function exportVideo(): Promise<void> {
+  if (!fxCanvasEl) {
+    toast.error("No live canvas to record");
+    return;
+  }
+  const { scene } = useFxStore.getState();
+  const ms = Math.round(Math.max(1, scene.duration) * 1000);
+  const recId = toast.info(`Recording ${(ms / 1000).toFixed(1)}s…`, { durationMs: 0 });
+  try {
+    const { bytes, ext } = await recordCanvasToFile(fxCanvasEl, ms);
+    useToasts.getState().dismiss(recId);
+    await saveBytes(bytes, `fx-scene.${ext}`, "Video", ext);
+  } catch (e) {
+    useToasts.getState().dismiss(recId);
+    log.error("fx video export", e);
+    toast.error("Video export unavailable", {
+      body: e instanceof Error ? e.message : String(e),
+    });
+  }
+}
+
+async function exportEmbed(): Promise<void> {
+  const { scene } = useFxStore.getState();
+  const sources: Record<string, string> = {};
+  for (const layer of scene.layers) {
+    if (!fxEffect(layer.effectId)?.source) continue;
+    const cnv = await rasterizeSource(layer, scene.width, scene.height);
+    if (cnv) sources[layer.id] = cnv.toDataURL("image/png");
+  }
+  const html = buildEmbedHtml(scene, sources);
+  await saveBytes(
+    new TextEncoder().encode(html),
+    "fx-scene.html",
+    "HTML",
+    "html",
+  );
+}
+
+async function exportJson(): Promise<void> {
+  const { scene } = useFxStore.getState();
+  await saveBytes(
+    new TextEncoder().encode(sceneToJson(scene)),
+    "fx-scene.json",
+    "FX scene",
+    "json",
+  );
+}
+
+function ExportMenu() {
+  const [open, setOpen] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const run = (fn: () => Promise<void>) => {
+    setOpen(false);
+    void fn().catch((e) => {
+      log.error("fx export", e);
+      toast.error("Export failed", { body: e instanceof Error ? e.message : String(e) });
+    });
+  };
+
+  return (
+    <div className="xd-fx-add-wrap">
+      <button
+        type="button"
+        className="xd-fx-play"
+        onClick={() => setOpen((v) => !v)}
+        title="Export / import"
+        aria-label="Export"
+      >
+        <Download size={13} />
+      </button>
+      {open && (
+        <>
+          <div className="xd-home-menu-scrim" onClick={() => setOpen(false)} />
+          <div className="xd-fx-add-menu">
+            <div className="xd-fx-add-group">Export</div>
+            <button type="button" onClick={() => run(exportPng)}>
+              <span className="xd-fx-add-label">PNG image</span>
+            </button>
+            <button type="button" onClick={() => run(exportVideo)}>
+              <span className="xd-fx-add-label">Video (one loop)</span>
+            </button>
+            <button type="button" onClick={() => run(exportEmbed)}>
+              <span className="xd-fx-add-label">HTML embed (standalone)</span>
+            </button>
+            <button type="button" onClick={() => run(exportJson)}>
+              <span className="xd-fx-add-label">Scene JSON</span>
+            </button>
+            <div className="xd-fx-add-group">Import</div>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                fileRef.current?.click();
+              }}
+            >
+              <span className="xd-fx-add-label">Scene JSON…</span>
+            </button>
+          </div>
+        </>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".json,application/json"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (!f) return;
+          void f.text().then((text) => {
+            const scene = sceneFromJson(text);
+            if (!scene) {
+              toast.error("Not a valid FX scene file");
+              return;
+            }
+            useFxStore.getState().hydrateFx({ scene });
+            toast.success("Scene imported");
+          });
+        }}
+      />
     </div>
   );
 }
@@ -310,6 +492,8 @@ function FxToolbar() {
         <option value="60">FPS 60</option>
         <option value="30">FPS 30</option>
       </select>
+      <span className="xd-fx-toolbar-spacer" />
+      <ExportMenu />
     </div>
   );
 }

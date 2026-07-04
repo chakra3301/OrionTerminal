@@ -105,12 +105,13 @@ export type FxCompositor = {
 
 export function createCompositor(
   canvas: HTMLCanvasElement,
+  opts?: { preserveDrawingBuffer?: boolean },
 ): FxCompositor | null {
   const gl = canvas.getContext("webgl2", {
     antialias: false,
     alpha: false,
     premultipliedAlpha: false,
-    preserveDrawingBuffer: false,
+    preserveDrawingBuffer: opts?.preserveDrawingBuffer ?? false,
   });
   if (!gl) {
     log.warn("fx: WebGL2 unavailable");

@@ -16467,6 +16467,7 @@ html.ot-reduce-glass .note-page .note-editor-body {
   font-variant-numeric: tabular-nums;
 }
 .xd-fx-key-chip:hover { background: rgba(var(--xd-accent-rgb), 0.3); text-decoration: line-through; }
+.xd-fx-toolbar-spacer { flex: 1; }
 
 /* ── Home-card badge ── */
 .xd-fx-badge {
