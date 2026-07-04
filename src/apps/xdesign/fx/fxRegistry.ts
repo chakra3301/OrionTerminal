@@ -490,8 +490,356 @@ vec4 fxMain(vec2 uv) {
 `,
 };
 
+// ── Centerpiece generators ───────────────────────────────────
+
+const aurora: FxEffectSpec = {
+  id: "aurora",
+  label: "Aurora",
+  category: "generator",
+  description: "Northern-lights curtains drifting across the sky",
+  params: [
+    { key: "colorA", label: "Base", type: "color", default: "#39ff88" },
+    { key: "colorB", label: "Tip", type: "color", default: "#b14cff" },
+    { key: "intensity", label: "Intensity", type: "number", min: 0, max: 2, step: 0.01, default: 0.9 },
+    { key: "spread", label: "Spread", type: "number", min: 0, max: 1, step: 0.01, default: 0.5 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 0.4 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec3 col = vec3(0.0);
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    float x = uv.x * (2.0 + fi * 0.8) + uTime * u_speed * (0.15 + fi * 0.07) + fi * 3.3;
+    float band = fxFbm(vec2(x, fi * 7.7));
+    float y = band * 0.5 + 0.22 + fi * 0.09;
+    float d = uv.y - y;
+    float glow = exp(-abs(d) * (22.0 - u_spread * 14.0)) * smoothstep(0.05, 0.35, band);
+    vec3 c = mix(u_colorA, u_colorB, clamp(d * 4.0 + 0.5, 0.0, 1.0));
+    col += c * glow * u_intensity * (1.0 - fi * 0.22);
+  }
+  float a = clamp(max(col.r, max(col.g, col.b)), 0.0, 1.0);
+  return vec4(col, a);
+}
+`,
+};
+
+const nebula: FxEffectSpec = {
+  id: "nebula",
+  label: "Nebula",
+  category: "generator",
+  description: "Domain-warped flowing color clouds",
+  params: [
+    { key: "colorA", label: "Deep", type: "color", default: "#0a0a2e" },
+    { key: "colorB", label: "Cloud", type: "color", default: "#ff3ea5" },
+    { key: "colorC", label: "Accent", type: "color", default: "#00e0ff" },
+    { key: "scale", label: "Scale", type: "number", min: 0.5, max: 8, step: 0.1, default: 2.2 },
+    { key: "warp", label: "Warp", type: "number", min: 0, max: 4, step: 0.05, default: 1.6 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 0.3 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec2 p = uv * u_scale;
+  vec2 q = vec2(fxFbm(p + uTime * u_speed * 0.10), fxFbm(p + vec2(5.2, 1.3)));
+  vec2 r = vec2(
+    fxFbm(p + q * u_warp + vec2(1.7, 9.2) + uTime * u_speed * 0.15),
+    fxFbm(p + q * u_warp + vec2(8.3, 2.8) - uTime * u_speed * 0.12)
+  );
+  float f = fxFbm(p + r * u_warp);
+  vec3 col = mix(u_colorA, u_colorB, clamp(f * f * 2.4, 0.0, 1.0));
+  col = mix(col, u_colorC, clamp(length(q) * 0.7, 0.0, 1.0) * 0.55);
+  return vec4(col, 1.0);
+}
+`,
+};
+
+const plasma: FxEffectSpec = {
+  id: "plasma",
+  label: "Plasma",
+  category: "generator",
+  description: "Retro demo-scene interference waves",
+  params: [
+    { key: "colorA", label: "Color A", type: "color", default: "#ff3ea5" },
+    { key: "colorB", label: "Color B", type: "color", default: "#00e0ff" },
+    { key: "scale", label: "Scale", type: "number", min: 0.5, max: 6, step: 0.1, default: 1.6 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 0.5 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  float t = uTime * u_speed;
+  float v = sin((uv.x + t * 0.30) * u_scale * 6.2831853);
+  v += sin((uv.y + t * 0.24) * u_scale * 5.0);
+  v += sin((uv.x + uv.y) * u_scale * 4.0 + t * 2.0);
+  v += sin(length(uv - 0.5) * u_scale * 8.0 - t * 3.0);
+  v *= 0.25;
+  vec3 col = mix(u_colorA, u_colorB, 0.5 + 0.5 * sin(v * 3.1415926 + t * 0.4));
+  return vec4(col, 1.0);
+}
+`,
+};
+
+const beam: FxEffectSpec = {
+  id: "beam",
+  label: "Beam",
+  category: "generator",
+  description: "A glowing light beam with pulse",
+  params: [
+    { key: "color", label: "Color", type: "color", default: "#00e0ff" },
+    { key: "x", label: "X", type: "number", min: 0, max: 1, step: 0.005, default: 0.5 },
+    { key: "y", label: "Y", type: "number", min: 0, max: 1, step: 0.005, default: 0.5 },
+    { key: "angle", label: "Angle", type: "number", min: -180, max: 180, step: 1, default: 0 },
+    { key: "width", label: "Width", type: "number", min: 0.05, max: 2, step: 0.01, default: 0.5 },
+    { key: "intensity", label: "Intensity", type: "number", min: 0, max: 3, step: 0.01, default: 1.2 },
+    { key: "pulse", label: "Pulse", type: "number", min: 0, max: 1, step: 0.01, default: 0.3 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 3, step: 0.01, default: 1 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec2 p = uv - vec2(u_x, u_y);
+  p.x *= uResolution.x / uResolution.y;
+  p = fxRotate2(radians(u_angle)) * p;
+  float pulse = 1.0 + u_pulse * 0.5 * sin(uTime * u_speed * 3.0);
+  float d = abs(p.y);
+  float core = exp(-d * d / (u_width * u_width * 0.002));
+  float halo = exp(-d / (u_width * 0.15));
+  vec3 col = u_color * (core * 1.2 + halo * 0.45) * pulse * u_intensity;
+  return vec4(col, clamp(core + halo * 0.6, 0.0, 1.0));
+}
+`,
+};
+
+const wisps: FxEffectSpec = {
+  id: "wisps",
+  label: "Wisps",
+  category: "generator",
+  description: "Drifting smoke tendrils",
+  params: [
+    { key: "color", label: "Color", type: "color", default: "#9ab0a8" },
+    { key: "scale", label: "Scale", type: "number", min: 0.5, max: 4, step: 0.05, default: 1.4 },
+    { key: "intensity", label: "Intensity", type: "number", min: 0, max: 2, step: 0.01, default: 0.9 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 0.5 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec3 col = vec3(0.0);
+  for (int i = 0; i < 4; i++) {
+    float fi = float(i);
+    vec2 p = uv;
+    p.y += sin(p.x * 3.0 + uTime * u_speed * (0.4 + fi * 0.13) + fi * 2.1) * 0.15;
+    float n = fxFbm(p * vec2(2.0, 6.0) * u_scale + vec2(fi * 13.7, uTime * u_speed * 0.35));
+    float band = exp(-abs(uv.y - (0.2 + fi * 0.2)) * 7.0);
+    col += u_color * n * n * band * u_intensity * 0.7;
+  }
+  float a = clamp(max(col.r, max(col.g, col.b)), 0.0, 1.0);
+  return vec4(col, a);
+}
+`,
+};
+
+const starfield: FxEffectSpec = {
+  id: "starfield",
+  label: "Starfield",
+  category: "generator",
+  description: "Parallax stars with twinkle",
+  params: [
+    { key: "color", label: "Color", type: "color", default: "#e6f4ec" },
+    { key: "density", label: "Density", type: "number", min: 0.2, max: 3, step: 0.05, default: 1 },
+    { key: "twinkle", label: "Twinkle", type: "number", min: 0, max: 2, step: 0.01, default: 0.8 },
+    { key: "speed", label: "Drift", type: "number", min: 0, max: 2, step: 0.01, default: 0.15 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec3 col = vec3(0.0);
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i) + 1.0;
+    vec2 p = uv * u_density * fi * 18.0 + vec2(uTime * u_speed * fi * 0.8, 0.0);
+    vec2 id = floor(p);
+    vec2 gv = fract(p) - 0.5;
+    float h = fxHash21(id);
+    if (h > 0.93) {
+      vec2 off = vec2(fxHash21(id + 1.3), fxHash21(id + 2.7)) - 0.5;
+      float d = length(gv - off * 0.8);
+      float tw = 0.6 + 0.4 * sin(uTime * (1.0 + h * 5.0) * u_twinkle * 4.0 + h * 40.0);
+      col += u_color * exp(-d * d * 160.0) * tw / fi;
+    }
+  }
+  float a = clamp(max(col.r, max(col.g, col.b)), 0.0, 1.0);
+  return vec4(col, a);
+}
+`,
+};
+
+const recursiveGrid: FxEffectSpec = {
+  id: "recursiveGrid",
+  label: "Recursive grid",
+  category: "generator",
+  description: "Infinitely zooming nested grid lines",
+  params: [
+    { key: "color", label: "Lines", type: "color", default: "#00e0ff" },
+    { key: "scale", label: "Scale", type: "number", min: 0.5, max: 6, step: 0.1, default: 1.5 },
+    { key: "thickness", label: "Thickness", type: "number", min: 0.1, max: 1, step: 0.01, default: 0.35 },
+    { key: "intensity", label: "Intensity", type: "number", min: 0, max: 2, step: 0.01, default: 0.9 },
+    { key: "speed", label: "Zoom", type: "number", min: -2, max: 2, step: 0.01, default: 0.4 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec2 p = uv - 0.5;
+  p.x *= uResolution.x / uResolution.y;
+  float z = fract(uTime * u_speed * 0.3);
+  vec3 col = vec3(0.0);
+  float alpha = 0.0;
+  for (int i = 0; i < 6; i++) {
+    float lv = float(i) - z;
+    float s = exp2(lv) * u_scale;
+    vec2 g = abs(fract(p * s + 0.5) - 0.5);
+    float line = 1.0 - smoothstep(0.0, u_thickness * 0.06, min(g.x, g.y));
+    float fade = sin(3.1415926 * clamp((lv + 1.0) / 6.0, 0.0, 1.0));
+    col += u_color * line * fade * u_intensity * 0.6;
+    alpha = max(alpha, line * fade);
+  }
+  return vec4(col, clamp(alpha * u_intensity, 0.0, 1.0));
+}
+`,
+};
+
+const metaballs: FxEffectSpec = {
+  id: "metaballs",
+  label: "Metaballs",
+  category: "generator",
+  description: "Gooey blobs — one follows the mouse",
+  params: [
+    { key: "colorA", label: "Core", type: "color", default: "#ff3ea5" },
+    { key: "colorB", label: "Edge", type: "color", default: "#b14cff" },
+    { key: "size", label: "Size", type: "number", min: 0.2, max: 3, step: 0.01, default: 1 },
+    { key: "soft", label: "Softness", type: "number", min: 0, max: 1, step: 0.01, default: 0.25 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 0.6 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  float asp = uResolution.x / uResolution.y;
+  float f = 0.0;
+  for (int i = 0; i < 6; i++) {
+    float fi = float(i);
+    vec2 c = i == 5
+      ? uMouse
+      : 0.5 + 0.36 * vec2(
+          sin(uTime * u_speed * (0.4 + fi * 0.11) + fi * 2.4),
+          cos(uTime * u_speed * (0.5 + fi * 0.09) + fi * 1.7)
+        );
+    vec2 d = uv - c;
+    d.x *= asp;
+    f += u_size * 0.004 / max(dot(d, d), 0.0001);
+  }
+  float m = smoothstep(1.0, 1.0 + u_soft + 0.02, f);
+  vec3 col = mix(u_colorB, u_colorA, clamp(f * 0.3, 0.0, 1.0));
+  return vec4(col, m);
+}
+`,
+};
+
+const sdfShape: FxEffectSpec = {
+  id: "sdfShape",
+  label: "3D shape",
+  category: "generator",
+  description: "Raymarched sphere / box / torus with noisy surface",
+  params: [
+    { key: "shape", label: "Shape", type: "select", options: [{ value: 0, label: "Sphere" }, { value: 1, label: "Box" }, { value: 2, label: "Torus" }], default: 0 },
+    { key: "colorA", label: "Surface", type: "color", default: "#00e0ff" },
+    { key: "colorB", label: "Rim", type: "color", default: "#ff3ea5" },
+    { key: "distort", label: "Distort", type: "number", min: 0, max: 1, step: 0.01, default: 0.15 },
+    { key: "zoom", label: "Size", type: "number", min: 0.4, max: 2.5, step: 0.01, default: 1 },
+    { key: "speed", label: "Spin", type: "number", min: 0, max: 2, step: 0.01, default: 0.4 },
+  ],
+  frag: `
+float fxSdMap(vec3 p) {
+  float t = uTime * u_speed;
+  float cy = cos(t), sy = sin(t);
+  p.xz = mat2(cy, -sy, sy, cy) * p.xz;
+  p.yz = mat2(0.9272, -0.3746, 0.3746, 0.9272) * p.yz;
+  float d;
+  if (u_shape < 0.5) {
+    d = length(p) - 0.62;
+  } else if (u_shape < 1.5) {
+    vec3 q = abs(p) - vec3(0.46);
+    d = length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+  } else {
+    vec2 q = vec2(length(p.xz) - 0.5, p.y);
+    d = length(q) - 0.2;
+  }
+  d += (fxFbm(p.xy * 3.0 + p.z * 2.0 + uTime * u_speed * 0.6) - 0.5) * u_distort * 0.35;
+  return d;
+}
+vec4 fxMain(vec2 uv) {
+  vec2 p = (uv - 0.5) * 2.0;
+  p.x *= uResolution.x / uResolution.y;
+  vec3 ro = vec3(0.0, 0.0, -2.2 / u_zoom);
+  vec3 rd = normalize(vec3(p, 1.6));
+  float t = 0.0;
+  float d = 1e9;
+  for (int i = 0; i < 48; i++) {
+    d = fxSdMap(ro + rd * t);
+    if (d < 0.002 || t > 6.0) break;
+    t += d * 0.85;
+  }
+  if (d >= 0.002) return vec4(0.0);
+  vec3 pos = ro + rd * t;
+  vec2 e = vec2(0.004, 0.0);
+  vec3 n = normalize(vec3(
+    fxSdMap(pos + e.xyy) - fxSdMap(pos - e.xyy),
+    fxSdMap(pos + e.yxy) - fxSdMap(pos - e.yxy),
+    fxSdMap(pos + e.yyx) - fxSdMap(pos - e.yyx)
+  ));
+  float diff = clamp(dot(n, normalize(vec3(0.6, 0.8, -0.5))), 0.0, 1.0);
+  float rim = pow(1.0 - clamp(dot(n, -rd), 0.0, 1.0), 2.5);
+  vec3 col = u_colorA * (0.25 + diff * 0.85) + u_colorB * rim * 1.2;
+  return vec4(col, 1.0);
+}
+`,
+};
+
+const caustics: FxEffectSpec = {
+  id: "caustics",
+  label: "Caustics",
+  category: "generator",
+  description: "Underwater light patterns",
+  params: [
+    { key: "colorA", label: "Light", type: "color", default: "#00e0ff" },
+    { key: "colorB", label: "Water", type: "color", default: "#03202e" },
+    { key: "scale", label: "Scale", type: "number", min: 0.5, max: 6, step: 0.1, default: 2 },
+    { key: "intensity", label: "Intensity", type: "number", min: 0, max: 3, step: 0.01, default: 1.2 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 0.5 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec2 p = uv * u_scale * 4.0;
+  p.x *= uResolution.x / uResolution.y;
+  float c = 0.0;
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    vec2 q = p + vec2(
+      fxFbm(p * 0.8 + uTime * u_speed * 0.30 + fi * 3.1),
+      fxFbm(p * 0.8 + vec2(3.1, 7.7) - uTime * u_speed * 0.24 + fi * 1.7)
+    ) * 1.6;
+    float n = fxNoise2(q);
+    c += pow(n, 4.0);
+  }
+  vec3 col = u_colorB + u_colorA * c * u_intensity * 0.9;
+  return vec4(col, 1.0);
+}
+`,
+};
+
 export const FX_EFFECTS: FxEffectSpec[] = [
   gradient,
+  aurora,
+  nebula,
+  plasma,
+  beam,
+  wisps,
+  starfield,
+  recursiveGrid,
+  metaballs,
+  sdfShape,
+  caustics,
   srcShape,
   srcText,
   srcImage,
