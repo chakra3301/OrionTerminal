@@ -880,6 +880,213 @@ vec4 fxMain(vec2 uv) {
 `,
 };
 
+// ── Mouse effects — uMouse + uMouseSpeed driven ─────────────────────
+
+const mouseGlow: FxEffectSpec = {
+  id: "mouseGlow",
+  label: "Cursor glow",
+  category: "generator",
+  description: "A light that follows the cursor — flares when you move fast",
+  params: [
+    { key: "color", label: "Color", type: "color", default: "#00e0ff" },
+    { key: "size", label: "Size", type: "number", min: 0.05, max: 1.5, step: 0.01, default: 0.35 },
+    { key: "intensity", label: "Intensity", type: "number", min: 0, max: 3, step: 0.01, default: 1 },
+    { key: "reactive", label: "Speed flare", type: "number", min: 0, max: 1, step: 0.01, default: 0.6 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec2 p = uv - uMouse;
+  p.x *= uResolution.x / uResolution.y;
+  float d = length(p);
+  float core = exp(-d * d / (u_size * u_size * 0.02));
+  float halo = exp(-d / (u_size * 0.35));
+  float boost = 1.0 + uMouseSpeed * u_reactive * 2.5;
+  vec3 col = u_color * (core + halo * 0.4) * u_intensity * boost;
+  return vec4(col, clamp(core + halo * 0.5, 0.0, 1.0));
+}
+`,
+};
+
+const spotlight: FxEffectSpec = {
+  id: "spotlight",
+  label: "Spotlight",
+  category: "effect",
+  description: "Darken everything except a circle at the cursor",
+  params: [
+    { key: "radius", label: "Radius", type: "number", min: 0.05, max: 1, step: 0.005, default: 0.3 },
+    { key: "softness", label: "Softness", type: "number", min: 0.01, max: 0.8, step: 0.01, default: 0.2 },
+    { key: "dim", label: "Darkness", type: "number", min: 0, max: 1, step: 0.01, default: 0.85 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec2 p = uv - uMouse;
+  p.x *= uResolution.x / uResolution.y;
+  float lit = smoothstep(u_radius, u_radius - u_softness - 0.001, length(p));
+  vec3 col = texture(uTex, uv).rgb;
+  return vec4(col * mix(1.0 - u_dim, 1.0, lit), 1.0);
+}
+`,
+};
+
+const lens: FxEffectSpec = {
+  id: "lens",
+  label: "Lens",
+  category: "effect",
+  description: "Magnifying glass at the cursor, with chromatic fringe",
+  params: [
+    { key: "radius", label: "Radius", type: "number", min: 0.05, max: 0.8, step: 0.005, default: 0.25 },
+    { key: "strength", label: "Magnify", type: "number", min: -1, max: 1, step: 0.01, default: 0.5 },
+    { key: "fringe", label: "Fringe", type: "number", min: 0, max: 1, step: 0.01, default: 0.3 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  float asp = uResolution.x / uResolution.y;
+  vec2 p = uv - uMouse;
+  p.x *= asp;
+  float d = length(p);
+  float k = smoothstep(u_radius, 0.0, d) * u_strength * 0.6;
+  vec2 q = uv - (uv - uMouse) * k;
+  float ca = k * u_fringe * 0.03;
+  vec2 dir = d > 0.0001 ? (uv - uMouse) / max(d, 0.0001) : vec2(0.0);
+  vec3 col = vec3(
+    texture(uTex, q + dir * ca).r,
+    texture(uTex, q).g,
+    texture(uTex, q - dir * ca).b
+  );
+  float rim = smoothstep(u_radius * 0.85, u_radius, d) * (1.0 - smoothstep(u_radius, u_radius * 1.06, d));
+  col *= 1.0 - rim * 0.3;
+  return vec4(col, 1.0);
+}
+`,
+};
+
+const repel: FxEffectSpec = {
+  id: "repel",
+  label: "Repel",
+  category: "effect",
+  description: "Pixels flee the cursor — negative strength attracts",
+  params: [
+    { key: "radius", label: "Radius", type: "number", min: 0.05, max: 1, step: 0.005, default: 0.3 },
+    { key: "strength", label: "Strength", type: "number", min: -1, max: 1, step: 0.01, default: 0.5 },
+    { key: "reactive", label: "Speed boost", type: "number", min: 0, max: 1, step: 0.01, default: 0.4 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  float asp = uResolution.x / uResolution.y;
+  vec2 p = uv - uMouse;
+  p.x *= asp;
+  float d = length(p);
+  float amp = u_strength * (1.0 + uMouseSpeed * u_reactive * 2.0);
+  float f = amp * 0.15 * exp(-d * d / (u_radius * u_radius * 0.5));
+  vec2 dir = d > 0.0001 ? p / d : vec2(0.0);
+  dir.x /= asp;
+  return texture(uTex, clamp(uv - dir * f, 0.0, 1.0));
+}
+`,
+};
+
+const mouseLiquid: FxEffectSpec = {
+  id: "mouseLiquid",
+  label: "Liquid cursor",
+  category: "effect",
+  description: "The image melts where the cursor moves — speed-reactive",
+  params: [
+    { key: "radius", label: "Radius", type: "number", min: 0.05, max: 1, step: 0.005, default: 0.35 },
+    { key: "scale", label: "Detail", type: "number", min: 1, max: 16, step: 0.1, default: 6 },
+    { key: "strength", label: "Strength", type: "number", min: 0, max: 1, step: 0.01, default: 0.5 },
+    { key: "reactive", label: "Speed drive", type: "number", min: 0, max: 1, step: 0.01, default: 0.7 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  vec2 p = uv - uMouse;
+  p.x *= uResolution.x / uResolution.y;
+  float prox = exp(-dot(p, p) / (u_radius * u_radius * 0.6));
+  float amp = u_strength * prox * (0.25 + uMouseSpeed * u_reactive * 2.5);
+  vec2 n = vec2(
+    fxFbmS(uv * u_scale + uTime * 0.7),
+    fxFbmS(uv * u_scale + 7.3 - uTime * 0.6)
+  ) - 0.5;
+  return texture(uTex, clamp(uv + n * amp * 0.3, 0.0, 1.0));
+}
+`,
+};
+
+const vhs: FxEffectSpec = {
+  id: "vhs",
+  label: "VHS glitch",
+  category: "effect",
+  description: "Tape damage — line jitter, band tears, chroma bleed, static",
+  params: [
+    { key: "glitch", label: "Glitch", type: "number", min: 0, max: 1, step: 0.01, default: 0.4 },
+    { key: "noise", label: "Static", type: "number", min: 0, max: 1, step: 0.01, default: 0.5 },
+    { key: "speed", label: "Speed", type: "number", min: 0, max: 2, step: 0.01, default: 1 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  float t = uTime * u_speed;
+  float line = floor(uv.y * uResolution.y / 3.0);
+  float band = step(0.985 - u_glitch * 0.05, fxHash21(vec2(floor(uv.y * 16.0), floor(t * 8.0))));
+  float jitter = (fxHash21(vec2(line, floor(t * 24.0))) - 0.5) * 0.012 * u_glitch + band * 0.06 * u_glitch;
+  vec2 q = vec2(uv.x + jitter, uv.y);
+  float ca = 0.002 * (1.0 + u_glitch * 3.0);
+  vec3 col = vec3(
+    texture(uTex, q + vec2(ca, 0.0)).r,
+    texture(uTex, q).g,
+    texture(uTex, q - vec2(ca, 0.0)).b
+  );
+  col *= 0.92 + 0.08 * sin(uv.y * uResolution.y * 3.1415926);
+  col += (fxHash21(uv * uResolution + fract(t) * 100.0) - 0.5) * 0.12 * u_noise;
+  col += band * 0.08;
+  return vec4(col, 1.0);
+}
+`,
+};
+
+const shimmer: FxEffectSpec = {
+  id: "shimmer",
+  label: "Heat shimmer",
+  category: "effect",
+  description: "Rising heat-haze distortion",
+  params: [
+    { key: "scale", label: "Scale", type: "number", min: 0.5, max: 6, step: 0.1, default: 2 },
+    { key: "strength", label: "Strength", type: "number", min: 0, max: 1, step: 0.01, default: 0.35 },
+    { key: "speed", label: "Rise", type: "number", min: 0, max: 3, step: 0.01, default: 1 },
+  ],
+  frag: `
+vec4 fxMain(vec2 uv) {
+  float n = fxFbmS(vec2(uv.x * u_scale * 6.0, uv.y * u_scale * 3.0 - uTime * u_speed * 1.2));
+  float m = (n - 0.5) * u_strength * 0.02;
+  return texture(uTex, clamp(uv + vec2(m, m * 0.4), 0.0, 1.0));
+}
+`,
+};
+
+const edgeGlow: FxEffectSpec = {
+  id: "edgeGlow",
+  label: "Neon edges",
+  category: "effect",
+  description: "Glowing outline of everything below (sobel)",
+  params: [
+    { key: "color", label: "Glow", type: "color", default: "#39ff88" },
+    { key: "gain", label: "Gain", type: "number", min: 1, max: 20, step: 0.1, default: 6 },
+    { key: "thickness", label: "Thickness", type: "number", min: 0.5, max: 4, step: 0.1, default: 1 },
+    { key: "keep", label: "Keep image", type: "number", min: 0, max: 1, step: 0.01, default: 0.35 },
+  ],
+  frag: `
+float fxLumAt(vec2 q) {
+  return dot(texture(uTex, q).rgb, vec3(0.299, 0.587, 0.114));
+}
+vec4 fxMain(vec2 uv) {
+  vec2 px = u_thickness / uResolution;
+  float gx = fxLumAt(uv + vec2(px.x, 0.0)) - fxLumAt(uv - vec2(px.x, 0.0));
+  float gy = fxLumAt(uv + vec2(0.0, px.y)) - fxLumAt(uv - vec2(0.0, px.y));
+  float e = clamp(length(vec2(gx, gy)) * u_gain, 0.0, 1.0);
+  vec3 col = texture(uTex, uv).rgb * u_keep + u_color * e;
+  return vec4(col, 1.0);
+}
+`,
+};
+
 const depthParallax: FxEffectSpec = {
   id: "depthParallax",
   label: "Depth parallax",
@@ -959,6 +1166,14 @@ export const FX_EFFECTS: FxEffectSpec[] = [
   gradientMap,
   mirror,
   posterize,
+  mouseGlow,
+  spotlight,
+  lens,
+  repel,
+  mouseLiquid,
+  vhs,
+  shimmer,
+  edgeGlow,
   depthParallax,
   custom,
 ];

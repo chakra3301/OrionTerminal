@@ -31,6 +31,8 @@ export type FxFrame = {
   time: number;
   /** Smoothed pointer in uv space (0..1, y up). */
   mouse: [number, number];
+  /** Normalized pointer speed 0..1 (0 when absent, e.g. snapshots). */
+  mouseSpeed?: number;
 };
 
 type ProgramEntry = {
@@ -338,6 +340,7 @@ export function createCompositor(
       gl!.uniform2f(loc(entry, "uResolution"), w, h);
       gl!.uniform1f(loc(entry, "uTime"), frame.time);
       gl!.uniform2f(loc(entry, "uMouse"), frame.mouse[0], frame.mouse[1]);
+      gl!.uniform1f(loc(entry, "uMouseSpeed"), frame.mouseSpeed ?? 0);
       gl!.uniform1f(loc(entry, "uOpacity"), Math.min(1, Math.max(0, layer.opacity)));
       gl!.uniform1f(loc(entry, "uBlend"), blendIndex(layer.blend));
       const over = overrides?.get(layer.id);

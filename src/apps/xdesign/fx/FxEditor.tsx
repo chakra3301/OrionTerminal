@@ -19,6 +19,9 @@ import {
   Diamond,
   Download,
   Activity,
+  Copy,
+  Dices,
+  Sparkles,
 } from "lucide-react";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { ipc } from "@/lib/ipc";
@@ -37,6 +40,8 @@ import { useXDesign } from "@/apps/xdesign/store";
 import { useXDProjects } from "@/apps/xdesign/projectsStore";
 import { FxShaderModal } from "./FxShaderModal";
 import { FxEffectBrowser } from "./FxEffectBrowser";
+import { FxAssistPanel } from "./FxAssistPanel";
+import { useFxAssist } from "./fxAssist";
 import { FX_CUSTOM_ID, customCodeOf } from "./fxModel";
 import { useFxStore } from "./fxStore";
 import { createCompositor, type FxCompositor } from "./compositor";
@@ -257,7 +262,7 @@ function FxViewport() {
       const t0 = performance.now();
       const passes = compositor.render(
         scene,
-        { time: sceneTime, mouse },
+        { time: sceneTime, mouse, mouseSpeed },
         pw,
         ph,
         overrides,
@@ -529,6 +534,7 @@ function FxToolbar() {
   const playing = useFxStore((s) => s.playing);
   const patchScene = useFxStore((s) => s.patchScene);
   const showPerf = useFxStore((s) => s.showPerf);
+  const assistOpen = useFxAssist((s) => s.open);
 
   const dim = (v: string, fallback: number) => {
     const n = Math.round(Number(v));
@@ -597,6 +603,14 @@ function FxToolbar() {
         <option value="30">FPS 30</option>
       </select>
       <span className="xd-fx-toolbar-spacer" />
+      <button
+        type="button"
+        className={`xd-fx-assist-toggle${assistOpen ? " active" : ""}`}
+        onClick={() => useFxAssist.getState().setOpen(!assistOpen)}
+        title="FX Assist — describe an effect, it builds it"
+      >
+        <Sparkles size={13} /> Assist
+      </button>
       <button
         type="button"
         className={`xd-fx-play${showPerf ? " active" : ""}`}
@@ -683,6 +697,17 @@ function LayerRow({ layer, isTop, isBottom }: { layer: FxLayer; isTop: boolean; 
         </span>
       )}
       <span className="xd-fx-layer-actions">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            useFxStore.getState().duplicateLayer(layer.id);
+          }}
+          aria-label="Duplicate layer"
+          title="Duplicate"
+        >
+          <Copy size={11} />
+        </button>
         <button
           type="button"
           disabled={isTop}
@@ -892,7 +917,12 @@ function ParamControl({
   const num = typeof value === "number" ? value : spec.default;
   return (
     <label className="xd-fx-field">
-      <span>{spec.label}</span>
+      <span
+        onDoubleClick={() => useFxStore.getState().resetParam(layerId, spec.key)}
+        title="Double-click to reset"
+      >
+        {spec.label}
+      </span>
       <span className="xd-fx-slider-row">
         <input
           type="range"
@@ -1013,6 +1043,15 @@ function FxInspector() {
         <>
           <div className="xd-fx-panel-head">
             <span>{spec.label}</span>
+            <button
+              type="button"
+              className="xd-fx-add"
+              onClick={() => useFxStore.getState().randomizeLayer(layer.id)}
+              title="Randomize parameters"
+              aria-label="Randomize parameters"
+            >
+              <Dices size={13} />
+            </button>
           </div>
           <div className="xd-fx-fields">
             <label className="xd-fx-field">
@@ -1174,6 +1213,7 @@ export function FxEditor() {
         <div className="xd-fx-stage-body">
           <FxViewport />
           {showPerf && <PerfHud />}
+          <FxAssistPanel />
         </div>
         <FxTimelineBar />
       </div>

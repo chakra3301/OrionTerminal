@@ -39,6 +39,11 @@ type FxState = {
 
   addLayer: (effectId: string) => void;
   removeLayer: (id: string) => void;
+  duplicateLayer: (id: string) => void;
+  /** Re-roll every number/color/select param within its legal range
+   * (text/image/code untouched) — the exploration dice. */
+  randomizeLayer: (id: string) => void;
+  resetParam: (id: string, key: string) => void;
   patchLayer: (id: string, patch: LayerPatch) => void;
   setParam: (id: string, key: string, value: FxParamValue) => void;
   /** null removes the binding for that param. */
@@ -58,6 +63,18 @@ type FxState = {
   patchScene: (patch: ScenePatch) => void;
   hydrateFx: (doc: FxDoc) => void;
 };
+
+function hslToHex(h: number, s: number, l: number): string {
+  const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const c = l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(255 * c)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
 
 /** Unique layer name within the scene: "Gradient", "Gradient 2", … */
 function uniqueLayerName(layers: FxLayer[], base: string): string {
@@ -136,6 +153,72 @@ export const useFxStore = create<FxState>((set, get) => ({
       selectedLayerId: layer.id,
     }));
   },
+
+  duplicateLayer: (id) =>
+    set((s) => {
+      const i = s.scene.layers.findIndex((l) => l.id === id);
+      const src = s.scene.layers[i];
+      if (!src) return s;
+      const copy: FxLayer = {
+        ...src,
+        id: ulid(),
+        name: uniqueLayerName(s.scene.layers, src.name),
+        params: { ...src.params },
+        bindings: src.bindings ? { ...src.bindings } : undefined,
+        keyframes: src.keyframes
+          ? Object.fromEntries(
+              Object.entries(src.keyframes).map(([k, v]) => [k, v.map((kf) => ({ ...kf }))]),
+            )
+          : undefined,
+      };
+      const layers = [...s.scene.layers];
+      layers.splice(i + 1, 0, copy);
+      return { scene: { ...s.scene, layers }, selectedLayerId: copy.id };
+    }),
+
+  randomizeLayer: (id) =>
+    set((s) => ({
+      scene: {
+        ...s.scene,
+        layers: s.scene.layers.map((l) => {
+          if (l.id !== id) return l;
+          const spec = fxEffect(l.effectId);
+          if (!spec) return l;
+          const params = { ...l.params };
+          for (const p of spec.params) {
+            if (p.hidden) continue;
+            if (p.type === "number") {
+              const v = p.min + Math.random() * (p.max - p.min);
+              const snapped = Math.round(v / p.step) * p.step;
+              params[p.key] = Number(snapped.toFixed(4));
+            } else if (p.type === "color") {
+              const h = Math.floor(Math.random() * 360);
+              const sMax = 60 + Math.random() * 40;
+              const lit = 35 + Math.random() * 40;
+              params[p.key] = hslToHex(h, sMax, lit);
+            } else if (p.type === "select") {
+              const o = p.options[Math.floor(Math.random() * p.options.length)];
+              if (o) params[p.key] = o.value;
+            }
+          }
+          return { ...l, params };
+        }),
+      },
+    })),
+
+  resetParam: (id, key) =>
+    set((s) => ({
+      scene: {
+        ...s.scene,
+        layers: s.scene.layers.map((l) => {
+          if (l.id !== id) return l;
+          const spec = fxEffect(l.effectId);
+          const p = spec?.params.find((q) => q.key === key);
+          if (!p) return l;
+          return { ...l, params: { ...l.params, [key]: p.default } };
+        }),
+      },
+    })),
 
   removeLayer: (id) =>
     set((s) => ({

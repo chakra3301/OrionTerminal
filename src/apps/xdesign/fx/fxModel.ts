@@ -313,6 +313,7 @@ uniform float uHasMask;
 uniform vec2 uResolution;
 uniform float uTime;
 uniform vec2 uMouse;
+uniform float uMouseSpeed;
 uniform float uOpacity;
 uniform float uBlend;
 ${decls}

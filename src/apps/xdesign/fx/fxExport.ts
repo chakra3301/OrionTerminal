@@ -192,6 +192,7 @@ const EMBED_PLAYER = String.raw`
       gl.uniform2f(gl.getUniformLocation(prog,"uResolution"),W,H);
       gl.uniform1f(gl.getUniformLocation(prog,"uTime"),T);
       gl.uniform2f(gl.getUniformLocation(prog,"uMouse"),mouse[0],mouse[1]);
+      gl.uniform1f(gl.getUniformLocation(prog,"uMouseSpeed"),speed);
       gl.uniform1f(gl.getUniformLocation(prog,"uOpacity"),l.opacity);
       gl.uniform1f(gl.getUniformLocation(prog,"uBlend"),Math.max(0,BLENDS.indexOf(l.blend||"normal")));
       for(var j=0;j<spec.params.length;j++){
