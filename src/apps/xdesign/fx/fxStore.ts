@@ -36,6 +36,8 @@ type FxState = {
   scrubTime: number | null;
   /** Perf HUD visibility. Transient. */
   showPerf: boolean;
+  /** Mic reactivity on. Transient. */
+  audioOn: boolean;
 
   addLayer: (effectId: string) => void;
   removeLayer: (id: string) => void;
@@ -51,6 +53,7 @@ type FxState = {
   restart: () => void;
   setScrub: (t: number | null) => void;
   setShowPerf: (v: boolean) => void;
+  setAudioOn: (v: boolean) => void;
   /** Insert/replace a key for a param at normalized t (0..1). */
   addKeyframe: (id: string, key: string, kf: FxKeyframe) => void;
   /** Remove one key by index, or all keys for the param when index is -1. */
@@ -137,6 +140,7 @@ export const useFxStore = create<FxState>((set, get) => ({
   restartNonce: 0,
   scrubTime: null,
   showPerf: false,
+  audioOn: false,
 
   addLayer: (effectId) => {
     const spec = fxEffect(effectId);
@@ -266,6 +270,8 @@ export const useFxStore = create<FxState>((set, get) => ({
   setScrub: (t) => set({ scrubTime: t }),
 
   setShowPerf: (v) => set({ showPerf: v }),
+
+  setAudioOn: (v) => set({ audioOn: v }),
 
   addKeyframe: (id, key, kf) =>
     set((s) => ({

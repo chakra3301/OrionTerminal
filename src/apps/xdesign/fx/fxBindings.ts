@@ -18,6 +18,8 @@ export type FxInputs = {
   hover: number;
   /** Eased 0→1 ramp after the scene (re)starts. */
   appear: number;
+  /** Live microphone loudness 0..1 (0 when mic off). */
+  audio: number;
 };
 
 export type FxOverrides = Map<string, Record<string, number>>;
@@ -84,4 +86,5 @@ export const FX_BIND_LABELS: Record<FxBinding["source"], string> = {
   mouseSpeed: "Mouse speed",
   hover: "Hover",
   appear: "Appear",
+  audio: "Audio (mic)",
 };

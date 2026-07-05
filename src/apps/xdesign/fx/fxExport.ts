@@ -142,6 +142,10 @@ const EMBED_PLAYER = String.raw`
   canvas.addEventListener("pointermove", function(e){var r=canvas.getBoundingClientRect();mt[0]=(e.clientX-r.left)/r.width;mt[1]=1-(e.clientY-r.top)/r.height;});
   canvas.addEventListener("pointerenter", function(){hover=1;});
   canvas.addEventListener("pointerleave", function(){hover=0;});
+  // Audio reactivity: click to grant the mic, then uAudio pulses to sound.
+  var audioLevel=0, an=null, ad=null;
+  function startMic(){ if(an) return; try{ navigator.mediaDevices.getUserMedia({audio:true}).then(function(s){ var AC=window.AudioContext||window.webkitAudioContext; var c=new AC(); var sr=c.createMediaStreamSource(s); an=c.createAnalyser(); an.fftSize=256; an.smoothingTimeConstant=0.6; sr.connect(an); ad=new Uint8Array(an.frequencyBinCount); }); }catch(e){} }
+  canvas.addEventListener("click", startMic);
   var visible = true;
   if (typeof IntersectionObserver !== "undefined") new IntersectionObserver(function(en){visible=en[0]?en[0].isIntersecting:true;}).observe(canvas);
   function evalKfs(kfs, t){
@@ -162,8 +166,9 @@ const EMBED_PLAYER = String.raw`
     mouse[0]+=(mt[0]-mouse[0])*k; mouse[1]+=(mt[1]-mouse[1])*k;
     if(dt>0){var raw=Math.min(1,Math.hypot(mt[0]-mp[0],mt[1]-mp[1])/dt/2);speed=Math.max(raw,speed*Math.exp(-dt*4));}
     mp[0]=mt[0]; mp[1]=mt[1];
+    if(an&&ad){an.getByteFrequencyData(ad);var asum=0;for(var qi=0;qi<ad.length;qi++)asum+=ad[qi];var aav=asum/ad.length/255;audioLevel+=(Math.min(1,aav*1.9)-audioLevel)*0.3;}
     var ac=Math.min(1,T/1.2); var appear=1-Math.pow(1-ac,3);
-    var inputs={mouseX:mouse[0],mouseY:mouse[1],mouseSpeed:speed,hover:hover,appear:appear};
+    var inputs={mouseX:mouse[0],mouseY:mouse[1],mouseSpeed:speed,hover:hover,appear:appear,audio:audioLevel};
     var dur=Math.max(0.1,scene.duration||6);
     var t01=((T%dur)+dur)%dur/dur;
     gl.bindVertexArray(vao);
@@ -193,6 +198,7 @@ const EMBED_PLAYER = String.raw`
       gl.uniform1f(gl.getUniformLocation(prog,"uTime"),T);
       gl.uniform2f(gl.getUniformLocation(prog,"uMouse"),mouse[0],mouse[1]);
       gl.uniform1f(gl.getUniformLocation(prog,"uMouseSpeed"),speed);
+      gl.uniform1f(gl.getUniformLocation(prog,"uAudio"),audioLevel);
       gl.uniform1f(gl.getUniformLocation(prog,"uOpacity"),l.opacity);
       gl.uniform1f(gl.getUniformLocation(prog,"uBlend"),Math.max(0,BLENDS.indexOf(l.blend||"normal")));
       for(var j=0;j<spec.params.length;j++){

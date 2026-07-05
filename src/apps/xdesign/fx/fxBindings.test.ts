@@ -8,6 +8,7 @@ const INPUTS: FxInputs = {
   mouseSpeed: 0,
   hover: 0,
   appear: 0,
+  audio: 0,
 };
 
 function layerWith(bindings: FxLayer["bindings"], params = {}): FxLayer {

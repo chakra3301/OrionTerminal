@@ -82,6 +82,7 @@ export const FX_BIND_SOURCES = [
   "mouseSpeed",
   "hover",
   "appear",
+  "audio",
 ] as const;
 export type FxBindSource = (typeof FX_BIND_SOURCES)[number];
 
@@ -314,6 +315,7 @@ uniform vec2 uResolution;
 uniform float uTime;
 uniform vec2 uMouse;
 uniform float uMouseSpeed;
+uniform float uAudio;
 uniform float uOpacity;
 uniform float uBlend;
 ${decls}

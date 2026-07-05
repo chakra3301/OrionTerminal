@@ -33,6 +33,8 @@ export type FxFrame = {
   mouse: [number, number];
   /** Normalized pointer speed 0..1 (0 when absent, e.g. snapshots). */
   mouseSpeed?: number;
+  /** Live mic loudness 0..1 (0 when mic off / snapshots). */
+  audio?: number;
 };
 
 type ProgramEntry = {
@@ -341,6 +343,7 @@ export function createCompositor(
       gl!.uniform1f(loc(entry, "uTime"), frame.time);
       gl!.uniform2f(loc(entry, "uMouse"), frame.mouse[0], frame.mouse[1]);
       gl!.uniform1f(loc(entry, "uMouseSpeed"), frame.mouseSpeed ?? 0);
+      gl!.uniform1f(loc(entry, "uAudio"), frame.audio ?? 0);
       gl!.uniform1f(loc(entry, "uOpacity"), Math.min(1, Math.max(0, layer.opacity)));
       gl!.uniform1f(loc(entry, "uBlend"), blendIndex(layer.blend));
       const over = overrides?.get(layer.id);

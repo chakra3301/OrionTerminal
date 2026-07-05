@@ -163,6 +163,34 @@ export const FX_PRESETS: FxPreset[] = [
     ],
   },
   {
+    id: "soundbloom",
+    name: "Sound bloom",
+    description: "Turn on the mic — nebula & glow breathe with the music",
+    background: "#03010a",
+    layers: [
+      {
+        effect: "nebula",
+        name: "Reactive gas",
+        params: { colorA: "#03010a", colorB: "#7a2fbf", colorC: "#00e0ff", scale: 2.6, speed: 0.3 },
+        bindings: {
+          density: { source: "audio", amount: 0.7, smooth: 0.15 },
+          warp: { source: "audio", amount: 0.5, smooth: 0.2 },
+        },
+      },
+      {
+        effect: "mouseGlow",
+        blend: "screen",
+        params: { color: "#00e0ff", size: 0.3 },
+        bindings: {
+          size: { source: "audio", amount: 0.8, smooth: 0.1 },
+          intensity: { source: "audio", amount: 0.9, smooth: 0.1 },
+        },
+      },
+      { effect: "bloom", params: { threshold: 0.5, intensity: 1 } },
+      { effect: "vignette", params: { amount: 0.55 } },
+    ],
+  },
+  {
     id: "hearth",
     name: "Hearth",
     description: "Fire, embers, warm CRT glass",

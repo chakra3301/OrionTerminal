@@ -22,6 +22,8 @@ import {
   Copy,
   Dices,
   Sparkles,
+  Mic,
+  MicOff,
 } from "lucide-react";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { ipc } from "@/lib/ipc";
@@ -42,6 +44,8 @@ import { FxShaderModal } from "./FxShaderModal";
 import { FxEffectBrowser } from "./FxEffectBrowser";
 import { FxAssistPanel } from "./FxAssistPanel";
 import { useFxAssist } from "./fxAssist";
+import { sampleAudio, startAudio, stopAudio } from "./fxAudio";
+import { toast as fxToast } from "@/store/toastStore";
 import { FX_CUSTOM_ID, customCodeOf } from "./fxModel";
 import { useFxStore } from "./fxStore";
 import { createCompositor, type FxCompositor } from "./compositor";
@@ -135,6 +139,7 @@ function FxViewport() {
     let visible = true;
     let hover = 0;
     let mouseSpeed = 0;
+    let audio = 0;
     let lastRestartNonce = useFxStore.getState().restartNonce;
     const bindings = new FxBindingRuntime();
     const mouse: [number, number] = [0.5, 0.5];
@@ -240,6 +245,7 @@ function FxViewport() {
       }
       mousePrev[0] = mouseTarget[0];
       mousePrev[1] = mouseTarget[1];
+      audio = sampleAudio();
 
       const timeline = evalSceneKeyframes(scene, sceneTime);
       const overrides = bindings.tick(
@@ -250,6 +256,7 @@ function FxViewport() {
           mouseSpeed,
           hover,
           appear: easeOutCubic(sceneTime / 1.2),
+          audio,
         },
         dt,
         timeline,
@@ -262,7 +269,7 @@ function FxViewport() {
       const t0 = performance.now();
       const passes = compositor.render(
         scene,
-        { time: sceneTime, mouse, mouseSpeed },
+        { time: sceneTime, mouse, mouseSpeed, audio },
         pw,
         ph,
         overrides,
@@ -534,7 +541,24 @@ function FxToolbar() {
   const playing = useFxStore((s) => s.playing);
   const patchScene = useFxStore((s) => s.patchScene);
   const showPerf = useFxStore((s) => s.showPerf);
+  const audioOn = useFxStore((s) => s.audioOn);
   const assistOpen = useFxAssist((s) => s.open);
+
+  const toggleAudio = () => {
+    if (audioOn) {
+      stopAudio();
+      useFxStore.getState().setAudioOn(false);
+      return;
+    }
+    void startAudio().then((ok) => {
+      useFxStore.getState().setAudioOn(ok);
+      if (!ok) {
+        fxToast.error("Microphone unavailable", {
+          body: "Grant mic access to drive effects with sound.",
+        });
+      }
+    });
+  };
 
   const dim = (v: string, fallback: number) => {
     const n = Math.round(Number(v));
@@ -603,6 +627,15 @@ function FxToolbar() {
         <option value="30">FPS 30</option>
       </select>
       <span className="xd-fx-toolbar-spacer" />
+      <button
+        type="button"
+        className={`xd-fx-play${audioOn ? " active" : ""}`}
+        onClick={toggleAudio}
+        title={audioOn ? "Mic reactivity on" : "React to sound (mic)"}
+        aria-label="Toggle audio reactivity"
+      >
+        {audioOn ? <Mic size={13} /> : <MicOff size={13} />}
+      </button>
       <button
         type="button"
         className={`xd-fx-assist-toggle${assistOpen ? " active" : ""}`}

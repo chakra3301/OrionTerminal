@@ -109,6 +109,8 @@ describe("buildFragment", () => {
     expect(src).toContain("uniform sampler2D uTex;");
     expect(src).toContain("uniform float uOpacity;");
     expect(src).toContain("uniform float uBlend;");
+    expect(src).toContain("uniform float uMouseSpeed;");
+    expect(src).toContain("uniform float uAudio;");
     expect(src).toContain("float fxFbm(vec2 p)");
     expect(src).toContain("fxBlend(below.rgb");
   });

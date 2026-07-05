@@ -57,7 +57,7 @@ export const FX_TOOLS = [
   {
     name: "fx_add_custom_shader",
     description:
-      "Add a layer with YOUR OWN GLSL ES 3.00 body defining `vec4 fxMain(vec2 uv)`. Use for anything the registry can't do. Available: uTex (stack below), uTime, uMouse (0..1), uMouseSpeed (0..1), uResolution, sliders u_a..u_d (0..1), colors u_colorA/u_colorB, helpers fxHash21/fxNoise2/fxFbm/fxSimplex/fxFbmS/fxRidge/fxRotate2. NO #version/precision/main/uniform declarations. The shader is compiled immediately — fix and retry on error.",
+      "Add a layer with YOUR OWN GLSL ES 3.00 body defining `vec4 fxMain(vec2 uv)`. Use for anything the registry can't do. Available: uTex (stack below), uTime, uMouse (0..1), uMouseSpeed (0..1), uAudio (0..1 mic loudness), uResolution, sliders u_a..u_d (0..1), colors u_colorA/u_colorB, helpers fxHash21/fxNoise2/fxFbm/fxSimplex/fxFbmS/fxRidge/fxRotate2. NO #version/precision/main/uniform declarations. The shader is compiled immediately — fix and retry on error.",
     input_schema: obj(
       {
         name: { type: "string" },
@@ -174,7 +174,7 @@ ${catalog()}
 
 # Rules of craft
 - Compose: base generator(s) low, sources (srcShape/srcText/srcImage) in the middle, distortion/grade effects on top.
-- INTERACTIVITY IS THE POINT. Use fx_set_binding liberally (mouseX/mouseY/mouseSpeed/hover/appear), and prefer mouse effects (mouseGlow, repel, lens, mouseLiquid, spotlight) when the user wants cursor feel.
+- INTERACTIVITY IS THE POINT. Use fx_set_binding liberally (mouseX/mouseY/mouseSpeed/hover/appear/audio). Prefer mouse effects (mouseGlow, repel, lens, mouseLiquid, spotlight) for cursor feel; bind to audio when the user wants music/sound reactivity.
 - Use fx_add_custom_shader for anything the registry can't express — you have full GLSL. If it returns a compile error, FIX the code and call it again.
 - Blend modes matter: add/screen for light, multiply for shadow, overlay/softlight for grading.
 - Timeline: scene loops over its duration; keys at t=0 and t=1 with equal values loop seamlessly.
