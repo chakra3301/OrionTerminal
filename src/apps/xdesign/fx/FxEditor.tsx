@@ -45,6 +45,7 @@ import { FxEffectBrowser } from "./FxEffectBrowser";
 import { FxAssistPanel } from "./FxAssistPanel";
 import { useFxAssist } from "./fxAssist";
 import { sampleAudio, startAudio, stopAudio } from "./fxAudio";
+import { ensureVideo, drawVideoFrame, dropVideo, dropAllVideos } from "./fxVideo";
 import { toast as fxToast } from "@/store/toastStore";
 import { FX_CUSTOM_ID, customCodeOf } from "./fxModel";
 import { useFxStore } from "./fxStore";
@@ -156,7 +157,8 @@ function FxViewport() {
     const syncSources = (pw: number, ph: number) => {
       const { scene } = useFxStore.getState();
       for (const layer of scene.layers) {
-        if (!fxEffect(layer.effectId)?.source) continue;
+        // Video sources stream live (see syncVideos) — not key-cached.
+        if (!fxEffect(layer.effectId)?.source || layer.effectId === "srcVideo") continue;
         const key = sourceRasterKey(layer, pw, ph);
         if (rasterKeys.get(layer.id) === key) continue;
         rasterKeys.set(layer.id, key);
@@ -169,6 +171,30 @@ function FxViewport() {
       for (const id of [...rasterKeys.keys()]) {
         if (!scene.layers.some((l) => l.id === id)) {
           rasterKeys.delete(id);
+          compositor?.dropSource(id);
+        }
+      }
+    };
+
+    // Video sources: create/point the <video>, upload the current frame
+    // every tick, and prune elements for deleted layers.
+    const videoIds = new Set<string>();
+    const syncVideos = (pw: number, ph: number) => {
+      const { scene } = useFxStore.getState();
+      const live = new Set<string>();
+      for (const layer of scene.layers) {
+        if (layer.effectId !== "srcVideo") continue;
+        live.add(layer.id);
+        videoIds.add(layer.id);
+        ensureVideo(layer);
+        if (layer.hidden) continue;
+        const cnv = drawVideoFrame(layer, pw, ph);
+        if (cnv) compositor?.updateSource(layer.id, cnv);
+      }
+      for (const id of [...videoIds]) {
+        if (!live.has(id)) {
+          videoIds.delete(id);
+          dropVideo(id);
           compositor?.dropSource(id);
         }
       }
@@ -266,6 +292,7 @@ function FxViewport() {
       const pw = Math.round(scene.width * dpi);
       const ph = Math.round(scene.height * dpi);
       syncSources(pw, ph);
+      syncVideos(pw, ph);
       const t0 = performance.now();
       const passes = compositor.render(
         scene,
@@ -300,6 +327,7 @@ function FxViewport() {
       canvas.removeEventListener("pointerleave", onLeave);
       canvas.removeEventListener("webglcontextlost", onCtxLost);
       canvas.removeEventListener("webglcontextrestored", onCtxRestored);
+      dropAllVideos();
       compositor?.dispose();
     };
   }, []);
@@ -904,7 +932,8 @@ function ParamControl({
       </label>
     );
   }
-  if (spec.type === "image") {
+  if (spec.type === "image" || spec.type === "video") {
+    const isVideo = spec.type === "video";
     const file = typeof value === "string" ? value : "";
     const name = file ? file.split("/").pop() : null;
     return (
@@ -916,15 +945,15 @@ function ParamControl({
           onClick={() => {
             void openDialog({
               multiple: false,
-              filters: [
-                { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"] },
-              ],
+              filters: isVideo
+                ? [{ name: "Video", extensions: ["mp4", "mov", "webm", "m4v", "ogv"] }]
+                : [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"] }],
             }).then((picked) => {
               if (typeof picked === "string") set(picked);
             });
           }}
         >
-          {name ?? "Choose image…"}
+          {name ?? (isVideo ? "Choose video…" : "Choose image…")}
         </button>
       </label>
     );

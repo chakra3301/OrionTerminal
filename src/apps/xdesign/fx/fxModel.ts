@@ -28,6 +28,8 @@ export type FxParamSpec = (
   | { key: string; label: string; type: "text"; default: string }
   /** Image file path — drives rasterization, not a uniform. "" = none. */
   | { key: string; label: string; type: "image"; default: string }
+  /** Video file path — streamed to a live texture, not a uniform. */
+  | { key: string; label: string; type: "video"; default: string }
 ) & {
   /** Hidden from the generic inspector (e.g. custom-shader code, which has
    * its own Monaco modal). */

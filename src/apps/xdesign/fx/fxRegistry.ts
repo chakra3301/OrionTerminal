@@ -118,6 +118,20 @@ const srcImage: FxEffectSpec = {
   frag: SRC_FRAG,
 };
 
+const srcVideo: FxEffectSpec = {
+  id: "srcVideo",
+  label: "Video",
+  category: "source",
+  source: true,
+  description: "A video file, playing live — distort it, mask it, grade it",
+  params: [
+    { key: "file", label: "File", type: "video", default: "" },
+    { key: "scale", label: "Scale", type: "number", min: 0.05, max: 3, step: 0.01, default: 1 },
+    ...POSITION_PARAMS,
+  ],
+  frag: SRC_FRAG,
+};
+
 // ── Filter effects — transform the accumulated stack below ─────────────
 
 const ripple: FxEffectSpec = {
@@ -1464,6 +1478,7 @@ export const FX_EFFECTS: FxEffectSpec[] = [
   srcShape,
   srcText,
   srcImage,
+  srcVideo,
   noiseDistort,
   ripple,
   wave,

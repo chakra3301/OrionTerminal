@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { X, ImageIcon } from "lucide-react";
+import { X, ImageIcon, Film } from "lucide-react";
 import { useFxStore } from "./fxStore";
 import { FX_EFFECTS } from "./fxRegistry";
 import { getEffectThumbs, getPresetThumbs } from "./fxThumbs";
@@ -161,6 +161,10 @@ export function FxEffectBrowser({ onClose }: { onClose: () => void }) {
                       ) : spec.id === "srcImage" ? (
                         <span className="xd-fx-card-fallback">
                           <ImageIcon size={22} />
+                        </span>
+                      ) : spec.id === "srcVideo" ? (
+                        <span className="xd-fx-card-fallback">
+                          <Film size={22} />
                         </span>
                       ) : (
                         <span className="xd-fx-card-loading" />

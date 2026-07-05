@@ -32,8 +32,8 @@ describe("FX presets", () => {
     }
   });
 
-  it("registry finale pack landed (51 layer types)", () => {
-    expect(FX_EFFECTS.length).toBe(51);
+  it("registry finale pack landed (52 layer types)", () => {
+    expect(FX_EFFECTS.length).toBe(52);
     for (const id of ["lightning", "sunGrid", "tunnel", "voronoi", "fire", "bokeh", "rainGlass", "interference", "crt", "sharpen"]) {
       expect(fxEffect(id), id).toBeDefined();
     }
