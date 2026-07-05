@@ -16326,6 +16326,55 @@ html.ot-reduce-glass .note-page .note-editor-body {
   color: var(--xd-text-3);
 }
 
+/* ── On-canvas transform gizmo (source layers) ── */
+.xd-fx-gizmo-root {
+  position: relative;
+  pointer-events: none;
+  z-index: 5;
+}
+.xd-fx-gizmo {
+  position: absolute;
+  pointer-events: auto;
+  border: 1.5px solid var(--xd-accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  cursor: move;
+  box-sizing: border-box;
+}
+.xd-fx-gizmo-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  background: #fff;
+  border: 1.5px solid var(--xd-accent);
+  border-radius: 2px;
+  pointer-events: auto;
+  cursor: nwse-resize;
+}
+.xd-fx-gizmo-rot {
+  position: absolute;
+  left: 50%;
+  top: -26px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  background: var(--xd-accent);
+  border: 1.5px solid #fff;
+  border-radius: 50%;
+  pointer-events: auto;
+  cursor: grab;
+}
+.xd-fx-gizmo-rot::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 11px;
+  width: 1.5px;
+  height: 14px;
+  margin-left: -0.75px;
+  background: var(--xd-accent);
+}
+
 /* ── Inspector fields ── */
 .xd-fx-fields {
   padding: 10px 12px;

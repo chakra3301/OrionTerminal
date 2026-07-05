@@ -44,6 +44,7 @@ import { FxShaderModal } from "./FxShaderModal";
 import { FxEffectBrowser } from "./FxEffectBrowser";
 import { FxAssistPanel } from "./FxAssistPanel";
 import { useFxAssist } from "./fxAssist";
+import { FxCanvasOverlay } from "./FxCanvasOverlay";
 import { sampleAudio, startAudio, stopAudio } from "./fxAudio";
 import { ensureVideo, drawVideoFrame, dropVideo, dropAllVideos } from "./fxVideo";
 import { toast as fxToast } from "@/store/toastStore";
@@ -337,14 +338,17 @@ function FxViewport() {
       {glLost ? (
         <div className="xd-fx-gl-lost">WebGL2 unavailable</div>
       ) : (
-        <canvas
-          ref={(el) => {
-            canvasRef.current = el;
-            fxCanvasEl = el;
-          }}
-          className="xd-fx-canvas"
-          style={{ width: fit.w || undefined, height: fit.h || undefined }}
-        />
+        <>
+          <canvas
+            ref={(el) => {
+              canvasRef.current = el;
+              fxCanvasEl = el;
+            }}
+            className="xd-fx-canvas"
+            style={{ width: fit.w || undefined, height: fit.h || undefined }}
+          />
+          <FxCanvasOverlay fitW={fit.w} fitH={fit.h} />
+        </>
       )}
     </div>
   );
@@ -948,8 +952,19 @@ function ParamControl({
               filters: isVideo
                 ? [{ name: "Video", extensions: ["mp4", "mov", "webm", "m4v", "ogv"] }]
                 : [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"] }],
-            }).then((picked) => {
-              if (typeof picked === "string") set(picked);
+            }).then(async (picked) => {
+              if (typeof picked !== "string") return;
+              // Copy into the app's scoped asset dir so the asset:// protocol
+              // can actually load it (an arbitrary ~/Desktop path is blocked).
+              try {
+                const stored = await ipc.assetStoreFile(picked);
+                set(stored.filePath);
+              } catch (e) {
+                log.error("fx source ingest", e);
+                toast.error("Couldn't load that file", {
+                  body: e instanceof Error ? e.message : String(e),
+                });
+              }
             });
           }}
         >

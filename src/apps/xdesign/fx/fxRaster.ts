@@ -8,6 +8,7 @@
 
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { FxLayer } from "./fxModel";
+import { setSourceAspect } from "./fxSourceInfo";
 import { log } from "@/lib/log";
 
 /** Cache key — re-rasterize only when something visual changed. */
@@ -147,6 +148,9 @@ export async function rasterizeSource(
     } catch (e) {
       log.warn("fx raster", e);
       return canvas;
+    }
+    if (img.naturalHeight > 0) {
+      setSourceAspect(layer.id, img.naturalWidth / img.naturalHeight);
     }
     // scale 1 = contain-fit inside the scene, then user scale on top.
     const fit = Math.min(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);

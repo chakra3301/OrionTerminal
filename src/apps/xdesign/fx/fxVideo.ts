@@ -8,6 +8,7 @@
 
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { FxLayer } from "./fxModel";
+import { setSourceAspect } from "./fxSourceInfo";
 import { log } from "@/lib/log";
 
 type Entry = {
@@ -63,6 +64,7 @@ export function drawVideoFrame(
   if (!e) return null;
   const v = e.video;
   if (v.readyState < 2 || v.videoWidth === 0) return null;
+  setSourceAspect(layer.id, v.videoWidth / v.videoHeight);
 
   const canvas = e.canvas;
   canvas.width = Math.max(1, Math.round(pw));
