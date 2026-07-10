@@ -2,7 +2,12 @@
  * Notes, journal entries, projects, chats, media, mood boards, tags and
  * collections become nodes; wikilinks, hierarchy, tags, board membership,
  * title mentions and semantic-embedding similarity become edges — no manual
- * linking required. Custom canvas force layout (60fps, locked dep list).
+ * linking required.
+ *
+ * Rendered in the energy-core visual language: a 3D force layout projected
+ * with a slow orbital camera, additive-blended glowing wireframe spheres for
+ * nodes (gyroscope rings, hot center) and luminous link lines — not flat
+ * dots. Drag empty space to orbit, wheel to zoom, drag a node to move it.
  * Click a node → detail rail with its connections, Open, and Ask Claude
  * (routes into the live Archives chat). */
 import {
@@ -38,7 +43,7 @@ const TYPE_COLOR: Record<BrainNodeType, string> = {
   chat: "#b14cff",
   asset: "#ff3ea5",
   board: "#ff8a3c",
-  tag: "#5a706a",
+  tag: "#4d6a5f",
   collection: "#9ab0a8",
 };
 
@@ -74,9 +79,22 @@ const EDGE_SPRING: Record<string, number> = {
   semantic: 0.55,
 };
 
+/** Perspective focal length — matches the core's tight fov feel. */
+const FOCAL = 900;
+const TAU = Math.PI * 2;
+
 function radiusFor(n: BrainNode): number {
   const base = n.type === "tag" || n.type === "collection" ? 4 : 5.5;
   return base + Math.min(11, Math.sqrt(n.degree) * 1.9);
+}
+
+function hashPhase(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 628) / 100;
 }
 
 /** Route "open this node" to the right surface, same rules as global search. */
@@ -117,6 +135,35 @@ function openNode(n: BrainNode) {
   }
 }
 
+/** Wireframe-sphere node glyph — outline + two gyroscope ellipses + hot
+ * center. Reads as a tiny energy core under additive blending. */
+function drawNodeGlyph(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  color: string,
+  spin: number,
+  detailed: boolean,
+) {
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TAU);
+  ctx.stroke();
+  if (detailed) {
+    ctx.beginPath();
+    ctx.ellipse(x, y, r, r * 0.36, spin, 0, TAU);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(x, y, r * 0.36, r, spin * 0.6 + 1.1, 0, TAU);
+    ctx.stroke();
+  }
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, Math.max(0.8, r * 0.2), 0, TAU);
+  ctx.fill();
+}
+
 export function BrainView() {
   const { graph, loading, refresh } = useBrainGraph();
   const [query, setQuery] = useState("");
@@ -147,20 +194,21 @@ export function BrainView() {
     );
   }, [visible, query]);
 
-  // ── Mutable sim + view state (refs — the rAF loop owns them) ────────
+  // ── Mutable sim + camera state (refs — the rAF loop owns them) ──────
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const simRef = useRef<{
     nodes: LayoutNode[];
     edges: LayoutEdge[];
     byId: Map<string, number>;
-  }>({ nodes: [], edges: [], byId: new Map() });
+    phases: Float32Array;
+  }>({ nodes: [], edges: [], byId: new Map(), phases: new Float32Array(0) });
   const alphaRef = useRef(1);
-  const viewRef = useRef({ x: 0, y: 0, zoom: 1, sized: false });
+  const camRef = useRef({ rx: -0.28, ry: 0.4, zoom: 1, lastInteract: 0 });
   const hoverRef = useRef<string | null>(null);
   const dragRef = useRef<
-    | { mode: "pan"; sx: number; sy: number; ox: number; oy: number }
-    | { mode: "node"; index: number; moved: boolean }
+    | { mode: "orbit"; sx: number; sy: number; orx: number; ory: number; moved: boolean }
+    | { mode: "node"; index: number; camZ: number; moved: boolean }
     | null
   >(null);
   const selectedRef = useRef<string | null>(null);
@@ -178,9 +226,23 @@ export function BrainView() {
       const old = prev.get(n.id);
       if (old) return { ...old, r: radiusFor(n) };
       const p = initialPosition(n.id);
-      return { id: n.id, x: p.x, y: p.y, vx: 0, vy: 0, r: radiusFor(n), fx: null, fy: null };
+      return {
+        id: n.id,
+        x: p.x,
+        y: p.y,
+        z: p.z,
+        vx: 0,
+        vy: 0,
+        vz: 0,
+        r: radiusFor(n),
+        fx: null,
+        fy: null,
+        fz: null,
+      };
     });
     const byId = new Map(nodes.map((n, i) => [n.id, i]));
+    const phases = new Float32Array(nodes.length);
+    for (let i = 0; i < nodes.length; i++) phases[i] = hashPhase(nodes[i]!.id);
     const edges: LayoutEdge[] = [];
     for (const e of visible.edges) {
       const a = byId.get(e.a);
@@ -188,7 +250,7 @@ export function BrainView() {
       if (a == null || b == null) continue;
       edges.push({ a, b, weight: EDGE_SPRING[e.kind] ?? 0.5 });
     }
-    simRef.current = { nodes, edges, byId };
+    simRef.current = { nodes, edges, byId, phases };
     alphaRef.current = Math.max(alphaRef.current, 0.6);
   }, [visible]);
 
@@ -203,6 +265,8 @@ export function BrainView() {
     let raf = 0;
     let w = 0;
     let h = 0;
+    // Projected scratch buffer: [sx, sy, persp] per node.
+    let proj = new Float32Array(0);
 
     const resize = () => {
       const rect = container.getBoundingClientRect();
@@ -214,25 +278,84 @@ export function BrainView() {
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (!viewRef.current.sized) {
-        viewRef.current = { x: w / 2, y: h / 2, zoom: 1, sized: true };
-      }
     };
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(container);
 
-    const draw = () => {
+    /** World → camera space (rotate Y then X). Returns [x1, y2, z2]. */
+    const cam = camRef.current;
+    const toCamera = (
+      x: number,
+      y: number,
+      z: number,
+      out: [number, number, number],
+    ) => {
+      const cy = Math.cos(cam.ry);
+      const sy = Math.sin(cam.ry);
+      const cx = Math.cos(cam.rx);
+      const sx = Math.sin(cam.rx);
+      const x1 = cy * x + sy * z;
+      const z1 = -sy * x + cy * z;
+      out[0] = x1;
+      out[1] = cx * y - sx * z1;
+      out[2] = sx * y + cx * z1;
+    };
+    /** Camera space → world (inverse rotations). */
+    const toWorldFromCamera = (
+      x1: number,
+      y2: number,
+      z2: number,
+      out: [number, number, number],
+    ) => {
+      const cy = Math.cos(cam.ry);
+      const sy = Math.sin(cam.ry);
+      const cx = Math.cos(cam.rx);
+      const sx = Math.sin(cam.rx);
+      const y = cx * y2 + sx * z2;
+      const z1 = -sx * y2 + cx * z2;
+      out[0] = cy * x1 - sy * z1;
+      out[1] = y;
+      out[2] = sy * x1 + cy * z1;
+    };
+
+    const scratch: [number, number, number] = [0, 0, 0];
+    const projectAll = () => {
+      const { nodes } = simRef.current;
+      if (proj.length < nodes.length * 3) proj = new Float32Array(nodes.length * 3);
+      for (let i = 0; i < nodes.length; i++) {
+        const nd = nodes[i]!;
+        toCamera(nd.x, nd.y, nd.z, scratch);
+        const persp = FOCAL / Math.max(80, FOCAL + scratch[2]);
+        proj[i * 3] = w / 2 + scratch[0] * persp * cam.zoom;
+        proj[i * 3 + 1] = h / 2 + scratch[1] * persp * cam.zoom;
+        proj[i * 3 + 2] = persp;
+      }
+    };
+
+    /** Depth cue 0..1 from perspective scale. */
+    const depthT = (persp: number) =>
+      Math.min(1, Math.max(0, (persp - 0.68) / 0.75));
+
+    const draw = (nowMs: number) => {
       if (alphaRef.current > 0.02) {
         stepLayout(simRef.current.nodes, simRef.current.edges, alphaRef.current);
         alphaRef.current *= 0.985;
       }
-      const { nodes, byId } = simRef.current;
-      const view = viewRef.current;
+      const t = nowMs / 1000;
+      const { byId, phases } = simRef.current;
       const g = visibleRef.current;
       const hover = hoverRef.current;
       const selected = selectedRef.current;
       const matches = matchRef.current;
+
+      // Slow auto-orbit — the core's idle spin. Pauses while the user is
+      // interacting so hover targets stay put.
+      const idle =
+        !dragRef.current && !hover && nowMs - cam.lastInteract > 2000;
+      if (idle) cam.ry += 0.0016;
+
+      projectAll();
 
       // Neighborhood of the focused (hover-or-selected) node.
       const focus = hover ?? selected;
@@ -246,125 +369,153 @@ export function BrainView() {
       }
 
       ctx.clearRect(0, 0, w, h);
-      ctx.save();
-      ctx.translate(view.x, view.y);
-      ctx.scale(view.zoom, view.zoom);
+      // Everything glows: additive blending, exactly like the core's shells.
+      ctx.globalCompositeOperation = "lighter";
 
       // Edges.
+      ctx.lineWidth = 1;
       for (const e of g.edges) {
         const ia = byId.get(e.a);
         const ib = byId.get(e.b);
         if (ia == null || ib == null) continue;
-        const a = nodes[ia]!;
-        const b = nodes[ib]!;
+        const ax = proj[ia * 3]!;
+        const ay = proj[ia * 3 + 1]!;
+        const bx = proj[ib * 3]!;
+        const by = proj[ib * 3 + 1]!;
+        const depth = depthT((proj[ia * 3 + 2]! + proj[ib * 3 + 2]!) / 2);
         const inFocus = focusSet ? focusSet.has(e.a) && focusSet.has(e.b) : true;
         const dimmed =
           (focusSet && !inFocus) ||
           (matches && !(matches.has(e.a) && matches.has(e.b)));
+        let base: number;
+        if (dimmed) base = 0.025;
+        else base = (0.08 + depth * 0.16) * (inFocus && focusSet ? 2.2 : 1);
         ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
         if (e.kind === "semantic") {
-          ctx.setLineDash([4, 4]);
-          ctx.strokeStyle = dimmed
-            ? "rgba(177, 76, 255, 0.05)"
-            : `rgba(177, 76, 255, ${0.16 + e.weight * 0.25})`;
+          ctx.setLineDash([3, 5]);
+          ctx.strokeStyle = `rgba(177, 76, 255, ${Math.min(1, base * (0.8 + e.weight))})`;
+        } else if (e.kind === "wikilink" || e.kind === "parent") {
+          ctx.setLineDash([]);
+          ctx.strokeStyle = `rgba(57, 255, 136, ${base})`;
         } else {
           ctx.setLineDash([]);
-          ctx.strokeStyle = dimmed
-            ? "rgba(154, 176, 168, 0.04)"
-            : e.kind === "wikilink" || e.kind === "parent"
-              ? "rgba(57, 255, 136, 0.28)"
-              : "rgba(154, 176, 168, 0.14)";
+          ctx.strokeStyle = `rgba(120, 180, 160, ${base * 0.8})`;
         }
-        ctx.lineWidth = (inFocus && focusSet ? 1.6 : 1) / view.zoom;
         ctx.stroke();
       }
       ctx.setLineDash([]);
 
-      // Nodes.
+      // Nodes — glowing wireframe spheres, depth-faded and depth-scaled.
       for (const n of g.nodes) {
         const i = byId.get(n.id);
         if (i == null) continue;
-        const p = nodes[i]!;
+        const sx = proj[i * 3]!;
+        const sy = proj[i * 3 + 1]!;
+        const persp = proj[i * 3 + 2]!;
+        const depth = depthT(persp);
+        const r = simRef.current.nodes[i]!.r * persp * cam.zoom;
         const color = TYPE_COLOR[n.type];
         const isFocus = n.id === focus;
-        const dimmed =
-          (focusSet && !focusSet.has(n.id)) || (matches && !matches.has(n.id));
-        ctx.globalAlpha = dimmed ? 0.15 : 1;
-        if (isFocus || (matches && matches.has(n.id))) {
-          ctx.shadowColor = color;
-          ctx.shadowBlur = 16;
-        }
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        if (n.id === selected) {
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r + 3.5 / view.zoom, 0, Math.PI * 2);
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 1.4 / view.zoom;
-          ctx.stroke();
-        }
+        const isMatch = matches ? matches.has(n.id) : false;
+        const dimmed = (focusSet && !focusSet.has(n.id)) || (matches && !isMatch);
 
-        // Labels — zoomed-in enough, or focused / matched.
-        const showLabel =
-          !dimmed &&
-          (isFocus ||
-            n.id === selected ||
-            (matches && matches.has(n.id)) ||
-            view.zoom * p.r >= 7);
-        if (showLabel) {
-          const size = Math.max(9, 11 / view.zoom);
-          ctx.font = `${size}px "JetBrains Mono", monospace`;
-          ctx.fillStyle = isFocus ? "#e6f4ec" : "rgba(154, 176, 168, 0.9)";
-          ctx.textAlign = "center";
-          const label =
-            n.label.length > 28 ? `${n.label.slice(0, 27)}…` : n.label;
-          ctx.fillText(label, p.x, p.y + p.r + size + 2 / view.zoom);
+        ctx.globalAlpha = dimmed ? 0.07 : 0.32 + depth * 0.68;
+        if (isFocus || isMatch) {
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 18;
+          ctx.globalAlpha = 1;
+        }
+        const spin = t * 0.6 + phases[i]!;
+        ctx.lineWidth = isFocus ? 1.4 : 1;
+        drawNodeGlyph(ctx, sx, sy, r, color, spin, r >= 5 && !dimmed);
+        ctx.shadowBlur = 0;
+
+        if (n.id === selected) {
+          // Selection halo — a slow-pulsing outer ring.
+          const pulse = 1 + Math.sin(t * 2.4) * 0.08;
+          ctx.beginPath();
+          ctx.arc(sx, sy, (r + 5) * pulse, 0, TAU);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1;
+          ctx.stroke();
         }
         ctx.globalAlpha = 1;
       }
-      ctx.restore();
+
+      // Labels — normal compositing so text stays crisp.
+      ctx.globalCompositeOperation = "source-over";
+      for (const n of g.nodes) {
+        const i = byId.get(n.id);
+        if (i == null) continue;
+        const persp = proj[i * 3 + 2]!;
+        const r = simRef.current.nodes[i]!.r * persp * cam.zoom;
+        const isFocus = n.id === focus;
+        const isMatch = matches ? matches.has(n.id) : false;
+        const dimmed = (focusSet && !focusSet.has(n.id)) || (matches && !isMatch);
+        const show =
+          !dimmed && (isFocus || n.id === selected || isMatch || r >= 8.5);
+        if (!show) continue;
+        const sx = proj[i * 3]!;
+        const sy = proj[i * 3 + 1]!;
+        const size = Math.max(9, Math.min(12, 10 * persp * cam.zoom));
+        ctx.font = `${size}px "JetBrains Mono", monospace`;
+        ctx.textAlign = "center";
+        ctx.globalAlpha = isFocus || isMatch ? 1 : 0.35 + depthT(persp) * 0.5;
+        ctx.fillStyle = isFocus ? "#e6f4ec" : TYPE_COLOR[n.type];
+        const label = n.label.length > 28 ? `${n.label.slice(0, 27)}…` : n.label;
+        ctx.fillText(label, sx, sy + r + size + 3);
+        ctx.globalAlpha = 1;
+      }
+
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
 
     // ── Interaction ───────────────────────────────────────────────────
-    const toWorld = (clientX: number, clientY: number) => {
-      const rect = canvas.getBoundingClientRect();
-      const view = viewRef.current;
-      return {
-        x: (clientX - rect.left - view.x) / view.zoom,
-        y: (clientY - rect.top - view.y) / view.zoom,
-      };
-    };
     const hitTest = (clientX: number, clientY: number): number => {
-      const p = toWorld(clientX, clientY);
+      const rect = canvas.getBoundingClientRect();
+      const mx = clientX - rect.left;
+      const my = clientY - rect.top;
       const { nodes } = simRef.current;
-      for (let i = nodes.length - 1; i >= 0; i--) {
-        const n = nodes[i]!;
-        const dx = p.x - n.x;
-        const dy = p.y - n.y;
-        const r = n.r + 3;
-        if (dx * dx + dy * dy <= r * r) return i;
+      let best = -1;
+      let bestPersp = -Infinity;
+      for (let i = 0; i < nodes.length; i++) {
+        const sx = proj[i * 3]!;
+        const sy = proj[i * 3 + 1]!;
+        const persp = proj[i * 3 + 2]!;
+        const r = nodes[i]!.r * persp * cam.zoom + 3;
+        const dx = mx - sx;
+        const dy = my - sy;
+        if (dx * dx + dy * dy <= r * r && persp > bestPersp) {
+          best = i;
+          bestPersp = persp;
+        }
       }
-      return -1;
+      return best;
     };
 
     const onPointerDown = (e: PointerEvent) => {
       canvas.setPointerCapture(e.pointerId);
+      cam.lastInteract = performance.now();
       const hit = hitTest(e.clientX, e.clientY);
       if (hit >= 0) {
-        dragRef.current = { mode: "node", index: hit, moved: false };
         const n = simRef.current.nodes[hit]!;
+        toCamera(n.x, n.y, n.z, scratch);
+        dragRef.current = { mode: "node", index: hit, camZ: scratch[2], moved: false };
         n.fx = n.x;
         n.fy = n.y;
+        n.fz = n.z;
       } else {
-        const view = viewRef.current;
-        dragRef.current = { mode: "pan", sx: e.clientX, sy: e.clientY, ox: view.x, oy: view.y };
+        dragRef.current = {
+          mode: "orbit",
+          sx: e.clientX,
+          sy: e.clientY,
+          orx: cam.rx,
+          ory: cam.ry,
+          moved: false,
+        };
       }
     };
     const onPointerMove = (e: PointerEvent) => {
@@ -376,19 +527,28 @@ export function BrainView() {
         canvas.style.cursor = id ? "pointer" : "grab";
         return;
       }
-      if (drag.mode === "pan") {
-        viewRef.current.x = drag.ox + (e.clientX - drag.sx);
-        viewRef.current.y = drag.oy + (e.clientY - drag.sy);
+      cam.lastInteract = performance.now();
+      if (drag.mode === "orbit") {
+        const dx = e.clientX - drag.sx;
+        const dy = e.clientY - drag.sy;
+        if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+        cam.ry = drag.ory + dx * 0.005;
+        cam.rx = Math.max(-1.3, Math.min(1.3, drag.orx + dy * 0.005));
       } else {
-        const p = toWorld(e.clientX, e.clientY);
+        const rect = canvas.getBoundingClientRect();
+        const persp = FOCAL / Math.max(80, FOCAL + drag.camZ);
+        const x1 = (e.clientX - rect.left - w / 2) / (persp * cam.zoom);
+        const y2 = (e.clientY - rect.top - h / 2) / (persp * cam.zoom);
+        toWorldFromCamera(x1, y2, drag.camZ, scratch);
         const n = simRef.current.nodes[drag.index]!;
-        n.fx = p.x;
-        n.fy = p.y;
+        n.fx = scratch[0];
+        n.fy = scratch[1];
+        n.fz = scratch[2];
         drag.moved = true;
         alphaRef.current = Math.max(alphaRef.current, 0.3);
       }
     };
-    const onPointerUp = (e: PointerEvent) => {
+    const onPointerUp = () => {
       const drag = dragRef.current;
       dragRef.current = null;
       if (!drag) return;
@@ -396,11 +556,9 @@ export function BrainView() {
         const n = simRef.current.nodes[drag.index]!;
         n.fx = null;
         n.fy = null;
+        n.fz = null;
         if (!drag.moved) setSelectedId(n.id);
-      } else if (
-        Math.abs(e.clientX - drag.sx) < 3 &&
-        Math.abs(e.clientY - drag.sy) < 3
-      ) {
+      } else if (!drag.moved) {
         setSelectedId(null);
       }
     };
@@ -413,16 +571,9 @@ export function BrainView() {
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const view = viewRef.current;
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
+      cam.lastInteract = performance.now();
       const factor = Math.exp(-e.deltaY * 0.0016);
-      const next = Math.min(4, Math.max(0.15, view.zoom * factor));
-      // Zoom about the cursor.
-      view.x = mx - ((mx - view.x) / view.zoom) * next;
-      view.y = my - ((my - view.y) / view.zoom) * next;
-      view.zoom = next;
+      cam.zoom = Math.min(4, Math.max(0.25, cam.zoom * factor));
     };
 
     canvas.addEventListener("pointerdown", onPointerDown);

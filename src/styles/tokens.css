@@ -3548,9 +3548,11 @@ summary:focus-visible,
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+  /* Deep-space void with a faint center bloom — same stage the energy core
+   * sits on. The additive-blended wireframe graph glows against it. */
   background:
-    radial-gradient(ellipse 70% 55% at 50% 45%, rgba(57, 255, 136, 0.035), transparent 70%),
-    var(--bg-0);
+    radial-gradient(ellipse 60% 50% at 50% 48%, rgba(57, 255, 136, 0.05), transparent 65%),
+    radial-gradient(ellipse 120% 100% at 50% 50%, #03060a 40%, #010203 100%);
 }
 .ar-brain-canvas {
   position: absolute;
