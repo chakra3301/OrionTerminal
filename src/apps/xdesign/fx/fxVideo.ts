@@ -39,12 +39,29 @@ export function ensureVideo(layer: FxLayer): void {
   if (existing && existing.src === file) return;
 
   const video = existing?.video ?? document.createElement("video");
-  video.src = resolveUrl(file);
+  // Flags BEFORE src so muted-autoplay is allowed. No crossOrigin: the
+  // asset:// protocol sends no CORS headers, so requesting CORS would fail
+  // the load outright (same-origin images already draw untainted).
   video.muted = true;
   video.loop = true;
   video.playsInline = true;
   video.autoplay = true;
-  video.crossOrigin = "anonymous";
+  video.setAttribute("muted", "");
+  video.setAttribute("playsinline", "");
+  // WKWebView (and others) often won't decode/advance a <video> that isn't
+  // in the document. Park it off-screen, hidden, 1px.
+  if (!video.isConnected) {
+    video.style.cssText =
+      "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
+    document.body.appendChild(video);
+  }
+  if (!existing) {
+    video.addEventListener("error", () =>
+      log.error("fx video: failed to load", video.error?.message ?? "", file),
+    );
+  }
+  video.src = resolveUrl(file);
+  video.load();
   void video.play().catch((e) => log.warn("fx video: autoplay blocked", e));
   entries.set(layer.id, {
     video,
@@ -94,6 +111,7 @@ export function dropVideo(id: string): void {
   e.video.pause();
   e.video.removeAttribute("src");
   e.video.load();
+  e.video.remove();
   entries.delete(id);
 }
 

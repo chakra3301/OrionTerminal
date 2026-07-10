@@ -950,7 +950,7 @@ function ParamControl({
             void openDialog({
               multiple: false,
               filters: isVideo
-                ? [{ name: "Video", extensions: ["mp4", "mov", "webm", "m4v", "ogv"] }]
+                ? [{ name: "Video", extensions: ["mp4", "mov", "m4v", "webm"] }]
                 : [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"] }],
             }).then(async (picked) => {
               if (typeof picked !== "string") return;
