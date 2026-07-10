@@ -48,6 +48,7 @@ export type AppStateKey =
   | "tab_autocomplete"
   | "repolens"
   | "learn_scratchpad"
+  | "note_visualizer"
   | "auth.user"
   | "auth.session"
   | "onboarding.completed";

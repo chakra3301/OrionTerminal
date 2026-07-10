@@ -6694,6 +6694,46 @@ summary:focus-visible,
   background: var(--bg-1);
   color: var(--t-primary);
   width: 100%;
+  position: relative;
+}
+
+/* ── Blueprint visualizer — live wireframe drafting layer behind the page ─ */
+.note-blueprint-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+/* Editor content sits above the drafting layer; the glass card's
+ * backdrop-filter still blurs the canvas into a soft glow under the text. */
+.note-editor-root > .note-editor-title,
+.note-editor-root > .note-editor-container {
+  position: relative;
+  z-index: 1;
+}
+.note-blueprint-toggle {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: rgba(6, 10, 15, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 50%;
+  color: var(--t-faint);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: color 0.15s ease, box-shadow 0.15s ease;
+}
+.note-blueprint-toggle:hover { color: var(--t-secondary); }
+.note-blueprint-toggle.on {
+  color: var(--neon-green);
+  border-color: rgba(var(--neon-green-rgb), 0.35);
+  box-shadow: 0 0 12px -2px rgba(var(--neon-green-rgb), 0.4);
 }
 .note-editor-loading {
   flex: 1;

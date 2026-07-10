@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ulid } from "ulid";
+import { DraftingCompass } from "lucide-react";
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
 import "@blocknote/mantine/style.css";
@@ -16,6 +17,8 @@ import {
 } from "@/features/notes/editorBridge";
 import { NoteAiControllers } from "@/features/notes/NoteEditorAi";
 import { BacklinksPanel } from "@/features/notes/BacklinksPanel";
+import { BlueprintCanvas } from "@/features/notes/visualizer/BlueprintCanvas";
+import { useVisualizer } from "@/features/notes/visualizer/visualizerStore";
 import { noteSchema } from "@/features/notes/noteSchema";
 import { log } from "@/lib/log";
 
@@ -232,6 +235,11 @@ function EditorBody({
 export function NoteEditor({ noteId }: { noteId: string }) {
   const note = useNotesStore((s) => s.notes.get(noteId));
   const saveTitle = useNotesStore((s) => s.saveTitle);
+  const vizEnabled = useVisualizer((s) => s.enabled);
+  const toggleViz = useVisualizer((s) => s.toggle);
+  useEffect(() => {
+    void useVisualizer.getState().hydrate();
+  }, []);
   const [titleDraft, setTitleDraft] = useState<string>(note?.title ?? "");
   const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -272,6 +280,20 @@ export function NoteEditor({ noteId }: { noteId: string }) {
 
   return (
     <div className="note-editor-root">
+      {vizEnabled && (
+        <BlueprintCanvas
+          text={`${note.title}\n${note.plaintext}`}
+          kind={note.kind}
+        />
+      )}
+      <button
+        type="button"
+        className={`note-blueprint-toggle${vizEnabled ? " on" : ""}`}
+        title={vizEnabled ? "Blueprint visualizer on" : "Blueprint visualizer off"}
+        onClick={toggleViz}
+      >
+        <DraftingCompass size={13} />
+      </button>
       <TitleInput
         value={titleDraft}
         onChange={onTitleChange}
