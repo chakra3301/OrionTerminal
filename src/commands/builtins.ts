@@ -812,6 +812,18 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
+    id: "archives.brain",
+    label: "Open Brain Graph",
+    keywords: ["brain", "graph", "knowledge", "links", "obsidian", "map", "archive"],
+    group: "Notes",
+    run: () => {
+      useShell.getState().openApp("archives");
+      useArchives.getState().setView("brain");
+      useStatusStore.getState().setHint("[ BRAIN ]", 1500);
+    },
+  });
+
+  registry.register({
     id: "mood.newBoard",
     label: "New Mood Board",
     keywords: ["mood", "board", "new", "pinterest", "archive"],

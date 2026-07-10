@@ -3541,6 +3541,274 @@ summary:focus-visible,
   padding: 44px;
 }
 
+/* ── Brain — automatic knowledge graph ─────────────────────────────── */
+.ar-brain {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 45%, rgba(57, 255, 136, 0.035), transparent 70%),
+    var(--bg-0);
+}
+.ar-brain-canvas {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  cursor: grab;
+}
+.ar-brain-topbar {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 2;
+}
+.ar-brain-topbar > * { pointer-events: auto; }
+.ar-brain-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  background: rgba(6, 10, 15, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--r-pill);
+  color: var(--t-tertiary);
+  backdrop-filter: blur(8px);
+  width: 200px;
+}
+.ar-brain-search input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  outline: 0;
+  font-size: 12px;
+  color: var(--t-primary);
+}
+.ar-brain-search input::placeholder { color: var(--t-faint); }
+.ar-brain-search button {
+  background: none;
+  border: 0;
+  color: var(--t-tertiary);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 0;
+}
+.ar-brain-chips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.ar-brain-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--t-secondary);
+  background: rgba(6, 10, 15, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
+.ar-brain-chip:hover { color: var(--t-primary); }
+.ar-brain-chip .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ar-brain-chip .n { color: var(--t-faint); }
+.ar-brain-chip.off { opacity: 0.4; }
+.ar-brain-chip.off .dot { background: var(--t-faint) !important; }
+.ar-brain-refresh {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px;
+  background: rgba(6, 10, 15, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 50%;
+  color: var(--t-tertiary);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+.ar-brain-refresh:hover { color: var(--t-primary); }
+.ar-brain-refresh .spin { animation: ar-brain-spin 0.9s linear infinite; }
+@keyframes ar-brain-spin { to { transform: rotate(360deg); } }
+.ar-brain-status {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--t-tertiary);
+  pointer-events: none;
+  z-index: 2;
+}
+.ar-brain-status .auto { color: var(--neon-violet); }
+.ar-brain-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 44px;
+  pointer-events: none;
+}
+.ar-brain-empty .title {
+  font-size: 15px;
+  color: var(--t-secondary);
+}
+.ar-brain-empty .hint {
+  font-size: 12px;
+  color: var(--t-tertiary);
+  max-width: 380px;
+  line-height: 1.5;
+}
+.ar-brain-detail {
+  position: absolute;
+  top: 52px;
+  right: 14px;
+  width: 248px;
+  max-height: calc(100% - 110px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(6, 10, 15, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--r-md);
+  backdrop-filter: blur(10px);
+  z-index: 3;
+  overflow: hidden;
+}
+.ar-brain-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 12px 8px;
+}
+.ar-brain-detail-head .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ar-brain-detail-head .titles { flex: 1; min-width: 0; }
+.ar-brain-detail-head .title {
+  font-size: 13px;
+  color: var(--t-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ar-brain-detail-head .sub {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--t-tertiary);
+  margin-top: 2px;
+}
+.ar-brain-detail-head .close {
+  background: none;
+  border: 0;
+  color: var(--t-tertiary);
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+}
+.ar-brain-detail-head .close:hover { color: var(--t-primary); }
+.ar-brain-detail-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 10px;
+}
+.ar-brain-detail-actions button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: var(--t-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.ar-brain-detail-actions button:hover { color: var(--t-primary); }
+.ar-brain-detail-actions button.ask {
+  color: var(--neon-green);
+  border-color: rgba(57, 255, 136, 0.25);
+  background: rgba(57, 255, 136, 0.06);
+}
+.ar-brain-detail-actions button.ask:hover {
+  background: rgba(57, 255, 136, 0.12);
+}
+.ar-brain-detail-section {
+  padding: 4px 12px;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--t-faint);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.ar-brain-detail-links {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 2px 6px 8px;
+  display: flex;
+  flex-direction: column;
+}
+.ar-brain-detail-links .link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--t-secondary);
+  font-size: 12px;
+  min-width: 0;
+}
+.ar-brain-detail-links .link:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--t-primary);
+}
+.ar-brain-detail-links .link .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ar-brain-detail-links .link .lbl {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .ar-main h1 {
   font-size: 36px;
   font-weight: 500;

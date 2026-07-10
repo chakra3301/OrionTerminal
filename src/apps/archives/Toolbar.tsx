@@ -42,6 +42,7 @@ const VIEW_LABEL: Record<ArchivesView, string> = {
   database: "Database",
   repolens: "RepoLens",
   learn: "Learn",
+  brain: "Brain",
 };
 
 type ActiveItem =

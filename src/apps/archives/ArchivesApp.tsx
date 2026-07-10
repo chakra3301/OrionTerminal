@@ -16,6 +16,7 @@ import {
   Star,
   ScanSearch,
   GraduationCap,
+  BrainCircuit,
 } from "lucide-react";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppConfig, resolveConfig, appFirstTurnPreamble, appAllowedTools } from "@/store/appConfigStore";
@@ -23,6 +24,7 @@ import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { useArchives, type ArchivesView } from "@/apps/archives/useArchives";
+import { setArchivesChatSender } from "@/apps/archives/chatBridge";
 import { useNotesStore } from "@/store/notesStore";
 import { setNoteNavigator } from "@/lib/orionProtocol";
 import { useAssetsStore } from "@/store/assetsStore";
@@ -42,6 +44,7 @@ import { ArchivesDatabase } from "@/apps/archives/database/ArchivesDatabase";
 import { RepoLensView } from "@/apps/archives/repolens/RepoLensView";
 import { LearnView } from "@/apps/archives/learn/LearnView";
 import { ArchivesFavorites } from "@/apps/archives/Favorites";
+import { BrainView } from "@/apps/archives/brain/BrainView";
 import { ArchivesToolbar } from "@/apps/archives/Toolbar";
 import { AssetPreviewModal } from "@/apps/archives/AssetPreviewModal";
 import { SidebarCollections } from "@/apps/archives/SidebarCollections";
@@ -56,6 +59,7 @@ type NavItem = {
 
 const LIBRARY: NavItem[] = [
   { key: "today", label: "Today", Icon: Sun },
+  { key: "brain", label: "Brain", Icon: BrainCircuit },
   { key: "journal", label: "Journal", Icon: BookOpen },
   { key: "projects", label: "Projects", Icon: FolderKanban },
   { key: "repolens", label: "RepoLens", Icon: ScanSearch },
@@ -248,6 +252,14 @@ export function ArchivesApp() {
     }
   };
 
+  // Let other Archives surfaces (Brain graph) push a prompt into this chat.
+  const handleSendRef = useRef(handleSend);
+  handleSendRef.current = handleSend;
+  useEffect(() => {
+    setArchivesChatSender((text) => void handleSendRef.current(text));
+    return () => setArchivesChatSender(null);
+  }, []);
+
   const handleCancel = () => {
     void dispatchCancel(thread.threadId, useModelPrefs.getState().modelFor("archives"));
   };
@@ -350,6 +362,7 @@ export function ArchivesApp() {
               {view === "database" && <ArchivesDatabase />}
               {view === "repolens" && <RepoLensView />}
               {view === "learn" && <LearnView />}
+              {view === "brain" && <BrainView />}
             </div>
           </main>
         </Panel>

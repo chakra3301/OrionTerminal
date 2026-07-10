@@ -11,7 +11,8 @@ export type ArchivesView =
   | "chats"
   | "database"
   | "repolens"
-  | "learn";
+  | "learn"
+  | "brain";
 
 type ArchivesState = {
   view: ArchivesView;
