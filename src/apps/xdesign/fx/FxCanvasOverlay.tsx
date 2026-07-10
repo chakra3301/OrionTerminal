@@ -144,7 +144,7 @@ export function FxCanvasOverlay({
   };
 
   return (
-    <div ref={rootRef} className="xd-fx-gizmo-root" style={{ width: fitW, height: fitH }}>
+    <div ref={rootRef} className="xd-fx-gizmo-root">
       <div
         className="xd-fx-gizmo"
         style={{

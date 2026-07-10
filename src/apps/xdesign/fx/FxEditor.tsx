@@ -338,17 +338,19 @@ function FxViewport() {
       {glLost ? (
         <div className="xd-fx-gl-lost">WebGL2 unavailable</div>
       ) : (
-        <>
+        <div
+          className="xd-fx-canvas-holder"
+          style={{ width: fit.w || undefined, height: fit.h || undefined }}
+        >
           <canvas
             ref={(el) => {
               canvasRef.current = el;
               fxCanvasEl = el;
             }}
             className="xd-fx-canvas"
-            style={{ width: fit.w || undefined, height: fit.h || undefined }}
           />
           <FxCanvasOverlay fitW={fit.w} fitH={fit.h} />
-        </>
+        </div>
       )}
     </div>
   );
