@@ -9,7 +9,22 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { FxLayer } from "./fxModel";
 import { setSourceAspect } from "./fxSourceInfo";
+import { toast } from "@/store/toastStore";
 import { log } from "@/lib/log";
+
+/** Human-readable reason for a HTMLMediaElement error. */
+function mediaErrorReason(v: HTMLVideoElement): string {
+  const c = v.error?.code;
+  if (c === 4) {
+    return "the macOS webview can't decode this file. It's likely HEVC/H.265 or ProRes — re-export as H.264 (.mp4 or .mov).";
+  }
+  if (c === 3) return "the video is corrupt or uses an unsupported codec (try H.264 .mp4).";
+  if (c === 2) return "a network/read error occurred loading the file.";
+  return v.error?.message || "unknown video error.";
+}
+
+// One error toast per file path so a stuck frame doesn't spam.
+const warned = new Set<string>();
 
 type Entry = {
   video: HTMLVideoElement;
@@ -55,11 +70,15 @@ export function ensureVideo(layer: FxLayer): void {
       "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
     document.body.appendChild(video);
   }
-  if (!existing) {
-    video.addEventListener("error", () =>
-      log.error("fx video: failed to load", video.error?.message ?? "", file),
-    );
-  }
+  video.addEventListener("error", () => {
+    const reason = mediaErrorReason(video);
+    log.error("fx video: failed to load", reason, file);
+    if (!warned.has(file)) {
+      warned.add(file);
+      toast.error("Video won't play", { body: reason });
+    }
+  });
+  video.preload = "auto";
   video.src = resolveUrl(file);
   video.load();
   void video.play().catch((e) => log.warn("fx video: autoplay blocked", e));
