@@ -2,31 +2,14 @@ import { useEffect, useRef } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useWallpaperStore } from "@/store/wallpaperStore";
 import { useShell } from "@/shell/store/useShell";
-
-const stars: Array<{ x: number; y: number; bright?: boolean }> = [
-  { x: 30, y: 20, bright: true },
-  { x: 170, y: 50, bright: true },
-  { x: 95, y: 110 },
-  { x: 110, y: 130, bright: true },
-  { x: 130, y: 150 },
-  { x: 50, y: 220, bright: true },
-  { x: 180, y: 240 },
-];
-
-const constellationLines: Array<[number, number]> = [
-  [0, 2],
-  [1, 2],
-  [2, 3],
-  [3, 4],
-  [2, 5],
-  [2, 6],
-];
+import { CoreOverlay } from "@/shell/CoreOverlay";
 
 export function Wallpaper() {
   const mode = useWallpaperStore((s) => s.mode);
   const customPath = useWallpaperStore((s) => s.customPath);
   const overlay = useWallpaperStore((s) => s.overlay);
   const overlayIntensity = useWallpaperStore((s) => s.overlayIntensity);
+  const matrixHue = useWallpaperStore((s) => s.matrixHue);
   const hasCustom = mode === "custom" && !!customPath;
   const customUrl = hasCustom ? convertFileSrc(customPath!) : null;
 
@@ -47,65 +30,10 @@ export function Wallpaper() {
         className="ot-wp-overlay"
         style={{ opacity: hasCustom ? overlayIntensity : 1 }}
       >
-        {overlay === "aurora" && <AuroraLayers />}
-        {overlay === "matrix" && <MatrixCanvas />}
-        {overlay === "stars" && <StarsLayers />}
+        {/* Add new overlays here as `overlay === "..."` branches. */}
+        {overlay === "matrix" && <MatrixCanvas hue={matrixHue} />}
+        {overlay === "core" && <CoreOverlay />}
       </div>
-    </div>
-  );
-}
-
-function AuroraLayers() {
-  return (
-    <>
-      <div className="ot-wp-aurora a1" />
-      <div className="ot-wp-aurora a2" />
-      <div className="ot-wp-aurora a3" />
-      <div className="ot-wp-stars" />
-      <div className="ot-wp-grid" />
-      <div className="ot-wp-horizon" />
-      <Constellation />
-    </>
-  );
-}
-
-function StarsLayers() {
-  return (
-    <>
-      <div className="ot-wp-stars-deep" />
-      <div className="ot-wp-stars-mid" />
-      <div className="ot-wp-stars-near" />
-      <Constellation />
-    </>
-  );
-}
-
-function Constellation() {
-  return (
-    <div className="ot-wp-constellation">
-      <svg viewBox="0 0 220 280">
-        {constellationLines.map(([a, b], i) => {
-          const sa = stars[a];
-          const sb = stars[b];
-          if (!sa || !sb) return null;
-          return (
-            <line
-              key={i}
-              x1={sa.x + 2}
-              y1={sa.y + 2}
-              x2={sb.x + 2}
-              y2={sb.y + 2}
-            />
-          );
-        })}
-      </svg>
-      {stars.map((s, i) => (
-        <div
-          key={i}
-          className={`star${s.bright ? " bright" : ""}`}
-          style={{ left: s.x, top: s.y }}
-        />
-      ))}
     </div>
   );
 }
@@ -118,8 +46,10 @@ const MATRIX_CHARS =
   "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホ" +
   "0123456789ABCDEF{}<>+=/*";
 
-function MatrixCanvas() {
+function MatrixCanvas({ hue }: { hue: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const hueRef = useRef(hue);
+  hueRef.current = hue;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -188,17 +118,18 @@ function MatrixCanvas() {
         const x = i * fontSize;
         const y = row * lineHeight;
         const head = MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
+        const h = hueRef.current;
 
-        ctx.fillStyle = "rgba(220, 255, 230, 0.95)";
+        ctx.fillStyle = `hsla(${h}, 100%, 92%, 0.95)`;
         ctx.shadowBlur = 8;
-        ctx.shadowColor = "rgba(57, 255, 136, 0.85)";
+        ctx.shadowColor = `hsla(${h}, 100%, 60%, 0.85)`;
         ctx.fillText(head ?? "", x, y);
 
         if (row > 1) {
           const trail =
             MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
           ctx.shadowBlur = 0;
-          ctx.fillStyle = "rgba(57, 255, 136, 0.55)";
+          ctx.fillStyle = `hsla(${h}, 100%, 60%, 0.55)`;
           ctx.fillText(trail ?? "", x, y - lineHeight);
         }
 

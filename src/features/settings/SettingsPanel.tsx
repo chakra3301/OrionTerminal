@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  Suspense,
+  lazy,
+} from "react";
+import type { CSSProperties } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
@@ -15,7 +23,13 @@ import {
   Image as ImageIcon,
   Plug,
   Plus,
+  Users,
 } from "lucide-react";
+const CharacterPicker = lazy(() =>
+  import("@/features/characters/CharacterPicker").then((m) => ({
+    default: m.CharacterPicker,
+  })),
+);
 import { useSettingsStore } from "@/store/settingsStore";
 import { useThemeStore, THEMES } from "@/store/themeStore";
 import { useWallpaperStore } from "@/store/wallpaperStore";
@@ -24,7 +38,14 @@ import { registry, type Command } from "@/commands/registry";
 import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
 
-type Section = "key" | "theme" | "wallpaper" | "mcp" | "shortcuts" | "about";
+type Section =
+  | "key"
+  | "theme"
+  | "wallpaper"
+  | "characters"
+  | "mcp"
+  | "shortcuts"
+  | "about";
 
 const SECTIONS: Array<{
   key: Section;
@@ -34,6 +55,7 @@ const SECTIONS: Array<{
   { key: "key", label: "API Key", Icon: KeyRound },
   { key: "theme", label: "Appearance", Icon: Sun },
   { key: "wallpaper", label: "Wallpaper", Icon: ImageIcon },
+  { key: "characters", label: "Characters", Icon: Users },
   { key: "mcp", label: "MCP Servers", Icon: Plug },
   { key: "shortcuts", label: "Shortcuts", Icon: Keyboard },
   { key: "about", label: "About", Icon: Info },
@@ -95,6 +117,11 @@ export function SettingsPanel() {
             {section === "key" && <APIKeySection />}
             {section === "theme" && <ThemeSection />}
             {section === "wallpaper" && <WallpaperSection />}
+            {section === "characters" && (
+              <Suspense fallback={<div className="ot-settings-p">Loading…</div>}>
+                <CharacterPicker />
+              </Suspense>
+            )}
             {section === "mcp" && <McpSection />}
             {section === "shortcuts" && <ShortcutsSection />}
             {section === "about" && <AboutSection />}
@@ -430,14 +457,14 @@ export function ThemeSection() {
 // Wallpaper
 // ─────────────────────────────────────────────────────────────
 
+// Add new overlays here (key must be in OVERLAY_KINDS).
 const OVERLAY_OPTIONS: Array<{
-  key: "aurora" | "matrix" | "stars";
+  key: "matrix" | "core";
   label: string;
   hint: string;
 }> = [
-  { key: "aurora", label: "Aurora", hint: "Neon JARVIS" },
   { key: "matrix", label: "Matrix", hint: "Katakana rain" },
-  { key: "stars", label: "Stars", hint: "Quiet night sky" },
+  { key: "core", label: "Core", hint: "Reactor core" },
 ];
 
 export function WallpaperSection() {
@@ -446,10 +473,18 @@ export function WallpaperSection() {
   const originalName = useWallpaperStore((s) => s.originalName);
   const overlay = useWallpaperStore((s) => s.overlay);
   const overlayIntensity = useWallpaperStore((s) => s.overlayIntensity);
+  const matrixHue = useWallpaperStore((s) => s.matrixHue);
+  const coreHue = useWallpaperStore((s) => s.coreHue);
   const setCustomFromPath = useWallpaperStore((s) => s.setCustomFromPath);
   const clearCustom = useWallpaperStore((s) => s.clearCustom);
   const setOverlay = useWallpaperStore((s) => s.setOverlay);
   const setOverlayIntensity = useWallpaperStore((s) => s.setOverlayIntensity);
+  const setMatrixHue = useWallpaperStore((s) => s.setMatrixHue);
+  const setCoreHue = useWallpaperStore((s) => s.setCoreHue);
+
+  const head = `hsl(${matrixHue}, 100%, 92%)`;
+  const glow = `hsl(${matrixHue}, 100%, 60%)`;
+  const trail = `hsla(${matrixHue}, 100%, 60%, 0.55)`;
 
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -495,9 +530,8 @@ export function WallpaperSection() {
     <>
       <h2 className="ot-settings-h2">Wallpaper</h2>
       <p className="ot-settings-p">
-        Use your own photo as the desktop background. The neon overlay (aurora,
-        stars, grid) stays on top — drag the slider to dim it if you want the
-        photo to read cleanly.
+        Use your own photo as the desktop background. The Matrix rain stays on
+        top — drag the slider to dim it if you want the photo to read cleanly.
       </p>
 
       <div className="ot-wp-preview">
@@ -508,7 +542,7 @@ export function WallpaperSection() {
             <div className="ot-wp-preview-blob a" />
             <div className="ot-wp-preview-blob b" />
             <div className="ot-wp-preview-blob c" />
-            <span>Default — neon aurora</span>
+            <span>Default — Matrix rain</span>
           </div>
         )}
       </div>
@@ -555,6 +589,94 @@ export function WallpaperSection() {
           ))}
         </div>
       </div>
+
+      {overlay === "matrix" && (
+      <div className="ot-wp-slider-row">
+        <label className="ot-wp-slider-label">
+          Matrix color
+          <span className="mono" style={{ color: glow }}>
+            {matrixHue}°
+          </span>
+        </label>
+        <div
+          className="ot-wp-color-preview"
+          style={{ "--mx-glow": glow } as CSSProperties}
+        >
+          <span className="swatch" style={{ background: glow }} />
+          <span
+            className="glyphs"
+            style={{ color: head, textShadow: `0 0 8px ${glow}` }}
+          >
+            ア ナ <span style={{ color: trail, textShadow: "none" }}>ミ</span>{" "}
+            タ 0 1 <span style={{ color: trail, textShadow: "none" }}>ワ</span> カ
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={360}
+          step={1}
+          value={matrixHue}
+          onChange={(e) => setMatrixHue(parseInt(e.target.value, 10))}
+          style={{
+            background:
+              "linear-gradient(to right, hsl(0,100%,60%), hsl(60,100%,60%), hsl(120,100%,60%), hsl(180,100%,60%), hsl(240,100%,60%), hsl(300,100%,60%), hsl(360,100%,60%))",
+          }}
+        />
+        <div className="ot-wp-slider-hint">
+          Sets the glyph color of the Matrix rain.
+        </div>
+      </div>
+      )}
+
+      {overlay === "core" && (
+      <div className="ot-wp-slider-row">
+        <label className="ot-wp-slider-label">
+          Core color
+          <span
+            className="mono"
+            style={{ color: `hsl(${coreHue}, 100%, 60%)` }}
+          >
+            {coreHue}°
+          </span>
+        </label>
+        <div
+          className="ot-wp-color-preview"
+          style={{ "--mx-glow": `hsl(${coreHue}, 100%, 60%)` } as CSSProperties}
+        >
+          <span
+            className="swatch"
+            style={{
+              background: `radial-gradient(circle at 50% 50%, hsl(${coreHue},100%,96%) 0%, hsl(${coreHue},100%,55%) 45%, hsl(${(coreHue - 24 + 360) % 360},100%,40%) 100%)`,
+            }}
+          />
+          <span
+            className="glyphs"
+            style={{
+              color: `hsl(${coreHue}, 100%, 60%)`,
+              textShadow: `0 0 10px hsl(${coreHue}, 100%, 55%)`,
+            }}
+          >
+            reactor core
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={360}
+          step={1}
+          value={coreHue}
+          onChange={(e) => setCoreHue(parseInt(e.target.value, 10))}
+          style={{
+            background:
+              "linear-gradient(to right, hsl(0,100%,60%), hsl(60,100%,60%), hsl(120,100%,60%), hsl(180,100%,60%), hsl(240,100%,60%), hsl(300,100%,60%), hsl(360,100%,60%))",
+          }}
+        />
+        <div className="ot-wp-slider-hint">
+          Sets the energy color of the reactor core.
+        </div>
+      </div>
+      )}
 
       <div className="ot-wp-slider-row">
         <label className="ot-wp-slider-label">

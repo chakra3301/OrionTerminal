@@ -16,6 +16,40 @@ const COL_HOT = new THREE.Color("#fff2f2"); // white-hot (snap peak)
 const COL_MAGENTA = new THREE.Color("#ff3ea5"); // shell rim accent
 const COL_PARTICLE = new THREE.Color("#ff2a40");
 
+type Palette = {
+  low: THREE.Color;
+  mid: THREE.Color;
+  hot: THREE.Color;
+  rim: THREE.Color;
+  particle: THREE.Color;
+};
+
+// hue === undefined → the original red art-direction (splash/login).
+// Otherwise the whole ramp is rebuilt from the chosen hue, keeping the rim a
+// touch shifted (as red→magenta) and the peak near white.
+function buildPalette(hue?: number): Palette {
+  if (hue == null) {
+    return {
+      low: COL_LOW,
+      mid: COL_MID,
+      hot: COL_HOT,
+      rim: COL_MAGENTA,
+      particle: COL_PARTICLE,
+    };
+  }
+  const h = (((hue % 360) + 360) % 360) / 360;
+  const rimH = ((((hue - 24) % 360) + 360) % 360) / 360;
+  const c = (hh: number, s: number, l: number) =>
+    new THREE.Color().setHSL(hh, s, l);
+  return {
+    low: c(h, 1, 0.16),
+    mid: c(h, 1, 0.55),
+    hot: c(h, 1, 0.96),
+    rim: c(rimH, 1, 0.62),
+    particle: c(h, 1, 0.58),
+  };
+}
+
 const easeInCubic = (t: number) => t * t * t;
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 
@@ -130,11 +164,16 @@ function Scene({
   mode,
   reduced,
   particleCount,
+  hue,
 }: {
   mode: CoreMode;
   reduced: boolean;
   particleCount: number;
+  hue?: number;
 }) {
+  const palette = useMemo(() => buildPalette(hue), [hue]);
+  const light = useRef<THREE.PointLight>(null);
+  const parallax = useRef<THREE.Group>(null);
   const group = useRef<THREE.Group>(null);
   const innerSpin = useRef<THREE.Group>(null);
   const shellSpin = useRef<THREE.Group>(null);
@@ -231,10 +270,29 @@ function Scene({
 
     // Keystroke spark envelope (login interactivity) — read imperatively so
     // typing never re-renders the React tree.
-    const env = sparkEnvelope(
-      useCoreReactions.getState().impulses,
-      performance.now(),
-    );
+    const cr = useCoreReactions.getState();
+    const env = sparkEnvelope(cr.impulses, performance.now());
+
+    // Live recolor: copy the current palette into the shader uniforms each
+    // frame (cheap; lets the hue slider update without rebuilding materials).
+    coreUniforms.uLow.value.copy(palette.low);
+    coreUniforms.uMid.value.copy(palette.mid);
+    coreUniforms.uHot.value.copy(palette.hot);
+    shellUniforms.uLow.value.copy(palette.rim).multiplyScalar(0.5);
+    shellUniforms.uMid.value.copy(palette.rim);
+    shellUniforms.uHot.value.copy(palette.hot);
+    ptUniforms.uColor.value.copy(palette.particle);
+    if (light.current) light.current.color.copy(palette.mid);
+
+    // Pointer parallax — ease the whole rig toward the cursor. Pointer stays
+    // 0,0 on the login/splash, so this is a no-op there; only the wallpaper
+    // overlay feeds it. Tilt is intentionally subtle.
+    if (parallax.current) {
+      const tx = cr.py * 0.22;
+      const ty = cr.px * 0.3;
+      parallax.current.rotation.x += (tx - parallax.current.rotation.x) * 0.06;
+      parallax.current.rotation.y += (ty - parallax.current.rotation.y) * 0.06;
+    }
     // Publish the envelope so the liquid-glass post pass flares with typing.
     state.scene.userData.spark = reduced ? env * 0.5 : env;
 
@@ -292,15 +350,17 @@ function Scene({
   });
 
   return (
-    <group ref={group}>
-      <points geometry={ptGeo} material={ptMat} />
-      <group ref={innerSpin}>
-        <mesh geometry={coreGeo} material={coreMat} />
+    <group ref={parallax}>
+      <group ref={group}>
+        <points geometry={ptGeo} material={ptMat} />
+        <group ref={innerSpin}>
+          <mesh geometry={coreGeo} material={coreMat} />
+        </group>
+        <group ref={shellSpin}>
+          <mesh geometry={shellGeo} material={shellMat} />
+        </group>
+        <pointLight ref={light} position={[0, 0, 3]} color={COL_MID} intensity={3} distance={9} />
       </group>
-      <group ref={shellSpin}>
-        <mesh geometry={shellGeo} material={shellMat} />
-      </group>
-      <pointLight position={[0, 0, 3]} color={COL_MID} intensity={3} distance={9} />
     </group>
   );
 }
@@ -309,10 +369,12 @@ export function EnergyCore({
   mode = "launch",
   reduced = false,
   particleCount = 1600,
+  hue,
 }: {
   mode?: CoreMode;
   reduced?: boolean;
   particleCount?: number;
+  hue?: number;
 }) {
   return (
     <Canvas
@@ -325,7 +387,7 @@ export function EnergyCore({
       style={{ background: "transparent" }}
     >
       <ambientLight intensity={0.4} />
-      <Scene mode={mode} reduced={reduced} particleCount={particleCount} />
+      <Scene mode={mode} reduced={reduced} particleCount={particleCount} hue={hue} />
       <LiquidGlassPost />
     </Canvas>
   );

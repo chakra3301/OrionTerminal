@@ -4,7 +4,8 @@ import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
 
 export type WallpaperMode = "default" | "custom";
-export type OverlayKind = "aurora" | "matrix" | "stars";
+// Extend this union (and OVERLAY_KINDS below) to add new overlays.
+export type OverlayKind = "matrix" | "core";
 
 export type WallpaperState = {
   mode: WallpaperMode;
@@ -12,6 +13,8 @@ export type WallpaperState = {
   originalName: string | null;
   overlay: OverlayKind;
   overlayIntensity: number;
+  matrixHue: number;
+  coreHue: number;
 };
 
 type WallpaperStore = WallpaperState & {
@@ -20,10 +23,14 @@ type WallpaperStore = WallpaperState & {
   clearCustom: () => Promise<void>;
   setOverlay: (overlay: OverlayKind) => void;
   setOverlayIntensity: (value: number) => void;
+  setMatrixHue: (value: number) => void;
+  setCoreHue: (value: number) => void;
 };
 
 const DEFAULT_OVERLAY = 0.6;
-const OVERLAY_KINDS: OverlayKind[] = ["aurora", "matrix", "stars"];
+const DEFAULT_HUE = 145;
+const DEFAULT_CORE_HUE = 354;
+export const OVERLAY_KINDS: OverlayKind[] = ["matrix", "core"];
 
 function persist(state: WallpaperState) {
   void setAppState("wallpaper", state);
@@ -33,8 +40,10 @@ export const useWallpaperStore = create<WallpaperStore>((set, get) => ({
   mode: "default",
   customPath: null,
   originalName: null,
-  overlay: "aurora",
+  overlay: "matrix",
   overlayIntensity: DEFAULT_OVERLAY,
+  matrixHue: DEFAULT_HUE,
+  coreHue: DEFAULT_CORE_HUE,
 
   hydrate: (s) =>
     set((prev) => ({
@@ -46,6 +55,12 @@ export const useWallpaperStore = create<WallpaperStore>((set, get) => ({
         typeof s.overlayIntensity === "number"
           ? clamp01(s.overlayIntensity)
           : prev.overlayIntensity,
+      matrixHue:
+        typeof s.matrixHue === "number"
+          ? clampHue(s.matrixHue)
+          : prev.matrixHue,
+      coreHue:
+        typeof s.coreHue === "number" ? clampHue(s.coreHue) : prev.coreHue,
     })),
 
   setCustomFromPath: async (sourcePath) => {
@@ -84,6 +99,7 @@ export const useWallpaperStore = create<WallpaperStore>((set, get) => ({
   },
 
   setOverlay: (overlay) => {
+    if (!OVERLAY_KINDS.includes(overlay)) return;
     set({ overlay });
     persist({ ...get(), overlay });
   },
@@ -93,9 +109,26 @@ export const useWallpaperStore = create<WallpaperStore>((set, get) => ({
     set({ overlayIntensity: v });
     persist({ ...get(), overlayIntensity: v });
   },
+
+  setMatrixHue: (value) => {
+    const v = clampHue(value);
+    set({ matrixHue: v });
+    persist({ ...get(), matrixHue: v });
+  },
+
+  setCoreHue: (value) => {
+    const v = clampHue(value);
+    set({ coreHue: v });
+    persist({ ...get(), coreHue: v });
+  },
 }));
 
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return DEFAULT_OVERLAY;
   return Math.max(0, Math.min(1, n));
+}
+
+function clampHue(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_HUE;
+  return Math.max(0, Math.min(360, Math.round(n)));
 }
