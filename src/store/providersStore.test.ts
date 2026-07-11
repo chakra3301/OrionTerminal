@@ -8,17 +8,18 @@ vi.mock("@/lib/agentsDb", () => ({
 }));
 
 import { useProvidersStore } from "./providersStore";
-import { BUILTIN_PROVIDER, CODEX_CLI_PROVIDER, GEMINI_CLI_PROVIDER } from "@/features/agents/seedData";
+import { BUILTIN_PROVIDER, CODEX_CLI_PROVIDER, CURSOR_SDK_PROVIDER, GEMINI_CLI_PROVIDER } from "@/features/agents/seedData";
 
 beforeEach(() => { rows.length = 0; useProvidersStore.setState({ providers: [], loaded: false }); });
 
 describe("providersStore seeding", () => {
-  it("seeds anthropic + both CLI engines when DB is empty", async () => {
+  it("seeds anthropic + CLI engines + cursor when DB is empty", async () => {
     await useProvidersStore.getState().load();
     const ids = useProvidersStore.getState().providers.map((p) => p.id);
     expect(ids).toContain(BUILTIN_PROVIDER.id);
     expect(ids).toContain(CODEX_CLI_PROVIDER.id);
     expect(ids).toContain(GEMINI_CLI_PROVIDER.id);
+    expect(ids).toContain(CURSOR_SDK_PROVIDER.id);
   });
   it("is idempotent — second load does not duplicate", async () => {
     await useProvidersStore.getState().load();

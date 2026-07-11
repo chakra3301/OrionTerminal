@@ -42,6 +42,20 @@ export const GEMINI_CLI_PROVIDER: Provider = {
   builtin: true,
 };
 
+export const CURSOR_SDK_PROVIDER: Provider = {
+  id: "builtin:cursor-sdk",
+  name: "Cursor (SDK)",
+  kind: "cursor_sdk",
+  baseUrl: "",
+  models: [
+    { id: "composer-2.5", label: "Composer 2.5" },
+    { id: "auto", label: "Auto" },
+  ],
+  keyRef: "builtin:cursor-sdk",
+  enabled: true,
+  builtin: true,
+};
+
 export const STARTER_SKILLS: Skill[] = [
   { id: "builtin:web-research", name: "Web Research", icon: "", accent: "#00e0ff", instructions: "Search the web for primary, current sources. Prefer official docs and firsthand reports over summaries.", tools: [{ kind: "builtin", name: "WebSearch" }], builtin: true },
   { id: "builtin:cite-sources", name: "Cite Sources", icon: "", accent: "#00e0ff", instructions: "Back every non-obvious claim with a citation. Use [n] markers and list sources at the end.", tools: [], builtin: true },

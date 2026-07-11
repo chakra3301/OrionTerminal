@@ -465,6 +465,11 @@ function handleAppChatClaudeEvent(env: ClaudeEnvelope): boolean {
   }
   if (t === "result") {
     const cost = (ev as { total_cost_usd?: number }).total_cost_usd;
+    const isError = (ev as { is_error?: boolean }).is_error;
+    const errors = (ev as { errors?: string[] }).errors;
+    if (isError && errors?.length) {
+      store.setError(app, errors.join("\n"));
+    }
     store.finishAssistant(app, typeof cost === "number" ? cost : null);
     forgetStream(env.chatId);
     return true;
@@ -571,7 +576,20 @@ function handleClaude(env: ClaudeEnvelope) {
 
   if (t === "result") {
     const cost = (ev as { total_cost_usd?: number }).total_cost_usd;
+    const isError = (ev as { is_error?: boolean }).is_error;
+    const errors = (ev as { errors?: string[] }).errors;
     if (typeof cost === "number") store.addCost(cost);
+    if (isError && errors?.length && store.active) {
+      // Append to any partially-streamed blocks; onAssistantBlocks creates the
+      // pending message itself when the run failed before streaming anything.
+      const prev =
+        store.active.messages.find((m) => m.id === store.pendingAssistantId)
+          ?.blocks ?? [];
+      store.onAssistantBlocks([
+        ...prev,
+        { type: "text", text: errors.join("\n") },
+      ]);
+    }
     store.finishTurn();
     return;
   }

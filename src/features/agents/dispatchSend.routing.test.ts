@@ -8,13 +8,15 @@ vi.mock("@/lib/ipc", () => ({
     runtimeCancel: vi.fn().mockResolvedValue(undefined),
     cliSend: vi.fn().mockResolvedValue(undefined),
     cliCancel: vi.fn().mockResolvedValue(undefined),
+    cursorSend: vi.fn().mockResolvedValue(undefined),
+    cursorCancel: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
 import { ipc } from "@/lib/ipc";
 import { dispatchSend, dispatchCancel } from "./dispatchSend";
 import { useProvidersStore } from "@/store/providersStore";
-import { BUILTIN_PROVIDER, CODEX_CLI_PROVIDER, GEMINI_CLI_PROVIDER } from "./seedData";
+import { BUILTIN_PROVIDER, CODEX_CLI_PROVIDER, CURSOR_SDK_PROVIDER, GEMINI_CLI_PROVIDER } from "./seedData";
 import type { Provider } from "./agentTypes";
 
 const openai: Provider = {
@@ -31,7 +33,7 @@ const openai: Provider = {
 beforeEach(() => {
   vi.clearAllMocks();
   useProvidersStore.setState({
-    providers: [BUILTIN_PROVIDER, openai, CODEX_CLI_PROVIDER, GEMINI_CLI_PROVIDER],
+    providers: [BUILTIN_PROVIDER, openai, CODEX_CLI_PROVIDER, GEMINI_CLI_PROVIDER, CURSOR_SDK_PROVIDER],
     loaded: true,
   });
 });
@@ -113,5 +115,17 @@ describe("dispatchSend CLI routing (Phase 2c)", () => {
   it("cancel routes a CLI selection to cliCancel", async () => {
     await dispatchCancel("c3", "gpt-5.1-codex");
     expect(ipc.cliCancel).toHaveBeenCalledWith("c3");
+  });
+  it("a cursor model routes to cursorSend with the provider keyRef", async () => {
+    await dispatchSend({ chatId: "c5", value: "composer-2.5", prompt: "P", history: [], projectRoot: "/proj", sessionId: "ag-1" });
+    expect(ipc.cursorSend).toHaveBeenCalledWith(
+      "c5", "P", "/proj", "ag-1", "composer-2.5", "", "builtin:cursor-sdk",
+    );
+    expect(ipc.claudeSend).not.toHaveBeenCalled();
+    expect(ipc.runtimeSend).not.toHaveBeenCalled();
+  });
+  it("cancel routes a cursor selection to cursorCancel", async () => {
+    await dispatchCancel("c5", "composer-2.5");
+    expect(ipc.cursorCancel).toHaveBeenCalledWith("c5");
   });
 });

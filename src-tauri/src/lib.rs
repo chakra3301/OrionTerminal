@@ -6,6 +6,7 @@ mod asset;
 mod autocomplete;
 mod claude_cli;
 mod cli_engine;
+mod cursor_engine;
 mod pi_engine;
 mod db_backup;
 mod fs_ops;
@@ -287,6 +288,9 @@ pub fn run() {
             api_key::github_token_set,
             api_key::github_token_clear,
             api_key::github_token_status,
+            api_key::cursor_api_key_set,
+            api_key::cursor_api_key_clear,
+            api_key::cursor_api_key_status,
             provider_keys::provider_key_set,
             provider_keys::provider_key_clear,
             provider_keys::provider_key_status,
@@ -315,6 +319,9 @@ pub fn run() {
             cli_engine::cli_status,
             cli_engine::cli_send,
             cli_engine::cli_cancel,
+            cursor_engine::cursor_status,
+            cursor_engine::cursor_send,
+            cursor_engine::cursor_cancel,
             pi_engine::pi_status,
             pi_engine::pi_send,
             pi_engine::pi_cancel,

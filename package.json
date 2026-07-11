@@ -9,11 +9,13 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "optimize:characters": "node scripts/optimize-characters.mjs"
   },
   "dependencies": {
     "@blocknote/mantine": "^0.39.1",
     "@blocknote/react": "^0.39.1",
+    "@cursor/sdk": "^1.0.22",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/space-grotesk": "^5.2.10",
     "@monaco-editor/react": "^4.7.0",
@@ -47,6 +49,8 @@
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.3.0",
+    "@gltf-transform/extensions": "^4.4.0",
+    "@gltf-transform/functions": "^4.4.0",
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

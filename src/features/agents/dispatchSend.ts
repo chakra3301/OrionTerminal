@@ -20,7 +20,7 @@ export type CliEngine = "codex_cli" | "gemini_cli";
 export type Route = "claude" | { engine: CliEngine } | Provider;
 
 /** "claude" → unchanged Claude CLI path; `{engine}` → subscription CLI engine
- *  (Phase 2c); otherwise the HTTP-runtime Provider to use. */
+ *  (Phase 2c); otherwise the HTTP-runtime or Cursor SDK Provider. */
 export function routeFor(providers: Provider[], model: string): Route {
   const owner = findOwningProvider(providers, model);
   if (!owner || owner.kind === "anthropic") return "claude";
@@ -139,6 +139,17 @@ export async function dispatchResolved(
       r.systemAppend ?? "",
     );
   }
+  if (route.kind === "cursor_sdk") {
+    return ipc.cursorSend(
+      chatId,
+      prompt,
+      opts.projectRoot ?? null,
+      opts.sessionId ?? null,
+      r.model,
+      r.systemAppend ?? "",
+      route.keyRef || route.id,
+    );
+  }
   return ipc.runtimeSend(
     chatId,
     route.kind,
@@ -233,5 +244,8 @@ export async function dispatchCancel(chatId: string, value: string): Promise<voi
   const route = routeFor(providers, model);
   if (route === "claude") return ipc.claudeCancel(chatId);
   if (typeof route === "object" && "engine" in route) return ipc.cliCancel(chatId);
+  if (typeof route === "object" && "kind" in route && route.kind === "cursor_sdk") {
+    return ipc.cursorCancel(chatId);
+  }
   return ipc.runtimeCancel(chatId);
 }

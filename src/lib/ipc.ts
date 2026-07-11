@@ -128,6 +128,10 @@ export const ipc = {
   apiKeyClear: (): Promise<void> => invoke("api_key_clear"),
   apiKeyStatus: (): Promise<boolean> => invoke<boolean>("api_key_status"),
 
+  cursorApiKeySet: (key: string): Promise<void> => invoke("cursor_api_key_set", { key }),
+  cursorApiKeyClear: (): Promise<void> => invoke("cursor_api_key_clear"),
+  cursorApiKeyStatus: (): Promise<boolean> => invoke<boolean>("cursor_api_key_status"),
+
   providerKeySet: (keyRef: string, key: string): Promise<void> =>
     invoke("provider_key_set", { keyRef, key }),
   providerKeyClear: (keyRef: string): Promise<void> =>
@@ -248,6 +252,28 @@ export const ipc = {
     engine: "codex_cli" | "gemini_cli",
   ): Promise<{ installed: boolean; loggedIn: boolean; version: string | null; detail: string }> =>
     invoke("cli_status", { engine }),
+
+  cursorSend: (
+    chatId: string,
+    prompt: string,
+    projectRoot: string | null,
+    sessionId: string | null,
+    model: string,
+    systemAppend: string,
+    keyRef: string,
+  ): Promise<void> =>
+    invoke("cursor_send", {
+      chatId,
+      prompt,
+      projectRoot,
+      sessionId,
+      model,
+      systemAppend,
+      keyRef,
+    }),
+  cursorCancel: (chatId: string): Promise<void> => invoke("cursor_cancel", { chatId }),
+  cursorStatus: (): Promise<{ installed: boolean; keySaved: boolean; ready: boolean; version: string | null; detail: string }> =>
+    invoke("cursor_status"),
 
   // Command Center — drive a profile as a headless `pi` run.
   piSend: (

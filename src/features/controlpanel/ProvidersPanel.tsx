@@ -76,12 +76,14 @@ export function ProvidersPanel() {
       <div className="cp-list">
         {providers.map((p) => {
           const isCli = p.kind === "codex_cli" || p.kind === "gemini_cli";
+          const isCursor = p.kind === "cursor_sdk";
           return (
             <div key={p.id} className="cp-card">
               <div className="cp-card-main">
                 <div className="cp-card-title">{p.name}</div>
                 <div className="cp-card-sub">{p.kind}{p.models.length ? ` · ${p.models.length} models` : ""}</div>
                 {isCli && <CliEngineStatus engine={p.kind as "codex_cli" | "gemini_cli"} />}
+                {isCursor && <CursorProviderStatus />}
                 {p.kind === "nous_oauth" && <NousProviderStatus keyRef={p.keyRef} />}
                 {isImageProvider(p) && <ImageModelField provider={p} />}
               </div>
@@ -194,6 +196,99 @@ function ImageModelField({ provider }: { provider: Provider }) {
         onChange={(e) => setVal(e.target.value)}
         onBlur={() => setImageModelOverride(provider.id, val)}
       />
+    </div>
+  );
+}
+
+function CursorProviderStatus() {
+  const [stat, setStat] = useState<{ installed: boolean; keySaved: boolean; ready: boolean; version: string | null; detail: string } | null>(null);
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState<boolean | null>(null);
+  const [justSaved, setJustSaved] = useState(false);
+  const [err, setErr] = useState("");
+
+  const refresh = async () => {
+    setBusy(true);
+    try {
+      const [status, hasKey] = await Promise.all([
+        ipc.cursorStatus(),
+        ipc.cursorApiKeyStatus(),
+      ]);
+      setStat(status);
+      setSaved(hasKey);
+      if (!hasKey) setJustSaved(false);
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const saveKey = async () => {
+    setErr("");
+    setJustSaved(false);
+    setBusy(true);
+    try {
+      if (!key.trim() && saved) {
+        await ipc.cursorApiKeyClear();
+      } else if (key.trim()) {
+        await ipc.cursorApiKeySet(key.trim());
+        setJustSaved(true);
+      } else {
+        setErr("Paste your Cursor API key first.");
+        return;
+      }
+      setKey("");
+      await refresh();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const keySaved = stat?.keySaved ?? saved === true;
+  const Icon = !stat ? RefreshCw : stat.ready ? CheckCircle2 : keySaved ? CheckCircle2 : LogIn;
+  const cls = stat?.ready ? "live" : keySaved ? "live" : "wait";
+  const label = !stat
+    ? "checking"
+    : stat.ready
+      ? "ready"
+      : keySaved
+        ? "key saved"
+        : "key needed";
+
+  return (
+    <div className="cp-cli-status">
+      <span className={`cp-badge ${cls}`}>
+        <Icon size={12} /> {label}
+      </span>
+      <span className="cp-card-sub">
+        {stat?.detail ?? ""}
+        {stat?.version ? ` · ${stat.version}` : ""}
+      </span>
+      <input
+        className="cp-input"
+        type="password"
+        placeholder={keySaved ? "API key saved — paste to replace" : "Cursor API key (cursor.com/dashboard → Integrations)"}
+        value={key}
+        onChange={(e) => { setKey(e.target.value); setJustSaved(false); }}
+        onKeyDown={(e) => { if (e.key === "Enter") void saveKey(); }}
+      />
+      <div className="cp-form-actions" style={{ marginTop: 8 }}>
+        <button type="button" className="cp-link" disabled={busy} onClick={() => void refresh()}>Re-check</button>
+        <button type="button" className="cp-btn" disabled={busy || (!key.trim() && !saved)} onClick={() => void saveKey()}>
+          {saved && !key.trim() ? "Clear key" : "Save key"}
+        </button>
+      </div>
+      {justSaved && !err && <span className="cp-card-sub" style={{ color: "var(--neon-green)" }}>Key saved to keychain.</span>}
+      {err && <span className="cp-form-error">{err}</span>}
     </div>
   );
 }
