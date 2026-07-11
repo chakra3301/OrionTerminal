@@ -11,6 +11,7 @@ import {
   extractConcepts,
   type ConceptMap,
 } from "@/features/notes/visualizer/conceptExtract";
+import { pictogramFor } from "@/features/notes/visualizer/pictograms";
 
 const ANALYZE_MS = 350;
 const TAU = Math.PI * 2;
@@ -23,7 +24,9 @@ const KIND_RGB: Record<NoteKind, [number, number, number]> = {
 
 type Glyph = {
   term: string;
-  shape: number;
+  draw: ShapeFn;
+  /** True when the term matched a real-object pictogram (tree, rocket, …). */
+  pictogram: boolean;
   phase: number;
   index: number; // stable part number
   x: number;
@@ -178,9 +181,11 @@ export function BlueprintCanvas({ text, kind }: { text: string; kind: NoteKind }
         const hsh = hash32(c.term);
         const tx = pad + ((hsh % 1000) / 1000) * (w - pad * 2);
         const ty = pad + (((hsh >>> 10) % 1000) / 1000) * (h - pad * 2);
+        const pict = pictogramFor(c.term);
         glyphs.set(c.term, {
           term: c.term,
-          shape: hsh % SHAPES.length,
+          draw: pict ?? SHAPES[hsh % SHAPES.length]!,
+          pictogram: pict != null,
           phase: ((hsh >>> 20) % 628) / 100,
           index: ++partCounter.current,
           x: tx,
@@ -389,6 +394,8 @@ export function BlueprintCanvas({ text, kind }: { text: string; kind: NoteKind }
         ctx.save();
         ctx.translate(gx, gy);
         ctx.strokeStyle = col(stroke);
+        // Pictograms fill small details (eyes, rivets, glyph text) too.
+        ctx.fillStyle = col(stroke);
         ctx.lineWidth = 1;
         // Draw-in: the shape traces itself like a pen plotter.
         if (glyph.appear < 1) {
@@ -398,7 +405,7 @@ export function BlueprintCanvas({ text, kind }: { text: string; kind: NoteKind }
           ctx.setLineDash([]);
         }
         const spin = reduced ? glyph.phase : t * 0.22 + glyph.phase;
-        SHAPES[glyph.shape]!(ctx, s, spin);
+        glyph.draw(ctx, s, spin);
         ctx.setLineDash([]);
 
         // Part number, top-left of the module.
