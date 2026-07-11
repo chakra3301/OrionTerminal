@@ -87,7 +87,12 @@ fn resolve_script(app: &AppHandle) -> Option<PathBuf> {
         return dev.canonicalize().ok().or(Some(dev));
     }
     if let Ok(res) = app.path().resource_dir() {
-        for candidate in [res.join("cursor-agent.mjs"), res.join("scripts/cursor-agent.mjs")] {
+        // Tauri maps resources declared with `../` under `_up_/` in the bundle.
+        for candidate in [
+            res.join("_up_/scripts/cursor-agent.mjs"),
+            res.join("scripts/cursor-agent.mjs"),
+            res.join("cursor-agent.mjs"),
+        ] {
             if candidate.exists() {
                 return Some(candidate);
             }
