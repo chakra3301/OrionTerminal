@@ -49,6 +49,7 @@ import {
   buildElementRefinePrompt,
 } from "@/apps/xdesign/htmlArtifact";
 import { useHtmlArtifact } from "@/apps/xdesign/htmlArtifactStore";
+import { useRailIntent } from "@/apps/xdesign/railIntentStore";
 import {
   extractSvg,
   stripSvg,
@@ -886,6 +887,39 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     { icon: Paintbrush, tip: "Apply brand — restyle the canvas to the active design system", onClick: handleApplyBrand, disabled: thread.running },
     { icon: Palette, tip: "Extract brand — distill the canvas into a reusable design system", onClick: handleExtractBrand, disabled: thread.running },
   ];
+
+  // External triggers (side tool rail, project-start picker) request a flow via
+  // the intent store; we surface the rail and dispatch to the matching handler.
+  const intentSeq = useRailIntent((s) => s.seq);
+  useEffect(() => {
+    const { mode, consume } = useRailIntent.getState();
+    if (!mode) return;
+    consume();
+    setOpen(true);
+    if (collapsed) setUi({ collapsed: false });
+    switch (mode) {
+      case "open":
+        break;
+      case "webpage":
+        handleWebpageButton();
+        break;
+      case "image":
+        handleImageButton();
+        break;
+      case "critique":
+        void handleCritique();
+        break;
+      case "applyBrand":
+        void handleApplyBrand();
+        break;
+      case "extractBrand":
+        void handleExtractBrand();
+        break;
+      default:
+        enterMode(mode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intentSeq]);
 
   if (!open) {
     return (
