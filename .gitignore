@@ -50,3 +50,6 @@ DerivedData
 
 # Brainstorm visual companion (local mockups)
 .superpowers/
+
+# Character source GLBs (126MB originals — optimized copies live in public/characters)
+scripts/characters-src/

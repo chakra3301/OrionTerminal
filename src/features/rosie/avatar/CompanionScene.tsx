@@ -8,13 +8,22 @@ import {
 } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import * as THREE from "three";
+import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { useVoice } from "@/store/voiceStore";
 import { useRosie } from "@/features/rosie/rosieStore";
 import { useCompanionMode, type CompanionMode } from "./companionMode";
 import { useCompanionDebug } from "./companionDebugStore";
 import { useCompanionProactive } from "./companionProactiveStore";
 import { dragState } from "./dragState";
+import { useCharacterStore } from "@/store/characterStore";
+import {
+  ROSIE_ID,
+  resolveClips,
+  BUILTIN_CHARACTERS,
+  type Character,
+} from "@/features/characters/catalog";
 
 // The merged companion (mesh + all 10 clips, built by scripts/build-companion-glb.mjs).
 // null → holographic placeholder (also the graceful fallback if it fails to load).
@@ -196,7 +205,7 @@ function RosieModel({ mode }: { mode: CompanionMode }) {
     action: null,
     fadeOutAt: 0,
     fading: false,
-    nextAt: 75, // first random fidget ~75s in (not right after the entrance)
+    nextAt: -1, // sentinel — seeded from the live clock on the first frame
     last: "",
     queue: [],
     lookW: 0,
@@ -229,7 +238,7 @@ function RosieModel({ mode }: { mode: CompanionMode }) {
     for (const c of animations) r.clips[c.name] = c;
     r.action = null;
     r.fading = false;
-    r.nextAt = 75;
+    r.nextAt = -1;
     r.last = "";
     r.queue = [];
     r.lookW = 0;
@@ -334,6 +343,10 @@ function RosieModel({ mode }: { mode: CompanionMode }) {
         r.fadeOutAt = t;
       }
 
+      // Seed the first-fidget delay from the live clock — the canvas clock may
+      // be long past 0 when this rig (re)mounts after a character switch.
+      if (r.nextAt < 0) r.nextAt = t + 75;
+
       // Fidget / one-shot machine. When the active clip ends, crossfade back to
       // the idle loop — re-enabling the idle action first, since three.js
       // disables an action once it fades to weight 0 (a bare fadeIn won't revive
@@ -432,6 +445,170 @@ function RosieModel({ mode }: { mode: CompanionMode }) {
   );
 }
 
+// ── Generic companion (a chosen character standing in for R.O.S.I.E) ────────
+// Meshy / uploaded models only ship idle/run/walk(/spin), so this is a lean rig
+// vs RosieModel: idle loop + occasional fidget + the same drag ragdoll swing.
+// Mode coloring still comes from ModeLight.
+function CharacterCompanion({ url }: { url: string }) {
+  const gltf = useGLTF(url);
+  const scene = useMemo(() => cloneSkeleton(gltf.scene), [gltf.scene]);
+  const swingRef = useRef<THREE.Group>(null);
+  const st = useRef({
+    mixer: null as THREE.AnimationMixer | null,
+    idle: null as THREE.AnimationAction | null,
+    action: null as THREE.AnimationAction | null,
+    fadeOutAt: 0,
+    fading: false,
+    nextAt: -1, // sentinel — seeded from the live clock on the first frame
+    root: undefined as THREE.Bone | undefined,
+    rootRest: undefined as THREE.Vector3 | undefined,
+    swingZ: 0,
+    swingVZ: 0,
+    swingX: 0,
+    swingVX: 0,
+  });
+
+  const fit = useMemo(() => {
+    scene.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(scene);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    return { scale: FIT_HEIGHT / (size.y || 1), center };
+  }, [scene]);
+
+  const names = useMemo(
+    () => gltf.animations.map((c) => c.name),
+    [gltf.animations],
+  );
+  const clips = useMemo(() => resolveClips(names), [names]);
+  const fidgetPool = useMemo(
+    () =>
+      names.filter((n) => {
+        const l = n.toLowerCase();
+        return (
+          l.includes("run") ||
+          l.includes("walk") ||
+          l.includes("spin") ||
+          l.includes("jump")
+        );
+      }),
+    [names],
+  );
+
+  useEffect(() => {
+    const s = st.current;
+    const m = new THREE.AnimationMixer(scene);
+    s.mixer = m;
+    s.action = null;
+    s.fading = false;
+    s.nextAt = -1;
+    const idleClip =
+      gltf.animations.find((c) => c.name === clips.idle) ?? gltf.animations[0];
+    if (idleClip) {
+      const a = m.clipAction(idleClip);
+      a.setLoop(THREE.LoopRepeat, Infinity);
+      a.play();
+      s.idle = a;
+    }
+    scene.traverse((o) => {
+      const b = o as THREE.Bone;
+      if (b.isBone && /hips|pelvis|root/i.test(b.name) && !s.root) {
+        s.root = b;
+        s.rootRest = b.position.clone();
+      }
+    });
+    return () => {
+      m.stopAllAction();
+      s.mixer = null;
+      s.idle = null;
+      s.action = null;
+      s.root = undefined;
+    };
+  }, [scene, gltf.animations, clips.idle]);
+
+  useFrame((state, rawDt) => {
+    const s = st.current;
+    const m = s.mixer;
+    if (!m) return;
+    const dt = Math.min(rawDt, 0.05);
+    const t = state.clock.elapsedTime;
+    m.update(dt);
+
+    // Seed the first-fidget delay from the live clock — the canvas clock may
+    // be long past 0 when this rig mounts after a character switch.
+    if (s.nextAt < 0) s.nextAt = t + 20 + Math.random() * 40;
+
+    // Fidget machine: idle loop, occasional one-shot, then ease back.
+    if (s.action) {
+      if (!s.fading && t >= s.fadeOutAt) {
+        s.action.fadeOut(0.4);
+        if (s.idle) {
+          s.idle.enabled = true;
+          s.idle.fadeIn(0.4);
+        }
+        s.fading = true;
+      }
+      if (s.fading && s.action.getEffectiveWeight() < 0.02) {
+        s.action.stop();
+        s.action = null;
+        s.fading = false;
+        s.nextAt = t + 90 + Math.random() * 180;
+      }
+    } else if (t >= s.nextAt && fidgetPool.length) {
+      const name = fidgetPool[Math.floor(Math.random() * fidgetPool.length)];
+      const clip = gltf.animations.find((c) => c.name === name);
+      if (clip) {
+        const a = m.clipAction(clip);
+        a.reset();
+        a.setLoop(THREE.LoopOnce, 1);
+        a.clampWhenFinished = true;
+        a.fadeIn(0.3).play();
+        s.idle?.fadeOut(0.3);
+        s.action = a;
+        s.fadeOutAt = t + 0.3 + clip.duration;
+        s.fading = false;
+      } else {
+        s.nextAt = t + 60;
+      }
+    }
+
+    // Keep planted: pin root horizontal so locomotion clips play in place.
+    if (s.root && s.rootRest) {
+      s.root.position.x = s.rootRest.x;
+      s.root.position.z = s.rootRest.z;
+    }
+
+    // Drag ragdoll swing (identical spring to RosieModel).
+    const ds = dragState;
+    ds.vx -= ds.vx * Math.min(1, dt * 7);
+    ds.vy -= ds.vy * Math.min(1, dt * 7);
+    const tZ = ds.dragging ? THREE.MathUtils.clamp(-ds.vx * 0.22, -0.7, 0.7) : 0;
+    const tX = ds.dragging ? THREE.MathUtils.clamp(ds.vy * 0.16, -0.5, 0.5) : 0;
+    const K = 95;
+    const C = 11;
+    s.swingVZ += (K * (tZ - s.swingZ) - C * s.swingVZ) * dt;
+    s.swingZ += s.swingVZ * dt;
+    s.swingVX += (K * (tX - s.swingX) - C * s.swingVX) * dt;
+    s.swingX += s.swingVX * dt;
+    if (swingRef.current) {
+      swingRef.current.rotation.z = s.swingZ;
+      swingRef.current.rotation.x = s.swingX;
+    }
+  });
+
+  return (
+    <group ref={swingRef}>
+      <group rotation={[0, MODEL_FACING, 0]} scale={fit.scale}>
+        <group position={[-fit.center.x, -fit.center.y, -fit.center.z]}>
+          <primitive object={scene} />
+        </group>
+      </group>
+    </group>
+  );
+}
+
 /** Falls back to the placeholder if the model fails to load. */
 class ModelBoundary extends Component<
   { fallback: ReactNode; children: ReactNode },
@@ -469,14 +646,33 @@ function ModeLight({ mode }: { mode: CompanionMode }) {
 
 function Avatar() {
   const mode = useCompanionMode();
+  const selectedId = useCharacterStore((s) => s.selectedId);
+  const custom = useCharacterStore((s) => s.custom);
+  const selected = useMemo<Character | null>(
+    () =>
+      [...BUILTIN_CHARACTERS, ...custom].find((c) => c.id === selectedId) ?? null,
+    [selectedId, custom],
+  );
   const placeholder = <Placeholder mode={mode} />;
-  const body = !MODEL_URL ? (
-    placeholder
+
+  // R.O.S.I.E (the default) keeps her full behavior rig; any other chosen
+  // character renders through the lean generic companion rig.
+  const isRosie = !selected || selectedId === ROSIE_ID;
+  const inner = isRosie ? (
+    MODEL_URL ? (
+      <RosieModel mode={mode} />
+    ) : (
+      placeholder
+    )
   ) : (
+    <CharacterCompanion
+      url={selected.custom ? convertFileSrc(selected.filePath) : selected.url}
+    />
+  );
+
+  const body = (
     <ModelBoundary fallback={placeholder}>
-      <Suspense fallback={placeholder}>
-        <RosieModel mode={mode} />
-      </Suspense>
+      <Suspense fallback={placeholder}>{inner}</Suspense>
     </ModelBoundary>
   );
   return (

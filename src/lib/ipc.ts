@@ -489,6 +489,13 @@ export const ipc = {
   wallpaperClearFile: (filePath: string): Promise<void> =>
     invoke("wallpaper_clear_file", { filePath }),
 
+  characterStoreFile: (
+    sourcePath: string,
+  ): Promise<{ filePath: string; originalName: string }> =>
+    invoke("character_store_file", { sourcePath }),
+  characterClearFile: (filePath: string): Promise<void> =>
+    invoke("character_clear_file", { filePath }),
+
   systemStats: (): Promise<SystemStats> => invoke("system_stats"),
   claudeUsage: (): Promise<ClaudeUsage> => invoke("claude_usage"),
   claudeLimits: (): Promise<ClaudeLimits> => invoke("claude_limits"),

@@ -1,4 +1,4 @@
-import { Fragment, useEffect } from "react";
+import { Fragment, Suspense, lazy, useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
 import { useControlPanel, type CpSection } from "@/store/controlPanelStore";
 import { ProvidersPanel } from "./ProvidersPanel";
@@ -7,7 +7,12 @@ import { AgentForge } from "./AgentForge";
 import { APIKeySection, ThemeSection, WallpaperSection, McpSection, ShortcutsSection, AboutSection } from "@/features/settings/SettingsPanel";
 import { AccountSection } from "@/features/auth/AccountSection";
 import { OrionSettings, ArchivesSettings, XDesignSettings } from "./AppSettingsPanels";
-import { X, Cpu, Hammer, Sparkles, KeyRound, Palette, Image as ImageIcon, Plug, Keyboard, Info, ShieldCheck, Code2, BookOpen, PenTool } from "lucide-react";
+const CharacterPicker = lazy(() =>
+  import("@/features/characters/CharacterPicker").then((m) => ({
+    default: m.CharacterPicker,
+  })),
+);
+import { X, Cpu, Hammer, Sparkles, KeyRound, Palette, Image as ImageIcon, Plug, Keyboard, Info, ShieldCheck, Code2, BookOpen, PenTool, Users } from "lucide-react";
 import "./controlpanel.css";
 
 const NAV: { key: CpSection; label: string; Icon: LucideIcon }[] = [
@@ -21,6 +26,7 @@ const NAV: { key: CpSection; label: string; Icon: LucideIcon }[] = [
   { key: "key", label: "API Keys", Icon: KeyRound },
   { key: "theme", label: "Appearance", Icon: Palette },
   { key: "wallpaper", label: "Wallpaper", Icon: ImageIcon },
+  { key: "characters", label: "Characters", Icon: Users },
   { key: "mcp", label: "MCP Servers", Icon: Plug },
   { key: "shortcuts", label: "Shortcuts", Icon: Keyboard },
   { key: "about", label: "About", Icon: Info },
@@ -76,6 +82,11 @@ export function ControlPanel() {
             {section === "key" && <APIKeySection />}
             {section === "theme" && <ThemeSection />}
             {section === "wallpaper" && <WallpaperSection />}
+            {section === "characters" && (
+              <Suspense fallback={<div className="ot-settings-p">Loading…</div>}>
+                <CharacterPicker />
+              </Suspense>
+            )}
             {section === "mcp" && <McpSection />}
             {section === "shortcuts" && <ShortcutsSection />}
             {section === "about" && <AboutSection />}

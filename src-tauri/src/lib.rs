@@ -27,6 +27,7 @@ mod spotify;
 mod sysstats;
 mod terminal;
 mod ui_bridge;
+mod characters;
 mod wallpaper;
 mod xdesign_image;
 mod xdesign_web;
@@ -354,6 +355,8 @@ pub fn run() {
             fs_watch::fs_watch_set_root,
             wallpaper::wallpaper_store_file,
             wallpaper::wallpaper_clear_file,
+            characters::character_store_file,
+            characters::character_clear_file,
             sysstats::system_stats,
             sysstats::claude_usage,
             sysstats::claude_limits,

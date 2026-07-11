@@ -44,6 +44,7 @@ import { useThemeStore } from "@/store/themeStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { useAppConfig, type AppConfigsPersist } from "@/store/appConfigStore";
 import { useWallpaperStore, type WallpaperState } from "@/store/wallpaperStore";
+import { useCharacterStore } from "@/store/characterStore";
 import { usePreviewStore, type PreviewState } from "@/store/previewStore";
 import { useXDesign } from "@/apps/xdesign/store";
 import {
@@ -123,6 +124,7 @@ async function hydrate() {
     terminalOpen,
     terminalHeight,
     wallpaper,
+    characters,
     preview,
     modelPrefs,
     reduceGlass,
@@ -140,6 +142,9 @@ async function hydrate() {
     getAppState<boolean>("terminal_open"),
     getAppState<number>("terminal_height"),
     getAppState<WallpaperState>("wallpaper"),
+    getAppState<Parameters<ReturnType<typeof useCharacterStore.getState>["hydrate"]>[0]>(
+      "characters",
+    ),
     getAppState<PreviewState>("preview"),
     getAppState<Record<string, string>>("models"),
     getAppState<boolean>("reduce_glass"),
@@ -151,6 +156,7 @@ async function hydrate() {
   useThemeStore.getState().hydrateGlass(reduceGlass);
   useAutocomplete.getState().hydrate(tabAutocomplete);
   if (wallpaper) useWallpaperStore.getState().hydrate(wallpaper);
+  if (characters) useCharacterStore.getState().hydrate(characters);
   if (preview) usePreviewStore.getState().hydrate(preview);
   void useXDProjects.getState().init();
   useModelPrefs.getState().hydrate(modelPrefs);

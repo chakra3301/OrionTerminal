@@ -28,6 +28,8 @@
           "$APPDATA/com.lucaorion.orion-terminal/assets/**",
           "$APPDATA/wallpapers/**",
           "$APPDATA/com.lucaorion.orion-terminal/wallpapers/**",
+          "$APPDATA/characters/**",
+          "$APPDATA/com.lucaorion.orion-terminal/characters/**",
           "$APPDATA/repolens/**",
           "$APPDATA/com.lucaorion.orion-terminal/repolens/**",
           "$APPDATA/command-center/**",
