@@ -246,14 +246,12 @@ fn chrono_like_now() -> String {
 }
 
 #[tauri::command]
-pub async fn asset_delete_file(file_path: String) -> Result<(), String> {
+pub async fn asset_delete_file(app: AppHandle, file_path: String) -> Result<(), String> {
     // Frontend calls this AFTER the DB row is deleted. Idempotent — a missing
-    // file is fine.
-    let path = PathBuf::from(&file_path);
-    if path.exists() {
-        fs::remove_file(&path).map_err(|e| format!("remove_file: {e}"))?;
-    }
-    Ok(())
+    // file is fine. Scoped to the assets dir so a bad path can't delete
+    // anything else.
+    let dir = asset_dir(&app)?;
+    crate::fs_ops::remove_file_within(&dir, &file_path)
 }
 
 /// Write a transient XDesign canvas snapshot PNG for the Claude vision loop.

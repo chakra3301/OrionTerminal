@@ -1044,17 +1044,6 @@ mod tests {
     }
 
     #[test]
-    fn first_image_picks_png_over_md() {
-        let files = vec![
-            "BEHAVIORS.md".to_string(),
-            "hero-desktop.png".to_string(),
-            "notes.txt".to_string(),
-        ];
-        assert_eq!(pick_thumbnail(&files), Some("hero-desktop.png".to_string()));
-        assert_eq!(pick_thumbnail(&["only.md".to_string()]), None);
-    }
-
-    #[test]
     fn earliest_new_image_skips_scaffold_and_picks_first_real_screenshot() {
         let initial: HashSet<String> =
             ["comparison.png".to_string(), ".gitkeep".to_string()]

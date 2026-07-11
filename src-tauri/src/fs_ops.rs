@@ -252,6 +252,28 @@ pub fn search_in_files(
     Ok(out)
 }
 
+/// Delete `file_path` only if it resolves inside `dir`. Guards the
+/// frontend-supplied delete commands (wallpapers, characters, assets) so a bad
+/// path can never reach outside the app's own storage directory. Idempotent —
+/// a missing file is fine. Canonicalizes both sides, so symlinks pointing out
+/// of the directory are refused too.
+pub(crate) fn remove_file_within(dir: &Path, file_path: &str) -> Result<(), String> {
+    let Ok(target) = Path::new(file_path).canonicalize() else {
+        return Ok(()); // already gone
+    };
+    let dir = dir
+        .canonicalize()
+        .map_err(|e| format!("canonicalize storage dir: {e}"))?;
+    if !target.starts_with(&dir) {
+        return Err(format!(
+            "refusing to delete outside {}: {}",
+            dir.display(),
+            file_path
+        ));
+    }
+    std::fs::remove_file(&target).map_err(|e| format!("remove_file: {e}"))
+}
+
 /// Create a new file (with parent dirs) or directory. Errors if it exists.
 #[tauri::command]
 pub fn create_path(path: String, is_dir: bool) -> Result<(), String> {

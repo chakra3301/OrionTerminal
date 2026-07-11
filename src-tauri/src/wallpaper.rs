@@ -79,10 +79,7 @@ pub async fn wallpaper_store_file(
 }
 
 #[tauri::command]
-pub async fn wallpaper_clear_file(file_path: String) -> Result<(), String> {
-    let path = PathBuf::from(&file_path);
-    if path.exists() {
-        fs::remove_file(&path).map_err(|e| format!("remove_file: {e}"))?;
-    }
-    Ok(())
+pub async fn wallpaper_clear_file(app: AppHandle, file_path: String) -> Result<(), String> {
+    let dir = wallpaper_dir(&app)?;
+    crate::fs_ops::remove_file_within(&dir, &file_path)
 }
