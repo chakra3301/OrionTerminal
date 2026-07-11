@@ -185,6 +185,7 @@ export function LessonView() {
   const topics          = useLearn((s) => s.topics);
   const nodes           = useLearn((s) => s.nodes);
   const generatingLesson = useLearn((s) => s.generatingLesson);
+  const lessonError     = useLearn((s) => (s.openNodeId ? s.lessonError[s.openNodeId] : undefined));
   const closeNode       = useLearn((s) => s.closeNode);
   const openNode        = useLearn((s) => s.openNode);
   const findLinks       = useLearn((s) => s.findLinks);
@@ -216,7 +217,7 @@ export function LessonView() {
   // ── Loading state ────────────────────────────────────────────────────
   if (!openNodeId || !node) return null;
 
-  if (generatingLesson || (node.lesson_json === null && !isEmpty)) {
+  if (generatingLesson) {
     return (
       <div className="ll-spine">
         <div className="ll-breadcrumb">
@@ -242,13 +243,18 @@ export function LessonView() {
         </div>
         <div className="ll-empty">
           <BookOpen size={32} className="ll-empty-icon" />
-          <p>No lesson content yet.</p>
+          <p>{lessonError ? "Lesson generation failed." : "No lesson content yet."}</p>
+          {lessonError && (
+            <p style={{ color: "var(--t-tertiary)", fontSize: 12, maxWidth: 360, textAlign: "center" }}>
+              {lessonError}
+            </p>
+          )}
           <button
             className="ll-btn ll-btn--primary"
             type="button"
             onClick={() => void openNode(openNodeId)}
           >
-            Generate lesson
+            {lessonError ? "Retry" : "Generate lesson"}
           </button>
         </div>
       </div>

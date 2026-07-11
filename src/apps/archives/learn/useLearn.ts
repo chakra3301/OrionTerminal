@@ -32,6 +32,7 @@ interface LearnState {
   openNodeId: string | null;
   generatingGraph: boolean;
   generatingLesson: boolean;
+  lessonError: Record<string, string>;
   recentMisses: string[];
   progress: Record<string, TopicProgress>;
   earnedKeys: Set<string>;
@@ -67,6 +68,7 @@ const initialState = {
   openNodeId: null as string | null,
   generatingGraph: false,
   generatingLesson: false,
+  lessonError: {} as Record<string, string>,
   recentMisses: [] as string[],
   progress: {} as Record<string, TopicProgress>,
   earnedKeys: new Set<string>() as Set<string>,
@@ -236,8 +238,14 @@ export const useLearn = create<LearnState>((set, get) => ({
         set((s) => {
           const existing = s.nodes[id];
           if (!existing) return {};
-          return { nodes: { ...s.nodes, [id]: { ...existing, lesson_json: json, lesson_at: lessonAt } } };
+          const lessonError = { ...s.lessonError };
+          delete lessonError[id];
+          return { nodes: { ...s.nodes, [id]: { ...existing, lesson_json: json, lesson_at: lessonAt } }, lessonError };
         });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        set((s) => ({ lessonError: { ...s.lessonError, [id]: msg } }));
+        toast.error("Lesson generation failed", { body: msg });
       } finally {
         set({ generatingLesson: false });
       }
