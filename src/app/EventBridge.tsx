@@ -23,6 +23,8 @@ import {
   isOrionHermesWriteTool,
 } from "@/lib/orionToolMatch";
 import { useHermes, type HermesStatus, type HermesColumn } from "@/store/hermesStore";
+import { usePluginManager } from "@/store/pluginManagerStore";
+import { BUILTIN_APP_PLUGIN_IDS } from "@/plugins/builtinApps";
 import { useCommand } from "@/store/commandStore";
 import { type CcEvent } from "@/apps/command/ccRun";
 import { useSpotify } from "@/store/spotifyStore";
@@ -504,7 +506,12 @@ function trackOrionToolSideEffects(env: ClaudeEnvelope) {
           if (isOrionNoteWriteTool(name)) scheduleNotesRefresh();
           if (isOrionMoodWriteTool(name)) scheduleMoodRefresh();
           if (isOrionAssetWriteTool(name)) scheduleAssetsRefresh();
-          if (isOrionHermesWriteTool(name)) scheduleHermesRefresh();
+          if (
+            isOrionHermesWriteTool(name) &&
+            usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.hermes)
+          ) {
+            scheduleHermesRefresh();
+          }
         }
         // GC: each tool_use id is one-shot — drop after first result.
         toolUseIdToName.delete(tr.tool_use_id);
@@ -664,6 +671,7 @@ export function EventBridge() {
     listen<{ taskId: string; agentId: string; text: string }>(
       "hermes:agent",
       (e) => {
+        if (!usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.hermes)) return;
         useHermes
           .getState()
           .applyAgentText(e.payload.taskId, e.payload.agentId, e.payload.text);
@@ -678,12 +686,14 @@ export function EventBridge() {
       error: string;
       sessionId: string | null;
     }>("hermes:agentStatus", (e) => {
+      if (!usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.hermes)) return;
       useHermes.getState().applyAgentStatus(e.payload);
     }).then((u) => unlisteners.push(u));
 
     listen<{ taskId: string; status: HermesStatus; columnId: HermesColumn }>(
       "hermes:task",
       (e) => {
+        if (!usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.hermes)) return;
         useHermes.getState().applyTask(e.payload);
       },
     ).then((u) => unlisteners.push(u));

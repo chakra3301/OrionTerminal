@@ -8,7 +8,8 @@ import { KeybindingsOverlay } from "@/features/keybindings/KeybindingsOverlay";
 import { installBuiltinCommands } from "@/commands/builtins";
 import { installShellCommands } from "@/shell/commands/shellCommands";
 import { installSpotifyCommands } from "@/shell/commands/spotifyCommands";
-import { ensureBuiltinAppPlugins } from "@/plugins/builtinApps";
+import { BUILTIN_APP_PLUGIN_IDS } from "@/plugins/builtinApps";
+import { usePluginManager, type PluginEnablementV1 } from "@/store/pluginManagerStore";
 import { HotkeyHost } from "@/lib/hotkeys";
 import { useTerminalStore } from "@/store/terminalStore";
 import { getAppState, getDb } from "@/lib/db";
@@ -76,7 +77,6 @@ import { ensureOrionTheme } from "@/apps/orion/monacoTheme";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
 import type { LayoutNode } from "@/components/workspace/types";
 
-ensureBuiltinAppPlugins();
 installBuiltinCommands();
 installShellCommands();
 installSpotifyCommands();
@@ -132,6 +132,7 @@ async function hydrate() {
     reduceGlass,
     tabAutocomplete,
     appConfigs,
+    pluginState,
   ] = await Promise.all([
     getAppState<{ sidebar: number; main: number; right: number }>("panel_sizes"),
     getAppState<boolean>("sidebar_open"),
@@ -152,6 +153,7 @@ async function hydrate() {
     getAppState<boolean>("reduce_glass"),
     getAppState<boolean>("tab_autocomplete"),
     getAppState<AppConfigsPersist>("appconfig"),
+    getAppState<PluginEnablementV1>("plugins.state"),
   ]);
 
   useThemeStore.getState().hydrate(theme ?? null);
@@ -160,7 +162,10 @@ async function hydrate() {
   if (wallpaper) useWallpaperStore.getState().hydrate(wallpaper);
   if (characters) useCharacterStore.getState().hydrate(characters);
   if (preview) usePreviewStore.getState().hydrate(preview);
-  void useXDProjects.getState().init();
+  usePluginManager.getState().hydrate(pluginState);
+  if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign)) {
+    void useXDProjects.getState().init();
+  }
   useModelPrefs.getState().hydrate(modelPrefs);
   useAppConfig.getState().hydrate(appConfigs);
 
@@ -221,15 +226,19 @@ async function hydrate() {
   } catch (err) {
     log.warn("collections load failed", err);
   }
-  try {
-    await useHermes.getState().load();
-  } catch (err) {
-    log.warn("hermes load failed", err);
+  if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.hermes)) {
+    try {
+      await useHermes.getState().load();
+    } catch (err) {
+      log.warn("hermes load failed", err);
+    }
   }
-  try {
-    await useCommand.getState().load();
-  } catch (err) {
-    log.warn("command center load failed", err);
+  if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.command)) {
+    try {
+      await useCommand.getState().load();
+    } catch (err) {
+      log.warn("command center load failed", err);
+    }
   }
   try {
     await useProvidersStore.getState().load();

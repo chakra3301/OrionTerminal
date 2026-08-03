@@ -4,6 +4,7 @@ import { useControlPanel, type CpSection } from "@/store/controlPanelStore";
 import { ProvidersPanel } from "./ProvidersPanel";
 import { SkillLibraryPanel } from "./SkillLibraryPanel";
 import { AgentForge } from "./AgentForge";
+import { PluginManagerPanel } from "./PluginManagerPanel";
 import { APIKeySection, ThemeSection, WallpaperSection, McpSection, ShortcutsSection, AboutSection } from "@/features/settings/SettingsPanel";
 import { AccountSection } from "@/features/auth/AccountSection";
 import { OrionSettings, ArchivesSettings, XDesignSettings } from "./AppSettingsPanels";
@@ -12,10 +13,11 @@ const CharacterPicker = lazy(() =>
     default: m.CharacterPicker,
   })),
 );
-import { X, Cpu, Hammer, Sparkles, KeyRound, Palette, Image as ImageIcon, Plug, Keyboard, Info, ShieldCheck, Code2, BookOpen, PenTool, Users } from "lucide-react";
+import { X, Cpu, Hammer, Sparkles, KeyRound, Palette, Image as ImageIcon, Plug, Keyboard, Info, ShieldCheck, Code2, BookOpen, PenTool, Users, Package } from "lucide-react";
 import "./controlpanel.css";
 
 const NAV: { key: CpSection; label: string; Icon: LucideIcon }[] = [
+  { key: "plugins", label: "Plugins", Icon: Package },
   { key: "providers", label: "Providers", Icon: Cpu },
   { key: "agents", label: "Agent Forge", Icon: Hammer },
   { key: "skills", label: "Skill Library", Icon: Sparkles },
@@ -72,6 +74,7 @@ export function ControlPanel() {
             <button className="cp-close" onClick={hide} aria-label="Close"><X size={14} /></button>
           </header>
           <div className="cp-main-body">
+            {section === "plugins" && <PluginManagerPanel />}
             {section === "providers" && <ProvidersPanel />}
             {section === "agents" && <AgentForge />}
             {section === "skills" && <SkillLibraryPanel />}

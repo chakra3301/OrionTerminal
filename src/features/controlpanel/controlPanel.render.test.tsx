@@ -11,6 +11,7 @@ import { createRoot } from "react-dom/client";
 import { AgentForge } from "./AgentForge";
 import { SkillLibraryPanel } from "./SkillLibraryPanel";
 import { SkillEditor } from "./SkillEditor";
+import { PluginManagerPanel } from "./PluginManagerPanel";
 import { ModelSelect } from "@/components/ModelSelect";
 import type { Skill } from "@/features/agents/agentTypes";
 
@@ -67,5 +68,8 @@ describe("Control Panel surfaces render without a Zustand v5 selector loop", () 
   });
   it("ModelSelect mounts", () => {
     expect(rendersWithoutLoop(<ModelSelect surface="orion" />)).toEqual({ ok: true, detail: "" });
+  });
+  it("PluginManagerPanel mounts", () => {
+    expect(rendersWithoutLoop(<PluginManagerPanel />)).toEqual({ ok: true, detail: "" });
   });
 });

@@ -224,6 +224,9 @@ As of 2026-08-03, the first internal-runtime slice is implemented:
 - The command registry tracks owners and supports owner-wide disposal while retaining its existing API.
 - Apps are dynamic trusted descriptors consumed by Shell, Dock, Spotlight, MenuBar, fullscreen navigation, persisted-window restore, and open commands.
 - Archives, Orion, XDesign, Command Center, and Hermes bootstrap through the same internal app contract. Hermes is the lifecycle pilot: deactivation removes its app descriptor, command, Dock/Spotlight surfaces, and open window.
+- `src/store/pluginManagerStore.ts` hydrates a versioned `plugins.state` record before persisted windows restore. New built-ins default enabled; unknown and migration-locked disable requests fail closed.
+- Control Panel and the legacy Settings surface now expose Plugin Manager. Hermes can be enabled/disabled live; running Hermes work blocks deactivation, and ordinary disable retains all task/report data.
+- Apps whose remaining commands/background services still use compatibility paths are visible but locked until those contributions are owner-migrated. This avoids presenting a partial disable as complete isolation.
 
 This is an internal trusted-plugin runtime only. It does not load packages or grant community code React/Tauri authority. A future community app renderer must be an opaque-origin sandbox renderer, not the current `trusted-react` renderer.
 

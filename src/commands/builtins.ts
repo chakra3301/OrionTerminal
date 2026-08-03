@@ -443,6 +443,13 @@ export function installBuiltinCommands() {
     group: "View",
     run: () => useControlPanel.getState().show("theme"),
   });
+  registry.register({
+    id: "plugins.open",
+    label: "Open Plugin Manager",
+    keywords: ["plugins", "extensions", "capabilities", "enable", "disable"],
+    group: "View",
+    run: () => useControlPanel.getState().show("plugins"),
+  });
 
   // Sign out — drops the remembered session and returns to the lock screen.
   // Only surfaced once sign-in is enabled (an account exists).

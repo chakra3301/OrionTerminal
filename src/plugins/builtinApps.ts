@@ -14,7 +14,7 @@ export const BUILTIN_APP_PLUGIN_IDS = {
   hermes: "@orion/hermes",
 } as const;
 
-const apps: readonly AppDescriptor[] = [
+export const BUILTIN_APP_DESCRIPTORS: readonly AppDescriptor[] = [
   {
     id: "archives",
     name: "Archives 47",
@@ -172,6 +172,62 @@ const apps: readonly AppDescriptor[] = [
   },
 ];
 
+export type BuiltinAppPluginInfo = {
+  pluginId: string;
+  appId: keyof typeof BUILTIN_APP_PLUGIN_IDS;
+  version: string;
+  description: string;
+  capabilities: readonly string[];
+  disableable: boolean;
+};
+
+export const BUILTIN_APP_PLUGIN_CATALOG: readonly BuiltinAppPluginInfo[] = [
+  {
+    pluginId: BUILTIN_APP_PLUGIN_IDS.archives,
+    appId: "archives",
+    version: "1.0.0",
+    description: "Notes, journals, media, knowledge graph, databases, and research tools.",
+    capabilities: ["Knowledge", "Search", "AI context"],
+    disableable: false,
+  },
+  {
+    pluginId: BUILTIN_APP_PLUGIN_IDS.orion,
+    appId: "orion",
+    version: "1.0.0",
+    description: "Code editing, project navigation, terminal, Git, LSP, and AI-assisted changes.",
+    capabilities: ["Workspace", "Terminal", "AI editing"],
+    disableable: false,
+  },
+  {
+    pluginId: BUILTIN_APP_PLUGIN_IDS.xdesign,
+    appId: "xdesign",
+    version: "1.0.0",
+    description: "Design canvas, webpages, decks, motion FX, images, and procedural 3D models.",
+    capabilities: ["Design", "Media", "Generation"],
+    disableable: false,
+  },
+  {
+    pluginId: BUILTIN_APP_PLUGIN_IDS.command,
+    appId: "command",
+    version: "1.0.0",
+    description: "Agent organization, reusable profiles, run history, and operational knowledge.",
+    capabilities: ["Agents", "Automation", "Wiki"],
+    disableable: false,
+  },
+  {
+    pluginId: BUILTIN_APP_PLUGIN_IDS.hermes,
+    appId: "hermes",
+    version: "1.0.0",
+    description: "Parallel agent orchestration with a live operations floor and task board.",
+    capabilities: ["Orchestration", "Task board", "Reports"],
+    disableable: true,
+  },
+];
+
+export function builtinAppDescriptor(appId: string): AppDescriptor | undefined {
+  return BUILTIN_APP_DESCRIPTORS.find((descriptor) => descriptor.id === appId);
+}
+
 function pluginFor(descriptor: AppDescriptor): InternalPlugin {
   const pluginId = BUILTIN_APP_PLUGIN_IDS[descriptor.id as keyof typeof BUILTIN_APP_PLUGIN_IDS];
   return {
@@ -191,7 +247,7 @@ function pluginFor(descriptor: AppDescriptor): InternalPlugin {
 }
 
 export function ensureBuiltinAppPlugins(): void {
-  for (const descriptor of apps) {
+  for (const descriptor of BUILTIN_APP_DESCRIPTORS) {
     const plugin = pluginFor(descriptor);
     if (!internalPluginHost.isActive(plugin.id)) internalPluginHost.activate(plugin);
   }
@@ -202,8 +258,22 @@ export function deactivateBuiltinAppPlugin(pluginId: string): readonly unknown[]
 }
 
 export function activateBuiltinAppPlugin(appId: keyof typeof BUILTIN_APP_PLUGIN_IDS): void {
-  const descriptor = apps.find((app) => app.id === appId);
+  const descriptor = BUILTIN_APP_DESCRIPTORS.find((app) => app.id === appId);
   if (!descriptor) throw new Error(`unknown built-in app: ${appId}`);
   const plugin = pluginFor(descriptor);
   if (!internalPluginHost.isActive(plugin.id)) internalPluginHost.activate(plugin);
+}
+
+export function syncBuiltinAppPlugins(disabledPluginIds: ReadonlySet<string>): readonly unknown[] {
+  const failures: unknown[] = [];
+  for (const info of BUILTIN_APP_PLUGIN_CATALOG) {
+    const shouldBeActive = !disabledPluginIds.has(info.pluginId);
+    const active = internalPluginHost.isActive(info.pluginId);
+    if (shouldBeActive && !active) {
+      activateBuiltinAppPlugin(info.appId);
+    } else if (!shouldBeActive && active) {
+      failures.push(...deactivateBuiltinAppPlugin(info.pluginId));
+    }
+  }
+  return failures;
 }

@@ -24,6 +24,7 @@ import {
   Plug,
   Plus,
   Users,
+  Package,
 } from "lucide-react";
 const CharacterPicker = lazy(() =>
   import("@/features/characters/CharacterPicker").then((m) => ({
@@ -31,6 +32,7 @@ const CharacterPicker = lazy(() =>
   })),
 );
 import { useSettingsStore } from "@/store/settingsStore";
+import { PluginManagerPanel } from "@/features/controlpanel/PluginManagerPanel";
 import { useThemeStore, THEMES } from "@/store/themeStore";
 import { useWallpaperStore } from "@/store/wallpaperStore";
 import { useMcpServers } from "@/store/mcpServersStore";
@@ -39,6 +41,7 @@ import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
 
 type Section =
+  | "plugins"
   | "key"
   | "theme"
   | "wallpaper"
@@ -52,6 +55,7 @@ const SECTIONS: Array<{
   label: string;
   Icon: typeof KeyRound;
 }> = [
+  { key: "plugins", label: "Plugins", Icon: Package },
   { key: "key", label: "API Key", Icon: KeyRound },
   { key: "theme", label: "Appearance", Icon: Sun },
   { key: "wallpaper", label: "Wallpaper", Icon: ImageIcon },
@@ -114,6 +118,7 @@ export function SettingsPanel() {
             })}
           </nav>
           <div className="ot-settings-section">
+            {section === "plugins" && <PluginManagerPanel />}
             {section === "key" && <APIKeySection />}
             {section === "theme" && <ThemeSection />}
             {section === "wallpaper" && <WallpaperSection />}

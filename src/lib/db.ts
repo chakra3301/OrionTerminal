@@ -43,6 +43,7 @@ export type AppStateKey =
   | "mcp.servers"
   | "models"
   | "appconfig"
+  | "plugins.state"
   | "widget.monitor"
   | "reduce_glass"
   | "tab_autocomplete"
