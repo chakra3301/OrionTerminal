@@ -4,7 +4,42 @@
 //! rails + Core) call this so every claude subprocess shares the same
 //! Orion-aware tool surface.
 
+use std::io::Write;
+use std::path::Path;
 use tauri::{AppHandle, Manager};
+
+fn write_private(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("orion-mcp.json");
+    let tmp = path.with_file_name(format!(".{file_name}.{}.tmp", ulid::Ulid::new()));
+
+    let result = (|| {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options.open(&tmp)?;
+        file.write_all(contents)?;
+        file.sync_all()?;
+        std::fs::rename(&tmp, path)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+        }
+        Ok(())
+    })();
+
+    if result.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    result
+}
 
 /// Materializes `<app_config_dir>/orion-mcp.json` pointing at the currently-
 /// running binary with `--mcp-serve` plus the SQLite DB path in the env.
@@ -53,7 +88,7 @@ pub fn write(app: &AppHandle) -> Option<String> {
     }
 
     let json = serde_json::json!({ "mcpServers": servers });
-    std::fs::write(&config_path, json.to_string()).ok()?;
+    write_private(&config_path, json.to_string().as_bytes()).ok()?;
     Some(config_path.to_string_lossy().into_owned())
 }
 
@@ -62,9 +97,7 @@ pub fn write(app: &AppHandle) -> Option<String> {
 /// `mcpServersStore`). Returns (name, claude-config-object) pairs. Best-
 /// effort: any read/parse failure yields an empty list so the built-in
 /// `orion` server still ships.
-fn read_user_mcp_servers(
-    db_path: &std::path::Path,
-) -> Vec<(String, serde_json::Value)> {
+fn read_user_mcp_servers(db_path: &std::path::Path) -> Vec<(String, serde_json::Value)> {
     let conn = match rusqlite::Connection::open(db_path) {
         Ok(c) => c,
         Err(_) => return Vec::new(),
@@ -115,7 +148,10 @@ pub fn orion_server(app: &AppHandle) -> Option<crate::cli_engine::config::OrionS
     let db_path = config_dir.join("orion.db");
     let context_path = config_dir.join("orion-context.json");
     let mut env: Vec<(String, String)> = vec![
-        ("ORION_DB_PATH".into(), db_path.to_string_lossy().into_owned()),
+        (
+            "ORION_DB_PATH".into(),
+            db_path.to_string_lossy().into_owned(),
+        ),
         (
             "ORION_CONTEXT_PATH".into(),
             context_path.to_string_lossy().into_owned(),
@@ -142,4 +178,31 @@ pub fn context_snapshot_write(app: AppHandle, json: String) -> Result<(), String
     let path = config_dir.join("orion-context.json");
     std::fs::write(&path, json).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_private;
+
+    #[test]
+    fn private_write_replaces_contents() {
+        let dir = std::env::temp_dir().join(format!("orion-mcp-test-{}", ulid::Ulid::new()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.json");
+
+        write_private(&path, b"first").unwrap();
+        write_private(&path, b"second").unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"second");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
+
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }

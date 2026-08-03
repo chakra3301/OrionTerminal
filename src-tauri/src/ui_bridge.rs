@@ -106,7 +106,7 @@ pub async fn start(app: AppHandle) -> Result<BridgeInfo, String> {
         .await
         .map_err(|e| format!("bind ui_bridge: {}", e))?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
-    let token = random_token();
+    let token = random_token()?;
     let info = BridgeInfo {
         port,
         token: token.clone(),
@@ -237,12 +237,7 @@ pub fn dispatch_sync(app: &AppHandle, kind: &str, payload: Value) -> Result<Valu
 /// waiting bridge connection (TCP or in-process). No-op if the request
 /// already timed out (the sender will have been removed from both maps).
 #[tauri::command]
-pub fn ui_bridge_respond(
-    request_id: String,
-    ok: bool,
-    data: Option<Value>,
-    error: Option<String>,
-) {
+pub fn ui_bridge_respond(request_id: String, ok: bool, data: Option<Value>, error: Option<String>) {
     let result = BridgeResult { ok, data, error };
     if let Some(tx) = PENDING.lock().remove(&request_id) {
         let _ = tx.send(result);
@@ -253,28 +248,11 @@ pub fn ui_bridge_respond(
     }
 }
 
-fn random_token() -> String {
-    // 16 bytes from system random source → hex. No external deps.
-    let mut bytes = [0u8; 16];
-    if getrandom(&mut bytes).is_err() {
-        // Fallback: timestamp-derived (low entropy but still launch-unique).
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0);
-        return format!("{:032x}", now);
-    }
-    bytes.iter().map(|b| format!("{:02x}", b)).collect()
-}
-
-fn getrandom(buf: &mut [u8]) -> Result<(), std::io::Error> {
-    use std::fs::File;
-    use std::io::Read;
-    // /dev/urandom is universal on macOS + Linux. Tauri also runs on
-    // Windows; this code path is best-effort, falling back to the
-    // timestamp-derived token if reading fails.
-    let mut f = File::open("/dev/urandom")?;
-    f.read_exact(buf)
+fn random_token() -> Result<String, String> {
+    let mut bytes = [0u8; 32];
+    getrandom::getrandom(&mut bytes)
+        .map_err(|e| format!("secure random source unavailable: {e}"))?;
+    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
 }
 
 #[cfg(test)]
@@ -301,5 +279,15 @@ mod tests {
     fn respond_unknown_id_is_noop() {
         // Must not panic when the id is in neither map.
         ui_bridge_respond("nope".to_string(), true, None, None);
+    }
+
+    #[test]
+    fn bridge_tokens_use_256_bits_of_system_randomness() {
+        let a = random_token().unwrap();
+        let b = random_token().unwrap();
+        assert_eq!(a.len(), 64);
+        assert_eq!(b.len(), 64);
+        assert_ne!(a, b);
+        assert!(a.bytes().all(|c| c.is_ascii_hexdigit()));
     }
 }
