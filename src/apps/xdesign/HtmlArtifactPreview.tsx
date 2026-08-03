@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -29,18 +29,17 @@ import { useAppChat } from "@/store/appChatStore";
 import { useToasts } from "@/store/toastStore";
 import { useDesignSystems } from "@/store/designSystemStore";
 import { isDeckHtml, deckToPptxBase64 } from "@/apps/xdesign/deckToPptx";
-import { recordCanvasToFile } from "@/apps/xdesign/recordCanvas";
 import { base64ToBytes } from "@/apps/xdesign/imageGen";
+import { parseInlineStyle } from "@/apps/xdesign/htmlEditor";
 import {
-  EDITOR_STYLE_ID,
-  NAV_GUARD_ID,
-  pathOf,
-  elementAt,
-  mergeInlineStyle,
-  parseInlineStyle,
-  serializeForSave,
-  cleanOuterHTML,
-} from "@/apps/xdesign/htmlEditor";
+  HTML_PREVIEW_SANDBOX,
+  prepareHtmlPreview,
+  parsePreviewEvent,
+  previewCommand,
+  type PreviewCommand,
+  type PreviewSelection,
+} from "@/apps/xdesign/htmlPreviewBridge";
+import { confirmAction } from "@/components/ConfirmModal";
 import { ipc } from "@/lib/ipc";
 import { toast } from "@/store/toastStore";
 import { log } from "@/lib/log";
@@ -51,40 +50,13 @@ const VIEWPORTS: { id: ArtifactViewport; icon: typeof Monitor; w: number | null;
   { id: "mobile", icon: Smartphone, w: 390, label: "Mobile" },
 ];
 
-// Injected into the preview's <head> so it runs before the page's own scripts.
-// Neutralizes in-frame navigation at the source (the iframe is same-origin, so
-// a navigation would load the host app's URL and break). Stripped on save by
-// stripEditorChrome (#xd-nav-guard).
-const NAV_GUARD_SCRIPT =
-  `<script id="${NAV_GUARD_ID}">(function(){try{` +
-  // Intercept ALL anchor clicks. In a srcdoc iframe the base URL is the host
-  // app's, so even "#section" links resolve to localhost/#section and would
-  // navigate AWAY from the page — so we scroll to the target ourselves and
-  // cancel the navigation; non-hash links are just cancelled.
-  `document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[href]');if(!a)return;var h=a.getAttribute('href')||'';if(!h)return;e.preventDefault();if(h.charAt(0)==='#'){var id=h.slice(1);if(id){var t=document.getElementById(id)||document.querySelector('a[name="'+id+'"]');if(t&&t.scrollIntoView){t.scrollIntoView({behavior:'smooth',block:'start'});}}}},true);` +
-  `document.addEventListener('submit',function(e){e.preventDefault();},true);` +
-  `try{HTMLFormElement.prototype.submit=function(){};}catch(_e){}` +
-  `try{window.open=function(){return null;};}catch(_e){}` +
-  `try{Location.prototype.assign=function(){};Location.prototype.replace=function(){};}catch(_e){}` +
-  `}catch(_e){}})();<\/script>`;
-
-/** Insert the navigation guard as the first thing in the document so it runs
- * before any page script can wire up a redirect. */
-function withNavGuard(html: string | null): string | undefined {
-  if (!html) return undefined;
-  const head = html.match(/<head[^>]*>/i);
-  if (head) return html.replace(head[0], head[0] + NAV_GUARD_SCRIPT);
-  const htmlTag = html.match(/<html[^>]*>/i);
-  if (htmlTag) return html.replace(htmlTag[0], htmlTag[0] + NAV_GUARD_SCRIPT);
-  return NAV_GUARD_SCRIPT + html;
-}
-
-const SELECTED_ATTR = "data-xd-selected";
-const EDITOR_CSS = `[${SELECTED_ATTR}]{outline:2px solid #ff3ea5 !important;outline-offset:1px;}
-[${SELECTED_ATTR}][contenteditable]{outline:2px dashed #ff3ea5 !important;}
-*{cursor:default;}`;
-
 type ToolbarPos = { top: number; left: number };
+type RecordedPreview = { bytes: Uint8Array; ext: "mp4" | "webm" };
+type PendingRecording = {
+  resolve: (result: RecordedPreview) => void;
+  reject: (error: Error) => void;
+  timer: number;
+};
 
 export function HtmlArtifactPreview() {
   const open = useHtmlArtifact((s) => s.open);
@@ -101,320 +73,181 @@ export function HtmlArtifactPreview() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiText, setAiText] = useState("");
   const [recording, setRecording] = useState(false);
-  // Bumping this remounts the iframe element — the only reliable way to force
-  // it back to our content after the generated page navigates itself away
-  // (re-setting srcdoc imperatively is a no-op in WKWebView).
-  const [reloadNonce, setReloadNonce] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  // --- In-place visual editor state ---
+  const stageRef = useRef<HTMLDivElement>(null);
+  const pendingRecordings = useRef(new Map<string, PendingRecording>());
+  const recordSequence = useRef(0);
   const [editMode, setEditMode] = useState(false);
-  const [selPath, setSelPath] = useState<number[] | null>(null);
-  const [toolbarPos, setToolbarPos] = useState<ToolbarPos | null>(null);
   const editModeRef = useRef(editMode);
   editModeRef.current = editMode;
-  const selPathRef = useRef<number[] | null>(null);
-  selPathRef.current = selPath;
-  const stageRef = useRef<HTMLDivElement>(null);
-  const listenersRef = useRef<{ doc: Document; click: EventListener; dbl: EventListener } | null>(
-    null,
-  );
-
-  // liveHtml drives the iframe srcDoc. We mutate the iframe's contentDocument in
-  // place during editing and persist back to the store WITHOUT reloading the
-  // iframe: selfSavedRef remembers what we wrote so the sync effect can tell our
-  // own echo from a genuine external change (regenerate / refine).
+  const persistAllowedUntil = useRef(0);
+  const [bridgeReady, setBridgeReady] = useState(false);
+  const [selection, setSelection] = useState<PreviewSelection | null>(null);
+  const [toolbarPos, setToolbarPos] = useState<ToolbarPos | null>(null);
   const [liveHtml, setLiveHtml] = useState<string | null>(html);
+  const [previewSrcDoc, setPreviewSrcDoc] = useState<string | undefined>();
   const selfSavedRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (html !== null && html !== selfSavedRef.current) {
       setLiveHtml(html);
-      setSelPath(null);
+      setSelection(null);
       setToolbarPos(null);
     }
   }, [html]);
 
-  // NOTE: no early return before the hooks below — all hooks (incl. the editor
-  // wiring useEffect) must run unconditionally every render. The render guard
-  // lives just before the JSX return.
+  useEffect(() => {
+    if (!liveHtml) {
+      setPreviewSrcDoc(undefined);
+      return;
+    }
+    const prepared = prepareHtmlPreview(liveHtml);
+    setBridgeReady(false);
+    setSelection(null);
+    setToolbarPos(null);
+    setPreviewSrcDoc(prepared.srcDoc);
+    return prepared.release;
+  }, [liveHtml]);
+
+  useEffect(
+    () => () => {
+      for (const pending of pendingRecordings.current.values()) {
+        window.clearTimeout(pending.timer);
+        pending.reject(new Error("preview closed before recording completed"));
+      }
+      pendingRecordings.current.clear();
+    },
+    [],
+  );
+
   const vp = VIEWPORTS.find((v) => v.id === viewport)!;
   const isDeck = !!html && isDeckHtml(html);
   const hasCanvas = !isDeck && !!html && /<canvas/i.test(html);
-  const canEdit = !hasCanvas; // editing a pure motion canvas is meaningless
+  const canEdit = !hasCanvas;
 
-  // --- Editor wiring (thin DOM-bridge side-effect layer) ---
+  const sendToPreview = useCallback((command: PreviewCommand) => {
+    iframeRef.current?.contentWindow?.postMessage(previewCommand(command), "*");
+  }, []);
 
-  const getDoc = (): Document | null => iframeRef.current?.contentDocument ?? null;
-
-  const persistEdits = () => {
-    const doc = getDoc();
-    if (!doc) return;
-    try {
-      const serialized = serializeForSave(doc);
-      selfSavedRef.current = serialized;
-      useHtmlArtifact.getState().setArtifact(serialized, title);
-    } catch (e) {
-      log.warn("html editor persist failed", e);
-    }
-  };
-
-  const positionToolbar = (el: Element) => {
-    const frame = iframeRef.current;
-    const stage = stageRef.current;
-    if (!frame || !stage) return;
-    const r = el.getBoundingClientRect();
-    const fr = frame.getBoundingClientRect();
-    const sr = stage.getBoundingClientRect();
-    const top = fr.top - sr.top + r.top - 42;
-    const left = fr.left - sr.left + r.left;
-    setToolbarPos({ top: Math.max(2, top), left: Math.max(2, left) });
-  };
-
-  const selectElement = (el: Element) => {
-    const doc = getDoc();
-    if (!doc) return;
-    for (const prev of Array.from(doc.querySelectorAll(`[${SELECTED_ATTR}]`)))
-      prev.removeAttribute(SELECTED_ATTR);
-    el.setAttribute(SELECTED_ATTR, "1");
-    setSelPath(pathOf(el));
-    positionToolbar(el);
-  };
-
-  const selectedEl = (): Element | null => {
-    const doc = getDoc();
-    if (!doc || !selPathRef.current) return null;
-    return elementAt(doc.documentElement, selPathRef.current);
-  };
-
-  const teardownEditor = () => {
-    const l = listenersRef.current;
-    if (l) {
-      l.doc.removeEventListener("click", l.click, true);
-      l.doc.removeEventListener("dblclick", l.dbl, true);
-      listenersRef.current = null;
-    }
-    const doc = getDoc();
-    if (doc) {
-      doc.getElementById(EDITOR_STYLE_ID)?.remove();
-      for (const el of Array.from(doc.querySelectorAll(`[${SELECTED_ATTR}]`)))
-        el.removeAttribute(SELECTED_ATTR);
-      for (const el of Array.from(doc.querySelectorAll("[contenteditable]")))
-        el.removeAttribute("contenteditable");
-    }
-    setSelPath(null);
-    setToolbarPos(null);
-  };
-
-  const setupEditor = () => {
-    const doc = getDoc();
-    if (!doc || !doc.body) return;
-    if (listenersRef.current) return; // already wired
-    let style = doc.getElementById(EDITOR_STYLE_ID) as HTMLStyleElement | null;
-    if (!style) {
-      style = doc.createElement("style");
-      style.id = EDITOR_STYLE_ID;
-      style.textContent = EDITOR_CSS;
-      doc.head?.appendChild(style);
-    }
-    const click: EventListener = (e) => {
-      const el = e.target as Element | null;
-      if (!el || el.nodeType !== 1) return;
-      if (el === doc.documentElement || el === doc.body) return;
-      e.preventDefault();
-      e.stopPropagation();
-      selectElement(el);
-    };
-    const dbl: EventListener = (e) => {
-      const el = e.target as HTMLElement | null;
-      if (!el || el.nodeType !== 1) return;
-      e.preventDefault();
-      e.stopPropagation();
-      selectElement(el);
-      el.setAttribute("contenteditable", "true");
-      el.focus();
-      const finish = () => {
-        el.removeAttribute("contenteditable");
-        persistEdits();
-      };
-      el.addEventListener("blur", finish, { once: true });
-    };
-    doc.addEventListener("click", click, true);
-    doc.addEventListener("dblclick", dbl, true);
-    listenersRef.current = { doc, click, dbl };
-  };
-
-  // Navigation guard. The preview iframe is same-origin (srcDoc inherits the
-  // app's localhost URL), so any navigation inside the generated page — a link
-  // click, a form submit, OR a programmatic `location =`/`form.submit()` — would
-  // load the host app's URL into the FRAME and boot a second, broken copy of
-  // the terminal. Two layers:
-  //  1. Cancel the common cases (anchor clicks / form submits) cleanly so the
-  //     preview never even flickers; real external links open in the OS browser.
-  //  2. Catch everything else after the fact: if the frame ever lands on a
-  //     non-srcdoc URL, send genuinely-external links to the browser and
-  //     restore the preview document. Runs in every mode.
-  useEffect(() => {
-    const frame = iframeRef.current;
-    if (!frame) return;
-    let bound: Document | null = null;
-    let restores: number[] = []; // timestamps, to stop redirect loops
-    const appOrigin = window.location.origin;
-    const onClick = (e: Event) => {
-      const t = e.target as Element | null;
-      const a =
-        t && t.nodeType === 1
-          ? (t.closest?.("a[href]") as HTMLAnchorElement | null)
-          : null;
-      if (!a) return;
-      const href = a.getAttribute("href") ?? "";
-      if (href === "") return;
-      e.preventDefault();
-      if (href.startsWith("#")) {
-        // Scroll within the frame instead of navigating to host/#id.
-        const id = href.slice(1);
-        const doc = a.ownerDocument;
-        const t =
-          (id && (doc.getElementById(id) || doc.querySelector(`a[name="${id}"]`))) || null;
-        t?.scrollIntoView({ behavior: "smooth", block: "start" });
-        return;
-      }
-      if (/^https?:\/\//i.test(href)) void openUrl(href).catch(() => {});
-    };
-    const onSubmit = (e: Event) => e.preventDefault();
-    const onLoad = () => {
-      // Did the frame navigate off its srcDoc? (srcDoc docs report
-      // about:srcdoc; a navigation lands on http(s)://…).
-      let href = "";
-      try {
-        href = frame.contentWindow?.location?.href ?? "";
-      } catch {
-        href = "";
-      }
-      if (href && !href.startsWith("about:")) {
-        const external = /^https?:\/\//i.test(href) && !href.startsWith(appOrigin);
-        if (external) void openUrl(href).catch(() => {});
-        toast.info("Blocked navigation", { body: href });
-        const now = Date.now();
-        restores = restores.filter((t) => now - t < 2000);
-        restores.push(now);
-        if (restores.length > 4) {
-          toast.warning("Preview paused", {
-            body: "This page keeps redirecting. Edit or regenerate it.",
-          });
-          return;
-        }
-        // Force a clean remount of the iframe back to our content.
-        setReloadNonce((n) => n + 1);
-        return;
-      }
-      const doc = frame.contentDocument;
-      if (doc && doc !== bound) {
-        bound = doc;
-        doc.addEventListener("click", onClick, true);
-        doc.addEventListener("submit", onSubmit, true);
-      }
-    };
-    onLoad();
-    frame.addEventListener("load", onLoad);
-    return () => {
-      frame.removeEventListener("load", onLoad);
-      if (bound) {
-        bound.removeEventListener("click", onClick, true);
-        bound.removeEventListener("submit", onSubmit, true);
-      }
-    };
-  }, [liveHtml, html, reloadNonce]);
-
-  // Re-wire whenever edit mode flips or the iframe reloads (liveHtml change).
-  useEffect(() => {
-    if (!editMode) {
-      teardownEditor();
+  const updateSelection = useCallback((next: PreviewSelection | null) => {
+    setSelection(next);
+    if (!next) {
+      setToolbarPos(null);
       return;
     }
     const frame = iframeRef.current;
-    if (!frame) return;
-    const wire = () => setupEditor();
-    // contentDocument may already be ready; also re-wire on reload.
-    wire();
-    frame.addEventListener("load", wire);
-    return () => {
-      frame.removeEventListener("load", wire);
-      teardownEditor();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editMode, liveHtml, reloadNonce]);
+    const stage = stageRef.current;
+    if (!frame || !stage) return;
+    const frameRect = frame.getBoundingClientRect();
+    const stageRect = stage.getBoundingClientRect();
+    setToolbarPos({
+      top: Math.max(2, frameRect.top - stageRect.top + next.rect.top - 42),
+      left: Math.max(2, frameRect.left - stageRect.left + next.rect.left),
+    });
+  }, []);
 
-  // --- Toolbar actions (operate on the resolved selected element) ---
+  useEffect(() => {
+    const onMessage = (event: MessageEvent<unknown>) => {
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      const message = parsePreviewEvent(event.data);
+      if (!message) return;
+
+      if (message.type === "ready") {
+        setBridgeReady(true);
+        sendToPreview({ type: "set-edit", enabled: editModeRef.current });
+      } else if (message.type === "selection") {
+        if (editModeRef.current) updateSelection(message.selection);
+      } else if (message.type === "persist") {
+        if (!editModeRef.current && Date.now() > persistAllowedUntil.current) return;
+        selfSavedRef.current = message.html;
+        useHtmlArtifact.getState().setArtifact(message.html, title);
+      } else if (message.type === "external-link") {
+        void confirmAction({
+          title: "Open external link?",
+          body: message.url,
+          confirmLabel: "Open",
+        }).then((approved) => {
+          if (approved) void openUrl(message.url).catch((error) => log.warn("openUrl failed", error));
+        });
+      } else if (message.type === "record-result") {
+        const pending = pendingRecordings.current.get(message.requestId);
+        if (!pending) return;
+        pendingRecordings.current.delete(message.requestId);
+        window.clearTimeout(pending.timer);
+        pending.resolve({ bytes: new Uint8Array(message.bytes), ext: message.ext });
+      } else if (message.type === "record-error") {
+        const pending = pendingRecordings.current.get(message.requestId);
+        if (!pending) return;
+        pendingRecordings.current.delete(message.requestId);
+        window.clearTimeout(pending.timer);
+        pending.reject(new Error(message.error));
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [sendToPreview, title, updateSelection]);
+
+  const recordPreviewCanvas = useCallback(
+    (durationMs: number): Promise<RecordedPreview> =>
+      new Promise((resolve, reject) => {
+        if (!bridgeReady) {
+          reject(new Error("preview is still loading"));
+          return;
+        }
+        const requestId = `record-${Date.now()}-${++recordSequence.current}`;
+        const timer = window.setTimeout(() => {
+          pendingRecordings.current.delete(requestId);
+          reject(new Error("preview recording timed out"));
+        }, durationMs + 15_000);
+        pendingRecordings.current.set(requestId, { resolve, reject, timer });
+        sendToPreview({ type: "record-canvas", requestId, durationMs });
+      }),
+    [bridgeReady, sendToPreview],
+  );
+
+  // --- Toolbar actions (operate through the isolated-frame bridge) ---
 
   const patchStyle = (patch: Record<string, string | null>) => {
-    const el = selectedEl() as HTMLElement | null;
-    if (!el) return;
-    el.setAttribute("style", mergeInlineStyle(el.getAttribute("style"), patch));
-    positionToolbar(el);
-    persistEdits();
+    if (!selection) return;
+    sendToPreview({ type: "patch-style", patch });
   };
 
   const bumpFontSize = (delta: number) => {
-    const el = selectedEl() as HTMLElement | null;
-    if (!el) return;
-    const doc = getDoc();
-    const cur = parseInlineStyle(el.getAttribute("style"))["font-size"];
-    const base = cur ? parseFloat(cur) : parseFloat(doc?.defaultView?.getComputedStyle(el).fontSize ?? "16");
-    const next = Math.max(8, Math.round((isNaN(base) ? 16 : base) + delta));
+    if (!selection) return;
+    const inline = parseInlineStyle(selection.inlineStyle);
+    const current = inline["font-size"] ?? selection.computed["font-size"] ?? "16";
+    const base = parseFloat(current);
+    const next = Math.max(8, Math.round((Number.isFinite(base) ? base : 16) + delta));
     patchStyle({ "font-size": `${next}px` });
   };
 
   const toggleBold = () => {
-    const el = selectedEl() as HTMLElement | null;
-    if (!el) return;
-    const cur = parseInlineStyle(el.getAttribute("style"))["font-weight"];
-    const isBold = cur === "700" || cur === "bold";
-    patchStyle({ "font-weight": isBold ? null : "700" });
+    if (!selection) return;
+    const inline = parseInlineStyle(selection.inlineStyle);
+    const weight = inline["font-weight"] ?? selection.computed["font-weight"] ?? "400";
+    patchStyle({ "font-weight": weight === "700" || weight === "bold" ? null : "700" });
   };
 
-  const deleteSelected = () => {
-    const el = selectedEl();
-    if (!el) return;
-    el.remove();
-    setSelPath(null);
-    setToolbarPos(null);
-    persistEdits();
-  };
-
-  const duplicateSelected = () => {
-    const el = selectedEl();
-    if (!el) return;
-    const clone = el.cloneNode(true) as Element;
-    clone.removeAttribute(SELECTED_ATTR);
-    el.after(clone);
-    selectElement(clone);
-    persistEdits();
-  };
-
-  const moveSelected = (dir: -1 | 1) => {
-    const el = selectedEl();
-    if (!el) return;
-    const sib = dir < 0 ? el.previousElementSibling : el.nextElementSibling;
-    if (!sib) return;
-    if (dir < 0) sib.before(el);
-    else sib.after(el);
-    setSelPath(pathOf(el));
-    positionToolbar(el);
-    persistEdits();
-  };
+  const deleteSelected = () => sendToPreview({ type: "delete-selection" });
+  const duplicateSelected = () => sendToPreview({ type: "duplicate-selection" });
+  const moveSelected = (direction: -1 | 1) =>
+    sendToPreview({ type: "move-selection", direction });
 
   const submitElementRefine = () => {
-    const t = aiText.trim();
-    const el = selectedEl();
-    if (!t || !el || running || !elementRefiner) return;
-    elementRefiner(cleanOuterHTML(el), t);
+    const text = aiText.trim();
+    if (!text || !selection || running || !elementRefiner) return;
+    elementRefiner(selection.outerHTML, text);
     setAiText("");
     setAiOpen(false);
   };
 
   const toggleEdit = () => {
-    if (editMode) persistEdits();
-    setEditMode((v) => !v);
+    const next = !editModeRef.current;
+    editModeRef.current = next;
+    persistAllowedUntil.current = next ? Number.POSITIVE_INFINITY : Date.now() + 1000;
+    setEditMode(next);
+    if (!next) updateSelection(null);
+    sendToPreview({ type: "set-edit", enabled: next });
   };
 
   const handleExport = async () => {
@@ -433,20 +266,11 @@ export function HtmlArtifactPreview() {
     }
   };
 
-  // Record the artifact's <canvas> animation to a video file (MediaRecorder on
-  // the in-iframe canvas stream — same trick voice capture uses).
   const handleExportVideo = async () => {
-    const doc = iframeRef.current?.contentDocument;
-    const canvas = (doc?.querySelector("canvas#scene") ??
-      doc?.querySelector("canvas")) as HTMLCanvasElement | null;
-    if (!canvas) {
-      toast.error("No canvas to record", { body: "This artifact has no <canvas> animation." });
-      return;
-    }
     setRecording(true);
     const recId = toast.info("Recording 6s…", { durationMs: 0, body: "Capturing the animation…" });
     try {
-      const { bytes, ext } = await recordCanvasToFile(canvas, 6000);
+      const { bytes, ext } = await recordPreviewCanvas(6000);
       useToasts.getState().dismiss(recId);
       const path = await save({
         defaultPath: `${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "motion"}.${ext}`,
@@ -515,6 +339,7 @@ export function HtmlArtifactPreview() {
             type="button"
             className={`xd-artifact-btn${editMode ? " active" : ""}`}
             onClick={toggleEdit}
+            disabled={!bridgeReady}
             title="Edit elements directly — click to select, double-click text to edit"
           >
             <Pencil size={12} /> {editMode ? "Editing" : "Edit"}
@@ -556,15 +381,15 @@ export function HtmlArtifactPreview() {
           style={vp.w ? { width: vp.w, maxWidth: "100%" } : { width: "100%" }}
         >
           <iframe
-            key={reloadNonce}
             ref={iframeRef}
             className="xd-artifact-iframe"
             title="Webpage preview"
-            srcDoc={withNavGuard(liveHtml ?? html)}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+            srcDoc={previewSrcDoc}
+            sandbox={HTML_PREVIEW_SANDBOX}
+            referrerPolicy="no-referrer"
           />
         </div>
-        {editMode && selPath && toolbarPos && (
+        {editMode && selection && toolbarPos && (
           <div
             className="xd-edit-toolbar"
             style={{ top: toolbarPos.top, left: toolbarPos.left }}
@@ -612,7 +437,7 @@ export function HtmlArtifactPreview() {
             )}
           </div>
         )}
-        {editMode && selPath && toolbarPos && aiOpen && (
+        {editMode && selection && toolbarPos && aiOpen && (
           <div
             className="xd-edit-ai"
             style={{ top: toolbarPos.top + 30, left: toolbarPos.left }}
@@ -636,19 +461,16 @@ export function HtmlArtifactPreview() {
           </div>
         )}
       </div>
-      {editMode && selPath && (() => {
-        const el = selectedEl() as HTMLElement | null;
-        return el ? (
-          <ElementInspector
-            key={selPath.join("-")}
-            el={el}
-            onPatch={patchStyle}
-            onMove={moveSelected}
-            onDuplicate={duplicateSelected}
-            onDelete={deleteSelected}
-          />
-        ) : null;
-      })()}
+      {editMode && selection && (
+        <ElementInspector
+          key={selection.path.join("-")}
+          selection={selection}
+          onPatch={patchStyle}
+          onMove={moveSelected}
+          onDuplicate={duplicateSelected}
+          onDelete={deleteSelected}
+        />
+      )}
       </div>
 
       <footer className="xd-artifact-refine">
@@ -691,26 +513,22 @@ function rgbToHex(v: string): string {
 }
 
 type InspectorProps = {
-  el: HTMLElement;
+  selection: PreviewSelection;
   onPatch: (patch: Record<string, string | null>) => void;
   onMove: (dir: -1 | 1) => void;
   onDuplicate: () => void;
   onDelete: () => void;
 };
 
-// Right-rail inspector for the selected element. Keyed by selection path so it
-// remounts (fresh initial values) whenever the selection changes; edits write
-// inline styles via onPatch.
-function ElementInspector({ el, onPatch, onMove, onDuplicate, onDelete }: InspectorProps) {
-  const cs = el.ownerDocument.defaultView?.getComputedStyle(el);
-  const inline = parseInlineStyle(el.getAttribute("style"));
-  const init = (prop: string): string => inline[prop] ?? cs?.getPropertyValue(prop) ?? "";
+function ElementInspector({ selection, onPatch, onMove, onDuplicate, onDelete }: InspectorProps) {
+  const inline = parseInlineStyle(selection.inlineStyle);
+  const init = (prop: string): string => inline[prop] ?? selection.computed[prop] ?? "";
   const px = (prop: string): string => {
-    const v = init(prop);
-    const n = parseFloat(v);
-    return isNaN(n) ? "" : String(Math.round(n));
+    const value = parseFloat(init(prop));
+    return Number.isFinite(value) ? String(Math.round(value)) : "";
   };
-  const tag = `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.trim().split(/\s+/)[0] : ""}`;
+  const firstClass = selection.className.trim().split(/\s+/)[0];
+  const tag = `${selection.tag}${firstClass ? `.${firstClass}` : ""}`;
 
   return (
     <aside className="xd-inspector">
@@ -751,11 +569,11 @@ function ElementInspector({ el, onPatch, onMove, onDuplicate, onDelete }: Inspec
       <div className="xd-insp-section">Spacing</div>
       <label className="xd-insp-row">
         <span>Padding</span>
-        <input defaultValue={inline["padding"] ?? ""} placeholder={cs?.padding ?? "0"} onChange={(e) => onPatch({ padding: e.target.value || null })} />
+        <input defaultValue={inline["padding"] ?? ""} placeholder={selection.computed.padding ?? "0"} onChange={(e) => onPatch({ padding: e.target.value || null })} />
       </label>
       <label className="xd-insp-row">
         <span>Margin</span>
-        <input defaultValue={inline["margin"] ?? ""} placeholder={cs?.margin ?? "0"} onChange={(e) => onPatch({ margin: e.target.value || null })} />
+        <input defaultValue={inline["margin"] ?? ""} placeholder={selection.computed.margin ?? "0"} onChange={(e) => onPatch({ margin: e.target.value || null })} />
       </label>
 
       <div className="xd-insp-section">Border</div>

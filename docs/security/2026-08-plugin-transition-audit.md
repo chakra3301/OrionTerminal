@@ -27,9 +27,9 @@ A same-user process with unrestricted filesystem access is outside the primary s
 ### OTSEC-001 — Generated HTML has shell-origin script authority
 
 Severity: **Critical**  
-Status: open
+Status: fixed in working tree; Tauri UI verification pending
 
-`src/apps/xdesign/HtmlArtifactPreview.tsx` renders model-generated HTML with:
+`src/apps/xdesign/HtmlArtifactPreview.tsx` previously rendered model-generated HTML with:
 
 ```html
 sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
@@ -37,29 +37,35 @@ sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
 
 For a `srcDoc` frame, `allow-scripts` plus `allow-same-origin` lets generated script share the application's origin. The parent intentionally reads `contentDocument`, confirming same-origin access. Tauri injects its IPC runtime into the application webview, and the main window registers broad custom commands. A generated page must therefore be treated as potentially able to attack shell state and native authority, not merely navigate its own frame.
 
-Required fix:
+Applied remediation:
 
-- Render active generated pages in an opaque-origin sandbox without `allow-same-origin`.
-- Replace direct `contentDocument` editing/recording with a narrow `postMessage` bridge that validates `event.source`, message schema, size, and operation.
-- Keep editing logic inside the frame and return only serialized document patches or bounded export data.
-- Remove unnecessary sandbox tokens. Do not allow top navigation or shell popups.
-- Add a regression fixture that attempts parent DOM access and Tauri invocation.
+- Preview sandbox is now exactly `allow-scripts`, producing an opaque origin with no forms, popups, modals, or same-origin authority.
+- All generated inline scripts are moved to revocable blob URLs; external scripts are removed.
+- A frame-local CSP denies network connections, frames, objects, forms, and base rewriting.
+- Editing, selection snapshots, persistence, navigation requests, and canvas recording use a versioned `postMessage` bridge.
+- Parent validates `event.source`, channel/version, schemas, paths, URLs, string sizes, and video size before handling a message.
+- External links require a host confirmation, persist messages are accepted only during an editing grant, and recording results must match a pending user request.
+- Regression tests lock the sandbox, CSP, script transformation, RPC validation, and size/type restrictions.
+
+Remaining verification: run static and motion artifacts in the bundled Tauri webview, exercise editing/video export, and confirm an adversarial artifact cannot reach `parent.document` or Tauri IPC.
 
 ### OTSEC-002 — Application CSP is disabled
 
 Severity: **Critical**  
-Status: open
+Status: fixed in working tree; packaged-app verification pending
 
-`src-tauri/tauri.conf.json` sets `app.security.csp` to `null`. A successful HTML/script injection therefore has no defense-in-depth barrier. Tauri recommends a restrictive CSP specifically to limit XSS impact.
+`src-tauri/tauri.conf.json` previously set `app.security.csp` to `null`. A successful HTML/script injection therefore had no defense-in-depth barrier.
 
-Required fix:
+Applied remediation:
 
-- Inventory Monaco workers, blob/data assets, custom asset protocol, fonts, provider traffic, and WebGL requirements.
-- Introduce a production CSP with `default-src 'self'`, explicit connect/image/font/worker rules, no object embedding, no base rewriting, and no unrestricted script source.
-- Avoid `unsafe-eval`; prove any unavoidable exception and isolate the dependent surface.
-- Add a production-bundle smoke test because dev-server requirements differ.
+- Production and development CSPs now define explicit defaults for IPC, assets, images/media, fonts, workers, frames, styles, and Hugging Face model downloads.
+- Inline shell scripts remain forbidden; objects, base rewriting, and form actions are denied.
+- Blob scripts are allowed for the isolated preview and blob workers.
+- `unsafe-eval` is temporarily retained because the currently locked `onnxruntime-web` bundle contains eval-based runtime code; Vite reports the exact dependency during build. Removing it is tied to the Transformers/ONNX dependency remediation rather than silently breaking local embeddings.
+- Tests assert the production policy exists, blocks inline scripts, and denies objects/base rewriting.
+- A full Tauri debug build validates the configuration.
 
-CSP does not replace iframe isolation or capability checks.
+Remaining verification: launch the packaged app, test embeddings/model download, Monaco workers, asset/media rendering, Spotify artwork, Orion web preview, and inspect CSP violation logs. CSP does not replace iframe isolation or capability checks.
 
 ### OTSEC-003 — Native commands assume the entire frontend is trusted
 
@@ -285,7 +291,7 @@ Required fix:
 
 Community plugin loading remains disabled until:
 
-- OTSEC-001 and OTSEC-002 are closed.
+- OTSEC-001 and OTSEC-002 are closed and human-smoke-tested in the bundled app.
 - Community frames cannot invoke Tauri in an adversarial test.
 - Native broker tests prove deny-by-default behavior.
 - Safe mode and quarantine are human-smoke-tested.

@@ -20,7 +20,34 @@
       }
     ],
     "security": {
-      "csp": null,
+      "csp": {
+        "default-src": "'self' customprotocol: asset:",
+        "connect-src": "ipc: http://ipc.localhost https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co",
+        "font-src": "'self' data: https://fonts.gstatic.com",
+        "img-src": "'self' asset: http://asset.localhost blob: data: https:",
+        "media-src": "'self' asset: http://asset.localhost blob: data: https:",
+        "script-src": "'self' blob: 'unsafe-eval'",
+        "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "worker-src": "'self' blob:",
+        "frame-src": "http: https: about:",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'"
+      },
+      "devCsp": {
+        "default-src": "'self' customprotocol: asset:",
+        "connect-src": "ipc: http://ipc.localhost http: https: ws: wss:",
+        "font-src": "'self' data: https://fonts.gstatic.com",
+        "img-src": "'self' asset: http://asset.localhost blob: data: https:",
+        "media-src": "'self' asset: http://asset.localhost blob: data: https:",
+        "script-src": "'self' blob: 'unsafe-eval'",
+        "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "worker-src": "'self' blob:",
+        "frame-src": "http: https: about:",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'"
+      },
       "assetProtocol": {
         "enable": true,
         "scope": [

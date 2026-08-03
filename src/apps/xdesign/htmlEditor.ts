@@ -1,15 +1,10 @@
-// Pure core for the in-place HTML-artifact visual editor (Part 2 Phase 1).
-//
-// The preview renders the artifact in a same-origin <iframe srcdoc>, so the
-// parent can read+edit iframe.contentDocument directly. This module holds the
-// pure, testable pieces: a stable element path (so a selection survives a
-// re-serialize), inline-style read/merge helpers, and serialize-for-save which
-// strips all injected editor chrome before persisting/exporting. The DOM-bridge
-// wiring in HtmlArtifactPreview.tsx is the thin untested side-effect layer.
+// Pure helpers retained for HTML-artifact serialization and style editing.
+// The live preview now runs in an opaque-origin frame; equivalent operations
+// execute inside its narrow postMessage bridge.
 
 /** Marker id of the editor's injected <style> (outline/selection chrome). */
 export const EDITOR_STYLE_ID = "xd-editor-style";
-/** Marker id of the injected navigation-guard <script> (preview only). */
+/** Legacy marker stripped from artifacts created by the former same-origin preview. */
 export const NAV_GUARD_ID = "xd-nav-guard";
 /** Attribute prefix for all editor-injected attributes. */
 export const EDITOR_ATTR_PREFIX = "data-xd-";

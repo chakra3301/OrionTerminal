@@ -29,11 +29,9 @@ window.addEventListener("unhandledrejection", (e) => {
 const root = document.getElementById("root");
 if (!root) throw new Error("root element missing");
 
-// Orion Terminal is a top-level app and must never run inside a frame. The
-// XDesign webpage preview renders generated HTML in a same-origin srcDoc
-// iframe; if that page navigates itself (a link/form/JS redirect) it would
-// load THIS app's URL inside the frame and boot a second, broken instance
-// that crashes the host. Refuse to mount when framed.
+// Orion Terminal is a top-level app and must never run inside a frame. Refuse
+// to mount if a preview or external page navigates a nested frame back to the
+// application entry point.
 if (window.top !== window.self) {
   document.documentElement.style.background = "#03060a";
   root.innerHTML =
