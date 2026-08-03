@@ -81,6 +81,20 @@ fn gemini_logged_in_from(creds_exists: bool) -> bool {
     creds_exists
 }
 
+fn cli_exit_error(engine: CliEngine, code: Option<i32>, stderr: &str) -> Option<String> {
+    let code = code.filter(|code| *code != 0)?;
+    let label = match engine {
+        CliEngine::Codex => "Codex",
+        CliEngine::Gemini => "Gemini",
+    };
+    let detail = stderr.trim();
+    Some(if detail.is_empty() {
+        format!("{label} CLI exited with code {code}")
+    } else {
+        format!("{label} CLI exited with code {code}: {detail}")
+    })
+}
+
 fn detail_for(engine: CliEngine, installed: bool, logged_in: bool) -> String {
     match (installed, logged_in) {
         (false, _) => match engine {
@@ -228,11 +242,35 @@ pub async fn cli_send(
     }
 
     let stdout = child.stdout.take().ok_or_else(|| "no stdout".to_string())?;
+    let stderr = child.stderr.take().ok_or_else(|| "no stderr".to_string())?;
     let cancel = Arc::new(Notify::new());
     CLI_CHILDREN.lock().insert(chat_id.clone(), cancel.clone());
 
     let app_loop = app.clone();
     let chat_loop = chat_id.clone();
+    let app_stderr = app.clone();
+    let chat_stderr = chat_id.clone();
+    let stderr_task = tokio::spawn(async move {
+        let mut captured = String::new();
+        let mut lines = BufReader::new(stderr).lines();
+        while let Ok(Some(text)) = lines.next_line().await {
+            let _ = app_stderr.emit(
+                "claude:event",
+                EventPayload {
+                    chat_id: chat_stderr.clone(),
+                    event: serde_json::json!({ "type": "stderr", "text": text }),
+                },
+            );
+            if captured.len() < 16 * 1024 {
+                if !captured.is_empty() {
+                    captured.push('\n');
+                }
+                let remaining = 16 * 1024 - captured.len();
+                captured.extend(text.chars().take(remaining));
+            }
+        }
+        captured
+    });
     let mut lines = BufReader::new(stdout).lines();
     let mut codex_state = transcode::CodexState::default();
     let mut gemini_state = transcode::GeminiState::default();
@@ -268,15 +306,21 @@ pub async fn cli_send(
         }
     }
     .await;
+    let stderr_text = stderr_task.await.unwrap_or_default();
 
     CLI_CHILDREN.lock().remove(&chat_id);
     match result {
         Ok(code) => {
+            let error = cli_exit_error(eng, code, &stderr_text);
             let _ = app.emit(
                 "claude:exit",
-                ExitPayload { chat_id, code, error: None },
+                ExitPayload {
+                    chat_id,
+                    code,
+                    error: error.clone(),
+                },
             );
-            Ok(())
+            error.map_or(Ok(()), Err)
         }
         Err(e) => {
             let _ = app.emit(
@@ -314,5 +358,15 @@ mod engine_tests {
         assert!(detail_for(CliEngine::Codex, false, false).contains("npm i -g @openai/codex"));
         assert!(detail_for(CliEngine::Gemini, true, false).contains("Login with Google"));
         assert_eq!(detail_for(CliEngine::Codex, true, true), "Ready.");
+    }
+    #[test]
+    fn nonzero_cli_exit_surfaces_stderr() {
+        use super::{cli_exit_error, CliEngine};
+        assert_eq!(cli_exit_error(CliEngine::Codex, Some(0), "warning"), None);
+        assert_eq!(cli_exit_error(CliEngine::Codex, None, "cancelled"), None);
+        assert_eq!(
+            cli_exit_error(CliEngine::Codex, Some(2), "unexpected argument '-a'"),
+            Some("Codex CLI exited with code 2: unexpected argument '-a'".into())
+        );
     }
 }
