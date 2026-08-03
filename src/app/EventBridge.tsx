@@ -25,8 +25,7 @@ import {
 import { useHermes, type HermesStatus, type HermesColumn } from "@/store/hermesStore";
 import { usePluginManager } from "@/store/pluginManagerStore";
 import { BUILTIN_APP_PLUGIN_IDS } from "@/plugins/builtinApps";
-import { useCommand } from "@/store/commandStore";
-import { type CcEvent } from "@/apps/command/ccRun";
+import { internalEventRegistry } from "@/plugins/internalEventRegistry";
 import { useSpotify } from "@/store/spotifyStore";
 import { useRepoLensWebsites } from "@/apps/archives/repolens/useRepoLensWebsites";
 import { onPassExit } from "@/features/agents/twoPassCoordinator";
@@ -642,20 +641,15 @@ export function EventBridge() {
       (u) => unlisteners.push(u),
     );
 
-    // Command Center — a profile's headless pi run streams flat cc events here;
-    // mirror them into the live run, persist on exit.
-    listen<{ runId: string; event: CcEvent }>("cc:event", (e) => {
-      useCommand.getState().applyRunEvent(e.payload.runId, e.payload.event);
+    // Native events stay kernel-owned; active plugins contribute disposable,
+    // schema-validating handlers through the internal event registry.
+    listen<unknown>("cc:event", (e) => {
+      internalEventRegistry.dispatch("cc:event", e.payload);
     }).then((u) => unlisteners.push(u));
 
-    listen<{ runId: string; code: number | null; error: string | null }>(
-      "cc:exit",
-      (e) => {
-        void useCommand
-          .getState()
-          .finishRun(e.payload.runId, e.payload.error ?? undefined);
-      },
-    ).then((u) => unlisteners.push(u));
+    listen<unknown>("cc:exit", (e) => {
+      internalEventRegistry.dispatch("cc:exit", e.payload);
+    }).then((u) => unlisteners.push(u));
 
     // OS-level Spotify media hotkeys (registered in Rust). Single code path:
     // the global shortcut fires here even when Orion is unfocused.

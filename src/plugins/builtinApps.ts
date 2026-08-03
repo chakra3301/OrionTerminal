@@ -5,6 +5,7 @@ import { useShell } from "@/shell/store/useShell";
 import { appRegistry, type AppDescriptor } from "@/plugins/appRegistry";
 import { internalPluginHost } from "@/plugins/host";
 import type { InternalPlugin } from "@/plugins/contracts";
+import { registerCommandCenterEventContributions } from "@/apps/command/pluginContributions";
 
 export const BUILTIN_APP_PLUGIN_IDS = {
   archives: "@orion/archives",
@@ -212,7 +213,7 @@ export const BUILTIN_APP_PLUGIN_CATALOG: readonly BuiltinAppPluginInfo[] = [
     version: "1.0.0",
     description: "Agent organization, reusable profiles, run history, and operational knowledge.",
     capabilities: ["Agents", "Automation", "Wiki"],
-    disableable: false,
+    disableable: true,
   },
   {
     pluginId: BUILTIN_APP_PLUGIN_IDS.hermes,
@@ -242,6 +243,9 @@ function pluginFor(descriptor: AppDescriptor): InternalPlugin {
         },
       };
       subscriptions.add(registry.register(command, ownerId));
+      if (descriptor.id === "command") {
+        registerCommandCenterEventContributions(ownerId, subscriptions);
+      }
     },
   };
 }

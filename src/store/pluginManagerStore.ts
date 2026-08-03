@@ -7,6 +7,7 @@ import {
   syncBuiltinAppPlugins,
 } from "@/plugins/builtinApps";
 import { useHermes } from "@/store/hermesStore";
+import { useCommand } from "@/store/commandStore";
 
 export type PluginEnablementV1 = {
   version: 1;
@@ -59,6 +60,12 @@ function blockReason(pluginId: string): string | null {
       return "Stop every running Hermes task before disabling the plugin.";
     }
   }
+  if (pluginId === BUILTIN_APP_PLUGIN_IDS.command) {
+    const command = useCommand.getState();
+    if (command.activeRun || command.planning || command.dispatching) {
+      return "Wait for Command Center planning and agent runs to finish before disabling the plugin.";
+    }
+  }
   return null;
 }
 
@@ -66,7 +73,6 @@ async function loadPluginData(pluginId: string): Promise<void> {
   if (pluginId === BUILTIN_APP_PLUGIN_IDS.hermes) {
     await useHermes.getState().load();
   } else if (pluginId === BUILTIN_APP_PLUGIN_IDS.command) {
-    const { useCommand } = await import("@/store/commandStore");
     await useCommand.getState().load();
   } else if (pluginId === BUILTIN_APP_PLUGIN_IDS.xdesign) {
     const { useXDProjects } = await import("@/apps/xdesign/projectsStore");
@@ -105,6 +111,10 @@ export const usePluginManager = create<PluginManagerState>((set, get) => ({
     }
     const isEnabled = !current.disabledIds.includes(pluginId);
     if (isEnabled === enabled) return true;
+    if (current.busyIds.length > 0) {
+      set({ error: "Wait for the current plugin change to finish." });
+      return false;
+    }
     if (!enabled) {
       const reason = blockReason(pluginId);
       if (reason) {
@@ -118,19 +128,26 @@ export const usePluginManager = create<PluginManagerState>((set, get) => ({
       ? previous.filter((id) => id !== pluginId)
       : [...previous, pluginId].sort();
     set((state) => ({
+      disabledIds: next,
       busyIds: [...new Set([...state.busyIds, pluginId])],
       error: null,
     }));
 
     try {
-      await setAppState("plugins.state", persisted(next));
       const failures = syncBuiltinAppPlugins(new Set(next));
       if (failures.length > 0) throw new Error("Plugin cleanup reported an error.");
-      set({ disabledIds: next });
+      await setAppState("plugins.state", persisted(next));
       if (enabled) await loadPluginData(pluginId);
       return true;
     } catch (error) {
-      syncBuiltinAppPlugins(new Set(previous));
+      set({ disabledIds: previous });
+      let runtimeRollbackFailed = false;
+      try {
+        syncBuiltinAppPlugins(new Set(previous));
+      } catch (rollbackError) {
+        runtimeRollbackFailed = true;
+        log.error("plugin enablement runtime rollback failed", rollbackError);
+      }
       try {
         await setAppState("plugins.state", persisted(previous));
       } catch (rollbackError) {
@@ -138,7 +155,11 @@ export const usePluginManager = create<PluginManagerState>((set, get) => ({
       }
       const message = error instanceof Error ? error.message : String(error);
       log.error("plugin enablement update failed", pluginId, error);
-      set({ disabledIds: previous, error: message });
+      set({
+        error: runtimeRollbackFailed
+          ? `${message} Runtime recovery failed; restart Orion Terminal.`
+          : message,
+      });
       return false;
     } finally {
       set((state) => ({
