@@ -30,6 +30,7 @@ import { tutorSystemPrompt } from "./pedagogy";
 import { parseLesson } from "./learnTypes";
 import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
+import { setArchivesActivity } from "@/apps/archives/runtimeActivity";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -103,6 +104,15 @@ export function TutorPanel() {
   const inputRef    = useRef<HTMLTextAreaElement>(null);
   // Pending assistant message id for streaming updates
   const pendingIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setArchivesActivity(
+      "learn-tutor",
+      running,
+      "Stop the Archives tutor before disabling the plugin.",
+    );
+    return () => setArchivesActivity("learn-tutor", false, "");
+  }, [running]);
 
   // Reset conversation when the node changes
   useEffect(() => {

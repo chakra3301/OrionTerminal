@@ -9,25 +9,17 @@ import {
 } from "@/store/appChatStore";
 import { useFileTreeRefresh } from "@/store/fileTreeRefreshStore";
 import { useTabsStore } from "@/store/tabsStore";
-import { useNotesStore } from "@/store/notesStore";
-import { useArchives } from "@/apps/archives/useArchives";
 import { useShell, type AppId } from "@/shell/store/useShell";
 import { useProjectStore } from "@/store/projectStore";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
-import { countNotes } from "@/lib/db";
 import { ipc } from "@/lib/ipc";
-import {
-  isOrionNoteWriteTool,
-  isOrionMoodWriteTool,
-  isOrionAssetWriteTool,
-  isOrionHermesWriteTool,
-} from "@/lib/orionToolMatch";
+import { isOrionHermesWriteTool } from "@/lib/orionToolMatch";
 import { useHermes, type HermesStatus, type HermesColumn } from "@/store/hermesStore";
 import { usePluginManager } from "@/store/pluginManagerStore";
 import { BUILTIN_APP_PLUGIN_IDS } from "@/plugins/builtinApps";
 import { internalEventRegistry } from "@/plugins/internalEventRegistry";
+import { internalActionRegistry } from "@/plugins/internalActionRegistry";
 import { useSpotify } from "@/store/spotifyStore";
-import { useRepoLensWebsites } from "@/apps/archives/repolens/useRepoLensWebsites";
 import { onPassExit } from "@/features/agents/twoPassCoordinator";
 import { log } from "@/lib/log";
 
@@ -70,6 +62,10 @@ type UiActionEnvelope = UiAction & { requestId: string };
 /** Returns data for read-back (query) kinds; void for fire-and-forget
  * actions. Throwing here surfaces an error back to the calling MCP tool. */
 async function handleUiAction(action: UiAction): Promise<unknown> {
+  const contributed = await internalActionRegistry.dispatch(action.kind, action.payload);
+  if (contributed.handled) return contributed.value;
+  if (action.kind === "open_note") throw new Error("Archives plugin is disabled");
+
   if (action.kind === "open_app") {
     const app = (action.payload as { app?: AppId } | undefined)?.app;
     if (
@@ -268,33 +264,6 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
     useWorkspace.getState().openTab({ kind: "diff-review", path: p.path });
     return;
   }
-  if (action.kind === "open_note") {
-    const p = action.payload as {
-      id?: string;
-      kind?: "note" | "journal" | "project";
-    };
-    if (!p?.id) return;
-    // 1. Re-hydrate notes so the freshly-written row is in the store before
-    //    the view tries to render it.
-    await useNotesStore.getState().load();
-    // 2. Open Archives behind whatever overlay is showing (Core panel etc).
-    useShell.getState().openApp("archives");
-    // 3. Switch to the right Archives view and select the note.
-    const archives = useArchives.getState();
-    const kind =
-      p.kind ?? useNotesStore.getState().notes.get(p.id)?.kind ?? "note";
-    if (kind === "project") {
-      archives.setView("projects");
-      archives.setOpenProjectId(p.id);
-    } else if (kind === "journal") {
-      archives.setView("journal");
-      archives.setSelectedNoteId(p.id);
-    } else {
-      archives.setView("notes");
-      archives.setOpenNoteId(p.id);
-    }
-    return;
-  }
   if (action.kind === "xdesign_apply") {
     const ops = (action.payload as { ops?: unknown }).ops;
     if (!Array.isArray(ops)) throw new Error("xdesign_apply: ops must be an array");
@@ -339,39 +308,6 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
  * EventBridge re-mounts and chatId boundaries. */
 const toolUseIdToName = new Map<string, string>();
 
-let notesRefreshTimer: ReturnType<typeof setTimeout> | null = null;
-function scheduleNotesRefresh() {
-  if (notesRefreshTimer) clearTimeout(notesRefreshTimer);
-  // Tiny coalescing window — multiple writes in quick succession (e.g. a
-  // claude turn that creates 3 notes) collapse to one load() + count.
-  notesRefreshTimer = setTimeout(() => {
-    notesRefreshTimer = null;
-    void useNotesStore.getState().load();
-    void countNotes()
-      .then((n) => useArchives.getState().setCounts({ notes: n }))
-      .catch(() => undefined);
-  }, 250);
-}
-let moodRefreshTimer: ReturnType<typeof setTimeout> | null = null;
-function scheduleMoodRefresh() {
-  if (moodRefreshTimer) clearTimeout(moodRefreshTimer);
-  moodRefreshTimer = setTimeout(() => {
-    moodRefreshTimer = null;
-    void import("@/store/moodBoardsStore").then((m) =>
-      m.useMoodBoardsStore.getState().load(),
-    );
-  }, 250);
-}
-let assetsRefreshTimer: ReturnType<typeof setTimeout> | null = null;
-function scheduleAssetsRefresh() {
-  if (assetsRefreshTimer) clearTimeout(assetsRefreshTimer);
-  assetsRefreshTimer = setTimeout(() => {
-    assetsRefreshTimer = null;
-    void import("@/store/assetsStore").then((m) =>
-      m.useAssetsStore.getState().load(),
-    );
-  }, 250);
-}
 let hermesRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleHermesRefresh() {
   if (hermesRefreshTimer) clearTimeout(hermesRefreshTimer);
@@ -502,9 +438,7 @@ function trackOrionToolSideEffects(env: ClaudeEnvelope) {
         const tr = block as Extract<UserContentBlock, { type: "tool_result" }>;
         const name = toolUseIdToName.get(tr.tool_use_id);
         if (name && !tr.is_error) {
-          if (isOrionNoteWriteTool(name)) scheduleNotesRefresh();
-          if (isOrionMoodWriteTool(name)) scheduleMoodRefresh();
-          if (isOrionAssetWriteTool(name)) scheduleAssetsRefresh();
+          internalEventRegistry.dispatch("claude:tool-result", { toolName: name });
           if (
             isOrionHermesWriteTool(name) &&
             usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.hermes)
@@ -692,17 +626,8 @@ export function EventBridge() {
       },
     ).then((u) => unlisteners.push(u));
 
-    // RepoLens website rip — the engine streams the rip's status/phase + log
-    // deltas + thumbnail path; mirror it into the store for the live progress UI.
-    listen<{
-      id: string;
-      status: import("../apps/archives/repolens/repolensWebsitesDb").WebsiteStatus;
-      phase: string;
-      logDelta?: string;
-      thumbnailPath?: string;
-      sessionId?: string | null;
-    }>("repolens:website", (e) => {
-      useRepoLensWebsites.getState().applyEvent(e.payload);
+    listen<unknown>("repolens:website", (e) => {
+      internalEventRegistry.dispatch("repolens:website", e.payload);
     }).then((u) => unlisteners.push(u));
 
     // UI-action bridge: out-of-process MCP server → main app via TCP →

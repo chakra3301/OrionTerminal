@@ -3,6 +3,7 @@ import { learnClaudeCall } from "../../../lib/ipc";
 import { parseGraphSpec, parseLesson, type GraphSpec, type Lesson } from "./learnTypes";
 import { graphPrompt, lessonPrompt, gradePrompt, findLinksPrompt, figurePrompt } from "./pedagogy";
 import { parseFigure, type Figure } from "./figure";
+import { withArchivesActivity } from "@/apps/archives/runtimeActivity";
 
 const MIN_GAP_MS = 1200;
 
@@ -29,14 +30,22 @@ function makeLane() {
 const enqueue = makeLane();
 const enqueueFigure = makeLane();
 
+function trackedCall(prompt: string, model: string, allowWeb: boolean) {
+  return withArchivesActivity(
+    "learn-ai",
+    "Wait for Archives Learn AI work to finish before disabling the plugin.",
+    () => learnClaudeCall(prompt, model, allowWeb),
+  );
+}
+
 export async function generateGraph(topic: string, model: string): Promise<GraphSpec> {
-  const reply = await enqueue(() => learnClaudeCall(graphPrompt(topic), model, false));
+  const reply = await enqueue(() => trackedCall(graphPrompt(topic), model, false));
   return parseGraphSpec(reply.result);
 }
 
 export async function generateFigure(topic: string, nodeCount: number, model: string): Promise<Figure | null> {
   try {
-    const reply = await enqueueFigure(() => learnClaudeCall(figurePrompt({ topic, nodeCount }), model, false));
+    const reply = await enqueueFigure(() => trackedCall(figurePrompt({ topic, nodeCount }), model, false));
     return parseFigure(reply.result);
   } catch {
     return null;
@@ -44,13 +53,13 @@ export async function generateFigure(topic: string, nodeCount: number, model: st
 }
 
 export async function generateLesson(args: { topic: string; nodeTitle: string; objective: string; level: string; priorTitles: string[] }, model: string): Promise<Lesson> {
-  const reply = await enqueue(() => learnClaudeCall(lessonPrompt(args), model, false));
+  const reply = await enqueue(() => trackedCall(lessonPrompt(args), model, false));
   return parseLesson(reply.result);
 }
 
 export type Grade = { correct: boolean; partial: boolean; missed_concepts: string[] };
 export async function gradeAnswer(args: { question: string; expected: string; concept: string; answer: string }, model: string): Promise<Grade> {
-  const reply = await enqueue(() => learnClaudeCall(gradePrompt(args), model, false));
+  const reply = await enqueue(() => trackedCall(gradePrompt(args), model, false));
   try {
     const s = reply.result; const a = s.indexOf("{"); const b = s.lastIndexOf("}");
     const o = a >= 0 && b > a ? JSON.parse(s.slice(a, b + 1)) : {};
@@ -61,7 +70,7 @@ export async function gradeAnswer(args: { question: string; expected: string; co
 }
 
 export async function findRealLinks(args: { topic: string; nodeTitle: string; keyTerms: string[] }, model: string): Promise<Array<{ type: string; title: string; url: string }>> {
-  const reply = await enqueue(() => learnClaudeCall(findLinksPrompt(args), model, true)); // allow_web
+  const reply = await enqueue(() => trackedCall(findLinksPrompt(args), model, true)); // allow_web
   try {
     const s = reply.result; const a = s.indexOf("["); const b = s.lastIndexOf("]");
     const arr = a >= 0 && b > a ? JSON.parse(s.slice(a, b + 1)) : [];

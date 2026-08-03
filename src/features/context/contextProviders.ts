@@ -2,6 +2,8 @@ import Fuse from "fuse.js";
 import { ulid } from "ulid";
 import { ipc, type TreeNode } from "@/lib/ipc";
 import { useNotesStore } from "@/store/notesStore";
+import { usePluginManager } from "@/store/pluginManagerStore";
+import { BUILTIN_APP_PLUGIN_IDS } from "@/plugins/builtinApps";
 import {
   useDiagnosticsStore,
   SEVERITY_ERROR,
@@ -167,9 +169,14 @@ export async function searchContextSuggestions(
 
   // Archives notes — the cross-app advantage: code questions with your own
   // research/notes attached.
-  const notes = [...useNotesStore.getState().notes.values()].filter(
-    (n) => (n.title || n.plaintext).trim().length > 0,
-  );
+  const archivesEnabled = usePluginManager
+    .getState()
+    .isEnabled(BUILTIN_APP_PLUGIN_IDS.archives);
+  const notes = archivesEnabled
+    ? [...useNotesStore.getState().notes.values()].filter(
+        (n) => (n.title || n.plaintext).trim().length > 0,
+      )
+    : [];
   if (q) {
     const noteFuse = new Fuse(notes, { keys: ["title", "plaintext"], threshold: 0.45 });
     for (const r of noteFuse.search(q).slice(0, 4)) {
@@ -282,6 +289,9 @@ async function resolveOne(c: ContextChip, projectRoot: string | null): Promise<R
         return { ...c, content: diff, truncated: diff.endsWith("(diff truncated)") };
       }
       case "note": {
+        if (!usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.archives)) {
+          throw new Error("Archives plugin is disabled");
+        }
         const note = c.detail ? useNotesStore.getState().notes.get(c.detail) : undefined;
         if (!note) throw new Error("note not found");
         const body = `# ${note.title || "Untitled"}\n\n${note.plaintext}`;

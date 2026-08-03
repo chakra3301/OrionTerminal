@@ -8,6 +8,13 @@ import { useHermes, type HermesAgent } from "@/store/hermesStore";
 import { useCommand } from "@/store/commandStore";
 import { newRun } from "@/apps/command/ccRun";
 import { internalEventRegistry } from "@/plugins/internalEventRegistry";
+import { internalActionRegistry } from "@/plugins/internalActionRegistry";
+import { overlayRegistry } from "@/plugins/overlayRegistry";
+import { useAppChat } from "@/store/appChatStore";
+import {
+  clearArchivesActivities,
+  setArchivesActivity,
+} from "@/apps/archives/runtimeActivity";
 import { usePluginManager } from "./pluginManagerStore";
 
 vi.mock("@/lib/db", () => ({ setAppState: vi.fn(async () => {}) }));
@@ -34,6 +41,21 @@ function reset() {
     loaded: false,
   });
   internalEventRegistry.clear();
+  internalActionRegistry.clear();
+  overlayRegistry.clear();
+  clearArchivesActivities();
+  const threads = useAppChat.getState().threads;
+  useAppChat.setState({
+    threads: {
+      ...threads,
+      archives: {
+        ...threads.archives,
+        running: false,
+        pendingAssistantId: null,
+        activeStreamId: null,
+      },
+    },
+  });
   vi.clearAllMocks();
 }
 
@@ -75,6 +97,75 @@ describe("plugin enablement persistence", () => {
     });
     expect(appRegistry.has("hermes")).toBe(false);
     expect(registry.has("app.openHermes")).toBe(false);
+  });
+
+  it("hydrates Archives as disabled before contributions or windows restore", () => {
+    usePluginManager.getState().hydrate({
+      version: 1,
+      disabled: [BUILTIN_APP_PLUGIN_IDS.archives],
+    });
+
+    expect(appRegistry.has("archives")).toBe(false);
+    expect(registry.has("note.quickCapture")).toBe(false);
+    expect(internalActionRegistry.has("open_note")).toBe(false);
+    expect(overlayRegistry.ownerOf("archives.overlay.ask")).toBeUndefined();
+  });
+
+  it("persists and disposes Archives contributions immediately", async () => {
+    usePluginManager.getState().hydrate(null);
+    expect(registry.ownerOf("note.quickCapture")).toBe(BUILTIN_APP_PLUGIN_IDS.archives);
+    expect(internalActionRegistry.has("open_note")).toBe(true);
+    expect(overlayRegistry.ownerOf("archives.overlay.ask")).toBe(
+      BUILTIN_APP_PLUGIN_IDS.archives,
+    );
+
+    const ok = await usePluginManager
+      .getState()
+      .setEnabled(BUILTIN_APP_PLUGIN_IDS.archives, false);
+
+    expect(ok).toBe(true);
+    expect(setAppState).toHaveBeenCalledWith("plugins.state", {
+      version: 1,
+      disabled: [BUILTIN_APP_PLUGIN_IDS.archives],
+    });
+    expect(appRegistry.has("archives")).toBe(false);
+    expect(registry.has("note.quickCapture")).toBe(false);
+    expect(internalActionRegistry.has("open_note")).toBe(false);
+    expect(overlayRegistry.ownerOf("archives.overlay.ask")).toBeUndefined();
+  });
+
+  it("blocks Archives disable while its Claude rail is running", async () => {
+    usePluginManager.getState().hydrate(null);
+    const threads = useAppChat.getState().threads;
+    useAppChat.setState({
+      threads: {
+        ...threads,
+        archives: { ...threads.archives, running: true },
+      },
+    });
+
+    const ok = await usePluginManager
+      .getState()
+      .setEnabled(BUILTIN_APP_PLUGIN_IDS.archives, false);
+
+    expect(ok).toBe(false);
+    expect(setAppState).not.toHaveBeenCalled();
+    expect(appRegistry.has("archives")).toBe(true);
+    expect(usePluginManager.getState().error).toMatch(/Claude response/);
+  });
+
+  it("blocks Archives disable while owned background work is active", async () => {
+    usePluginManager.getState().hydrate(null);
+    setArchivesActivity("learn", true, "Archives Learn is running.");
+
+    const ok = await usePluginManager
+      .getState()
+      .setEnabled(BUILTIN_APP_PLUGIN_IDS.archives, false);
+
+    expect(ok).toBe(false);
+    expect(setAppState).not.toHaveBeenCalled();
+    expect(appRegistry.has("archives")).toBe(true);
+    expect(usePluginManager.getState().error).toBe("Archives Learn is running.");
   });
 
   it("persists and disposes Command Center and its event handlers", async () => {

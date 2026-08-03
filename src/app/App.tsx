@@ -14,17 +14,12 @@ import { HotkeyHost } from "@/lib/hotkeys";
 import { useTerminalStore } from "@/store/terminalStore";
 import { getAppState, getDb } from "@/lib/db";
 import { useLayoutStore } from "@/store/layoutStore";
-import { useNotesStore } from "@/store/notesStore";
-import { useAssetsStore } from "@/store/assetsStore";
-import { useMoodBoardsStore } from "@/store/moodBoardsStore";
-import { useCollectionsStore } from "@/store/collectionsStore";
 import { useHermes } from "@/store/hermesStore";
 import { useCommand } from "@/store/commandStore";
 import { useProvidersStore } from "@/store/providersStore";
 import { useDesignSystems } from "@/store/designSystemStore";
 import { useSkillsStore } from "@/store/skillsStore";
 import { useAgentsStore } from "@/store/agentsStore";
-import { LinkInsertPalette } from "@/features/notes/LinkInsertPalette";
 import { HelpWindow } from "@/features/help/HelpWindow";
 import { Walkthrough } from "@/features/onboarding/Walkthrough";
 import { useOnboarding } from "@/features/onboarding/onboardingStore";
@@ -61,8 +56,11 @@ import {
   setWorkspaceLayout,
   logActivity,
 } from "@/lib/db";
-import { runEmbeddingBackfill } from "@/lib/embeddingIndexer";
 import { startContextSnapshotter } from "@/lib/contextSnapshot";
+import {
+  loadArchivesPluginData,
+  refreshArchivesPluginData,
+} from "@/apps/archives/pluginContributions";
 import { log } from "@/lib/log";
 import { toast } from "@/store/toastStore";
 import { useAutocomplete } from "@/store/autocompleteStore";
@@ -91,6 +89,12 @@ async function sanitizeLayout(node: LayoutNode): Promise<LayoutNode> {
   if (node.kind === "panel") {
     const keptTabs: typeof node.tabs = [];
     for (const t of node.tabs) {
+      if (
+        t.descriptor.kind === "note" &&
+        !usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.archives)
+      ) {
+        continue;
+      }
       if (t.descriptor.kind === "file") {
         try {
           const ok = await ipc.pathExists(t.descriptor.path);
@@ -200,31 +204,14 @@ async function hydrate() {
     await useProjectStore.getState().hydrateFromId(lastProjectId);
   }
 
-  try {
-    const purged = await purgeEmptyNotes();
-    if (purged > 0) log.info(`purged ${purged} empty notes`);
-  } catch (err) {
-    log.warn("purgeEmptyNotes failed", err);
-  }
-  try {
-    await useNotesStore.getState().load();
-  } catch (err) {
-    log.warn("notes load failed", err);
-  }
-  try {
-    await useAssetsStore.getState().load();
-  } catch (err) {
-    log.warn("assets load failed", err);
-  }
-  try {
-    await useMoodBoardsStore.getState().load();
-  } catch (err) {
-    log.warn("mood boards load failed", err);
-  }
-  try {
-    await useCollectionsStore.getState().load();
-  } catch (err) {
-    log.warn("collections load failed", err);
+  if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.archives)) {
+    try {
+      const purged = await purgeEmptyNotes();
+      if (purged > 0) log.info(`purged ${purged} empty notes`);
+      await loadArchivesPluginData();
+    } catch (err) {
+      log.warn("archives load failed", err);
+    }
   }
   if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.hermes)) {
     try {
@@ -292,11 +279,6 @@ async function hydrate() {
     useShell.getState().openApp("orion");
   }
 
-  // Kick off the semantic-search backfill after the rest of the app is up.
-  // Fire-and-forget — the indexer never throws, and the search layer falls
-  // back to FTS5 when embeddings aren't available yet.
-  void scheduleEmbeddingBackfill();
-
   // Codebase semantic index for the active project (and on project switch).
   scheduleCodebaseIndex();
 
@@ -325,19 +307,6 @@ async function hydrate() {
 
   // Live git status (branch, dirty files) for the active project.
   startGitWatch();
-}
-
-let backfillStarted = false;
-function scheduleEmbeddingBackfill(): void {
-  if (backfillStarted) return;
-  backfillStarted = true;
-  // Defer past the first paint so the model download/load doesn't compete
-  // with initial UI render.
-  setTimeout(() => {
-    void runEmbeddingBackfill().catch((err) =>
-      log.warn("embedding backfill rejected", err),
-    );
-  }, 1500);
 }
 
 let codebaseIndexStarted = false;
@@ -590,32 +559,18 @@ function useFsWatcher() {
  * Frontend-only + debounced; a store reload doesn't disturb an open BlockNote
  * editor (its content is held in-memory, not re-seeded from the store). */
 function useArchivesLiveRefresh() {
+  const disabledIds = usePluginManager((state) => state.disabledIds);
+  const hydrated = usePluginManager((state) => state.hydrated);
+  const enabled = hydrated && !disabledIds.includes(BUILTIN_APP_PLUGIN_IDS.archives);
   useEffect(() => {
+    if (!enabled) return;
     let t: ReturnType<typeof setTimeout> | null = null;
     const refresh = () => {
       if (t) clearTimeout(t);
       t = setTimeout(() => {
-        void (async () => {
-          try {
-            const [{ useCollectionsStore }, { useAssetsStore }, { useArchives }] =
-              await Promise.all([
-                import("@/store/collectionsStore"),
-                import("@/store/assetsStore"),
-                import("@/apps/archives/useArchives"),
-              ]);
-            await Promise.all([
-              useNotesStore.getState().load(),
-              useCollectionsStore.getState().load(),
-              useAssetsStore.getState().load(),
-            ]);
-            useArchives.getState().setCounts({
-              notes: useNotesStore.getState().notes.size,
-              assets: useAssetsStore.getState().assets.size,
-            });
-          } catch (e) {
-            log.warn("archives live refresh", e);
-          }
-        })();
+        void refreshArchivesPluginData().catch((error) =>
+          log.warn("archives live refresh", error),
+        );
       }, 250);
     };
     const unlisten = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
@@ -625,7 +580,7 @@ function useArchivesLiveRefresh() {
       void unlisten.then((f) => f());
       if (t) clearTimeout(t);
     };
-  }, []);
+  }, [enabled]);
 }
 
 /** Minimal boot placeholder shown before the gate resolves and during a warm
@@ -699,7 +654,6 @@ export default function App() {
       <SettingsPanel />
       <ControlPanel />
       <KeybindingsOverlay />
-      <LinkInsertPalette />
       <HelpWindow />
       <Walkthrough />
       {SplashPreview && (

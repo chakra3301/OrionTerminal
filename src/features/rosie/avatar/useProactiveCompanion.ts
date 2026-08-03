@@ -5,6 +5,8 @@ import { useVoice } from "@/store/voiceStore";
 import { useProjectStore } from "@/store/projectStore";
 import { useShell } from "@/shell/store/useShell";
 import { useNotesStore } from "@/store/notesStore";
+import { usePluginManager } from "@/store/pluginManagerStore";
+import { BUILTIN_APP_PLUGIN_IDS } from "@/plugins/builtinApps";
 import {
   useWorkspace,
   allTabs,
@@ -79,12 +81,14 @@ function gatherContext(): string {
     /* ignore */
   }
   try {
-    const notes = [...useNotesStore.getState().notes.values()]
-      .filter((n) => n.title?.trim())
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, 3)
-      .map((n) => n.title.trim());
-    if (notes.length) lines.push(`Recent notes: ${notes.join("; ")}.`);
+    if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.archives)) {
+      const notes = [...useNotesStore.getState().notes.values()]
+        .filter((n) => n.title?.trim())
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, 3)
+        .map((n) => n.title.trim());
+      if (notes.length) lines.push(`Recent notes: ${notes.join("; ")}.`);
+    }
   } catch {
     /* ignore */
   }
@@ -104,13 +108,19 @@ function gatherContext(): string {
 }
 
 function pickFallback(): string {
-  return FALLBACK[Math.floor(Math.random() * FALLBACK.length)]!;
+  const options = usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.archives)
+    ? FALLBACK
+    : FALLBACK.filter((line) => !line.includes("recent notes"));
+  return options[Math.floor(Math.random() * options.length)]!;
 }
 
 async function generateQuestion(): Promise<string> {
   try {
     const ctx = gatherContext();
-    const angle = ANGLES[Math.floor(Math.random() * ANGLES.length)]!;
+    const angles = usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.archives)
+      ? ANGLES
+      : ANGLES.filter((angle) => !angle.includes("recent notes"));
+    const angle = angles[Math.floor(Math.random() * angles.length)]!;
     const prompt =
       "You are R.O.S.I.E, a warm, witty JARVIS-style desktop AI companion living on the user's screen.\n" +
       "Here's what you currently know about them:\n" +

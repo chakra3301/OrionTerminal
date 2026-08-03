@@ -12,11 +12,13 @@
 //! DB path comes from the `ORION_DB_PATH` env var that the main process
 //! sets when spawning claude-code.
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
+use std::collections::HashSet;
 use std::io::{self, BufRead, Write};
 
 const PROTOCOL_VERSION: &str = "2024-11-05";
+const ARCHIVES_PLUGIN_ID: &str = "@orion/archives";
 
 pub fn serve() -> ! {
     let stdin = io::stdin();
@@ -93,7 +95,7 @@ fn dispatch(method: &str, params: &Value) -> Result<Value, RpcError> {
             "serverInfo": { "name": "orion-mcp", "version": "0.1.0" },
         })),
         "notifications/initialized" => Ok(Value::Null),
-        "tools/list" => Ok(json!({ "tools": tool_definitions() })),
+        "tools/list" => Ok(json!({ "tools": available_tool_definitions() })),
         "tools/call" => call_tool(params),
         _ => Err(RpcError {
             code: -32601,
@@ -729,6 +731,103 @@ pub fn tool_definitions() -> Value {
     ])
 }
 
+fn plugin_for_tool(name: &str) -> Option<&'static str> {
+    match name {
+        "orion_list_recent_notes"
+        | "orion_search_archive"
+        | "orion_create_note"
+        | "orion_create_project"
+        | "orion_update_note_body"
+        | "orion_read_note"
+        | "orion_list_assets"
+        | "orion_search_assets"
+        | "orion_create_mood_board"
+        | "orion_add_to_mood_board"
+        | "orion_attach_tag"
+        | "orion_delete_note" => Some(ARCHIVES_PLUGIN_ID),
+        _ => None,
+    }
+}
+
+fn plugin_for_app(app: &str) -> Option<&'static str> {
+    match app {
+        "archives" => Some(ARCHIVES_PLUGIN_ID),
+        "orion" => Some("@orion/editor"),
+        "xdesign" => Some("@orion/xdesign"),
+        "hermes" => Some("@orion/hermes"),
+        _ => None,
+    }
+}
+
+fn parse_disabled_plugin_ids(raw: Option<&str>) -> HashSet<String> {
+    let Some(raw) = raw else { return HashSet::new() };
+    let value: Value = serde_json::from_str(raw).unwrap_or(Value::Null);
+    if value.get("version").and_then(Value::as_i64) != Some(1) {
+        return HashSet::new();
+    }
+    value
+        .get("disabled")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_string)
+        .collect()
+}
+
+fn disabled_plugin_ids() -> Result<HashSet<String>, String> {
+    let conn = open_db()?;
+    let raw: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_state WHERE key = 'plugins.state'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|error| format!("read plugin state: {error}"))?;
+    Ok(parse_disabled_plugin_ids(raw.as_deref()))
+}
+
+fn plugin_enabled(plugin_id: &str) -> Result<bool, String> {
+    Ok(!disabled_plugin_ids()?.contains(plugin_id))
+}
+
+fn ensure_tool_plugin_enabled(name: &str) -> Result<(), String> {
+    let Some(plugin_id) = plugin_for_tool(name) else { return Ok(()) };
+    if plugin_enabled(plugin_id)? {
+        Ok(())
+    } else {
+        Err(format!("plugin disabled: {plugin_id}"))
+    }
+}
+
+fn filter_tool_definitions_for_disabled(
+    definitions: Value,
+    disabled: &HashSet<String>,
+) -> Value {
+    let Value::Array(tools) = definitions else {
+        return Value::Array(Vec::new());
+    };
+    Value::Array(
+        tools
+            .into_iter()
+            .filter(|tool| {
+                let name = tool.get("name").and_then(Value::as_str).unwrap_or("");
+                match plugin_for_tool(name) {
+                    Some(plugin_id) => !disabled.contains(plugin_id),
+                    None => true,
+                }
+            })
+            .collect(),
+    )
+}
+
+pub(crate) fn available_tool_definitions() -> Value {
+    let disabled = disabled_plugin_ids()
+        .unwrap_or_else(|_| HashSet::from([ARCHIVES_PLUGIN_ID.to_string()]));
+    filter_tool_definitions_for_disabled(tool_definitions(), &disabled)
+}
+
 fn call_tool(params: &Value) -> Result<Value, RpcError> {
     let name = params
         .get("name")
@@ -754,6 +853,7 @@ fn call_tool(params: &Value) -> Result<Value, RpcError> {
 /// Shared tool dispatcher. The stdio serve loop (`call_tool`) and the
 /// in-process runtime both call this — one implementation, no duplication.
 pub fn dispatch_tool(name: &str, args: &Value) -> Result<String, String> {
+    ensure_tool_plugin_enabled(name)?;
     match name {
         "orion_list_recent_notes" => tool_list_recent_notes(args),
         "orion_search_archive" => tool_search_archive(args),
@@ -1254,6 +1354,11 @@ fn tool_open_app(args: &Value) -> Result<String, String> {
         .ok_or_else(|| "app required".to_string())?;
     if !matches!(app, "archives" | "orion" | "xdesign" | "hermes") {
         return Err(format!("invalid app: {} (archives|orion|xdesign|hermes)", app));
+    }
+    if let Some(plugin_id) = plugin_for_app(app) {
+        if !plugin_enabled(plugin_id)? {
+            return Err(format!("plugin disabled: {plugin_id}"));
+        }
     }
     send_ui_action(
         "open_app",
@@ -2004,12 +2109,16 @@ fn humanize_age(ms: i64) -> String {
 
 fn tool_recent_activity(args: &Value) -> Result<String, String> {
     let conn = open_db()?;
+    let archives_enabled = plugin_enabled(ARCHIVES_PLUGIN_ID).unwrap_or(false);
     let limit = args
         .get("limit")
         .and_then(|v| v.as_i64())
         .unwrap_or(30)
         .clamp(1, 200);
     let source = args.get("source").and_then(|v| v.as_str());
+    if source == Some("archives") && !archives_enabled {
+        return Err(format!("plugin disabled: {ARCHIVES_PLUGIN_ID}"));
+    }
     let since = args
         .get("since_hours")
         .and_then(|v| v.as_f64())
@@ -2020,6 +2129,8 @@ fn tool_recent_activity(args: &Value) -> Result<String, String> {
     );
     if source.is_some() {
         sql.push_str(" AND source = ?1");
+    } else if !archives_enabled {
+        sql.push_str(" AND source != 'archives'");
     }
     if let Some(s) = since {
         sql.push_str(&format!(" AND ts >= {}", s));
@@ -2367,6 +2478,53 @@ fn tool_hermes_decompose(args: &Value) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn archive_tools_are_owned_by_the_archives_plugin() {
+        assert_eq!(
+            super::plugin_for_tool("orion_create_note"),
+            Some(super::ARCHIVES_PLUGIN_ID)
+        );
+        assert_eq!(
+            super::plugin_for_tool("orion_search_assets"),
+            Some(super::ARCHIVES_PLUGIN_ID)
+        );
+        assert_eq!(super::plugin_for_tool("orion_read_file"), None);
+    }
+
+    #[test]
+    fn disabled_plugin_tools_are_removed_from_advertised_schemas() {
+        let disabled = std::collections::HashSet::from([
+            super::ARCHIVES_PLUGIN_ID.to_string()
+        ]);
+        let filtered = super::filter_tool_definitions_for_disabled(
+            super::tool_definitions(),
+            &disabled,
+        );
+        let names: Vec<&str> = filtered
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|tool| tool.get("name").and_then(serde_json::Value::as_str))
+            .collect();
+        assert!(!names.contains(&"orion_read_note"));
+        assert!(!names.contains(&"orion_search_assets"));
+        assert!(names.contains(&"orion_read_file"));
+    }
+
+    #[test]
+    fn plugin_state_parser_accepts_only_version_one_disabled_ids() {
+        let disabled = super::parse_disabled_plugin_ids(Some(
+            r#"{"version":1,"disabled":["@orion/archives",47,"@orion/archives"]}"#,
+        ));
+        assert_eq!(disabled.len(), 1);
+        assert!(disabled.contains(super::ARCHIVES_PLUGIN_ID));
+        assert!(super::parse_disabled_plugin_ids(Some(
+            r#"{"version":2,"disabled":["@orion/archives"]}"#
+        ))
+        .is_empty());
+        assert!(super::parse_disabled_plugin_ids(Some("not json")).is_empty());
+    }
+
     #[test]
     fn read_file_returns_contents_and_errors_on_missing() {
         let dir = std::env::temp_dir();

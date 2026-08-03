@@ -176,17 +176,23 @@ export function buildMenu(app: AppId | null, name: string): MenuItem[] {
   // Desktop (no focused app).
   if (!app) {
     switch (name) {
-      case "File":
+      case "File": {
+        const archives = registry.has("note.new")
+          ? [
+              cmd("note.new", "New Note"),
+              cmd("note.newJournal", "New Journal Entry"),
+              cmd("note.newProject", "New Project"),
+              cmd("mood.newBoard", "New Mood Board"),
+              sep,
+            ]
+          : [];
         return [
-          cmd("note.new", "New Note"),
-          cmd("note.newJournal", "New Journal Entry"),
-          cmd("note.newProject", "New Project"),
-          cmd("mood.newBoard", "New Mood Board"),
-          sep,
+          ...archives,
           cmd("file.openProject", "Open Project…"),
           sep,
           cmd("settings.open", "Settings…"),
         ];
+      }
       case "Edit":
         return EDIT_BLOCK;
       case "View":

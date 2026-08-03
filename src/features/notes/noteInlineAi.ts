@@ -1,4 +1,5 @@
 import { ipc } from "@/lib/ipc";
+import { withArchivesActivity } from "@/apps/archives/runtimeActivity";
 
 /** Inline AI actions for the note editor (BlockNote). Subscription CLI, same
  * as the rest of Archives AI. Prompt builders are pure + tested; the runners
@@ -53,7 +54,11 @@ export function cleanAiText(raw: string): string {
 }
 
 export async function runOneshot(prompt: string): Promise<string> {
-  const reply = await ipc.claudeOneshot(prompt);
+  const reply = await withArchivesActivity(
+    "note-inline-ai",
+    "Wait for note AI editing to finish before disabling the Archives plugin.",
+    () => ipc.claudeOneshot(prompt),
+  );
   return cleanAiText(reply);
 }
 

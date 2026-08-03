@@ -8,6 +8,10 @@ import {
 } from "@/plugins/builtinApps";
 import { useHermes } from "@/store/hermesStore";
 import { useCommand } from "@/store/commandStore";
+import {
+  archivesDisableReason,
+  loadArchivesPluginData,
+} from "@/apps/archives/pluginContributions";
 
 export type PluginEnablementV1 = {
   version: 1;
@@ -51,6 +55,9 @@ function blockReason(pluginId: string): string | null {
   const plugin = catalogById.get(pluginId);
   if (!plugin) return "Unknown plugin.";
   if (!plugin.disableable) return "This built-in remains required while its private contributions migrate.";
+  if (pluginId === BUILTIN_APP_PLUGIN_IDS.archives) {
+    return archivesDisableReason();
+  }
   if (pluginId === BUILTIN_APP_PLUGIN_IDS.hermes) {
     const hermes = useHermes.getState();
     if (
@@ -70,7 +77,9 @@ function blockReason(pluginId: string): string | null {
 }
 
 async function loadPluginData(pluginId: string): Promise<void> {
-  if (pluginId === BUILTIN_APP_PLUGIN_IDS.hermes) {
+  if (pluginId === BUILTIN_APP_PLUGIN_IDS.archives) {
+    await loadArchivesPluginData();
+  } else if (pluginId === BUILTIN_APP_PLUGIN_IDS.hermes) {
     await useHermes.getState().load();
   } else if (pluginId === BUILTIN_APP_PLUGIN_IDS.command) {
     await useCommand.getState().load();

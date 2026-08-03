@@ -26,6 +26,16 @@ type IndexTask = {
   text: string;
 };
 
+let archivesEmbeddingEnabled = false;
+const reindexTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+export function setArchivesEmbeddingEnabled(enabled: boolean): void {
+  archivesEmbeddingEnabled = enabled;
+  if (enabled) return;
+  for (const timer of reindexTimers.values()) clearTimeout(timer);
+  reindexTimers.clear();
+}
+
 function noteText(n: NoteRow): string {
   return `${n.title || "Untitled"}\n${n.plaintext || ""}`.trim();
 }
@@ -50,6 +60,7 @@ export async function runEmbeddingBackfill(): Promise<{
   embedded: number;
   skipped: number;
 }> {
+  if (!archivesEmbeddingEnabled) return { embedded: 0, skipped: 0 };
   let embedded = 0;
   let skipped = 0;
   try {
@@ -84,8 +95,10 @@ export async function runEmbeddingBackfill(): Promise<{
     // Warm the model first. If it fails (e.g., offline), skip the whole
     // pass — the search layer falls back to FTS5 cleanly.
     await warmEmbeddings();
+    if (!archivesEmbeddingEnabled) return { embedded: 0, skipped: 0 };
 
     for (const t of tasks) {
+      if (!archivesEmbeddingEnabled) break;
       const key = `${t.kind}:${t.id}`;
       const currentHash = await hashText(t.text);
       if (hashes.get(key) === currentHash) {
@@ -97,6 +110,7 @@ export async function runEmbeddingBackfill(): Promise<{
         // Model load failed mid-pass; bail out — try again next boot.
         break;
       }
+      if (!archivesEmbeddingEnabled) break;
       await upsertEmbedding(
         t.kind,
         t.id,
@@ -126,6 +140,7 @@ export async function reindexEntity(
   id: string,
   text: string,
 ): Promise<void> {
+  if (!archivesEmbeddingEnabled) return;
   const trimmed = text.trim();
   if (!trimmed) return;
   try {
@@ -133,7 +148,7 @@ export async function reindexEntity(
     const hashes = await listEmbeddingHashes();
     if (hashes.get(`${kind}:${id}`) === hash) return;
     const vec = await embed(trimmed);
-    if (!vec) return;
+    if (!vec || !archivesEmbeddingEnabled) return;
     await upsertEmbedding(kind, id, serializeVector(vec), hash);
     invalidateSemanticCache();
   } catch (err) {
@@ -158,7 +173,6 @@ export async function removeEntityEmbedding(
 // Per-(kind:id) debounce. Multiple writes within the same window collapse
 // into a single embed pass that reads the freshest text via the resolver.
 const REINDEX_DEBOUNCE_MS = 2000;
-const reindexTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 /** Schedule a reindex for an entity. The `getText` resolver is invoked when
  * the timer fires, so the embedded text always reflects the freshest state
@@ -169,6 +183,7 @@ export function scheduleReindex(
   id: string,
   getText: () => string | null,
 ): void {
+  if (!archivesEmbeddingEnabled) return;
   const key = `${kind}:${id}`;
   const existing = reindexTimers.get(key);
   if (existing) clearTimeout(existing);

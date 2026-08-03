@@ -10,6 +10,8 @@ import { ipc, type TreeNode } from "@/lib/ipc";
 import { type SearchHit, recentActivity, type ActivityEntry } from "@/lib/db";
 import { searchHybrid } from "@/lib/searchHybrid";
 import { routeToSearchHit } from "@/apps/archives/searchNav";
+import { usePluginManager } from "@/store/pluginManagerStore";
+import { BUILTIN_APP_PLUGIN_IDS } from "@/plugins/builtinApps";
 import { log } from "@/lib/log";
 
 type SpotlightKind =
@@ -77,6 +79,9 @@ export function Spotlight() {
   const focusedId = useShell((s) => s.focusedWindowId);
   const windows = useShell((s) => s.windows);
   const appDescriptors = useAppDescriptors();
+  const archivesEnabled = usePluginManager(
+    (state) => state.hydrated && !state.disabledIds.includes(BUILTIN_APP_PLUGIN_IDS.archives),
+  );
 
   const project = useProjectStore((s) => s.active);
   const recents = useProjectStore((s) => s.recents);
@@ -158,7 +163,7 @@ export function Spotlight() {
   // assets) on every keystroke, debounced lightly. Skipped in commands-only
   // mode so `>` is unambiguously the command channel.
   useEffect(() => {
-    if (!open || isCommandsOnly || !trimmedQuery) {
+    if (!open || !archivesEnabled || isCommandsOnly || !trimmedQuery) {
       setArchiveHits([]);
       return;
     }
@@ -177,7 +182,7 @@ export function Spotlight() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [open, isCommandsOnly, trimmedQuery]);
+  }, [open, archivesEnabled, isCommandsOnly, trimmedQuery]);
 
   const entries: SpotlightEntry[] = useMemo(() => {
     const apps: SpotlightEntry[] = appDescriptors.map((descriptor) => ({
@@ -226,7 +231,7 @@ export function Spotlight() {
         }))
       : [];
 
-    const archiveEntries: SpotlightEntry[] = archiveHits.map((h) => ({
+    const archiveEntries: SpotlightEntry[] = (archivesEnabled ? archiveHits : []).map((h) => ({
       kind: "archive",
       id: `archive:${h.entityType}:${h.entityId}`,
       label: h.title,
@@ -239,7 +244,9 @@ export function Spotlight() {
       },
     }));
 
-    const activityEntries: SpotlightEntry[] = activity.map((a) => ({
+    const activityEntries: SpotlightEntry[] = activity
+      .filter((entry) => entry.source !== "archives" || archivesEnabled)
+      .map((a) => ({
       kind: "activity",
       id: `activity:${a.id}`,
       label: a.title,
@@ -301,6 +308,7 @@ export function Spotlight() {
     archiveHits,
     activity,
     appDescriptors,
+    archivesEnabled,
   ]);
 
   const fuse = useMemo(

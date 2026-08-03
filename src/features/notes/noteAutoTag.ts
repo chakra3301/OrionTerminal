@@ -14,6 +14,18 @@ const MAX_TAGS = 5;
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 const attempted = new Set<string>();
 const inFlight = new Set<string>();
+let enabled = false;
+
+export function setNoteAutoTagEnabled(next: boolean): void {
+  enabled = next;
+  if (next) return;
+  for (const timer of timers.values()) clearTimeout(timer);
+  timers.clear();
+}
+
+export function noteAutoTagBusy(): boolean {
+  return inFlight.size > 0;
+}
 
 function buildPrompt(title: string, body: string): string {
   return [
@@ -35,6 +47,7 @@ export function parseTags(reply: string): string[] {
 }
 
 async function run(id: string): Promise<void> {
+  if (!enabled) return;
   const note = useNotesStore.getState().notes.get(id);
   if (!note) return;
   if (note.tags.length > 0) return; // never fight manual/existing tags
@@ -45,6 +58,7 @@ async function run(id: string): Promise<void> {
   attempted.add(id);
   try {
     const reply = await ipc.claudeOneshot(buildPrompt(note.title, note.plaintext));
+    if (!enabled) return;
     const tags = parseTags(reply);
     // Re-check: the user may have added tags while we waited.
     const fresh = useNotesStore.getState().notes.get(id);
@@ -62,6 +76,7 @@ async function run(id: string): Promise<void> {
 
 /** Debounced trigger — call from the note save path. */
 export function scheduleNoteAutoTag(id: string): void {
+  if (!enabled) return;
   const prev = timers.get(id);
   if (prev) clearTimeout(prev);
   timers.set(

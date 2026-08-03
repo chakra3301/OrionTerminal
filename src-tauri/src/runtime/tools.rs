@@ -16,7 +16,13 @@ pub struct ToolDef {
 /// contains Orion tool names (e.g. "orion_read_file"); the sentinel
 /// "mcp__orion" means "expose the entire Orion catalog".
 pub fn filter_tools(allowed: &[String]) -> Vec<ToolDef> {
-    let defs = crate::mcp_server::tool_definitions();
+    filter_tool_definitions(
+        crate::mcp_server::available_tool_definitions(),
+        allowed,
+    )
+}
+
+fn filter_tool_definitions(defs: Value, allowed: &[String]) -> Vec<ToolDef> {
     let all = allowed.iter().any(|t| t == "mcp__orion");
     let mut out = Vec::new();
     if let Some(arr) = defs.as_array() {
@@ -194,12 +200,15 @@ mod acc_tests {
 
 #[cfg(test)]
 mod schema_tests {
-    use super::{filter_tools, gemini_tools, openai_tools, ToolDef};
+    use super::{filter_tool_definitions, filter_tools, gemini_tools, openai_tools, ToolDef};
     use serde_json::json;
 
     #[test]
     fn filter_by_name_subset() {
-        let got = filter_tools(&["orion_read_note".to_string(), "orion_apply_edit".to_string()]);
+        let got = filter_tool_definitions(
+            crate::mcp_server::tool_definitions(),
+            &["orion_read_note".to_string(), "orion_apply_edit".to_string()],
+        );
         let names: Vec<&str> = got.iter().map(|t| t.name.as_str()).collect();
         assert!(names.contains(&"orion_read_note"));
         assert!(names.contains(&"orion_apply_edit"));
@@ -208,7 +217,10 @@ mod schema_tests {
 
     #[test]
     fn mcp_orion_means_all() {
-        let all = filter_tools(&["mcp__orion".to_string()]);
+        let all = filter_tool_definitions(
+            crate::mcp_server::tool_definitions(),
+            &["mcp__orion".to_string()],
+        );
         // Catalog has 30+ tools; "all" must be much larger than a 1-name filter.
         assert!(all.len() > 10);
         assert!(all.iter().any(|t| t.name == "orion_read_note"));

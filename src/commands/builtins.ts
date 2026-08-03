@@ -16,14 +16,8 @@ import { useChatStore } from "@/store/chatStore";
 import { useTerminalStore } from "@/store/terminalStore";
 import { useKeybindingsStore } from "@/store/keybindingsStore";
 import { useControlPanel } from "@/store/controlPanelStore";
-import { useNotesStore } from "@/store/notesStore";
-import { useMoodBoardsStore } from "@/store/moodBoardsStore";
-import { useArchives } from "@/apps/archives/useArchives";
-import { useStatusStore } from "@/store/statusStore";
 import { useAutocomplete } from "@/store/autocompleteStore";
 import { toast } from "@/store/toastStore";
-import { useLinkPaletteStore } from "@/features/notes/LinkInsertPalette";
-import { getActiveNoteEditor } from "@/features/notes/editorBridge";
 import { useShell } from "@/shell/store/useShell";
 import { useAuth } from "@/features/auth/authStore";
 import { useHelp } from "@/features/help/helpStore";
@@ -526,67 +520,6 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
-    id: "note.quickCapture",
-    label: "Quick Capture",
-    hotkey: "mod+shift+n",
-    keywords: ["capture", "inbox", "jot", "note", "quick", "scratch"],
-    group: "Notes",
-    run: () => {
-      void import("@/features/notes/quickCapture").then((m) =>
-        m.useQuickCapture.getState().show(),
-      );
-    },
-  });
-
-  registry.register({
-    id: "note.askArchive",
-    label: "Ask your Archive",
-    hotkey: "mod+shift+a",
-    keywords: ["ask", "search", "rag", "question", "find", "recall", "ai"],
-    group: "Notes",
-    run: () => {
-      void import("@/features/notes/askArchive").then((m) =>
-        m.useAskArchive.getState().show(),
-      );
-    },
-  });
-
-  registry.register({
-    id: "note.newFromTemplate",
-    label: "New from Template…",
-    keywords: ["template", "new", "meeting", "daily", "project", "reading", "boilerplate"],
-    group: "Notes",
-    run: () => {
-      void import("@/features/notes/templates").then((m) =>
-        m.useTemplatePicker.getState().show(),
-      );
-    },
-  });
-
-  registry.register({
-    id: "note.exportPdf",
-    label: "Export Note to PDF",
-    keywords: ["pdf", "export", "print", "save", "share"],
-    group: "Notes",
-    run: () => {
-      void import("@/features/notes/exportPdf").then((m) =>
-        m.exportOpenNoteToPdf(),
-      );
-    },
-  });
-
-  registry.register({
-    id: "note.dailyNote",
-    label: "Open Today's Note",
-    hotkey: "mod+shift+d",
-    keywords: ["daily", "today", "journal", "diary", "log"],
-    group: "Notes",
-    run: () => {
-      void import("@/features/notes/dailyNote").then((m) => m.openDailyNote());
-    },
-  });
-
-  registry.register({
     id: "editor.toggleTabAutocomplete",
     label: "Toggle Tab Autocomplete",
     keywords: ["autocomplete", "ghost", "suggestion", "completion", "ai", "tab"],
@@ -772,110 +705,6 @@ export function installBuiltinCommands() {
       const ptyId = useTerminalStore.getState().ptyId;
       if (!ptyId) return;
       void ipc.terminalWrite(ptyId, "\x0c");
-    },
-  });
-
-  registry.register({
-    id: "note.new",
-    label: "New Note",
-    hotkey: "mod+n",
-    keywords: ["note", "new", "create", "archive"],
-    group: "Notes",
-    run: async () => {
-      const note = await useNotesStore.getState().create(null, "note");
-      useShell.getState().openApp("archives");
-      useArchives.getState().setView("notes");
-      useArchives.getState().setOpenNoteId(note.id);
-      useStatusStore.getState().setHint("[ NEW NOTE ]", 1500);
-    },
-  });
-
-  registry.register({
-    id: "note.newJournal",
-    label: "New Journal Entry",
-    keywords: ["journal", "new", "entry", "diary", "archive"],
-    group: "Notes",
-    run: async () => {
-      const note = await useNotesStore.getState().create(null, "journal");
-      useShell.getState().openApp("archives");
-      useArchives.getState().setView("journal");
-      useArchives.getState().setSelectedNoteId(note.id);
-      useStatusStore.getState().setHint("[ NEW JOURNAL ENTRY ]", 1500);
-    },
-  });
-
-  registry.register({
-    id: "note.newProject",
-    label: "New Project",
-    keywords: ["project", "new", "page", "notion", "archive"],
-    group: "Notes",
-    run: async () => {
-      const note = await useNotesStore.getState().create(null, "project");
-      useShell.getState().openApp("archives");
-      useArchives.getState().setView("projects");
-      useArchives.getState().setOpenProjectId(note.id);
-      useStatusStore.getState().setHint("[ NEW PROJECT ]", 1500);
-    },
-  });
-
-  registry.register({
-    id: "archives.brain",
-    label: "Open Brain Graph",
-    keywords: ["brain", "graph", "knowledge", "links", "obsidian", "map", "archive"],
-    group: "Notes",
-    run: () => {
-      useShell.getState().openApp("archives");
-      useArchives.getState().setView("brain");
-      useStatusStore.getState().setHint("[ BRAIN ]", 1500);
-    },
-  });
-
-  registry.register({
-    id: "mood.newBoard",
-    label: "New Mood Board",
-    keywords: ["mood", "board", "new", "pinterest", "archive"],
-    group: "Notes",
-    run: async () => {
-      const board = await useMoodBoardsStore.getState().create("Untitled board");
-      useShell.getState().openApp("archives");
-      useArchives.getState().setView("mood");
-      useArchives.getState().setOpenBoardId(board.id);
-      useStatusStore.getState().setHint("[ NEW MOOD BOARD ]", 1500);
-    },
-  });
-
-  registry.register({
-    id: "note.delete",
-    label: "Delete Note",
-    keywords: ["note", "delete", "remove"],
-    group: "Notes",
-    when: () => focusedTab()?.descriptor.kind === "note",
-    run: async () => {
-      const t = focusedTab();
-      if (!t || t.descriptor.kind !== "note") return;
-      const note = useNotesStore.getState().get(t.descriptor.noteId);
-      const ok = await confirmDialog(
-        `Delete "${note?.title || "Untitled"}"? This cannot be undone.`,
-        { title: "Delete note", kind: "warning" },
-      );
-      if (!ok) return;
-      await useNotesStore.getState().remove(t.descriptor.noteId);
-    },
-  });
-
-  registry.register({
-    id: "note.linkInsert",
-    label: "Insert Note Link",
-    hotkey: "mod+p",
-    keywords: ["link", "note", "reference"],
-    group: "Notes",
-    when: () => focusedTab()?.descriptor.kind === "note",
-    run: async () => {
-      const handle = getActiveNoteEditor();
-      if (!handle) return;
-      const result = await useLinkPaletteStore.getState().show(handle.id);
-      if (!result) return;
-      handle.handle.insertLink(result.href, result.text);
     },
   });
 
