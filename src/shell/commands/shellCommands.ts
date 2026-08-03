@@ -8,39 +8,6 @@ export function installShellCommands() {
   installed = true;
 
   registry.register({
-    id: "app.openArchives",
-    label: "Open Archives 47",
-    hotkey: "mod+1",
-    keywords: ["archive", "notes", "journal"],
-    group: "View",
-    run: () => {
-      useShell.getState().openApp("archives");
-    },
-  });
-
-  registry.register({
-    id: "app.openOrion",
-    label: "Open Orion (code editor)",
-    hotkey: "mod+2",
-    keywords: ["editor", "code", "ide"],
-    group: "View",
-    run: () => {
-      useShell.getState().openApp("orion");
-    },
-  });
-
-  registry.register({
-    id: "app.openXDesign",
-    label: "Open XDesign",
-    hotkey: "mod+3",
-    keywords: ["design", "canvas", "figma"],
-    group: "View",
-    run: () => {
-      useShell.getState().openApp("xdesign");
-    },
-  });
-
-  registry.register({
     id: "window.close",
     label: "Close Focused Window",
     keywords: ["close", "window"],

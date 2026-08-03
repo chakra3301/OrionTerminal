@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { ulid } from "ulid";
-import type { AppId } from "@/shell/store/useShell";
+
+export type AppChatId = "archives" | "orion" | "xdesign" | "hermes" | "command";
 
 export type AppChatMessage = {
   id: string;
@@ -35,20 +36,20 @@ export type AppChatThread = {
 };
 
 type AppChatState = {
-  threads: Record<AppId, AppChatThread>;
-  appendUser: (app: AppId, content: string) => void;
-  beginAssistant: (app: AppId, streamId: string) => string;
+  threads: Record<AppChatId, AppChatThread>;
+  appendUser: (app: AppChatId, content: string) => void;
+  beginAssistant: (app: AppChatId, streamId: string) => string;
   /** Messages-API transport: append a single delta to the pending message. */
-  appendDelta: (app: AppId, text: string) => void;
+  appendDelta: (app: AppChatId, text: string) => void;
   /** CLI transport: replace the pending message's content with the full snapshot. */
-  setAssistantContent: (app: AppId, content: string) => void;
-  setSessionId: (app: AppId, sessionId: string) => void;
-  finishAssistant: (app: AppId, totalCostUsd: number | null) => void;
-  setError: (app: AppId, message: string) => void;
-  setRunning: (app: AppId, running: boolean) => void;
-  newThread: (app: AppId) => void;
+  setAssistantContent: (app: AppChatId, content: string) => void;
+  setSessionId: (app: AppChatId, sessionId: string) => void;
+  finishAssistant: (app: AppChatId, totalCostUsd: number | null) => void;
+  setError: (app: AppChatId, message: string) => void;
+  setRunning: (app: AppChatId, running: boolean) => void;
+  newThread: (app: AppChatId) => void;
   /** Hydrate a thread from a persisted ChatRow when the user resumes one. */
-  restoreThread: (app: AppId, thread: AppChatThread) => void;
+  restoreThread: (app: AppChatId, thread: AppChatThread) => void;
 };
 
 function makeThread(): AppChatThread {
@@ -74,7 +75,7 @@ export const useAppChat = create<AppChatState>((set) => ({
     orion: makeThread(),
     xdesign: makeThread(),
     // Hermes has no chat rail (ROSIE orchestrates it via MCP tools), but the
-    // per-app thread map is keyed by AppId, so it gets an inert thread.
+    // The built-in rail thread map includes it as an inert entry.
     hermes: makeThread(),
     // Command Center routes chat through cc_messages, not this rail; inert.
     command: makeThread(),
@@ -241,13 +242,13 @@ export const useAppChat = create<AppChatState>((set) => ({
  * Map streamId → appId so the event bridge can route incoming `chat:*`
  * events to the right thread without storing the streamId on every event.
  */
-const STREAM_TO_APP = new Map<string, AppId>();
+const STREAM_TO_APP = new Map<string, AppChatId>();
 
-export function registerStream(streamId: string, app: AppId) {
+export function registerStream(streamId: string, app: AppChatId) {
   STREAM_TO_APP.set(streamId, app);
 }
 
-export function appForStream(streamId: string): AppId | null {
+export function appForStream(streamId: string): AppChatId | null {
   return STREAM_TO_APP.get(streamId) ?? null;
 }
 

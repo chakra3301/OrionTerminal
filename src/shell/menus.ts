@@ -1,6 +1,7 @@
 import type { MenuItem } from "@/components/ContextMenu";
 import { registry } from "@/commands/registry";
 import { useShell, type AppId } from "@/shell/store/useShell";
+import { appName } from "@/plugins/appRegistry";
 import { useArchives } from "@/apps/archives/useArchives";
 import { useProjectStore } from "@/store/projectStore";
 import { useXDesign } from "@/apps/xdesign/store";
@@ -106,7 +107,7 @@ function windowMenu(): MenuItem[] {
     items.push(sep);
     for (const w of open) {
       items.push({
-        label: APP_TITLE[w.app] ?? w.app,
+        label: appName(w.app),
         checked: w.id === s.focusedWindowId,
         onClick: () => s.focusWindow(w.id),
       });
@@ -114,13 +115,6 @@ function windowMenu(): MenuItem[] {
   }
   return items;
 }
-
-const APP_TITLE: Record<string, string> = {
-  archives: "Archives 47",
-  orion: "Orion",
-  xdesign: "XDesign",
-  hermes: "Hermes",
-};
 
 // ── App-specific store actions ──────────────────────────────────────────────
 

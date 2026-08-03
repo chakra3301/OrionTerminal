@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Fuse from "fuse.js";
 import { Search, Sparkles, Archive as ArchiveIcon, Folder, Clock } from "lucide-react";
-import { useShell, APP_NAMES, type AppId } from "@/shell/store/useShell";
+import { useShell } from "@/shell/store/useShell";
+import { appRegistry, useAppDescriptors, type AppId } from "@/plugins/appRegistry";
 import { registry, type Command } from "@/commands/registry";
 import { useProjectStore } from "@/store/projectStore";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
@@ -75,6 +76,7 @@ export function Spotlight() {
   const openApp = useShell((s) => s.openApp);
   const focusedId = useShell((s) => s.focusedWindowId);
   const windows = useShell((s) => s.windows);
+  const appDescriptors = useAppDescriptors();
 
   const project = useProjectStore((s) => s.active);
   const recents = useProjectStore((s) => s.recents);
@@ -178,21 +180,14 @@ export function Spotlight() {
   }, [open, isCommandsOnly, trimmedQuery]);
 
   const entries: SpotlightEntry[] = useMemo(() => {
-    const apps: SpotlightEntry[] = (Object.keys(APP_NAMES) as AppId[]).map((id) => ({
+    const apps: SpotlightEntry[] = appDescriptors.map((descriptor) => ({
       kind: "app",
-      id: `app:${id}`,
-      label: `Open ${APP_NAMES[id]}`,
-      hint:
-        id === "orion"
-          ? "code editor"
-          : id === "archives"
-            ? "personal knowledge base"
-            : id === "xdesign"
-              ? "design studio"
-              : "agent orchestration board",
-      appId: id,
+      id: `app:${descriptor.id}`,
+      label: `Open ${descriptor.name}`,
+      hint: descriptor.spotlight.description,
+      appId: descriptor.id,
       run: () => {
-        openApp(id);
+        openApp(descriptor.id);
         close();
       },
     }));
@@ -248,8 +243,8 @@ export function Spotlight() {
       kind: "activity",
       id: `activity:${a.id}`,
       label: a.title,
-      hint: `${APP_NAMES[a.source as AppId] ?? a.source} · ${a.summary || a.kind}`,
-      appId: a.source as AppId,
+      hint: `${appRegistry.get(a.source)?.name ?? a.source} · ${a.summary || a.kind}`,
+      appId: a.source,
       run: () => {
         close();
         // Best-effort jump: Orion file edits reopen the file; everything else
@@ -265,7 +260,7 @@ export function Spotlight() {
             { label: a.ref_id.split(/[\\/]/).pop() ?? a.ref_id, preferRole: "editor" },
           );
         }
-        openApp(a.source as AppId);
+        if (appRegistry.has(a.source)) openApp(a.source);
       },
     }));
 
@@ -305,6 +300,7 @@ export function Spotlight() {
     isCommandsOnly,
     archiveHits,
     activity,
+    appDescriptors,
   ]);
 
   const fuse = useMemo(

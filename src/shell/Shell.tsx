@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { useShell, type AppId } from "@/shell/store/useShell";
+import { useShell } from "@/shell/store/useShell";
+import { useAppDescriptors, type AppDescriptor } from "@/plugins/appRegistry";
 import { Wallpaper } from "@/shell/Wallpaper";
 import { MenuBar } from "@/shell/MenuBar";
 import { Dock } from "@/shell/Dock";
@@ -21,26 +22,6 @@ import { CompanionClipTester } from "@/features/rosie/avatar/CompanionClipTester
 import { useProactiveCompanion } from "@/features/rosie/avatar/useProactiveCompanion";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
 
-// Each app is a heavy, independent surface (Monaco, BlockNote, the XDesign
-// canvas). Lazy-load them so the main bundle stays lean and an app's code
-// only downloads when its window first opens. Named-export → default shim.
-const OrionApp = lazy(() =>
-  import("@/apps/orion/OrionApp").then((m) => ({ default: m.OrionApp })),
-);
-const ArchivesApp = lazy(() =>
-  import("@/apps/archives/ArchivesApp").then((m) => ({ default: m.ArchivesApp })),
-);
-const XDesignApp = lazy(() =>
-  import("@/apps/xdesign/XDesignApp").then((m) => ({ default: m.XDesignApp })),
-);
-const HermesApp = lazy(() =>
-  import("@/apps/hermes/HermesApp").then((m) => ({ default: m.HermesApp })),
-);
-const CommandCenterApp = lazy(() =>
-  import("@/apps/command/CommandCenterApp").then((m) => ({
-    default: m.CommandCenterApp,
-  })),
-);
 // three.js + r3f are heavy — keep the companion (and its 3D stack) out of the
 // main bundle; it streams in after first paint.
 const CompanionAvatar = lazy(() =>
@@ -79,29 +60,20 @@ function AppLoading() {
   );
 }
 
-function AppBody({ app }: { app: AppId }) {
+function AppBody({ descriptor }: { descriptor: AppDescriptor }) {
+  const Component = descriptor.renderer.component;
   return (
     <Suspense fallback={<AppLoading />}>
-      {app === "orion" && <OrionApp />}
-      {app === "archives" && <ArchivesApp />}
-      {app === "xdesign" && <XDesignApp />}
-      {app === "hermes" && <HermesApp />}
-      {app === "command" && <CommandCenterApp />}
+      <Component />
     </Suspense>
   );
 }
 
-const APP_TITLES: Record<AppId, { title: string; subtitle: string }> = {
-  orion:    { title: "ORION",        subtitle: "orix47" },
-  archives: { title: "ARCHIVES 47",  subtitle: "today" },
-  xdesign:  { title: "XDESIGN",      subtitle: "untitled frame" },
-  hermes:   { title: "HERMES",       subtitle: "agent board" },
-  command:  { title: "COMMAND CENTER", subtitle: "the org" },
-};
-
 export function Shell() {
   const windows = useShell((s) => s.windows);
   const focusedId = useShell((s) => s.focusedWindowId);
+  const apps = useAppDescriptors();
+  const appById = new Map(apps.map((app) => [app.id, app]));
   useProactiveCompanion();
 
   // Prefetch the ROSIE chunk once boot has settled so the first ⌘⇧K /
@@ -119,7 +91,8 @@ export function Shell() {
       <div className="ot-windows-layer">
         {windows.map((w) => {
           if (w.minimized) return null;
-          const meta = APP_TITLES[w.app];
+          const descriptor = appById.get(w.app);
+          if (!descriptor) return null;
           // A maximized window fills the canvas, so any window stacked below it
           // (lower z) is fully hidden. Skip its paint/layout via the body's
           // content-visibility while keeping its React tree (pty/editor state)
@@ -138,11 +111,11 @@ export function Shell() {
               window={w}
               focused={focusedId === w.id}
               occluded={occluded}
-              title={meta.title}
-              subtitle={meta.subtitle}
+              title={descriptor.window.title}
+              subtitle={descriptor.window.subtitle}
             >
-              <ErrorBoundary label={meta.title} compact>
-                <AppBody app={w.app} />
+              <ErrorBoundary label={descriptor.window.title} compact>
+                <AppBody descriptor={descriptor} />
               </ErrorBoundary>
             </WindowFrame>
           );

@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { ulid } from "ulid";
+import { appRegistry, type AppId } from "@/plugins/appRegistry";
 
-export type AppId = "archives" | "orion" | "xdesign" | "hermes" | "command";
+export type { AppId } from "@/plugins/appRegistry";
 
 export type WindowState = {
   id: string;
@@ -53,15 +54,6 @@ type ShellState = {
   ) => boolean;
 };
 
-const DEFAULT_SIZE: Record<AppId, { w: number; h: number }> = {
-  orion:    { w: 1280, h: 800 },
-  archives: { w: 1080, h: 720 },
-  xdesign:  { w: 1180, h: 760 },
-  // Hermes is a dashboard — open large; clamped to the viewport in openApp.
-  hermes:   { w: 1760, h: 1080 },
-  command:  { w: 1280, h: 820 },
-};
-
 function clampY(y: number): number {
   return Math.max(40, y);
 }
@@ -73,6 +65,8 @@ export const useShell = create<ShellState>((set, get) => ({
   spotlightOpen: false,
 
   openApp: (app) => {
+    const descriptor = appRegistry.get(app);
+    if (!descriptor) throw new Error(`unknown or disabled app: ${app}`);
     const existing = get().windows.find((w) => w.app === app);
     if (existing) {
       if (existing.minimized) {
@@ -84,9 +78,9 @@ export const useShell = create<ShellState>((set, get) => ({
     }
     const id = ulid();
     const offset = get().windows.length * 24;
-    const size = DEFAULT_SIZE[app];
-    // Clamp the default to the viewport so a large default (e.g. the Hermes
-    // dashboard) fills a big screen but never overflows a small one.
+    const size = descriptor.window.defaultSize;
+    // Clamp the default to the viewport so a large app default fills a big
+    // screen but never overflows a small one.
     const w = Math.min(size.w, window.innerWidth - 48);
     const h = Math.min(size.h, window.innerHeight - 104);
     const x = Math.max(24, Math.round((window.innerWidth - w) / 2) + offset);
@@ -257,6 +251,8 @@ export const useShell = create<ShellState>((set, get) => ({
 
   restoreWindows: (windows, focusedWindowId) => {
     if (!Array.isArray(windows) || windows.length === 0) return false;
+    const available = windows.filter((windowState) => appRegistry.has(windowState.app));
+    if (available.length === 0) return false;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const MIN_W = 480;
@@ -264,7 +260,7 @@ export const useShell = create<ShellState>((set, get) => ({
     const MENUBAR_H = 44;
     const DOCK_GUARD = 80;
     let maxZ = 10;
-    const clamped: WindowState[] = windows.map((w) => {
+    const clamped: WindowState[] = available.map((w) => {
       const cw = Math.max(MIN_W, Math.min(w.w, Math.max(MIN_W, vw - 48)));
       const ch = Math.max(MIN_H, Math.min(w.h, Math.max(MIN_H, vh - MENUBAR_H - DOCK_GUARD)));
       const cx = Math.max(12, Math.min(w.x, Math.max(12, vw - cw - 12)));
@@ -293,10 +289,16 @@ export function focusedApp(s: ShellState): AppId | null {
   return w ? w.app : null;
 }
 
-export const APP_NAMES: Record<AppId, string> = {
-  archives: "Archives 47",
-  orion: "Orion",
-  xdesign: "XDesign",
-  hermes: "Hermes",
-  command: "Command Center",
-};
+appRegistry.subscribe(() => {
+  const available = new Set(appRegistry.list().map((app) => app.id));
+  const state = useShell.getState();
+  const windows = state.windows.filter((windowState) => available.has(windowState.app));
+  if (windows.length === state.windows.length) return;
+  const focusedWindowId = windows.some((windowState) => windowState.id === state.focusedWindowId)
+    ? state.focusedWindowId
+    : windows.reduce<WindowState | null>(
+        (top, windowState) => (!top || windowState.z > top.z ? windowState : top),
+        null,
+      )?.id ?? null;
+  useShell.setState({ windows, focusedWindowId });
+});

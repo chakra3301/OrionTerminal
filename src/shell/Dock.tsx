@@ -1,60 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Archive, Code2, Palette, Search, SlidersHorizontal, Radar, Workflow } from "lucide-react";
-import { useShell, type AppId, APP_NAMES } from "@/shell/store/useShell";
+import { Search, SlidersHorizontal } from "lucide-react";
+import { useShell } from "@/shell/store/useShell";
+import { useAppDescriptors, type AppId } from "@/plugins/appRegistry";
 import { useRosie } from "@/features/rosie/rosieStore";
 import { useControlPanel } from "@/store/controlPanelStore";
-
-type DockApp = {
-  id: AppId;
-  title: string;
-  bg: string;
-  glow: string;
-  fg: string;
-  Icon: typeof Archive;
-};
-
-const DOCK_APPS: DockApp[] = [
-  {
-    id: "archives",
-    title: APP_NAMES.archives,
-    bg: "linear-gradient(135deg, rgba(57,255,136,0.4), rgba(57,255,136,0.05))",
-    glow: "0 0 14px -2px rgba(57,255,136,0.4)",
-    fg: "#001008",
-    Icon: Archive,
-  },
-  {
-    id: "orion",
-    title: APP_NAMES.orion,
-    bg: "linear-gradient(135deg, rgba(0,224,255,0.45), rgba(0,224,255,0.05))",
-    glow: "0 0 14px -2px rgba(0,224,255,0.5)",
-    fg: "#011018",
-    Icon: Code2,
-  },
-  {
-    id: "xdesign",
-    title: APP_NAMES.xdesign,
-    bg: "linear-gradient(135deg, rgba(255,62,165,0.4), rgba(255,62,165,0.05))",
-    glow: "0 0 14px -2px rgba(255,62,165,0.4)",
-    fg: "#1b0613",
-    Icon: Palette,
-  },
-  {
-    id: "command",
-    title: APP_NAMES.command,
-    bg: "linear-gradient(135deg, rgba(255,194,75,0.42), rgba(255,194,75,0.05))",
-    glow: "0 0 14px -2px rgba(255,194,75,0.45)",
-    fg: "#1c1303",
-    Icon: Radar,
-  },
-  {
-    id: "hermes",
-    title: APP_NAMES.hermes,
-    bg: "linear-gradient(135deg, rgba(255,138,61,0.42), rgba(255,138,61,0.05))",
-    glow: "0 0 14px -2px rgba(255,138,61,0.45)",
-    fg: "#1c0e03",
-    Icon: Workflow,
-  },
-];
 
 // Magnify tuning. `INFLUENCE` is how far (in px) the cursor's effect on a
 // dock item reaches; `MAX_SCALE` is the peak size of the closest item.
@@ -76,6 +25,7 @@ export function Dock() {
   const openSpotlight = useShell((s) => s.openSpotlight);
   const windows = useShell((s) => s.windows);
   const focusedWindowId = useShell((s) => s.focusedWindowId);
+  const apps = useAppDescriptors();
 
   const activeIds = new Set(
     windows.filter((w) => !w.minimized).map((w) => w.app),
@@ -118,23 +68,23 @@ export function Dock() {
   return (
     <div className="ot-dock-wrap">
       <div className="ot-dock" ref={dockRef}>
-        {DOCK_APPS.map((a) => {
-          const Icon = a.Icon;
+        {apps.map((a) => {
+          const Icon = a.dock.Icon;
           const active = activeIds.has(a.id);
           return (
             <DockTile
               key={a.id}
               cursorX={cursorX}
               active={active}
-              title={a.title}
+              title={a.name}
               coachId={`app-${a.id}`}
               onClick={() => handleDockClick(a.id)}
             >
               <div
                 className="icon-bed"
-                style={{ background: a.bg, boxShadow: a.glow }}
+                style={{ background: a.dock.background, boxShadow: a.dock.glow }}
               >
-                <Icon size={18} color={a.fg} strokeWidth={2} />
+                <Icon size={18} color={a.dock.foreground} strokeWidth={2} />
               </div>
             </DockTile>
           );

@@ -1,13 +1,6 @@
 import { useEffect } from "react";
-import { useShell, fullscreenWindow, APP_NAMES, type AppId } from "@/shell/store/useShell";
-
-const APP_ACCENT: Record<AppId, string> = {
-  archives: "var(--neon-green)",
-  orion: "var(--neon-cyan)",
-  xdesign: "var(--neon-magenta)",
-  hermes: "var(--neon-violet)",
-  command: "var(--neon-yellow)",
-};
+import { useShell, fullscreenWindow } from "@/shell/store/useShell";
+import { useAppDescriptors } from "@/plugins/appRegistry";
 
 /** Floating app-switcher shown only while a window is in true fullscreen.
  * Tab between open apps without leaving fullscreen; Esc exits. */
@@ -17,6 +10,8 @@ export function FullscreenNav() {
   const enterFullscreen = useShell((s) => s.enterFullscreen);
   const exitFullscreen = useShell((s) => s.exitFullscreen);
   const cycleFullscreen = useShell((s) => s.cycleFullscreen);
+  const apps = useAppDescriptors();
+  const appById = new Map(apps.map((app) => [app.id, app]));
 
   useEffect(() => {
     if (!fs) return;
@@ -43,6 +38,8 @@ export function FullscreenNav() {
     <div className="ot-fsnav" role="tablist" aria-label="Open apps">
       {open.map((w) => {
         const active = w.id === fs.id;
+        const descriptor = appById.get(w.app);
+        if (!descriptor) return null;
         return (
           <button
             key={w.id}
@@ -50,11 +47,11 @@ export function FullscreenNav() {
             role="tab"
             aria-selected={active}
             className={`ot-fsnav-tab${active ? " active" : ""}`}
-            style={{ ["--tab-accent" as string]: APP_ACCENT[w.app] }}
+            style={{ ["--tab-accent" as string]: descriptor.accent }}
             onClick={() => enterFullscreen(w.id)}
           >
             <span className="ot-fsnav-dot" />
-            {APP_NAMES[w.app]}
+            {descriptor.name}
           </button>
         );
       })}

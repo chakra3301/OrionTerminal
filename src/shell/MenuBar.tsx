@@ -1,5 +1,6 @@
 import { Wifi, BatteryMedium, Mic, MicOff, Loader2 } from "lucide-react";
-import { useShell, focusedApp, APP_NAMES } from "@/shell/store/useShell";
+import { useShell, focusedApp } from "@/shell/store/useShell";
+import { useAppDescriptors } from "@/plugins/appRegistry";
 import { useClock } from "@/shell/useClock";
 import { useVoice } from "@/store/voiceStore";
 import { useContextMenu } from "@/components/ContextMenu";
@@ -24,13 +25,6 @@ const WAVE_BARS: Array<{ delay: number; duration: number; peak: number }> = [
   { delay: 0.16, duration: 0.86, peak: 0.7  },
   { delay: 0.28, duration: 0.98, peak: 0.45 },
 ];
-
-const APP_MENUS: Record<string, string[]> = {
-  archives: ["File", "Edit", "View", "Insert", "Format"],
-  orion: ["File", "Edit", "Selection", "View", "Run", "Terminal"],
-  xdesign: ["File", "Edit", "Object", "Type", "Effect", "View"],
-  hermes: ["Board", "Task", "Agents", "View"],
-};
 
 const DEFAULT_MENU = ["File", "Edit", "View", "Window"];
 
@@ -126,10 +120,12 @@ function VoiceIndicator() {
 export function MenuBar() {
   const time = useClock();
   const app = useShell(focusedApp);
+  const descriptors = useAppDescriptors();
+  const descriptor = app ? descriptors.find((candidate) => candidate.id === app) : null;
   const { openUnder, menu } = useContextMenu();
 
-  const items = app ? APP_MENUS[app] ?? DEFAULT_MENU : DEFAULT_MENU;
-  const appLabel = app ? APP_NAMES[app] : "Desktop";
+  const items = descriptor?.menuNames ?? DEFAULT_MENU;
+  const appLabel = descriptor?.name ?? "Desktop";
 
   const clockText = time.toLocaleTimeString([], {
     hour: "2-digit",

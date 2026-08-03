@@ -8,6 +8,7 @@ import { KeybindingsOverlay } from "@/features/keybindings/KeybindingsOverlay";
 import { installBuiltinCommands } from "@/commands/builtins";
 import { installShellCommands } from "@/shell/commands/shellCommands";
 import { installSpotifyCommands } from "@/shell/commands/spotifyCommands";
+import { ensureBuiltinAppPlugins } from "@/plugins/builtinApps";
 import { HotkeyHost } from "@/lib/hotkeys";
 import { useTerminalStore } from "@/store/terminalStore";
 import { getAppState, getDb } from "@/lib/db";
@@ -75,6 +76,7 @@ import { ensureOrionTheme } from "@/apps/orion/monacoTheme";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
 import type { LayoutNode } from "@/components/workspace/types";
 
+ensureBuiltinAppPlugins();
 installBuiltinCommands();
 installShellCommands();
 installSpotifyCommands();

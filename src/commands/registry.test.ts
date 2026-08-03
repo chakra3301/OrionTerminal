@@ -67,6 +67,17 @@ describe("command registry", () => {
     expect(registry.has("z")).toBe(false);
   });
 
+  it("tracks command owners and disposes them as one contribution scope", () => {
+    registry.register({ id: "plugin.one", label: "One", run: () => {} }, "@orion/pilot");
+    registry.register({ id: "plugin.two", label: "Two", run: () => {} }, "@orion/pilot");
+    registry.register({ id: "kernel.one", label: "Kernel", run: () => {} });
+    expect(registry.ownerOf("plugin.one")).toBe("@orion/pilot");
+    expect(registry.disposeOwner("@orion/pilot")).toBe(2);
+    expect(registry.has("plugin.one")).toBe(false);
+    expect(registry.has("plugin.two")).toBe(false);
+    expect(registry.has("kernel.one")).toBe(true);
+  });
+
   it("notifies subscribers on register/unregister", () => {
     const fn = vi.fn();
     const off = registry.subscribe(fn);

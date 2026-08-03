@@ -1,6 +1,6 @@
 # Orion Terminal plugin platform
 
-Status: approved direction; Plugin API v1 is not yet frozen  
+Status: P1 internal contribution runtime underway; Plugin API v1 is not yet frozen
 Date: 2026-08-03
 
 ## Product definition
@@ -213,6 +213,19 @@ Migration rules:
 5. Add app slots and convert one augmenting feature.
 6. Build Plugin Manager and persisted enablement.
 7. Only then add the community sandbox and package loader.
+
+## Current implementation
+
+As of 2026-08-03, the first internal-runtime slice is implemented:
+
+- `src/plugins/contracts.ts` defines plugin identity, permission vocabulary, disposable scopes, and activation context.
+- `src/plugins/manifest.ts` validates the v1 manifest envelope, rejects unknown top-level/authority fields, validates package-relative entrypoints, and fails closed on unknown permissions.
+- `src/plugins/ownerRegistry.ts` provides stable owner-tagged contribution snapshots, duplicate rejection, subscriptions, and owner-wide disposal.
+- The command registry tracks owners and supports owner-wide disposal while retaining its existing API.
+- Apps are dynamic trusted descriptors consumed by Shell, Dock, Spotlight, MenuBar, fullscreen navigation, persisted-window restore, and open commands.
+- Archives, Orion, XDesign, Command Center, and Hermes bootstrap through the same internal app contract. Hermes is the lifecycle pilot: deactivation removes its app descriptor, command, Dock/Spotlight surfaces, and open window.
+
+This is an internal trusted-plugin runtime only. It does not load packages or grant community code React/Tauri authority. A future community app renderer must be an opaque-origin sandbox renderer, not the current `trusted-react` renderer.
 
 ## Ranked delivery slices
 
