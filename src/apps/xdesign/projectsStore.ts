@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { ulid } from "ulid";
 import { getAppState, setAppState } from "@/lib/db";
+import { log } from "@/lib/log";
 import {
   useXDesign,
   type Page,
@@ -10,6 +11,7 @@ import {
 import { useHtmlArtifact, migrateLegacyArtifactTo } from "./htmlArtifactStore";
 import { useFxStore, snapshotFxDoc, emptyFxDoc } from "./fx/fxStore";
 import type { FxDoc } from "./fx/fxModel";
+import { beginXDesignActivity, trackXDesignActivity } from "./runtimeActivity";
 
 /** A persisted XDesign document — the same shape `useXDesign.hydrate` accepts
  * and `useXDesignPersistence` writes. One per project. */
@@ -79,19 +81,35 @@ export function snapshotActiveDoc(): XDDoc {
 }
 
 export async function loadDoc(id: string): Promise<XDDoc | null> {
-  return getAppState<XDDoc>(docKey(id));
+  return trackXDesignActivity(
+    "project-load",
+    "Wait for the XDesign project to finish loading before disabling the plugin.",
+    () => getAppState<XDDoc>(docKey(id)),
+  );
 }
 
 export async function saveDoc(id: string, doc: XDDoc): Promise<void> {
-  await setAppState(docKey(id), doc);
+  await trackXDesignActivity(
+    "project-save",
+    "Wait for the XDesign project to finish saving before disabling the plugin.",
+    () => setAppState(docKey(id), doc),
+  );
 }
 
 export async function loadFxDoc(id: string): Promise<FxDoc | null> {
-  return getAppState<FxDoc>(fxDocKey(id));
+  return trackXDesignActivity(
+    "project-load",
+    "Wait for the XDesign project to finish loading before disabling the plugin.",
+    () => getAppState<FxDoc>(fxDocKey(id)),
+  );
 }
 
 export async function saveFxDoc(id: string, doc: FxDoc): Promise<void> {
-  await setAppState(fxDocKey(id), doc);
+  await trackXDesignActivity(
+    "project-save",
+    "Wait for the XDesign project to finish saving before disabling the plugin.",
+    () => setAppState(fxDocKey(id), doc),
+  );
 }
 
 /** Load a project's doc into the right live store (design vs fx) and scope
@@ -138,7 +156,13 @@ type XDProjectsState = {
 /** Persist the registry (recent list). Tabs + active are session state and
  * intentionally NOT restored across launches — we always land on Home. */
 function persistRegistry(registry: XDProjectMeta[]): void {
-  void setAppState("xdesign.projects", { registry });
+  const end = beginXDesignActivity(
+    "project-registry-save",
+    "Wait for the XDesign project list to finish saving before disabling the plugin.",
+  );
+  void setAppState("xdesign.projects", { registry })
+    .catch((error) => log.warn("xdesign project registry save failed", error))
+    .finally(end);
 }
 
 /** Flush the live doc to the active project's slot + bump its updatedAt.

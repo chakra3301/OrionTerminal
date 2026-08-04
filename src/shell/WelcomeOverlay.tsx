@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Sparkles, Folder } from "lucide-react";
 import { useShell } from "@/shell/store/useShell";
+import { useAppDescriptors } from "@/plugins/appRegistry";
 import { countNotes, countAssets, listAllChats } from "@/lib/db";
 import { useProjectStore } from "@/store/projectStore";
 import { log } from "@/lib/log";
@@ -33,6 +34,8 @@ export function WelcomeOverlay() {
   const recents = useProjectStore((s) => s.recents);
   const loadRecents = useProjectStore((s) => s.loadRecents);
   const switchToProject = useProjectStore((s) => s.switchToProject);
+  const appDescriptors = useAppDescriptors();
+  const enabledApps = new Set(appDescriptors.map((descriptor) => descriptor.id));
   const [now, setNow] = useState(() => new Date());
   const [stats, setStats] = useState<Stats | null>(null);
 
@@ -93,18 +96,24 @@ export function WelcomeOverlay() {
               each, contextual to where you are.
             </div>
             <div className="ot-welcome-firstrun-actions">
-              <button type="button" onClick={() => openApp("archives")}>
-                <Sparkles size={11} color="var(--neon-green)" />
-                <span>Archives 47</span>
-              </button>
-              <button type="button" onClick={() => openApp("orion")}>
-                <Sparkles size={11} color="var(--neon-cyan)" />
-                <span>Orion</span>
-              </button>
-              <button type="button" onClick={() => openApp("xdesign")}>
-                <Sparkles size={11} color="var(--neon-magenta)" />
-                <span>XDesign</span>
-              </button>
+              {enabledApps.has("archives") && (
+                <button type="button" onClick={() => openApp("archives")}>
+                  <Sparkles size={11} color="var(--neon-green)" />
+                  <span>Archives 47</span>
+                </button>
+              )}
+              {enabledApps.has("orion") && (
+                <button type="button" onClick={() => openApp("orion")}>
+                  <Sparkles size={11} color="var(--neon-cyan)" />
+                  <span>Orion</span>
+                </button>
+              )}
+              {enabledApps.has("xdesign") && (
+                <button type="button" onClick={() => openApp("xdesign")}>
+                  <Sparkles size={11} color="var(--neon-magenta)" />
+                  <span>XDesign</span>
+                </button>
+              )}
             </div>
           </div>
         ) : stats ? (

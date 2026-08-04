@@ -43,6 +43,7 @@ import { confirmAction } from "@/components/ConfirmModal";
 import { ipc } from "@/lib/ipc";
 import { toast } from "@/store/toastStore";
 import { log } from "@/lib/log";
+import { trackXDesignActivity } from "@/apps/xdesign/runtimeActivity";
 
 const VIEWPORTS: { id: ArtifactViewport; icon: typeof Monitor; w: number | null; label: string }[] = [
   { id: "desktop", icon: Monitor, w: null, label: "Desktop" },
@@ -189,7 +190,10 @@ export function HtmlArtifactPreview() {
 
   const recordPreviewCanvas = useCallback(
     (durationMs: number): Promise<RecordedPreview> =>
-      new Promise((resolve, reject) => {
+      trackXDesignActivity(
+        "preview-recording",
+        "Wait for XDesign preview recording to finish before disabling the plugin.",
+        () => new Promise((resolve, reject) => {
         if (!bridgeReady) {
           reject(new Error("preview is still loading"));
           return;
@@ -202,6 +206,7 @@ export function HtmlArtifactPreview() {
         pendingRecordings.current.set(requestId, { resolve, reject, timer });
         sendToPreview({ type: "record-canvas", requestId, durationMs });
       }),
+      ),
     [bridgeReady, sendToPreview],
   );
 

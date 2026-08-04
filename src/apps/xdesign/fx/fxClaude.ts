@@ -7,6 +7,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { ulid } from "ulid";
 import { ipc } from "@/lib/ipc";
+import { trackXDesignActivity } from "@/apps/xdesign/runtimeActivity";
 
 const SYSTEM = `You write GLSL ES 3.00 fragment-shader bodies for a layer-based WebGL compositor (like Unicorn Studio).
 
@@ -42,6 +43,10 @@ export async function generateFxShader(
   prompt: string,
   currentCode: string,
 ): Promise<string> {
+  return trackXDesignActivity(
+    "shader-generation",
+    "Wait for XDesign shader generation to finish before disabling the plugin.",
+    async () => {
   const chatId = `fxshader-${ulid()}`;
   let text = "";
 
@@ -73,4 +78,6 @@ export async function generateFxShader(
   const body = extractGlslBody(text);
   if (!body) throw new Error("Claude's reply contained no fxMain body");
   return body;
+    },
+  );
 }

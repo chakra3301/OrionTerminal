@@ -65,6 +65,13 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
   const contributed = await internalActionRegistry.dispatch(action.kind, action.payload);
   if (contributed.handled) return contributed.value;
   if (action.kind === "open_note") throw new Error("Archives plugin is disabled");
+  if (action.kind.startsWith("xdesign_")) throw new Error("XDesign plugin is disabled");
+  if (
+    action.kind.startsWith("model_") &&
+    !usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign)
+  ) {
+    throw new Error("XDesign plugin is disabled");
+  }
 
   if (action.kind === "open_app") {
     const app = (action.payload as { app?: AppId } | undefined)?.app;
@@ -124,95 +131,6 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
     log.warn("run_in_terminal: pty never came up within 3s");
     return;
   }
-  if (action.kind === "xdesign_add_rect") {
-    const p = action.payload as {
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-      fill?: string;
-      radius?: number;
-    };
-    useShell.getState().openApp("xdesign");
-    await (await import("@/apps/xdesign/projectsStore")).useXDProjects.getState().ensureActive();
-    const { useXDesign } = await import("@/apps/xdesign/store");
-    useXDesign.getState().addShape({
-      kind: "rect",
-      x: p.x,
-      y: p.y,
-      w: p.w,
-      h: p.h,
-      radius: p.radius ?? 0,
-      fill: p.fill ?? "#00e0ff",
-      stroke: "transparent",
-      strokeWidth: 0,
-    });
-    return;
-  }
-  if (action.kind === "xdesign_add_ellipse") {
-    const p = action.payload as {
-      x: number; y: number; w: number; h: number; fill?: string;
-    };
-    useShell.getState().openApp("xdesign");
-    await (await import("@/apps/xdesign/projectsStore")).useXDProjects.getState().ensureActive();
-    const { useXDesign } = await import("@/apps/xdesign/store");
-    useXDesign.getState().addShape({
-      kind: "ellipse",
-      x: p.x,
-      y: p.y,
-      w: p.w,
-      h: p.h,
-      fill: p.fill ?? "#00e0ff",
-      stroke: "transparent",
-      strokeWidth: 0,
-    });
-    return;
-  }
-  if (action.kind === "xdesign_add_frame") {
-    const p = action.payload as {
-      x: number; y: number; w: number; h: number; fill?: string;
-    };
-    useShell.getState().openApp("xdesign");
-    await (await import("@/apps/xdesign/projectsStore")).useXDProjects.getState().ensureActive();
-    const { useXDesign } = await import("@/apps/xdesign/store");
-    useXDesign.getState().addShape({
-      kind: "frame",
-      x: p.x,
-      y: p.y,
-      w: p.w,
-      h: p.h,
-      radius: 0,
-      fill: p.fill ?? "rgba(255,255,255,0.03)",
-      stroke: "rgba(255,255,255,0.12)",
-      strokeWidth: 1,
-    });
-    return;
-  }
-  if (action.kind === "xdesign_add_text") {
-    const p = action.payload as {
-      x: number;
-      y: number;
-      text: string;
-      fontSize?: number;
-      fill?: string;
-    };
-    useShell.getState().openApp("xdesign");
-    await (await import("@/apps/xdesign/projectsStore")).useXDProjects.getState().ensureActive();
-    const { useXDesign } = await import("@/apps/xdesign/store");
-    useXDesign.getState().addShape({
-      kind: "text",
-      x: p.x,
-      y: p.y,
-      w: Math.max(60, p.text.length * (p.fontSize ?? 24) * 0.55),
-      h: (p.fontSize ?? 24) * 1.3,
-      text: p.text,
-      fontSize: p.fontSize ?? 24,
-      fill: p.fill ?? "#e6f4ec",
-      stroke: "transparent",
-      strokeWidth: 0,
-    });
-    return;
-  }
   if (action.kind === "open_file") {
     const raw = (action.payload as { path?: string } | undefined)?.path?.trim();
     if (!raw) return;
@@ -263,40 +181,6 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
     useShell.getState().openApp("orion");
     useWorkspace.getState().openTab({ kind: "diff-review", path: p.path });
     return;
-  }
-  if (action.kind === "xdesign_apply") {
-    const ops = (action.payload as { ops?: unknown }).ops;
-    if (!Array.isArray(ops)) throw new Error("xdesign_apply: ops must be an array");
-    useShell.getState().openApp("xdesign");
-    await (await import("@/apps/xdesign/projectsStore")).useXDProjects.getState().ensureActive();
-    const { runCanvasCommands } = await import("@/apps/xdesign/claudeCommands");
-    // Whole array applies as ONE undo step; returns new ids + per-op status.
-    const outcome = runCanvasCommands(
-      ops as Parameters<typeof runCanvasCommands>[0],
-    );
-    return { applied: outcome.applied, results: outcome.results };
-  }
-  if (action.kind === "xdesign_get_canvas") {
-    const { useXDesign } = await import("@/apps/xdesign/store");
-    const st = useXDesign.getState();
-    return {
-      activePageId: st.activePageId,
-      pages: st.pages.map((p) => ({
-        id: p.id,
-        name: p.name,
-        shapeCount: p.shapes.length,
-      })),
-      selection: Array.from(st.selection),
-      shapes: st.shapes,
-    };
-  }
-  if (action.kind === "xdesign_get_selection") {
-    const { useXDesign } = await import("@/apps/xdesign/store");
-    const st = useXDesign.getState();
-    return {
-      selection: Array.from(st.selection),
-      shapes: st.shapes.filter((s) => st.selection.has(s.id)),
-    };
   }
   log.warn("ui:action unknown kind:", action.kind);
 }

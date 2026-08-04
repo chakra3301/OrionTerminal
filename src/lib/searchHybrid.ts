@@ -4,6 +4,7 @@ import {
   type SearchHit,
   type NoteKind,
   type SearchEntityType,
+  type ChatOrigin,
 } from "@/lib/db";
 import { semanticSearch, type SemanticHit } from "@/lib/semanticSearch";
 
@@ -18,6 +19,7 @@ type EnrichRow = {
   title: string;
   body_excerpt: string;
   note_kind: NoteKind | null;
+  chat_origin: ChatOrigin | null;
 };
 
 /** Pull title + a short body excerpt for a batch of semantic-only hits so
@@ -59,6 +61,7 @@ async function enrichSemanticHits(
         title: r.title || "Untitled",
         body_excerpt: (r.plaintext ?? "").slice(0, 160),
         note_kind: r.kind,
+        chat_origin: null,
       });
     }
   }
@@ -66,9 +69,9 @@ async function enrichSemanticHits(
   if (chatIds.length > 0) {
     const placeholders = chatIds.map((_, i) => `$${i + 1}`).join(",");
     const rows = await db.select<
-      Array<{ id: string; title: string; searchable_text: string }>
+      Array<{ id: string; title: string; searchable_text: string; origin: ChatOrigin | null }>
     >(
-      `SELECT id, title, searchable_text
+      `SELECT id, title, searchable_text, origin
          FROM chats
         WHERE id IN (${placeholders})`,
       chatIds,
@@ -80,6 +83,7 @@ async function enrichSemanticHits(
         title: r.title || "Untitled chat",
         body_excerpt: (r.searchable_text ?? "").slice(0, 160),
         note_kind: null,
+        chat_origin: r.origin,
       });
     }
   }
@@ -101,6 +105,7 @@ async function enrichSemanticHits(
         title: r.title || r.original_name || "Asset",
         body_excerpt: "",
         note_kind: null,
+        chat_origin: null,
       });
     }
   }
@@ -149,6 +154,7 @@ export async function searchHybrid(
       title: e.title,
       snippet: e.body_excerpt,
       noteKind: e.note_kind,
+      chatOrigin: e.chat_origin,
     });
   }
   return merged;

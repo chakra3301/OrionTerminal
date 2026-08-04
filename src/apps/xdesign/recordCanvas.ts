@@ -2,6 +2,8 @@
 // captureStream — the same primitive voice capture uses, so it works in this
 // webview. Used by the motion-artifact "Export video" action.
 
+import { trackXDesignActivity } from "@/apps/xdesign/runtimeActivity";
+
 /** Pick the best supported recording mime + file extension, given a tester
  * (defaults to MediaRecorder.isTypeSupported). Pure for testing. */
 export function pickVideoMime(
@@ -32,6 +34,10 @@ export async function recordCanvasToFile(
   canvas: HTMLCanvasElement,
   durationMs = 6000,
 ): Promise<{ bytes: Uint8Array; ext: string }> {
+  return trackXDesignActivity(
+    "canvas-recording",
+    "Wait for XDesign video recording to finish before disabling the plugin.",
+    async () => {
   const cap = (canvas as unknown as { captureStream?: (fps?: number) => MediaStream }).captureStream;
   if (typeof MediaRecorder === "undefined" || typeof cap !== "function") {
     throw new Error("video recording isn't supported in this webview — export the HTML instead");
@@ -59,4 +65,6 @@ export async function recordCanvasToFile(
   const blob = await done;
   const buf = await blob.arrayBuffer();
   return { bytes: new Uint8Array(buf), ext: picked.ext };
+    },
+  );
 }

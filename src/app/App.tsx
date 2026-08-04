@@ -17,7 +17,6 @@ import { useLayoutStore } from "@/store/layoutStore";
 import { useHermes } from "@/store/hermesStore";
 import { useCommand } from "@/store/commandStore";
 import { useProvidersStore } from "@/store/providersStore";
-import { useDesignSystems } from "@/store/designSystemStore";
 import { useSkillsStore } from "@/store/skillsStore";
 import { useAgentsStore } from "@/store/agentsStore";
 import { HelpWindow } from "@/features/help/HelpWindow";
@@ -43,24 +42,17 @@ import { useAppConfig, type AppConfigsPersist } from "@/store/appConfigStore";
 import { useWallpaperStore, type WallpaperState } from "@/store/wallpaperStore";
 import { useCharacterStore } from "@/store/characterStore";
 import { usePreviewStore, type PreviewState } from "@/store/previewStore";
-import { useXDesign } from "@/apps/xdesign/store";
-import {
-  useXDProjects,
-  projectKind,
-  flushActive as flushActiveXDProject,
-} from "@/apps/xdesign/projectsStore";
-import { useFxStore } from "@/apps/xdesign/fx/fxStore";
 import {
   setAppState,
   getWorkspaceLayout,
   setWorkspaceLayout,
-  logActivity,
 } from "@/lib/db";
 import { startContextSnapshotter } from "@/lib/contextSnapshot";
 import {
   loadArchivesPluginData,
   refreshArchivesPluginData,
 } from "@/apps/archives/pluginContributions";
+import { loadXDesignPluginData } from "@/apps/xdesign/pluginContributions";
 import { log } from "@/lib/log";
 import { toast } from "@/store/toastStore";
 import { useAutocomplete } from "@/store/autocompleteStore";
@@ -167,9 +159,6 @@ async function hydrate() {
   if (characters) useCharacterStore.getState().hydrate(characters);
   if (preview) usePreviewStore.getState().hydrate(preview);
   usePluginManager.getState().hydrate(pluginState);
-  if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign)) {
-    void useXDProjects.getState().init();
-  }
   useModelPrefs.getState().hydrate(modelPrefs);
   useAppConfig.getState().hydrate(appConfigs);
 
@@ -213,6 +202,13 @@ async function hydrate() {
       log.warn("archives load failed", err);
     }
   }
+  if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign)) {
+    try {
+      await loadXDesignPluginData();
+    } catch (err) {
+      log.warn("xdesign load failed", err);
+    }
+  }
   if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.hermes)) {
     try {
       await useHermes.getState().load();
@@ -242,12 +238,6 @@ async function hydrate() {
   } catch (err) {
     log.warn("agents load failed", err);
   }
-  try {
-    await useDesignSystems.getState().load();
-  } catch (err) {
-    log.warn("design systems load failed", err);
-  }
-
   if (typeof terminalHeight === "number") {
     useTerminalStore.getState().setHeight(terminalHeight);
   }
@@ -375,76 +365,6 @@ function useShellWindowsPersistence() {
     const unsubscribe = useShell.subscribe(() => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(flush, 400);
-    });
-    return () => {
-      if (timer) clearTimeout(timer);
-      unsubscribe();
-    };
-  }, []);
-}
-
-/**
- * Debounced auto-persist for the XDesign document. Subscribed once at app
- * boot. The first emission right after hydrate is intentionally let through —
- * it's idempotent (same shapes back to disk) and avoids needing a "loaded"
- * flag.
- */
-function useXDesignPersistence() {
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    // Opening / switching projects hydrates the store, which fires this
-    // subscription — but that's a load, not an edit. Track the last project we
-    // logged for so a fresh activeId is treated as a load (persist, don't log).
-    let lastLoggedId: string | null = null;
-    const flush = () => {
-      // Edits only persist when a project is open. On the Home screen there's
-      // no active project, so there's nothing to write to.
-      const activeId = useXDProjects.getState().activeId;
-      if (!activeId) return;
-      const s = useXDesign.getState();
-      void flushActiveXDProject();
-      if (activeId === lastLoggedId) {
-        const page = s.pages.find((p) => p.id === s.activePageId);
-        void logActivity({
-          source: "xdesign",
-          kind: "design.edit",
-          title: page?.name || "Canvas",
-          summary: `${s.shapes.length} layer${s.shapes.length === 1 ? "" : "s"}`,
-          refId: s.activePageId,
-        });
-      } else {
-        lastLoggedId = activeId;
-      }
-    };
-    const unsubscribe = useXDesign.subscribe(() => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(flush, 400);
-    });
-    return () => {
-      if (timer) clearTimeout(timer);
-      unsubscribe();
-    };
-  }, []);
-}
-
-/**
- * Debounced auto-persist for FX scenes — the shader-compositor sibling of
- * `useXDesignPersistence`. Only writes when the active project is kind "fx";
- * transient state (selection, play/pause) is filtered out by comparing the
- * scene reference.
- */
-function useFxPersistence() {
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const unsubscribe = useFxStore.subscribe((state, prev) => {
-      if (state.scene === prev.scene) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        const { activeId, registry } = useXDProjects.getState();
-        if (!activeId) return;
-        if (projectKind(registry.find((m) => m.id === activeId)) !== "fx") return;
-        void flushActiveXDProject();
-      }, 400);
     });
     return () => {
       if (timer) clearTimeout(timer);
@@ -613,8 +533,6 @@ export default function App() {
     hydrated && (warm || (probed && splashDone && authPhase === "unlocked"));
   useWindowSizePersistence();
   useShellWindowsPersistence();
-  useXDesignPersistence();
-  useFxPersistence();
   useProjectScopedLayout();
   useFsWatcher();
   useArchivesLiveRefresh();

@@ -15,6 +15,11 @@ import {
   clearArchivesActivities,
   setArchivesActivity,
 } from "@/apps/archives/runtimeActivity";
+import { XDESIGN_CONTRIBUTION_IDS } from "@/apps/xdesign/pluginContributions";
+import {
+  clearXDesignActivities,
+  setXDesignActivity,
+} from "@/apps/xdesign/runtimeActivity";
 import { usePluginManager } from "./pluginManagerStore";
 
 vi.mock("@/lib/db", () => ({ setAppState: vi.fn(async () => {}) }));
@@ -44,12 +49,19 @@ function reset() {
   internalActionRegistry.clear();
   overlayRegistry.clear();
   clearArchivesActivities();
+  clearXDesignActivities();
   const threads = useAppChat.getState().threads;
   useAppChat.setState({
     threads: {
       ...threads,
       archives: {
         ...threads.archives,
+        running: false,
+        pendingAssistantId: null,
+        activeStreamId: null,
+      },
+      xdesign: {
+        ...threads.xdesign,
         running: false,
         pendingAssistantId: null,
         activeStreamId: null,
@@ -168,6 +180,58 @@ describe("plugin enablement persistence", () => {
     expect(usePluginManager.getState().error).toBe("Archives Learn is running.");
   });
 
+  it("persists and disposes XDesign commands and bridge actions", async () => {
+    usePluginManager.getState().hydrate(null);
+    expect(registry.ownerOf("xdesign.present")).toBe(BUILTIN_APP_PLUGIN_IDS.xdesign);
+    expect(internalActionRegistry.ownerOf(XDESIGN_CONTRIBUTION_IDS.applyAction)).toBe(
+      BUILTIN_APP_PLUGIN_IDS.xdesign,
+    );
+
+    const ok = await usePluginManager
+      .getState()
+      .setEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign, false);
+
+    expect(ok).toBe(true);
+    expect(setAppState).toHaveBeenCalledWith("plugins.state", {
+      version: 1,
+      disabled: [BUILTIN_APP_PLUGIN_IDS.xdesign],
+    });
+    expect(appRegistry.has("xdesign")).toBe(false);
+    expect(registry.has("xdesign.present")).toBe(false);
+    expect(internalActionRegistry.has(XDESIGN_CONTRIBUTION_IDS.applyAction)).toBe(false);
+  });
+
+  it("blocks XDesign disable during Claude and owned background work", async () => {
+    usePluginManager.getState().hydrate(null);
+    const threads = useAppChat.getState().threads;
+    useAppChat.setState({
+      threads: {
+        ...threads,
+        xdesign: { ...threads.xdesign, running: true },
+      },
+    });
+    let ok = await usePluginManager
+      .getState()
+      .setEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign, false);
+    expect(ok).toBe(false);
+    expect(usePluginManager.getState().error).toMatch(/XDesign Claude response/);
+
+    useAppChat.setState({
+      threads: {
+        ...useAppChat.getState().threads,
+        xdesign: { ...useAppChat.getState().threads.xdesign, running: false },
+      },
+    });
+    usePluginManager.setState({ error: null });
+    setXDesignActivity("image", true, "XDesign image generation is running.");
+    ok = await usePluginManager
+      .getState()
+      .setEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign, false);
+    expect(ok).toBe(false);
+    expect(usePluginManager.getState().error).toBe("XDesign image generation is running.");
+    expect(setAppState).not.toHaveBeenCalled();
+  });
+
   it("persists and disposes Command Center and its event handlers", async () => {
     usePluginManager.getState().hydrate(null);
     expect(internalEventRegistry.ownerOf("command-center.event.stream")).toBe(
@@ -201,6 +265,7 @@ describe("plugin enablement persistence", () => {
     expect(appRegistry.has("command")).toBe(true);
     expect(registry.has("app.openCommandCenter")).toBe(true);
     expect(internalEventRegistry.has("command-center.event.stream")).toBe(true);
+    expect(useCommand.getState().loaded).toBe(true);
     expect(setAppState).toHaveBeenLastCalledWith("plugins.state", {
       version: 1,
       disabled: [],

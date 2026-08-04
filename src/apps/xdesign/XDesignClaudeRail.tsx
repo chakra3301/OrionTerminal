@@ -76,6 +76,7 @@ import { parseDesignPlans, stripDesignPlan } from "@/apps/xdesign/designPlan";
 import { ingestDesignPlan, ingestDesignPlans } from "@/apps/xdesign/ingestDesignPlan";
 import { computeExportBounds, renderPngBytes } from "@/apps/xdesign/exportXD";
 import { clamp } from "@/lib/time";
+import { trackXDesignActivity } from "@/apps/xdesign/runtimeActivity";
 
 // With the vision loop attaching a render every turn, Claude can SEE all the
 // layers — but it still needs each layer's id to target it for update/delete,
@@ -736,13 +737,17 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
       body: `${provider.name} · ${model}`,
     });
     try {
-      const { b64, mime } = await ipc.xdesignImageGen(
-        provider.kind,
-        provider.baseUrl,
-        provider.keyRef,
-        model,
-        styled,
-        size,
+      const { b64, mime } = await trackXDesignActivity(
+        "image-generation",
+        "Wait for XDesign image generation to finish before disabling the plugin.",
+        () => ipc.xdesignImageGen(
+          provider.kind,
+          provider.baseUrl,
+          provider.keyRef,
+          model,
+          styled,
+          size,
+        ),
       );
       const ext = mime.includes("jpeg") ? "jpg" : mime.includes("webp") ? "webp" : "png";
       const blob = new Blob([base64ToBytes(b64)], { type: mime });
@@ -798,13 +803,17 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
       await Promise.all(
         requests.map(async (desc) => {
           try {
-            const { b64, mime } = await ipc.xdesignImageGen(
-              provider.kind,
-              provider.baseUrl,
-              provider.keyRef,
-              model,
-              styleImagePrompt(desc, brand),
-              defaultSize(),
+            const { b64, mime } = await trackXDesignActivity(
+              "image-generation",
+              "Wait for XDesign image generation to finish before disabling the plugin.",
+              () => ipc.xdesignImageGen(
+                provider.kind,
+                provider.baseUrl,
+                provider.keyRef,
+                model,
+                styleImagePrompt(desc, brand),
+                defaultSize(),
+              ),
             );
             map.set(desc, `data:${mime};base64,${b64}`);
           } catch (e) {

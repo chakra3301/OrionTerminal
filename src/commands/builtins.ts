@@ -498,28 +498,6 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
-    id: "xdesign.exportToCode",
-    label: "XDesign: Export Selection to React",
-    keywords: ["xdesign", "export", "react", "code", "design", "component", "tsx"],
-    group: "View",
-    run: () => {
-      void import("@/apps/xdesign/exportToCode").then((m) =>
-        m.exportSelectionToCode(),
-      );
-    },
-  });
-
-  registry.register({
-    id: "xdesign.present",
-    label: "XDesign: Present Prototype",
-    keywords: ["xdesign", "present", "play", "prototype", "preview", "demo", "flow"],
-    group: "View",
-    run: () => {
-      void import("@/apps/xdesign/XDesignApp").then((m) => m.startPresent());
-    },
-  });
-
-  registry.register({
     id: "editor.toggleTabAutocomplete",
     label: "Toggle Tab Autocomplete",
     keywords: ["autocomplete", "ghost", "suggestion", "completion", "ai", "tab"],

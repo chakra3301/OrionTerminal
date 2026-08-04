@@ -1,6 +1,7 @@
 import { Fragment, Suspense, lazy, useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
 import { useControlPanel, type CpSection } from "@/store/controlPanelStore";
+import { useAppDescriptors } from "@/plugins/appRegistry";
 import { ProvidersPanel } from "./ProvidersPanel";
 import { SkillLibraryPanel } from "./SkillLibraryPanel";
 import { AgentForge } from "./AgentForge";
@@ -34,11 +35,27 @@ const NAV: { key: CpSection; label: string; Icon: LucideIcon }[] = [
   { key: "about", label: "About", Icon: Info },
 ];
 
+const APP_SETTINGS_SECTION: Partial<Record<CpSection, string>> = {
+  "app-orion": "orion",
+  "app-archives": "archives",
+  "app-xdesign": "xdesign",
+};
+
 export function ControlPanel() {
   const open = useControlPanel((s) => s.open);
   const section = useControlPanel((s) => s.section);
   const setSection = useControlPanel((s) => s.setSection);
   const hide = useControlPanel((s) => s.hide);
+  const appDescriptors = useAppDescriptors();
+  const enabledApps = new Set(appDescriptors.map((descriptor) => descriptor.id));
+  const nav = NAV.filter((item) => {
+    const appId = APP_SETTINGS_SECTION[item.key];
+    return !appId || enabledApps.has(appId);
+  });
+
+  useEffect(() => {
+    if (!nav.some((item) => item.key === section)) setSection("plugins");
+  }, [nav, section, setSection]);
 
   useEffect(() => {
     if (!open) return;
@@ -56,7 +73,7 @@ export function ControlPanel() {
       <div className="cp-surface" onMouseDown={(e) => e.stopPropagation()}>
         <aside className="cp-rail">
           <div className="cp-rail-title">Control Panel</div>
-          {NAV.map((n) => (
+          {nav.map((n) => (
             <Fragment key={n.key}>
               {n.key === "account" && <div className="cp-rail-divider" />}
               <button
@@ -70,7 +87,7 @@ export function ControlPanel() {
         </aside>
         <main className="cp-main">
           <header className="cp-main-head">
-            <span>{NAV.find((n) => n.key === section)?.label}</span>
+            <span>{nav.find((n) => n.key === section)?.label}</span>
             <button className="cp-close" onClick={hide} aria-label="Close"><X size={14} /></button>
           </header>
           <div className="cp-main-body">

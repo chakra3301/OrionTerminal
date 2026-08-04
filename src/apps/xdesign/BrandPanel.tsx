@@ -9,6 +9,7 @@ import { ipc } from "@/lib/ipc";
 import { promptText } from "@/components/PromptModal";
 import { useToasts, toast } from "@/store/toastStore";
 import { log } from "@/lib/log";
+import { trackXDesignActivity } from "@/apps/xdesign/runtimeActivity";
 
 function blankSystem(name: string): DesignSystem {
   const now = Date.now();
@@ -172,7 +173,11 @@ export function XDesignBrandPanel() {
     if (!u) return;
     const loadingId = toast.info("Extracting brand…", { durationMs: 0, body: u });
     try {
-      const html = await ipc.xdesignFetchUrl(u);
+      const html = await trackXDesignActivity(
+        "brand-extraction",
+        "Wait for XDesign brand extraction to finish before disabling the plugin.",
+        () => ipc.xdesignFetchUrl(u),
+      );
       const ds = brandFromSite(html, u, `ds-${ulid()}`);
       await save(ds);
       await setActive(ds.id);

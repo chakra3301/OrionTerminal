@@ -231,7 +231,9 @@ export function Spotlight() {
         }))
       : [];
 
-    const archiveEntries: SpotlightEntry[] = (archivesEnabled ? archiveHits : []).map((h) => ({
+    const archiveEntries: SpotlightEntry[] = (archivesEnabled ? archiveHits : [])
+      .filter((hit) => hit.chatOrigin !== "xdesign" || appRegistry.has("xdesign"))
+      .map((h) => ({
       kind: "archive",
       id: `archive:${h.entityType}:${h.entityId}`,
       label: h.title,
@@ -245,7 +247,7 @@ export function Spotlight() {
     }));
 
     const activityEntries: SpotlightEntry[] = activity
-      .filter((entry) => entry.source !== "archives" || archivesEnabled)
+      .filter((entry) => appRegistry.has(entry.source))
       .map((a) => ({
       kind: "activity",
       id: `activity:${a.id}`,

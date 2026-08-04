@@ -13,6 +13,7 @@ import { internalActionRegistry } from "./internalActionRegistry";
 import { overlayRegistry } from "./overlayRegistry";
 import { COMMAND_CENTER_EVENT_IDS } from "@/apps/command/pluginContributions";
 import { ARCHIVES_CONTRIBUTION_IDS } from "@/apps/archives/pluginContributions";
+import { XDESIGN_CONTRIBUTION_IDS } from "@/apps/xdesign/pluginContributions";
 import { newRun } from "@/apps/command/ccRun";
 import { useCommand } from "@/store/commandStore";
 import { allTabs, useWorkspace } from "@/components/workspace/workspaceStore";
@@ -75,6 +76,29 @@ describe("built-in app plugins", () => {
     expect(overlayRegistry.ownerOf(ARCHIVES_CONTRIBUTION_IDS.askOverlay)).toBeUndefined();
     expect(useShell.getState().windows.some((windowState) => windowState.id === windowId)).toBe(false);
     expect(allTabs(useWorkspace.getState().root).some((tab) => tab.descriptor.kind === "note")).toBe(false);
+  });
+
+  it("deactivating XDesign removes its app, commands, bridge actions, and window", async () => {
+    ensureBuiltinAppPlugins();
+    const windowId = useShell.getState().openApp("xdesign");
+    expect(registry.ownerOf("xdesign.exportToCode")).toBe(
+      BUILTIN_APP_PLUGIN_IDS.xdesign,
+    );
+    await expect(
+      internalActionRegistry.dispatch(XDESIGN_CONTRIBUTION_IDS.addRectAction, {
+        x: 0,
+        y: 0,
+        w: -1,
+        h: 100,
+      }),
+    ).rejects.toThrow(/w must be greater than zero/);
+
+    expect(deactivateBuiltinAppPlugin(BUILTIN_APP_PLUGIN_IDS.xdesign)).toEqual([]);
+    expect(appRegistry.has("xdesign")).toBe(false);
+    expect(registry.has("app.openXDesign")).toBe(false);
+    expect(registry.has("xdesign.exportToCode")).toBe(false);
+    expect(internalActionRegistry.has(XDESIGN_CONTRIBUTION_IDS.applyAction)).toBe(false);
+    expect(useShell.getState().windows.some((windowState) => windowState.id === windowId)).toBe(false);
   });
 
   it("deactivating Command Center removes its app, command, event handlers, and window", () => {

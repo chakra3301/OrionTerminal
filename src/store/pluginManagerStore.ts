@@ -12,6 +12,10 @@ import {
   archivesDisableReason,
   loadArchivesPluginData,
 } from "@/apps/archives/pluginContributions";
+import {
+  loadXDesignPluginData,
+  xdesignDisableReason,
+} from "@/apps/xdesign/pluginContributions";
 
 export type PluginEnablementV1 = {
   version: 1;
@@ -58,6 +62,9 @@ function blockReason(pluginId: string): string | null {
   if (pluginId === BUILTIN_APP_PLUGIN_IDS.archives) {
     return archivesDisableReason();
   }
+  if (pluginId === BUILTIN_APP_PLUGIN_IDS.xdesign) {
+    return xdesignDisableReason();
+  }
   if (pluginId === BUILTIN_APP_PLUGIN_IDS.hermes) {
     const hermes = useHermes.getState();
     if (
@@ -84,8 +91,7 @@ async function loadPluginData(pluginId: string): Promise<void> {
   } else if (pluginId === BUILTIN_APP_PLUGIN_IDS.command) {
     await useCommand.getState().load();
   } else if (pluginId === BUILTIN_APP_PLUGIN_IDS.xdesign) {
-    const { useXDProjects } = await import("@/apps/xdesign/projectsStore");
-    await useXDProjects.getState().init();
+    await loadXDesignPluginData();
   }
 }
 
@@ -153,6 +159,7 @@ export const usePluginManager = create<PluginManagerState>((set, get) => ({
       let runtimeRollbackFailed = false;
       try {
         syncBuiltinAppPlugins(new Set(previous));
+        if (!previous.includes(pluginId)) await loadPluginData(pluginId);
       } catch (rollbackError) {
         runtimeRollbackFailed = true;
         log.error("plugin enablement runtime rollback failed", rollbackError);

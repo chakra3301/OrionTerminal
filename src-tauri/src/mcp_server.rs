@@ -19,6 +19,8 @@ use std::io::{self, BufRead, Write};
 
 const PROTOCOL_VERSION: &str = "2024-11-05";
 const ARCHIVES_PLUGIN_ID: &str = "@orion/archives";
+const XDESIGN_PLUGIN_ID: &str = "@orion/xdesign";
+const HERMES_PLUGIN_ID: &str = "@orion/hermes";
 
 pub fn serve() -> ! {
     let stdin = io::stdin();
@@ -745,6 +747,21 @@ fn plugin_for_tool(name: &str) -> Option<&'static str> {
         | "orion_add_to_mood_board"
         | "orion_attach_tag"
         | "orion_delete_note" => Some(ARCHIVES_PLUGIN_ID),
+        "orion_xdesign_add_rect"
+        | "orion_xdesign_add_text"
+        | "orion_xdesign_add_ellipse"
+        | "orion_xdesign_add_frame"
+        | "orion_xdesign_get_canvas"
+        | "orion_xdesign_get_selection"
+        | "orion_xdesign_apply" => Some(XDESIGN_PLUGIN_ID),
+        name if name.starts_with("orion_model_") => Some(XDESIGN_PLUGIN_ID),
+        "orion_hermes_list_tasks"
+        | "orion_hermes_get_task"
+        | "orion_hermes_create_task"
+        | "orion_hermes_add_agent"
+        | "orion_hermes_update_task"
+        | "orion_hermes_move_task"
+        | "orion_hermes_decompose" => Some(HERMES_PLUGIN_ID),
         _ => None,
     }
 }
@@ -753,8 +770,8 @@ fn plugin_for_app(app: &str) -> Option<&'static str> {
     match app {
         "archives" => Some(ARCHIVES_PLUGIN_ID),
         "orion" => Some("@orion/editor"),
-        "xdesign" => Some("@orion/xdesign"),
-        "hermes" => Some("@orion/hermes"),
+        "xdesign" => Some(XDESIGN_PLUGIN_ID),
+        "hermes" => Some(HERMES_PLUGIN_ID),
         _ => None,
     }
 }
@@ -823,8 +840,13 @@ fn filter_tool_definitions_for_disabled(
 }
 
 pub(crate) fn available_tool_definitions() -> Value {
-    let disabled = disabled_plugin_ids()
-        .unwrap_or_else(|_| HashSet::from([ARCHIVES_PLUGIN_ID.to_string()]));
+    let disabled = disabled_plugin_ids().unwrap_or_else(|_| {
+        HashSet::from([
+            ARCHIVES_PLUGIN_ID.to_string(),
+            XDESIGN_PLUGIN_ID.to_string(),
+            HERMES_PLUGIN_ID.to_string(),
+        ])
+    });
     filter_tool_definitions_for_disabled(tool_definitions(), &disabled)
 }
 
@@ -2109,15 +2131,23 @@ fn humanize_age(ms: i64) -> String {
 
 fn tool_recent_activity(args: &Value) -> Result<String, String> {
     let conn = open_db()?;
-    let archives_enabled = plugin_enabled(ARCHIVES_PLUGIN_ID).unwrap_or(false);
+    let disabled = disabled_plugin_ids().unwrap_or_else(|_| {
+        HashSet::from([
+            ARCHIVES_PLUGIN_ID.to_string(),
+            XDESIGN_PLUGIN_ID.to_string(),
+            HERMES_PLUGIN_ID.to_string(),
+        ])
+    });
     let limit = args
         .get("limit")
         .and_then(|v| v.as_i64())
         .unwrap_or(30)
         .clamp(1, 200);
     let source = args.get("source").and_then(|v| v.as_str());
-    if source == Some("archives") && !archives_enabled {
-        return Err(format!("plugin disabled: {ARCHIVES_PLUGIN_ID}"));
+    if let Some(plugin_id) = source.and_then(plugin_for_app) {
+        if disabled.contains(plugin_id) {
+            return Err(format!("plugin disabled: {plugin_id}"));
+        }
     }
     let since = args
         .get("since_hours")
@@ -2129,8 +2159,19 @@ fn tool_recent_activity(args: &Value) -> Result<String, String> {
     );
     if source.is_some() {
         sql.push_str(" AND source = ?1");
-    } else if !archives_enabled {
-        sql.push_str(" AND source != 'archives'");
+    } else {
+        if disabled.contains(ARCHIVES_PLUGIN_ID) {
+            sql.push_str(" AND source != 'archives'");
+        }
+        if disabled.contains(XDESIGN_PLUGIN_ID) {
+            sql.push_str(" AND source != 'xdesign'");
+        }
+        if disabled.contains("@orion/editor") {
+            sql.push_str(" AND source != 'orion'");
+        }
+        if disabled.contains(HERMES_PLUGIN_ID) {
+            sql.push_str(" AND source != 'hermes'");
+        }
     }
     if let Some(s) = since {
         sql.push_str(&format!(" AND ts >= {}", s));
@@ -2479,7 +2520,7 @@ fn tool_hermes_decompose(args: &Value) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn archive_tools_are_owned_by_the_archives_plugin() {
+    fn plugin_tools_are_owned_by_their_app_plugins() {
         assert_eq!(
             super::plugin_for_tool("orion_create_note"),
             Some(super::ARCHIVES_PLUGIN_ID)
@@ -2488,13 +2529,27 @@ mod tests {
             super::plugin_for_tool("orion_search_assets"),
             Some(super::ARCHIVES_PLUGIN_ID)
         );
+        assert_eq!(
+            super::plugin_for_tool("orion_xdesign_apply"),
+            Some(super::XDESIGN_PLUGIN_ID)
+        );
+        assert_eq!(
+            super::plugin_for_tool("orion_model_request_render"),
+            Some(super::XDESIGN_PLUGIN_ID)
+        );
+        assert_eq!(
+            super::plugin_for_tool("orion_hermes_create_task"),
+            Some(super::HERMES_PLUGIN_ID)
+        );
         assert_eq!(super::plugin_for_tool("orion_read_file"), None);
     }
 
     #[test]
     fn disabled_plugin_tools_are_removed_from_advertised_schemas() {
         let disabled = std::collections::HashSet::from([
-            super::ARCHIVES_PLUGIN_ID.to_string()
+            super::ARCHIVES_PLUGIN_ID.to_string(),
+            super::XDESIGN_PLUGIN_ID.to_string(),
+            super::HERMES_PLUGIN_ID.to_string(),
         ]);
         let filtered = super::filter_tool_definitions_for_disabled(
             super::tool_definitions(),
@@ -2508,6 +2563,9 @@ mod tests {
             .collect();
         assert!(!names.contains(&"orion_read_note"));
         assert!(!names.contains(&"orion_search_assets"));
+        assert!(!names.contains(&"orion_xdesign_apply"));
+        assert!(!names.contains(&"orion_model_request_render"));
+        assert!(!names.contains(&"orion_hermes_create_task"));
         assert!(names.contains(&"orion_read_file"));
     }
 

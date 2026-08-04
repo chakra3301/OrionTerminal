@@ -1,6 +1,7 @@
 import { getChatById, type SearchHit } from "@/lib/db";
 import { useArchives } from "@/apps/archives/useArchives";
 import { useShell } from "@/shell/store/useShell";
+import { appRegistry } from "@/plugins/appRegistry";
 import { useChatStore } from "@/store/chatStore";
 import { useAppChat, type AppChatMessage, type AppChatThread } from "@/store/appChatStore";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
@@ -87,6 +88,10 @@ export async function openChatById(chatId: string): Promise<void> {
     updatedAt: row.updated_at,
   };
   if (row.origin === "xdesign") {
+    if (!appRegistry.has("xdesign")) {
+      log.warn("openChatById: XDesign plugin is disabled", chatId);
+      return;
+    }
     useAppChat.getState().restoreThread("xdesign", restored);
     useShell.getState().openApp("xdesign");
     return;

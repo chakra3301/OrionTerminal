@@ -747,6 +747,8 @@ export type SearchHit = {
   /** For notes: the underlying kind (note | journal | project) so the result
    * can be routed to the right view. Null for chat/asset. */
   noteKind?: NoteKind | null;
+  /** For chats: owning app surface, used to hide disabled-plugin data. */
+  chatOrigin?: ChatOrigin | null;
 };
 
 type SearchRow = {
@@ -755,6 +757,7 @@ type SearchRow = {
   title: string;
   snip: string;
   note_kind: NoteKind | null;
+  chat_origin: ChatOrigin | null;
 };
 
 /**
@@ -780,10 +783,13 @@ export async function searchArchive(
             s.entity_type AS entity_type,
             s.title       AS title,
             snippet(search_index, 3, '〔', '〕', '…', 16) AS snip,
-            n.kind        AS note_kind
+            n.kind        AS note_kind,
+            c.origin      AS chat_origin
        FROM search_index s
        LEFT JOIN notes n
          ON n.id = s.entity_id AND s.entity_type = 'note'
+       LEFT JOIN chats c
+         ON c.id = s.entity_id AND s.entity_type = 'chat'
       WHERE search_index MATCH $1
       ORDER BY rank
       LIMIT $2`,
@@ -795,6 +801,7 @@ export async function searchArchive(
     title: r.title || "Untitled",
     snippet: r.snip || "",
     noteKind: r.note_kind ?? null,
+    chatOrigin: r.chat_origin ?? null,
   }));
 }
 
