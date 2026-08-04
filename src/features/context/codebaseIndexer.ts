@@ -18,6 +18,7 @@ import {
 import { chunkCode, chunkEmbedText, looksMinified } from "./codeChunker";
 import { useProjectStore } from "@/store/projectStore";
 import { log } from "@/lib/log";
+import { beginOrionActivity } from "@/apps/orion/runtimeActivity";
 
 /** Source extensions worth indexing. Everything else (binaries, lockfiles,
  * JSON blobs) only adds noise to retrieval. */
@@ -131,6 +132,9 @@ async function indexOneFile(
 
 let running = false;
 let queued: { projectId: string; root: string } | null = null;
+let generation = 0;
+let kickTimer: ReturnType<typeof setTimeout> | null = null;
+let stopProjectSubscription: (() => void) | null = null;
 
 /** Full hash-aware sweep: new/changed files re-embed, deleted files drop.
  * Serial on purpose — inference runs in the worker, so this never janks
@@ -140,14 +144,21 @@ export async function indexCodebase(projectId: string, root: string): Promise<vo
     queued = { projectId, root };
     return;
   }
+  const runGeneration = generation;
+  const endActivity = beginOrionActivity(
+    "codebase-index",
+    "Wait for Orion's codebase index to finish before disabling the plugin.",
+  );
   running = true;
   try {
     const tree = await ipc.readDirTree(root, 10);
+    if (runGeneration !== generation) return;
     const files = collectCodeFiles(tree);
     const stored = await listCodeFileHashes(projectId);
     const current = new Set(files.map((f) => relPath(root, f)));
 
     for (const [path] of stored) {
+      if (runGeneration !== generation) return;
       if (!current.has(path)) {
         await deleteCodeFile(projectId, path);
         invalidateSearchCache();
@@ -157,6 +168,7 @@ export async function indexCodebase(projectId: string, root: string): Promise<vo
     useCodebaseIndex.setState({ state: "indexing", total: files.length, done: 0 });
     let changed = 0;
     for (const abs of files) {
+      if (runGeneration !== generation) return;
       const rel = relPath(root, abs);
       try {
         if (await indexOneFile(projectId, root, abs, stored.get(rel) ?? null)) {
@@ -175,12 +187,50 @@ export async function indexCodebase(projectId: string, root: string): Promise<vo
     useCodebaseIndex.setState((s) => ({ ...s, state: "ready" }));
   } finally {
     running = false;
-    if (queued) {
+    endActivity();
+    if (queued && runGeneration === generation) {
       const next = queued;
       queued = null;
       void indexCodebase(next.projectId, next.root);
     }
   }
+}
+
+function scheduleProjectIndex(project: { id: string; root_path: string } | null): void {
+  if (!project) return;
+  if (kickTimer) clearTimeout(kickTimer);
+  kickTimer = setTimeout(() => {
+    kickTimer = null;
+    void indexCodebase(project.id, project.root_path);
+  }, 4_000);
+}
+
+export function startCodebaseIndexing(): () => void {
+  if (stopProjectSubscription) return stopProjectSubscription;
+  scheduleProjectIndex(useProjectStore.getState().active);
+  const unsubscribe = useProjectStore.subscribe((state, previous) => {
+    if (state.active?.id !== previous.active?.id) scheduleProjectIndex(state.active);
+  });
+  let disposed = false;
+  stopProjectSubscription = () => {
+    if (disposed) return;
+    disposed = true;
+    unsubscribe();
+    stopProjectSubscription = null;
+    stopCodebaseIndexing();
+  };
+  return stopProjectSubscription;
+}
+
+export function stopCodebaseIndexing(): void {
+  generation += 1;
+  queued = null;
+  if (kickTimer) clearTimeout(kickTimer);
+  kickTimer = null;
+  for (const timer of saveTimers.values()) clearTimeout(timer);
+  saveTimers.clear();
+  invalidateSearchCache();
+  useCodebaseIndex.setState({ state: "idle", total: 0, done: 0 });
 }
 
 // ── Single-file reindex on save ───────────────────────────────────────────
@@ -197,15 +247,25 @@ export function scheduleCodeFileReindex(absPath: string): void {
     absPath,
     setTimeout(() => {
       saveTimers.delete(absPath);
+      const runGeneration = generation;
+      const endActivity = beginOrionActivity(
+        `code-reindex:${absPath}`,
+        "Wait for Orion's saved file to finish indexing before disabling the plugin.",
+      );
       void (async () => {
         try {
           const rel = relPath(project.root_path, absPath);
           const known = await getCodeFileHash(project.id, rel);
-          if (await indexOneFile(project.id, project.root_path, absPath, known)) {
+          if (
+            runGeneration === generation &&
+            (await indexOneFile(project.id, project.root_path, absPath, known))
+          ) {
             invalidateSearchCache();
           }
         } catch (e) {
           log.warn("code reindex on save failed", e);
+        } finally {
+          endActivity();
         }
       })();
     }, 1500),

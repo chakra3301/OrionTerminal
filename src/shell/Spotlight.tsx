@@ -79,6 +79,7 @@ export function Spotlight() {
   const focusedId = useShell((s) => s.focusedWindowId);
   const windows = useShell((s) => s.windows);
   const appDescriptors = useAppDescriptors();
+  const orionEnabled = appDescriptors.some((descriptor) => descriptor.id === "orion");
   const archivesEnabled = usePluginManager(
     (state) => state.hydrated && !state.disabledIds.includes(BUILTIN_APP_PLUGIN_IDS.archives),
   );
@@ -92,8 +93,8 @@ export function Spotlight() {
   // Pull recents whenever the palette opens so the list is fresh (cheap —
   // single sqlite query). loadRecents itself is a no-op if it races.
   useEffect(() => {
-    if (open) void loadRecents();
-  }, [open, loadRecents]);
+    if (open && orionEnabled) void loadRecents();
+  }, [open, orionEnabled, loadRecents]);
 
   // Cross-app activity feed (the shared terminal memory). Pulled on open so
   // "what was I just doing" is one ⌘K away.
@@ -138,7 +139,7 @@ export function Spotlight() {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    if (!project) {
+    if (!orionEnabled || !project) {
       setFiles([]);
       return;
     }
@@ -154,7 +155,7 @@ export function Spotlight() {
     return () => {
       cancelled = true;
     };
-  }, [open, project]);
+  }, [open, orionEnabled, project]);
 
   const isCommandsOnly = query.startsWith(">");
   const trimmedQuery = isCommandsOnly ? query.slice(1).trim() : query.trim();
@@ -210,7 +211,7 @@ export function Spotlight() {
       },
     }));
 
-    const fileEntries: SpotlightEntry[] = project
+    const fileEntries: SpotlightEntry[] = orionEnabled && project
       ? files.slice(0, 200).map((f) => ({
           kind: "file",
           id: `file:${f}`,
@@ -233,6 +234,7 @@ export function Spotlight() {
 
     const archiveEntries: SpotlightEntry[] = (archivesEnabled ? archiveHits : [])
       .filter((hit) => hit.chatOrigin !== "xdesign" || appRegistry.has("xdesign"))
+      .filter((hit) => hit.chatOrigin !== "orion" || orionEnabled)
       .map((h) => ({
       kind: "archive",
       id: `archive:${h.entityType}:${h.entityId}`,
@@ -274,7 +276,7 @@ export function Spotlight() {
     }));
 
     // Recent projects: skip the currently-active one (no-op switch anyway).
-    const projectEntries: SpotlightEntry[] = recents
+    const projectEntries: SpotlightEntry[] = (orionEnabled ? recents : [])
       .filter((p) => p.id !== project?.id)
       .slice(0, 8)
       .map((p) => ({
@@ -311,6 +313,7 @@ export function Spotlight() {
     activity,
     appDescriptors,
     archivesEnabled,
+    orionEnabled,
   ]);
 
   const fuse = useMemo(

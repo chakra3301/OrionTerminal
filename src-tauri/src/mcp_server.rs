@@ -19,6 +19,7 @@ use std::io::{self, BufRead, Write};
 
 const PROTOCOL_VERSION: &str = "2024-11-05";
 const ARCHIVES_PLUGIN_ID: &str = "@orion/archives";
+const EDITOR_PLUGIN_ID: &str = "@orion/editor";
 const XDESIGN_PLUGIN_ID: &str = "@orion/xdesign";
 const HERMES_PLUGIN_ID: &str = "@orion/hermes";
 
@@ -747,6 +748,14 @@ fn plugin_for_tool(name: &str) -> Option<&'static str> {
         | "orion_add_to_mood_board"
         | "orion_attach_tag"
         | "orion_delete_note" => Some(ARCHIVES_PLUGIN_ID),
+        "orion_list_projects"
+        | "orion_switch_project"
+        | "orion_open_file"
+        | "orion_apply_edit"
+        | "orion_write_file"
+        | "orion_read_file"
+        | "orion_search_files"
+        | "orion_run_in_terminal" => Some(EDITOR_PLUGIN_ID),
         "orion_xdesign_add_rect"
         | "orion_xdesign_add_text"
         | "orion_xdesign_add_ellipse"
@@ -769,7 +778,7 @@ fn plugin_for_tool(name: &str) -> Option<&'static str> {
 fn plugin_for_app(app: &str) -> Option<&'static str> {
     match app {
         "archives" => Some(ARCHIVES_PLUGIN_ID),
-        "orion" => Some("@orion/editor"),
+        "orion" => Some(EDITOR_PLUGIN_ID),
         "xdesign" => Some(XDESIGN_PLUGIN_ID),
         "hermes" => Some(HERMES_PLUGIN_ID),
         _ => None,
@@ -843,6 +852,7 @@ pub(crate) fn available_tool_definitions() -> Value {
     let disabled = disabled_plugin_ids().unwrap_or_else(|_| {
         HashSet::from([
             ARCHIVES_PLUGIN_ID.to_string(),
+            EDITOR_PLUGIN_ID.to_string(),
             XDESIGN_PLUGIN_ID.to_string(),
             HERMES_PLUGIN_ID.to_string(),
         ])
@@ -2134,6 +2144,7 @@ fn tool_recent_activity(args: &Value) -> Result<String, String> {
     let disabled = disabled_plugin_ids().unwrap_or_else(|_| {
         HashSet::from([
             ARCHIVES_PLUGIN_ID.to_string(),
+            EDITOR_PLUGIN_ID.to_string(),
             XDESIGN_PLUGIN_ID.to_string(),
             HERMES_PLUGIN_ID.to_string(),
         ])
@@ -2166,7 +2177,7 @@ fn tool_recent_activity(args: &Value) -> Result<String, String> {
         if disabled.contains(XDESIGN_PLUGIN_ID) {
             sql.push_str(" AND source != 'xdesign'");
         }
-        if disabled.contains("@orion/editor") {
+        if disabled.contains(EDITOR_PLUGIN_ID) {
             sql.push_str(" AND source != 'orion'");
         }
         if disabled.contains(HERMES_PLUGIN_ID) {
@@ -2530,6 +2541,10 @@ mod tests {
             Some(super::ARCHIVES_PLUGIN_ID)
         );
         assert_eq!(
+            super::plugin_for_tool("orion_read_file"),
+            Some(super::EDITOR_PLUGIN_ID)
+        );
+        assert_eq!(
             super::plugin_for_tool("orion_xdesign_apply"),
             Some(super::XDESIGN_PLUGIN_ID)
         );
@@ -2541,13 +2556,14 @@ mod tests {
             super::plugin_for_tool("orion_hermes_create_task"),
             Some(super::HERMES_PLUGIN_ID)
         );
-        assert_eq!(super::plugin_for_tool("orion_read_file"), None);
+        assert_eq!(super::plugin_for_tool("orion_get_context"), None);
     }
 
     #[test]
     fn disabled_plugin_tools_are_removed_from_advertised_schemas() {
         let disabled = std::collections::HashSet::from([
             super::ARCHIVES_PLUGIN_ID.to_string(),
+            super::EDITOR_PLUGIN_ID.to_string(),
             super::XDESIGN_PLUGIN_ID.to_string(),
             super::HERMES_PLUGIN_ID.to_string(),
         ]);
@@ -2563,10 +2579,12 @@ mod tests {
             .collect();
         assert!(!names.contains(&"orion_read_note"));
         assert!(!names.contains(&"orion_search_assets"));
+        assert!(!names.contains(&"orion_read_file"));
+        assert!(!names.contains(&"orion_run_in_terminal"));
         assert!(!names.contains(&"orion_xdesign_apply"));
         assert!(!names.contains(&"orion_model_request_render"));
         assert!(!names.contains(&"orion_hermes_create_task"));
-        assert!(names.contains(&"orion_read_file"));
+        assert!(names.contains(&"orion_get_context"));
     }
 
     #[test]

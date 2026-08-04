@@ -9,6 +9,7 @@
 //   orion://chat/<id>           (future)
 
 import { useWorkspace } from "@/components/workspace/workspaceStore";
+import { appRegistry } from "@/plugins/appRegistry";
 
 export type OrionRef =
   | { kind: "note"; id: string }
@@ -56,9 +57,11 @@ export function handleOrionUri(href: string): boolean {
   switch (ref.kind) {
     case "note":
       if (noteNavigator?.(ref.id)) return true;
+      if (!appRegistry.has("orion")) return false;
       useWorkspace.getState().openTab({ kind: "note", noteId: ref.id });
       return true;
     case "asset":
+      if (!appRegistry.has("orion")) return false;
       useWorkspace.getState().openTab({ kind: "asset-detail", assetId: ref.id });
       return true;
     case "chat":

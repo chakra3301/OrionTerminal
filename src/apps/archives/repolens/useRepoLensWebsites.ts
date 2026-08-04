@@ -7,6 +7,7 @@ import { useProjectStore } from "@/store/projectStore";
 import { useShell } from "@/shell/store/useShell";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
 import { usePreviewStore } from "@/store/previewStore";
+import { appRegistry } from "@/plugins/appRegistry";
 
 // Stable per-rip dev-server port in an uncommon range (avoids the default 3000),
 // so reopening the same clone reuses its port and different clones don't collide.
@@ -83,6 +84,10 @@ export const useRepoLensWebsites = create<State>((set, get) => ({
   },
 
   openInOrion: async (id) => {
+    if (!appRegistry.has("orion")) {
+      toast.warning("Enable the Orion editor plugin to open this clone");
+      return;
+    }
     const row = get().rips.find((r) => r.id === id);
     if (!row) return;
     await useProjectStore.getState().openProjectAtPath(row.project_path);

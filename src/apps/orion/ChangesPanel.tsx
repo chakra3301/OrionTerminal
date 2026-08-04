@@ -32,6 +32,10 @@ import { ipc } from "@/lib/ipc";
 import { toast } from "@/store/toastStore";
 import { confirmAction } from "@/components/ConfirmModal";
 import { log } from "@/lib/log";
+import {
+  beginOrionActivity,
+  trackOrionActivity,
+} from "@/apps/orion/runtimeActivity";
 
 function basename(p: string): string {
   return p.split(/[\\/]/).pop() || p;
@@ -152,15 +156,21 @@ function GitRow({
   };
 
   const act = async (fn: () => Promise<void>, label: string) => {
-    try {
-      await fn();
-    } catch (e) {
-      log.error(`${label} failed`, e);
-      toast.error(`${label} failed`, {
-        body: e instanceof Error ? e.message : String(e),
-      });
-    }
-    refresh();
+    await trackOrionActivity(
+      `git-${label.toLowerCase()}`,
+      `Wait for Orion Git ${label.toLowerCase()} to finish before disabling the plugin.`,
+      async () => {
+        try {
+          await fn();
+        } catch (error) {
+          log.error(`${label} failed`, error);
+          toast.error(`${label} failed`, {
+            body: error instanceof Error ? error.message : String(error),
+          });
+        }
+        refresh();
+      },
+    );
   };
 
   return (
@@ -238,6 +248,10 @@ function GitSection() {
 
   const generateMessage = async () => {
     setBusy("ai");
+    const endActivity = beginOrionActivity(
+      "git-message",
+      "Wait for Orion to finish generating the Git message before disabling the plugin.",
+    );
     try {
       const diff = await ipc.gitWorkingDiff(root);
       const msg = await ipc.claudeOneshot(
@@ -249,12 +263,17 @@ function GitSection() {
         body: e instanceof Error ? e.message : String(e),
       });
     } finally {
+      endActivity();
       setBusy("");
     }
   };
 
   const commit = async () => {
     setBusy("commit");
+    const endActivity = beginOrionActivity(
+      "git-commit",
+      "Wait for Orion's Git commit to finish before disabling the plugin.",
+    );
     try {
       await ipc.gitCommit(root, message.trim());
       setMessage("");
@@ -264,13 +283,27 @@ function GitSection() {
         body: e instanceof Error ? e.message : String(e),
       });
     } finally {
+      endActivity();
       setBusy("");
       refresh();
     }
   };
 
+  const stageAll = () =>
+    trackOrionActivity(
+      "git-stage-all",
+      "Wait for Orion's Git staging operation to finish before disabling the plugin.",
+      () => ipc.gitStage(root, unstaged.map((file) => file.path)),
+    )
+      .catch((error) => toast.error("Stage all failed", { body: String(error) }))
+      .finally(refresh);
+
   const push = async () => {
     setBusy("push");
+    const endActivity = beginOrionActivity(
+      "git-push",
+      "Wait for Orion's Git push to finish before disabling the plugin.",
+    );
     try {
       const out = await ipc.gitPush(root);
       toast.success("Pushed", { body: out.trim().split("\n")[0] || undefined });
@@ -279,6 +312,7 @@ function GitSection() {
         body: e instanceof Error ? e.message : String(e),
       });
     } finally {
+      endActivity();
       setBusy("");
       refresh();
     }
@@ -294,12 +328,7 @@ function GitSection() {
               type="button"
               className="or-diff-btn"
               title="Stage all changes"
-              onClick={() =>
-                void ipc
-                  .gitStage(root, unstaged.map((f) => f.path))
-                  .catch((e) => toast.error("Stage all failed", { body: String(e) }))
-                  .finally(refresh)
-              }
+              onClick={() => void stageAll()}
             >
               <Plus size={12} /> Stage all
             </button>

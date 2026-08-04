@@ -4,6 +4,7 @@ import {
   isOrionMoodWriteTool,
   isOrionAssetWriteTool,
   isOrionHermesWriteTool,
+  isOrionEditorTool,
 } from "@/lib/orionToolMatch";
 
 describe("orion tool matchers", () => {
@@ -48,6 +49,14 @@ describe("orion tool matchers", () => {
     expect(isOrionHermesWriteTool("mcp__orion__orion_hermes_move_task")).toBe(true);
     expect(isOrionHermesWriteTool("mcp__orion__orion_hermes_decompose")).toBe(true);
     expect(isOrionHermesWriteTool("orion_hermes_create_task")).toBe(true);
+  });
+
+  it("matches editor-owned MCP tools without crossing app boundaries", () => {
+    expect(isOrionEditorTool("mcp__orion__orion_apply_edit")).toBe(true);
+    expect(isOrionEditorTool("orion_read_file")).toBe(true);
+    expect(isOrionEditorTool("mcp__orion__orion_run_in_terminal")).toBe(true);
+    expect(isOrionEditorTool("orion_create_note")).toBe(false);
+    expect(isOrionEditorTool("orion_get_context")).toBe(false);
   });
 
   it("treats Hermes read tools + other categories as non-refreshing", () => {

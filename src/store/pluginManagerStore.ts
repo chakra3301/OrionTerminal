@@ -16,6 +16,10 @@ import {
   loadXDesignPluginData,
   xdesignDisableReason,
 } from "@/apps/xdesign/pluginContributions";
+import {
+  loadOrionPluginData,
+  orionDisableReason,
+} from "@/apps/orion/pluginContributions";
 
 export type PluginEnablementV1 = {
   version: 1;
@@ -65,6 +69,9 @@ function blockReason(pluginId: string): string | null {
   if (pluginId === BUILTIN_APP_PLUGIN_IDS.xdesign) {
     return xdesignDisableReason();
   }
+  if (pluginId === BUILTIN_APP_PLUGIN_IDS.orion) {
+    return orionDisableReason();
+  }
   if (pluginId === BUILTIN_APP_PLUGIN_IDS.hermes) {
     const hermes = useHermes.getState();
     if (
@@ -92,6 +99,8 @@ async function loadPluginData(pluginId: string): Promise<void> {
     await useCommand.getState().load();
   } else if (pluginId === BUILTIN_APP_PLUGIN_IDS.xdesign) {
     await loadXDesignPluginData();
+  } else if (pluginId === BUILTIN_APP_PLUGIN_IDS.orion) {
+    await loadOrionPluginData();
   }
 }
 

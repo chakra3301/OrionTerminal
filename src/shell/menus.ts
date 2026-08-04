@@ -186,12 +186,10 @@ export function buildMenu(app: AppId | null, name: string): MenuItem[] {
               sep,
             ]
           : [];
-        return [
-          ...archives,
-          cmd("file.openProject", "Open Project…"),
-          sep,
-          cmd("settings.open", "Settings…"),
-        ];
+        const editor = registry.has("file.openProject")
+          ? [cmd("file.openProject", "Open Project…"), sep]
+          : [];
+        return [...archives, ...editor, cmd("settings.open", "Settings…")];
       }
       case "Edit":
         return EDIT_BLOCK;

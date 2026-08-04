@@ -26,6 +26,7 @@ import { useContextMenu, type MenuItem } from "@/components/ContextMenu";
 import { promptText } from "@/components/PromptModal";
 import { registry } from "@/commands/registry";
 import { log } from "@/lib/log";
+import { trackOrionActivity } from "@/apps/orion/runtimeActivity";
 import { useFileDropZone } from "@/lib/fileDrop";
 
 type RowContext = (e: React.MouseEvent, node: TreeNode) => void;
@@ -192,10 +193,16 @@ export function OrionFileTree() {
     }
     setLoading(true);
     try {
-      const t = await ipc.readDirTree(project.root_path, 6);
-      setTree(t);
-    } catch (e) {
-      log.error("readDirTree failed", e);
+      await trackOrionActivity(
+        "file-tree-load",
+        "Wait for Orion's file tree to finish loading before disabling the plugin.",
+        async () => {
+          const tree = await ipc.readDirTree(project.root_path, 6);
+          setTree(tree);
+        },
+      );
+    } catch (error) {
+      log.error("readDirTree failed", error);
     } finally {
       setLoading(false);
     }
@@ -224,9 +231,15 @@ export function OrionFileTree() {
     if (!name) return;
     const target = joinPath(dir, name);
     try {
-      await ipc.createPath(target, false);
-      await refresh();
-      openTab({ kind: "file", path: target }, { label: name, preferRole: "editor" });
+      await trackOrionActivity(
+        "file-create",
+        "Wait for Orion to finish creating the file before disabling the plugin.",
+        async () => {
+          await ipc.createPath(target, false);
+          await refresh();
+          openTab({ kind: "file", path: target }, { label: name, preferRole: "editor" });
+        },
+      );
     } catch (e) {
       log.error("create file failed", e);
     }
@@ -240,8 +253,14 @@ export function OrionFileTree() {
     });
     if (!name) return;
     try {
-      await ipc.createPath(joinPath(dir, name), true);
-      await refresh();
+      await trackOrionActivity(
+        "folder-create",
+        "Wait for Orion to finish creating the folder before disabling the plugin.",
+        async () => {
+          await ipc.createPath(joinPath(dir, name), true);
+          await refresh();
+        },
+      );
     } catch (e) {
       log.error("create folder failed", e);
     }
@@ -261,12 +280,18 @@ export function OrionFileTree() {
         (t) => t.descriptor.kind === "file" && t.descriptor.path === node.path,
       );
     try {
-      await ipc.renamePath(node.path, target);
-      if (wasOpen) {
-        closeTabsFor(node.path);
-        openTab({ kind: "file", path: target }, { label: next, preferRole: "editor" });
-      }
-      await refresh();
+      await trackOrionActivity(
+        "path-rename",
+        "Wait for Orion to finish renaming the path before disabling the plugin.",
+        async () => {
+          await ipc.renamePath(node.path, target);
+          if (wasOpen) {
+            closeTabsFor(node.path);
+            openTab({ kind: "file", path: target }, { label: next, preferRole: "editor" });
+          }
+          await refresh();
+        },
+      );
     } catch (e) {
       log.error("rename failed", e);
       toast.error(`Couldn't rename ${node.name}`, {
@@ -284,9 +309,15 @@ export function OrionFileTree() {
     });
     if (!ok) return;
     try {
-      await ipc.deletePath(node.path);
-      closeTabsFor(node.path);
-      await refresh();
+      await trackOrionActivity(
+        "path-delete",
+        "Wait for Orion to finish deleting the path before disabling the plugin.",
+        async () => {
+          await ipc.deletePath(node.path);
+          closeTabsFor(node.path);
+          await refresh();
+        },
+      );
     } catch (e) {
       log.error("delete failed", e);
       toast.error(`Couldn't delete ${node.name}`, {

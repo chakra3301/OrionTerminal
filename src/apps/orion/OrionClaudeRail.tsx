@@ -8,9 +8,6 @@ import { useProjectStore } from "@/store/projectStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { dispatchAgentTurn, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
-import { upsertChat } from "@/lib/db";
-import { scheduleReindex } from "@/lib/embeddingIndexer";
-import { useEffect } from "react";
 import { useAppConfig, resolveConfig, appFirstTurnPreamble, appAllowedTools } from "@/store/appConfigStore";
 import {
   searchContextSuggestions,
@@ -43,16 +40,6 @@ function blocksToText(msg: ChatMessage): string {
     .join("\n\n");
 }
 
-function chatSearchableText(chat: NonNullable<ReturnType<typeof useChatStore.getState>["active"]>): string {
-  const parts: string[] = [];
-  for (const m of chat.messages) {
-    for (const b of m.blocks) {
-      if (b.type === "text" && b.text) parts.push(b.text);
-    }
-  }
-  return parts.join("\n");
-}
-
 export function OrionClaudeRail() {
   const active = useChatStore((s) => s.active);
   const running = useChatStore((s) => s.running);
@@ -60,31 +47,6 @@ export function OrionClaudeRail() {
   const appendUserMessage = useChatStore((s) => s.appendUserMessage);
   const setRunning = useChatStore((s) => s.setRunning);
   const project = useProjectStore((s) => s.active);
-
-  // Persist active chat on change (existing Week 1/2 behavior).
-  useEffect(() => {
-    if (!active) return;
-    const id = setTimeout(() => {
-      void upsertChat({
-        id: active.id,
-        title: active.title,
-        messages_json: JSON.stringify(active.messages),
-        searchable_text: chatSearchableText(active),
-        session_id: active.sessionId,
-        project_id: active.projectId,
-        total_cost_usd: active.totalCostUsd,
-        origin: "orion",
-        created_at: active.createdAt,
-        updated_at: active.updatedAt,
-      });
-      scheduleReindex("chat", active.id, () => {
-        const cur = useChatStore.getState().active;
-        if (!cur || cur.id !== active.id) return null;
-        return `${cur.title || "Untitled chat"}\n${chatSearchableText(cur)}`;
-      });
-    }, 600);
-    return () => clearTimeout(id);
-  }, [active]);
 
   const messages: ClaudeChatMessage[] = useMemo(() => {
     if (!active) return [];

@@ -5,6 +5,7 @@ import { useWorkspace, allTabs } from "@/components/workspace/workspaceStore";
 import { useArchives } from "@/apps/archives/useArchives";
 import { useNotesStore } from "@/store/notesStore";
 import { log } from "@/lib/log";
+import { appRegistry } from "@/plugins/appRegistry";
 
 /** What the user is looking at, snapshotted to disk for the MCP server's
  * `orion_get_context` tool. Kept small + JSON-clean so the agent reads it
@@ -15,6 +16,8 @@ function buildSnapshot() {
   const ws = useWorkspace.getState();
   const archives = useArchives.getState();
   const notes = useNotesStore.getState().notes;
+  const orionEnabled = appRegistry.has("orion");
+  const archivesEnabled = appRegistry.has("archives");
 
   const focused = shell.windows.find((w) => w.id === shell.focusedWindowId);
   const focusedPanel = ws.focusedPanelId
@@ -22,7 +25,7 @@ function buildSnapshot() {
     : null;
   const activeTab =
     focusedPanel?.tabs.find((t) => t.id === focusedPanel.activeTabId) ?? null;
-  const tabSummary = activeTab
+  const tabSummary = orionEnabled && activeTab
     ? {
         kind: activeTab.descriptor.kind,
         label: activeTab.label,
@@ -40,7 +43,7 @@ function buildSnapshot() {
     : null;
 
   let openNote = null;
-  if (focused?.app === "archives") {
+  if (archivesEnabled && focused?.app === "archives") {
     const id =
       archives.openNoteId ??
       archives.openProjectId ??
@@ -70,14 +73,14 @@ function buildSnapshot() {
     visible_apps: shell.windows
       .filter((w) => !w.minimized)
       .map((w) => w.app),
-    active_project: project
+    active_project: orionEnabled && project
       ? { id: project.id, name: project.name, root_path: project.root_path }
       : null,
     active_archives_view:
-      focused?.app === "archives" ? archives.view : null,
+      archivesEnabled && focused?.app === "archives" ? archives.view : null,
     open_note: openNote,
     active_tab: tabSummary,
-    open_file_paths: allFileTabs
+    open_file_paths: (orionEnabled ? allFileTabs : [])
       .map((t) =>
         t.descriptor.kind === "file" ? t.descriptor.path : null,
       )

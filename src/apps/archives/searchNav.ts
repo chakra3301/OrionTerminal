@@ -41,6 +41,10 @@ export async function openChatById(chatId: string): Promise<void> {
   // Orion has a different message shape (tool blocks, etc.) — keep its
   // restore path distinct from the simple {role,content} app-chat path.
   if (row.origin === "orion" || (!row.origin && row.project_id)) {
+    if (!appRegistry.has("orion")) {
+      log.warn("openChatById: Orion editor plugin is disabled", chatId);
+      return;
+    }
     useChatStore.getState().setActive({
       id: row.id,
       title: row.title,

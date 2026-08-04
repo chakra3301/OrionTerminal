@@ -57,8 +57,10 @@ function gatherContext(): string {
     /* ignore */
   }
   try {
-    const name = useProjectStore.getState().active?.name;
-    if (name) lines.push(`Active project: ${name}.`);
+    if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.orion)) {
+      const name = useProjectStore.getState().active?.name;
+      if (name) lines.push(`Active project: ${name}.`);
+    }
   } catch {
     /* ignore */
   }
@@ -66,17 +68,19 @@ function gatherContext(): string {
     const shell = useShell.getState();
     const win = shell.windows.find((w) => w.id === shell.focusedWindowId);
     if (win) lines.push(`Focused app: ${win.app}.`);
-    const ws = useWorkspace.getState();
-    const path = activeFilePathInFocused(ws.root, ws.focusedPanelId);
-    if (path) lines.push(`Open file: ${path.split(/[\\/]/).pop()}.`);
-    const files = allTabs(ws.root)
-      .map((tb) =>
-        tb.descriptor.kind === "file"
-          ? tb.descriptor.path.split(/[\\/]/).pop()
-          : null,
-      )
-      .filter((n): n is string => !!n);
-    if (files.length > 1) lines.push(`Open files: ${files.slice(0, 6).join(", ")}.`);
+    if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.orion)) {
+      const ws = useWorkspace.getState();
+      const path = activeFilePathInFocused(ws.root, ws.focusedPanelId);
+      if (path) lines.push(`Open file: ${path.split(/[\\/]/).pop()}.`);
+      const files = allTabs(ws.root)
+        .map((tab) =>
+          tab.descriptor.kind === "file"
+            ? tab.descriptor.path.split(/[\\/]/).pop()
+            : null,
+        )
+        .filter((name): name is string => !!name);
+      if (files.length > 1) lines.push(`Open files: ${files.slice(0, 6).join(", ")}.`);
+    }
   } catch {
     /* ignore */
   }

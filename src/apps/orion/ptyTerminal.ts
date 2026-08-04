@@ -6,6 +6,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import "@xterm/xterm/css/xterm.css";
 import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
+import { beginLiveTerminal } from "@/apps/orion/terminalActivity";
 
 const THEME = {
   background: "#03060a",
@@ -211,11 +212,13 @@ export function attachPtyTerminal(opts: PtyTerminalOptions): PtyTerminalHandle {
   })().catch((e) => log.error("pty terminal init", e));
 
   liveTerminals.set(opts.ptyId, term);
+  const endLiveTerminal = beginLiveTerminal();
 
   return {
     term,
     dispose: () => {
       disposed = true;
+      endLiveTerminal();
       liveTerminals.delete(opts.ptyId);
       if (resizeTimer != null) window.clearTimeout(resizeTimer);
       unlistenData?.();

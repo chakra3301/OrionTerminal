@@ -55,6 +55,7 @@ const starting = new Map<string, Promise<ServerState | null>>();
 const probeCache = new Map<string, boolean>();
 
 let monacoRef: MonacoNs | null = null;
+let lifecycleGeneration = 0;
 
 /** Status surface for the UI (which servers are live). */
 export type LspStatus = { key: string; lang: string; running: boolean };
@@ -76,6 +77,7 @@ async function probe(cmd: string): Promise<boolean> {
 }
 
 async function ensureServer(lang: string, root: string): Promise<ServerState | null> {
+  const runGeneration = lifecycleGeneration;
   const config = configForLang(lang);
   if (!config) return null;
   const key = serverKey(config, root);
@@ -85,10 +87,14 @@ async function ensureServer(lang: string, root: string): Promise<ServerState | n
   if (inFlight) return inFlight;
 
   const p = (async (): Promise<ServerState | null> => {
-    if (!(await probe(config.cmd))) return null;
+    if (!(await probe(config.cmd)) || runGeneration !== lifecycleGeneration) return null;
     const serverId = key;
     try {
       await ipc.lspStart(serverId, config.cmd, config.args, root);
+      if (runGeneration !== lifecycleGeneration) {
+        await ipc.lspStop(serverId).catch(() => {});
+        return null;
+      }
     } catch (e) {
       log.warn(`[lsp] failed to start ${config.cmd}`, e);
       return null;
@@ -283,6 +289,19 @@ export function lspNoteActiveFile(path: string): void {
 }
 
 const changeDebounce = new Map<string, ReturnType<typeof setTimeout>>();
+
+export function stopAllLsp(): void {
+  lifecycleGeneration += 1;
+  for (const timer of changeDebounce.values()) clearTimeout(timer);
+  changeDebounce.clear();
+  for (const [key, server] of servers) {
+    server.client.dispose();
+    void ipc.lspStop(key).catch(() => {});
+  }
+  servers.clear();
+  setBrowserTsMuted(false);
+  publishStatus();
+}
 
 /** Mount-once wiring (called from the Monaco loader-init hook). */
 export function registerLsp(monaco: MonacoNs): void {

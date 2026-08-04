@@ -1,6 +1,7 @@
 import { open as openDialog, confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { registry } from "@/commands/registry";
+import { registry, type Command } from "@/commands/registry";
+import type { DisposableScope } from "@/plugins/contracts";
 import { useProjectStore } from "@/store/projectStore";
 import { useTabsStore, isFileTabDirty } from "@/store/tabsStore";
 import {
@@ -25,31 +26,73 @@ import { useOnboarding } from "@/features/onboarding/onboardingStore";
 import { ipc } from "@/lib/ipc";
 import { listChatsForProject, logActivity } from "@/lib/db";
 import { log } from "@/lib/log";
+import { trackOrionActivity } from "@/apps/orion/runtimeActivity";
 
 let installed = false;
+const orionCommandDefinitions = new Map<string, Command>();
+
+const ORION_COMMAND_IDS = new Set([
+  "file.openProject",
+  "project.switch",
+  "file.openFile",
+  "file.closeTab",
+  "file.nextTab",
+  "file.prevTab",
+  "file.save",
+  "file.saveAll",
+  "view.problems",
+  "view.changes",
+  "search.inFiles",
+  "editor.format",
+  "editor.gotoSymbol",
+  "editor.organizeImports",
+  "view.splitEditor",
+  "view.resetLayout",
+  "view.openPreview",
+  "view.openFilesTree",
+  "view.openTerminal",
+  "view.openClaude",
+  "view.openClaudeCode",
+  "view.openHermes",
+  "view.openPi",
+  "editor.toggleTabAutocomplete",
+  "claude.inlineEdit",
+  "claude.newChat",
+  "claude.continueChat",
+  "claude.listChats",
+  "claude.cancel",
+  "terminal.toggle",
+  "terminal.clear",
+  "panel.toggleSidebar",
+  "panel.toggleRightRail",
+]);
 
 async function saveFileBuffer(path: string): Promise<boolean> {
   const buf = useTabsStore.getState().fileBuffers[path];
   if (!buf?.loaded) return false;
-  try {
-    await ipc.saveFileAtomic(path, buf.contents);
-    useTabsStore.getState().markSaved(path);
-    void logActivity({
-      source: "orion",
-      kind: "file.save",
-      title: path.split("/").pop() || path,
-      refId: path,
-    });
-    // Keep the codebase semantic index fresh (lazy — module loads on
-    // first save, debounced per path inside).
-    void import("@/features/context/codebaseIndexer").then((m) =>
-      m.scheduleCodeFileReindex(path),
-    );
-    return true;
-  } catch (e) {
-    log.error("save failed", path, e);
-    return false;
-  }
+  return trackOrionActivity(
+    `file-save:${path}`,
+    "Wait for Orion to finish saving files before disabling the plugin.",
+    async () => {
+      try {
+        await ipc.saveFileAtomic(path, buf.contents);
+        useTabsStore.getState().markSaved(path);
+        void logActivity({
+          source: "orion",
+          kind: "file.save",
+          title: path.split("/").pop() || path,
+          refId: path,
+        });
+        void import("@/features/context/codebaseIndexer").then((module) =>
+          module.scheduleCodeFileReindex(path),
+        );
+        return true;
+      } catch (error) {
+        log.error("save failed", path, error);
+        return false;
+      }
+    },
+  );
 }
 
 function focusedTab() {
@@ -80,7 +123,7 @@ export function installBuiltinCommands() {
     group: "View",
     run: () => {
       const f = useFocusStore.getState();
-      if (f.editorFocused && f.hasSelection) {
+      if (f.editorFocused && f.hasSelection && registry.has("claude.inlineEdit")) {
         void registry.run("claude.inlineEdit");
       } else {
         useShell.getState().openSpotlight();
@@ -725,4 +768,21 @@ export function installBuiltinCommands() {
       useWorkspace.getState().togglePanelByRole("claude");
     },
   });
+
+  for (const id of ORION_COMMAND_IDS) {
+    const command = registry.get(id);
+    if (!command) throw new Error(`missing Orion command definition: ${id}`);
+    orionCommandDefinitions.set(id, command);
+    registry.unregister(id);
+  }
+}
+
+export function registerOrionCommands(
+  ownerId: string,
+  subscriptions: DisposableScope,
+): void {
+  installBuiltinCommands();
+  for (const command of orionCommandDefinitions.values()) {
+    subscriptions.add(registry.register(command, ownerId));
+  }
 }

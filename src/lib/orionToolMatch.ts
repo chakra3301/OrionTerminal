@@ -14,6 +14,16 @@ const NOTE_WRITE = [
 ];
 const MOOD_WRITE = ["orion_create_mood_board", "orion_add_to_mood_board"];
 const ASSET_WRITE = ["orion_attach_tag"];
+const EDITOR_TOOLS = [
+  "orion_list_projects",
+  "orion_switch_project",
+  "orion_open_file",
+  "orion_apply_edit",
+  "orion_write_file",
+  "orion_read_file",
+  "orion_search_files",
+  "orion_run_in_terminal",
+];
 const HERMES_WRITE = [
   "orion_hermes_create_task",
   "orion_hermes_add_agent",
@@ -37,4 +47,7 @@ export function isOrionAssetWriteTool(name: string): boolean {
 }
 export function isOrionHermesWriteTool(name: string): boolean {
   return endsWithAny(name, HERMES_WRITE);
+}
+export function isOrionEditorTool(name: string): boolean {
+  return endsWithAny(name, EDITOR_TOOLS);
 }

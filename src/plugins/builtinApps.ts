@@ -8,6 +8,7 @@ import type { InternalPlugin } from "@/plugins/contracts";
 import { registerCommandCenterEventContributions } from "@/apps/command/pluginContributions";
 import { registerArchivesContributions } from "@/apps/archives/pluginContributions";
 import { registerXDesignContributions } from "@/apps/xdesign/pluginContributions";
+import { registerOrionContributions } from "@/apps/orion/pluginContributions";
 
 export const BUILTIN_APP_PLUGIN_IDS = {
   archives: "@orion/archives",
@@ -199,7 +200,7 @@ export const BUILTIN_APP_PLUGIN_CATALOG: readonly BuiltinAppPluginInfo[] = [
     version: "1.0.0",
     description: "Code editing, project navigation, terminal, Git, LSP, and AI-assisted changes.",
     capabilities: ["Workspace", "Terminal", "AI editing"],
-    disableable: false,
+    disableable: true,
   },
   {
     pluginId: BUILTIN_APP_PLUGIN_IDS.xdesign,
@@ -247,6 +248,8 @@ function pluginFor(descriptor: AppDescriptor): InternalPlugin {
       subscriptions.add(registry.register(command, ownerId));
       if (descriptor.id === "archives") {
         registerArchivesContributions(ownerId, subscriptions);
+      } else if (descriptor.id === "orion") {
+        registerOrionContributions(ownerId, subscriptions);
       } else if (descriptor.id === "xdesign") {
         registerXDesignContributions(ownerId, subscriptions);
       } else if (descriptor.id === "command") {

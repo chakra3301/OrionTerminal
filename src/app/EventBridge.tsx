@@ -1,26 +1,25 @@
 import { useEffect } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { useInlineEditStore } from "@/store/inlineEditStore";
-import { useChatStore, type ContentBlock } from "@/store/chatStore";
+import type { ContentBlock } from "@/store/chatStore";
 import {
   useAppChat,
   appForStream,
   forgetStream,
 } from "@/store/appChatStore";
-import { useFileTreeRefresh } from "@/store/fileTreeRefreshStore";
-import { useTabsStore } from "@/store/tabsStore";
 import { useShell, type AppId } from "@/shell/store/useShell";
-import { useProjectStore } from "@/store/projectStore";
-import { useWorkspace } from "@/components/workspace/workspaceStore";
 import { ipc } from "@/lib/ipc";
-import { isOrionHermesWriteTool } from "@/lib/orionToolMatch";
+import {
+  isOrionEditorTool,
+  isOrionHermesWriteTool,
+} from "@/lib/orionToolMatch";
+import { beginOrionActivity } from "@/apps/orion/runtimeActivity";
 import { useHermes, type HermesStatus, type HermesColumn } from "@/store/hermesStore";
 import { usePluginManager } from "@/store/pluginManagerStore";
 import { BUILTIN_APP_PLUGIN_IDS } from "@/plugins/builtinApps";
 import { internalEventRegistry } from "@/plugins/internalEventRegistry";
 import { internalActionRegistry } from "@/plugins/internalActionRegistry";
+import { appRegistry } from "@/plugins/appRegistry";
 import { useSpotify } from "@/store/spotifyStore";
-import { onPassExit } from "@/features/agents/twoPassCoordinator";
 import { log } from "@/lib/log";
 
 /** UI actions the MCP server can request via the local TCP bridge. Each
@@ -65,121 +64,17 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
   const contributed = await internalActionRegistry.dispatch(action.kind, action.payload);
   if (contributed.handled) return contributed.value;
   if (action.kind === "open_note") throw new Error("Archives plugin is disabled");
+  if (["switch_project", "open_file", "run_in_terminal", "staged_edit"].includes(action.kind)) {
+    throw new Error("Orion editor plugin is disabled");
+  }
   if (action.kind.startsWith("xdesign_")) throw new Error("XDesign plugin is disabled");
-  if (
-    action.kind.startsWith("model_") &&
-    !usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign)
-  ) {
-    throw new Error("XDesign plugin is disabled");
-  }
-
   if (action.kind === "open_app") {
-    const app = (action.payload as { app?: AppId } | undefined)?.app;
-    if (
-      app &&
-      (app === "archives" ||
-        app === "orion" ||
-        app === "xdesign" ||
-        app === "hermes")
-    ) {
-      useShell.getState().openApp(app);
+    const app = (action.payload as { app?: unknown } | undefined)?.app;
+    if (typeof app !== "string" || !["archives", "orion", "xdesign", "command", "hermes"].includes(app)) {
+      throw new Error("open_app: invalid app");
     }
-    return;
-  }
-  if (action.kind === "switch_project") {
-    const q = (action.payload as { name_or_id?: string } | undefined)
-      ?.name_or_id;
-    if (!q || !q.trim()) return;
-    const project = useProjectStore.getState();
-    await project.loadRecents();
-    const recents = useProjectStore.getState().recents;
-    const lower = q.toLowerCase();
-    const match =
-      recents.find((p) => p.id === q) ??
-      recents.find((p) => p.name === q) ??
-      recents.find((p) => p.name.toLowerCase() === lower) ??
-      recents.find((p) => p.name.toLowerCase().includes(lower));
-    if (match) {
-      await project.switchToProject(match);
-      useShell.getState().openApp("orion");
-    } else {
-      log.warn("ui:action switch_project — no match for:", q);
-    }
-    return;
-  }
-  if (action.kind === "run_in_terminal") {
-    const cmd = (action.payload as { command?: string } | undefined)?.command;
-    if (!cmd?.trim()) return;
-    // Open Orion + the Terminal tab if not already.
-    useShell.getState().openApp("orion");
-    useWorkspace
-      .getState()
-      .openTab({ kind: "terminal" }, { preferRole: "terminal" });
-    // The terminal panel sets ptyId after `terminalOpen` resolves — wait
-    // for it (up to ~3s) then write. Newline appended so the shell runs it.
-    const { useTerminalStore } = await import("@/store/terminalStore");
-    const { ipc } = await import("@/lib/ipc");
-    const start = Date.now();
-    while (Date.now() - start < 3000) {
-      const id = useTerminalStore.getState().ptyId;
-      if (id) {
-        await ipc.terminalWrite(id, `${cmd}\n`);
-        return;
-      }
-      await new Promise((r) => setTimeout(r, 100));
-    }
-    log.warn("run_in_terminal: pty never came up within 3s");
-    return;
-  }
-  if (action.kind === "open_file") {
-    const raw = (action.payload as { path?: string } | undefined)?.path?.trim();
-    if (!raw) return;
-    const project = useProjectStore.getState().active;
-    const isAbs = /^([a-zA-Z]:)?[\\/]/.test(raw);
-    const path =
-      isAbs || !project
-        ? raw
-        : `${project.root_path}/${raw}`.replace(/\/+/g, "/");
-    useShell.getState().openApp("orion");
-    const label = path.split(/[\\/]/).pop() ?? path;
-    useWorkspace.getState().openTab(
-      { kind: "file", path },
-      { label, preferRole: "editor" },
-    );
-    return;
-  }
-  if (action.kind === "staged_edit") {
-    // The chat agent edited a file via orion_apply_edit / orion_write_file.
-    // The new content is already on disk; stage it for the user to review and
-    // surface the diff. We reply immediately (no blocking on the human).
-    const p = action.payload as {
-      path?: string;
-      original?: string;
-      updated?: string;
-      is_new?: boolean;
-    };
-    if (!p.path || typeof p.updated !== "string") return;
-    const { usePendingEdits } = await import("@/store/pendingEditsStore");
-    usePendingEdits.getState().stage({
-      path: p.path,
-      original: p.original ?? "",
-      updated: p.updated,
-      isNew: !!p.is_new,
-    });
-    // Checkpoint the pre-image (first edit per file per burst) so the whole
-    // agent turn is one-click restorable even after the review is accepted.
-    void import("@/features/aiEdits/checkpoints").then((m) =>
-      m.captureForStagedEdit({
-        path: p.path!,
-        original: p.original ?? "",
-        isNew: !!p.is_new,
-      }),
-    );
-    // Refresh any open buffer to the new content (clean — disk matches).
-    useTabsStore.getState().markLoaded(p.path, p.updated);
-    useFileTreeRefresh.getState().bump();
-    useShell.getState().openApp("orion");
-    useWorkspace.getState().openTab({ kind: "diff-review", path: p.path });
+    if (!appRegistry.has(app)) throw new Error(`${app} plugin is disabled`);
+    useShell.getState().openApp(app as AppId);
     return;
   }
   log.warn("ui:action unknown kind:", action.kind);
@@ -190,7 +85,18 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
  * assistant tool_use block. Read when the matching user tool_result lands
  * so we know what to invalidate. Module-scope so it survives across
  * EventBridge re-mounts and chatId boundaries. */
-const toolUseIdToName = new Map<string, string>();
+const toolUseIdToName = new Map<
+  string,
+  { name: string; chatId: string; endOrionActivity?: () => void }
+>();
+
+function clearToolActivitiesForChat(chatId: string): void {
+  for (const [toolUseId, tracked] of toolUseIdToName) {
+    if (tracked.chatId !== chatId) continue;
+    tracked.endOrionActivity?.();
+    toolUseIdToName.delete(toolUseId);
+  }
+}
 
 let hermesRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleHermesRefresh() {
@@ -201,30 +107,6 @@ function scheduleHermesRefresh() {
     hermesRefreshTimer = null;
     void useHermes.getState().refresh();
   }, 250);
-}
-
-// Tools whose completion changes the project's file layout. When a
-// tool_result for one of these lands, we bump the file-tree refresh counter
-// so the explorer shows the new file/rename without waiting for the chat
-// turn to end.
-const FILE_MODIFYING_TOOLS = new Set([
-  "Write",
-  "Edit",
-  "MultiEdit",
-  "NotebookEdit",
-]);
-
-function findToolUseName(
-  chat: ReturnType<typeof useChatStore.getState>["active"],
-  toolUseId: string,
-): string | null {
-  if (!chat) return null;
-  for (const m of chat.messages) {
-    for (const b of m.blocks) {
-      if (b.type === "tool_use" && b.id === toolUseId) return b.name;
-    }
-  }
-  return null;
 }
 
 type ClaudeEnvelope = {
@@ -309,8 +191,19 @@ function trackOrionToolSideEffects(env: ClaudeEnvelope) {
     const msg = (ev as { message?: { content?: ContentBlock[] } }).message;
     if (msg && Array.isArray(msg.content)) {
       for (const block of msg.content) {
-        if (block.type === "tool_use") {
-          toolUseIdToName.set(block.id, block.name);
+        if (block.type === "tool_use" && !toolUseIdToName.has(block.id)) {
+          toolUseIdToName.set(block.id, {
+            name: block.name,
+            chatId: env.chatId,
+            ...(isOrionEditorTool(block.name) && appRegistry.has("orion")
+              ? {
+                  endOrionActivity: beginOrionActivity(
+                    `ai-tool:${block.id}`,
+                    "Wait for the Orion editor tool call to finish before disabling the plugin.",
+                  ),
+                }
+              : {}),
+          });
         }
       }
     }
@@ -320,7 +213,8 @@ function trackOrionToolSideEffects(env: ClaudeEnvelope) {
       for (const block of msg.content) {
         if (block.type !== "tool_result") continue;
         const tr = block as Extract<UserContentBlock, { type: "tool_result" }>;
-        const name = toolUseIdToName.get(tr.tool_use_id);
+        const tracked = toolUseIdToName.get(tr.tool_use_id);
+        const name = tracked?.name;
         if (name && !tr.is_error) {
           internalEventRegistry.dispatch("claude:tool-result", { toolName: name });
           if (
@@ -330,129 +224,39 @@ function trackOrionToolSideEffects(env: ClaudeEnvelope) {
             scheduleHermesRefresh();
           }
         }
-        // GC: each tool_use id is one-shot — drop after first result.
+        tracked?.endOrionActivity?.();
         toolUseIdToName.delete(tr.tool_use_id);
       }
     }
+  } else if (ev.type === "result") {
+    clearToolActivitiesForChat(env.chatId);
   }
 }
 
 function handleClaude(env: ClaudeEnvelope) {
-  // Global side-effect pass: track tool_use names + invalidate caches when
-  // we see write-tool results. Runs regardless of which chat surface owns
-  // the chatId so Core / Orix47 / Archives / XDesign all stay in sync.
   trackOrionToolSideEffects(env);
-
-  // App-chat (Archives/XDesign over the CLI) owns this chatId? Route there
-  // and stop — useChatStore is Orion-only.
   if (handleAppChatClaudeEvent(env)) return;
-
-  const ev = env.event;
-  const t = ev.type;
-  const store = useChatStore.getState();
-  if (!store.active || store.active.id !== env.chatId) return;
-
-  if (t === "system") {
-    const subtype = (ev as { subtype?: string }).subtype;
-    if (subtype === "init") {
-      const sid = (ev as { session_id?: string }).session_id;
-      if (sid) store.setSessionId(sid);
-    }
-    return;
-  }
-
-  if (t === "assistant") {
-    const msg = (ev as { message?: { content?: ContentBlock[] } }).message;
-    if (msg && Array.isArray(msg.content)) {
-      const blocks = msg.content.filter(
-        (b): b is ContentBlock => b.type === "text" || b.type === "tool_use",
-      );
-      store.onAssistantBlocks(blocks);
-    }
-    return;
-  }
-
-  if (t === "user") {
-    const msg = (ev as { message?: { content?: UserContentBlock[] } }).message;
-    if (msg && Array.isArray(msg.content)) {
-      let shouldRefreshTree = false;
-      for (const b of msg.content) {
-        if (b.type === "tool_result") {
-          const tr = b as Extract<UserContentBlock, { type: "tool_result" }>;
-          // Look up the tool name in the live chat blocks to decide whether
-          // a filesystem mutation is implied. Skip errored results.
-          if (!tr.is_error) {
-            const name = findToolUseName(store.active, tr.tool_use_id);
-            if (name && FILE_MODIFYING_TOOLS.has(name)) {
-              shouldRefreshTree = true;
-            }
-          }
-          store.onToolResult(tr.tool_use_id, {
-            content: tr.content,
-            isError: tr.is_error,
-          });
-        }
-      }
-      if (shouldRefreshTree) useFileTreeRefresh.getState().bump();
-    }
-    return;
-  }
-
-  if (t === "result") {
-    const cost = (ev as { total_cost_usd?: number }).total_cost_usd;
-    const isError = (ev as { is_error?: boolean }).is_error;
-    const errors = (ev as { errors?: string[] }).errors;
-    if (typeof cost === "number") store.addCost(cost);
-    if (isError && errors?.length && store.active) {
-      // Append to any partially-streamed blocks; onAssistantBlocks creates the
-      // pending message itself when the run failed before streaming anything.
-      const prev =
-        store.active.messages.find((m) => m.id === store.pendingAssistantId)
-          ?.blocks ?? [];
-      store.onAssistantBlocks([
-        ...prev,
-        { type: "text", text: errors.join("\n") },
-      ]);
-    }
-    store.finishTurn();
-    return;
-  }
-
-  if (t === "stderr") {
-    const text = (ev as { text?: string }).text;
-    if (text) log.warn("[claude stderr]", text);
-    return;
-  }
+  internalEventRegistry.dispatch("orion.claude.event", env);
 }
 
 export function EventBridge() {
-  const inline = useInlineEditStore;
-
   useEffect(() => {
     const unlisteners: UnlistenFn[] = [];
 
-    listen<{ streamId: string; text: string }>("inline:delta", (e) => {
-      const cur = inline.getState();
-      if (cur.streamId !== e.payload.streamId) return;
-      cur.appendDelta(e.payload.text);
+    listen<unknown>("inline:delta", (e) => {
+      internalEventRegistry.dispatch("orion.inline.delta", e.payload);
     }).then((u) => unlisteners.push(u));
 
-    listen<{ streamId: string; text: string }>("inline:final", (e) => {
-      const cur = inline.getState();
-      if (cur.streamId !== e.payload.streamId) return;
-      cur.setFinal(e.payload.text);
+    listen<unknown>("inline:final", (e) => {
+      internalEventRegistry.dispatch("orion.inline.final", e.payload);
     }).then((u) => unlisteners.push(u));
 
-    listen<{ streamId: string }>("inline:done", (e) => {
-      const cur = inline.getState();
-      if (cur.streamId !== e.payload.streamId) return;
-      cur.finishStream();
+    listen<unknown>("inline:done", (e) => {
+      internalEventRegistry.dispatch("orion.inline.done", e.payload);
     }).then((u) => unlisteners.push(u));
 
-    listen<{ streamId: string; message: string }>("inline:error", (e) => {
-      const cur = inline.getState();
-      if (cur.streamId !== e.payload.streamId) return;
-      cur.setError(e.payload.message);
+    listen<unknown>("inline:error", (e) => {
+      internalEventRegistry.dispatch("orion.inline.error", e.payload);
     }).then((u) => unlisteners.push(u));
 
     listen<ClaudeEnvelope>("claude:event", (e) => handleClaude(e.payload)).then(
@@ -536,35 +340,18 @@ export function EventBridge() {
         });
     }).then((u) => unlisteners.push(u));
 
-    // Auto-refresh the file tree whenever ANY terminal pty produces output —
-    // covers the Claude Code tab (which runs interactively in a pty, so its
-    // file edits never flow through `claude:event` and the existing tool-use
-    // refresh path can't see them) as well as raw shell commands like `npm i`
-    // / `mv`. Throttled (leading bump per window) so continuous TUI output
-    // refreshes ~once a second instead of slamming the tree refetch.
-    let treeBumpTimer: number | null = null;
-    const scheduleTreeBump = () => {
-      if (treeBumpTimer != null) return;
-      treeBumpTimer = window.setTimeout(() => {
-        useFileTreeRefresh.getState().bump();
-        treeBumpTimer = null;
-      }, 750);
-    };
-    listen<{ ptyId: string; data: string }>("terminal:data", () => {
-      scheduleTreeBump();
+    listen<unknown>("terminal:data", () => {
+      internalEventRegistry.dispatch("orion.file.refresh", null);
     }).then((u) => unlisteners.push(u));
 
-    // External-source changes (Finder, VS Code, git, downloads) come through
-    // the Rust fs_watch debouncer as `fs:changed`. Share the same throttle so
-    // bursts overlapping with terminal/Claude-Code activity coalesce to one
-    // refresh.
-    listen<null>("fs:changed", () => {
-      scheduleTreeBump();
+    listen<unknown>("fs:changed", () => {
+      internalEventRegistry.dispatch("orion.file.refresh", null);
     }).then((u) => unlisteners.push(u));
 
     listen<{ chatId: string; code: number | null; error: string | null }>(
       "claude:exit",
       (e) => {
+        clearToolActivitiesForChat(e.payload.chatId);
         // App-chat (Archives/XDesign over CLI)?
         const app = appForStream(e.payload.chatId);
         if (app) {
@@ -579,15 +366,7 @@ export function EventBridge() {
           forgetStream(e.payload.chatId);
           return;
         }
-        const store = useChatStore.getState();
-        if (!store.active || store.active.id !== e.payload.chatId) return;
-        // Two-pass agent? On the Brain pass's exit this seals the plan and
-        // fires the Action pass — do NOT finalize. The Action pass's exit (or
-        // a single-pass turn) falls through to the normal finalize below.
-        if (onPassExit(e.payload.chatId, e.payload.error)) return;
-        store.finishTurn();
-        store.setRunning(false);
-        if (e.payload.error) log.warn("[claude exit]", e.payload.error);
+        internalEventRegistry.dispatch("orion.claude.exit", e.payload);
       },
     ).then((u) => unlisteners.push(u));
 
@@ -620,12 +399,8 @@ export function EventBridge() {
 
     return () => {
       for (const u of unlisteners) u();
-      if (treeBumpTimer != null) {
-        clearTimeout(treeBumpTimer);
-        treeBumpTimer = null;
-      }
     };
-  }, [inline]);
+  }, []);
 
   return null;
 }

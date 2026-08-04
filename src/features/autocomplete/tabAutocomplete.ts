@@ -10,6 +10,7 @@ import { useAutocomplete } from "@/store/autocompleteStore";
 import { useDiagnosticsStore } from "@/store/diagnosticsStore";
 import { recentEditContext } from "@/features/autocomplete/recentEdits";
 import { log } from "@/lib/log";
+import { trackOrionActivity } from "@/apps/orion/runtimeActivity";
 
 type MonacoNs = Parameters<OnMount>[1];
 
@@ -94,14 +95,19 @@ export function registerTabAutocomplete(monaco: MonacoNs): void {
       const started = performance.now();
       let text = "";
       try {
-        text = await ipc.autocompleteRun({
-          path,
-          language: model.getLanguageId(),
-          prefix: trimmedPrefix,
-          suffix: trimmedSuffix,
-          diagnostics: diagnostics || undefined,
-          recentEdits: recentEditContext(path),
-        });
+        text = await trackOrionActivity(
+          "tab-autocomplete",
+          "Wait for Orion's autocomplete request to finish before disabling the plugin.",
+          () =>
+            ipc.autocompleteRun({
+              path,
+              language: model.getLanguageId(),
+              prefix: trimmedPrefix,
+              suffix: trimmedSuffix,
+              diagnostics: diagnostics || undefined,
+              recentEdits: recentEditContext(path),
+            }),
+        );
       } catch (e) {
         // Errors stay quiet at the ghost layer (a failing autocomplete
         // must never interrupt typing) — but they're loggable.

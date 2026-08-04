@@ -9,11 +9,10 @@ import { installBuiltinCommands } from "@/commands/builtins";
 import { installShellCommands } from "@/shell/commands/shellCommands";
 import { installSpotifyCommands } from "@/shell/commands/spotifyCommands";
 import { BUILTIN_APP_PLUGIN_IDS } from "@/plugins/builtinApps";
+import { appRegistry } from "@/plugins/appRegistry";
 import { usePluginManager, type PluginEnablementV1 } from "@/store/pluginManagerStore";
 import { HotkeyHost } from "@/lib/hotkeys";
-import { useTerminalStore } from "@/store/terminalStore";
 import { getAppState, getDb } from "@/lib/db";
-import { useLayoutStore } from "@/store/layoutStore";
 import { useHermes } from "@/store/hermesStore";
 import { useCommand } from "@/store/commandStore";
 import { useProvidersStore } from "@/store/providersStore";
@@ -33,20 +32,13 @@ const SplashPreview = import.meta.env.DEV
     )
   : null;
 import { purgeEmptyNotes } from "@/lib/db";
-import { ipc } from "@/lib/ipc";
 import { startFileDropOrchestrator } from "@/lib/fileDrop";
-import { useProjectStore } from "@/store/projectStore";
 import { useThemeStore } from "@/store/themeStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { useAppConfig, type AppConfigsPersist } from "@/store/appConfigStore";
 import { useWallpaperStore, type WallpaperState } from "@/store/wallpaperStore";
 import { useCharacterStore } from "@/store/characterStore";
-import { usePreviewStore, type PreviewState } from "@/store/previewStore";
-import {
-  setAppState,
-  getWorkspaceLayout,
-  setWorkspaceLayout,
-} from "@/lib/db";
+import { setAppState } from "@/lib/db";
 import { startContextSnapshotter } from "@/lib/contextSnapshot";
 import {
   loadArchivesPluginData,
@@ -55,142 +47,56 @@ import {
 import { loadXDesignPluginData } from "@/apps/xdesign/pluginContributions";
 import { log } from "@/lib/log";
 import { toast } from "@/store/toastStore";
-import { useAutocomplete } from "@/store/autocompleteStore";
-import { startGitWatch } from "@/store/gitStore";
 import { Shell } from "@/shell/Shell";
 import { SplashScreen } from "@/shell/Splash/SplashScreen";
 import { useAuth } from "@/features/auth/authStore";
 import { LockScreen } from "@/features/auth/LockScreen";
 import { FirstRunSetup } from "@/features/auth/FirstRunSetup";
 import { useShell, type WindowState } from "@/shell/store/useShell";
-import { ensureOrionTheme } from "@/apps/orion/monacoTheme";
-import { useWorkspace } from "@/components/workspace/workspaceStore";
-import type { LayoutNode } from "@/components/workspace/types";
+import { loadOrionPluginData } from "@/apps/orion/pluginContributions";
 
 installBuiltinCommands();
 installShellCommands();
 installSpotifyCommands();
-void ensureOrionTheme();
-
-/**
- * Walk the persisted layout tree and drop file tabs whose paths no longer
- * exist on disk. Splits and panels with no surviving tabs collapse naturally
- * because the workspace's hydrate path uses the same tree-pruning rules.
- */
-async function sanitizeLayout(node: LayoutNode): Promise<LayoutNode> {
-  if (node.kind === "panel") {
-    const keptTabs: typeof node.tabs = [];
-    for (const t of node.tabs) {
-      if (
-        t.descriptor.kind === "note" &&
-        !usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.archives)
-      ) {
-        continue;
-      }
-      if (t.descriptor.kind === "file") {
-        try {
-          const ok = await ipc.pathExists(t.descriptor.path);
-          if (ok) keptTabs.push(t);
-        } catch {
-          /* drop unreadable file tabs silently */
-        }
-      } else {
-        keptTabs.push(t);
-      }
-    }
-    const active =
-      keptTabs.find((t) => t.id === node.activeTabId)?.id ??
-      keptTabs[0]?.id ??
-      null;
-    return { ...node, tabs: keptTabs, activeTabId: active };
-  }
-  const children = await Promise.all(node.children.map(sanitizeLayout));
-  return { ...node, children };
-}
 
 async function hydrate() {
   await getDb();
   const [
-    panelSizes,
-    sidebarOpen,
-    rightOpen,
-    workspaceLayout,
-    focusedPanelId,
-    lastProjectId,
     theme,
     windowSize,
-    terminalOpen,
-    terminalHeight,
     wallpaper,
     characters,
-    preview,
     modelPrefs,
     reduceGlass,
-    tabAutocomplete,
     appConfigs,
     pluginState,
   ] = await Promise.all([
-    getAppState<{ sidebar: number; main: number; right: number }>("panel_sizes"),
-    getAppState<boolean>("sidebar_open"),
-    getAppState<boolean>("right_rail_open"),
-    getAppState<LayoutNode>("workspace.layout"),
-    getAppState<string>("workspace.focusedPanel"),
-    getAppState<string>("last_project_id"),
     getAppState<string>("theme"),
     getAppState<{ width: number; height: number }>("window_size"),
-    getAppState<boolean>("terminal_open"),
-    getAppState<number>("terminal_height"),
     getAppState<WallpaperState>("wallpaper"),
     getAppState<Parameters<ReturnType<typeof useCharacterStore.getState>["hydrate"]>[0]>(
       "characters",
     ),
-    getAppState<PreviewState>("preview"),
     getAppState<Record<string, string>>("models"),
     getAppState<boolean>("reduce_glass"),
-    getAppState<boolean>("tab_autocomplete"),
     getAppState<AppConfigsPersist>("appconfig"),
     getAppState<PluginEnablementV1>("plugins.state"),
   ]);
 
   useThemeStore.getState().hydrate(theme ?? null);
   useThemeStore.getState().hydrateGlass(reduceGlass);
-  useAutocomplete.getState().hydrate(tabAutocomplete);
   if (wallpaper) useWallpaperStore.getState().hydrate(wallpaper);
   if (characters) useCharacterStore.getState().hydrate(characters);
-  if (preview) usePreviewStore.getState().hydrate(preview);
   usePluginManager.getState().hydrate(pluginState);
   useModelPrefs.getState().hydrate(modelPrefs);
   useAppConfig.getState().hydrate(appConfigs);
 
-  useLayoutStore.getState().hydrate({
-    ...(panelSizes ? { sizes: panelSizes } : {}),
-    ...(typeof sidebarOpen === "boolean" ? { sidebarOpen } : {}),
-    ...(typeof rightOpen === "boolean" ? { rightOpen } : {}),
-  });
-
-  // Per-project layout (new since 2026-05-24) takes precedence over the
-  // legacy global `workspace.layout` key. The global is still used as a
-  // fallback for first-launch / no-project state.
-  let effectiveLayout: LayoutNode | null = workspaceLayout;
-  let effectiveFocused: string | null = focusedPanelId ?? null;
-  if (lastProjectId) {
+  if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.orion)) {
     try {
-      const perProject = await getWorkspaceLayout<LayoutNode>(lastProjectId);
-      if (perProject) {
-        effectiveLayout = perProject.layout;
-        effectiveFocused = perProject.focusedPanelId;
-      }
+      await loadOrionPluginData();
     } catch (err) {
-      log.warn("per-project layout load failed", err);
+      log.warn("orion load failed", err);
     }
-  }
-  if (effectiveLayout) {
-    const sanitized = await sanitizeLayout(effectiveLayout);
-    useWorkspace.getState().hydrate(sanitized, effectiveFocused);
-  }
-
-  if (lastProjectId) {
-    await useProjectStore.getState().hydrateFromId(lastProjectId);
   }
 
   if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.archives)) {
@@ -238,13 +144,6 @@ async function hydrate() {
   } catch (err) {
     log.warn("agents load failed", err);
   }
-  if (typeof terminalHeight === "number") {
-    useTerminalStore.getState().setHeight(terminalHeight);
-  }
-  if (typeof terminalOpen === "boolean") {
-    useTerminalStore.getState().setOpen(terminalOpen);
-  }
-
   if (windowSize) {
     try {
       await getCurrentWindow().setSize(
@@ -265,12 +164,14 @@ async function hydrate() {
   const restored = useShell
     .getState()
     .restoreWindows(savedWindows ?? [], savedFocused ?? null);
-  if (!restored && useProjectStore.getState().active) {
-    useShell.getState().openApp("orion");
+  if (
+    !restored &&
+    usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.orion) &&
+    appRegistry.has("orion")
+  ) {
+    const { useProjectStore } = await import("@/store/projectStore");
+    if (useProjectStore.getState().active) useShell.getState().openApp("orion");
   }
-
-  // Codebase semantic index for the active project (and on project switch).
-  scheduleCodebaseIndex();
 
   // Resume the user's last Core conversation so the panel re-opens to
   // where they left off. Lazy import keeps the Core bundle out of the
@@ -295,31 +196,6 @@ async function hydrate() {
   // the file the MCP server's `orion_get_context` tool reads from.
   startContextSnapshotter();
 
-  // Live git status (branch, dirty files) for the active project.
-  startGitWatch();
-}
-
-let codebaseIndexStarted = false;
-function scheduleCodebaseIndex(): void {
-  if (codebaseIndexStarted) return;
-  codebaseIndexStarted = true;
-  const kick = (p: { id: string; root_path: string } | null) => {
-    if (!p) return;
-    // Give boot + the notes backfill a head start; the indexer itself is
-    // hash-aware so repeat runs are cheap. Lazy import keeps the indexer
-    // out of the boot path entirely.
-    setTimeout(() => {
-      void import("@/features/context/codebaseIndexer").then((m) =>
-        m.indexCodebase(p.id, p.root_path),
-      );
-    }, 4000);
-  };
-  kick(useProjectStore.getState().active);
-  useProjectStore.subscribe((s, prev) => {
-    if (s.active?.id !== prev.active?.id) {
-      kick(s.active ?? null);
-    }
-  });
 }
 
 function useWindowSizePersistence() {
@@ -373,74 +249,6 @@ function useShellWindowsPersistence() {
   }, []);
 }
 
-/**
- * Keeps the workspace layout scoped per project: switching projects saves
- * the prior project's layout (synchronously, no debounce — so the swap is
- * atomic) and loads the new project's layout. Within a single project,
- * layout changes are debounced and written to that project's slot.
- *
- * Falls back to the global `workspace.layout` app_state key when there's
- * no active project (e.g., first launch) so nothing regresses.
- */
-function useProjectScopedLayout() {
-  useEffect(() => {
-    let currentProjectId: string | null =
-      useProjectStore.getState().active?.id ?? null;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    const flushSnapshotTo = (projectId: string) => {
-      const ws = useWorkspace.getState();
-      void setWorkspaceLayout(projectId, ws.root, ws.focusedPanelId);
-    };
-
-    const unsubWorkspace = useWorkspace.subscribe(() => {
-      if (!currentProjectId) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        if (currentProjectId) flushSnapshotTo(currentProjectId);
-      }, 400);
-    });
-
-    const unsubProject = useProjectStore.subscribe((s) => {
-      const nextId = s.active?.id ?? null;
-      if (nextId === currentProjectId) return;
-      // 1. Flush prior project's layout immediately (cancel any pending
-      // debounce so the snapshot can't land in the new project's slot).
-      if (timer) {
-        clearTimeout(timer);
-        timer = null;
-      }
-      if (currentProjectId) flushSnapshotTo(currentProjectId);
-      // 2. Load the new project's layout (or reset to default if none).
-      void (async () => {
-        if (nextId) {
-          try {
-            const loaded = await getWorkspaceLayout<LayoutNode>(nextId);
-            if (loaded) {
-              const sanitized = await sanitizeLayout(loaded.layout);
-              useWorkspace.getState().hydrate(sanitized, loaded.focusedPanelId);
-            } else {
-              const { defaultOrionLayout } = await import(
-                "@/components/workspace/workspaceStore"
-              );
-              useWorkspace.getState().resetLayout(defaultOrionLayout);
-            }
-          } catch (err) {
-            log.warn("per-project layout swap failed", err);
-          }
-        }
-      })();
-      currentProjectId = nextId;
-    });
-
-    return () => {
-      if (timer) clearTimeout(timer);
-      unsubWorkspace();
-      unsubProject();
-    };
-  }, []);
-}
-
 /** Boot the single webview-level Finder drag-drop orchestrator (zones opt
  * in via `useFileDropZone`). Mount-once. */
 function useFinderDropOrchestrator() {
@@ -456,21 +264,6 @@ function useFinderDropOrchestrator() {
       cancelled = true;
       unlisten?.();
     };
-  }, []);
-}
-
-/** Keep the Rust file watcher pointed at the active project, so external
- * changes (editor saves, git, Finder, downloads, etc.) refresh the tree
- * within ~300ms. Passing null stops watching when no project is open. */
-function useFsWatcher() {
-  useEffect(() => {
-    const sync = (root: string | null) => {
-      void ipc.fsWatchSetRoot(root).catch((e) => log.warn("fs watch", e));
-    };
-    sync(useProjectStore.getState().active?.root_path ?? null);
-    return useProjectStore.subscribe((s) =>
-      sync(s.active?.root_path ?? null),
-    );
   }, []);
 }
 
@@ -533,8 +326,6 @@ export default function App() {
     hydrated && (warm || (probed && splashDone && authPhase === "unlocked"));
   useWindowSizePersistence();
   useShellWindowsPersistence();
-  useProjectScopedLayout();
-  useFsWatcher();
   useArchivesLiveRefresh();
   useFinderDropOrchestrator();
 

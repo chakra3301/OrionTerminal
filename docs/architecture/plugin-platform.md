@@ -1,7 +1,7 @@
 # Orion Terminal plugin platform
 
 Status: P1 internal contribution runtime underway; Plugin API v1 is not yet frozen
-Date: 2026-08-03
+Date: 2026-08-04
 
 ## Product definition
 
@@ -227,10 +227,11 @@ As of 2026-08-03, the first internal-runtime slice is implemented:
 - `src/plugins/internalEventRegistry.ts` keeps native event listeners kernel-owned while letting trusted built-ins contribute owner-tagged, synchronously disposable handlers. Command Center's schema-validating `cc:event` and `cc:exit` handlers use this contract and disappear before its UI is disabled.
 - Archives owns its note commands/hotkeys, global overlays, `open_note` bridge action, RepoLens event handling, tool-result refreshes, data loading, and semantic-index background work. Spotlight, context attachment, proactive companion context, persisted note tabs, and MCP tool schemas/calls all fail closed while Archives is disabled.
 - XDesign owns its export/present commands, validated canvas bridge actions, project/design-system loading, canvas and FX persistence, and runtime cleanup for previews, present mode, audio, and video sources. Claude, image/shader generation, recordings, project I/O, FX Assist, and Model Assist block disable while active. XDesign settings, activity, MCP canvas/model tools, and bridge calls fail closed while disabled.
+- Orion owns project/workspace hydration, editor commands and hotkeys, validated project/file/terminal/staged-edit bridge actions, inline-edit and Claude event handlers, chat/layout persistence, filesystem and Git watchers, code indexing, autocomplete work, LSP shutdown, and file-tree refreshes. Unsaved buffers, pending AI reviews, active AI work, and owned background operations block disable. Project/file/terminal MCP tools, project recents, editor activity/chats, settings, and context snapshots fail closed while disabled. The live web preview is opaque-origin sandboxed.
 - `src/plugins/overlayRegistry.ts` and `src/plugins/internalActionRegistry.ts` extend owner-wide disposal to trusted global UI and host-bridge actions. Community packages do not receive either internal contract directly.
-- `src/store/pluginManagerStore.ts` hydrates a versioned `plugins.state` record before persisted windows restore. New built-ins default enabled; unknown and migration-locked disable requests fail closed.
-- Control Panel and the legacy Settings surface expose Plugin Manager. Archives, XDesign, Hermes, and Command Center can be enabled/disabled live; running work blocks deactivation, and ordinary disable retains plugin data.
-- Apps whose remaining commands/background services still use compatibility paths are visible but locked until those contributions are owner-migrated. This avoids presenting a partial disable as complete isolation.
+- `src/store/pluginManagerStore.ts` hydrates a versioned `plugins.state` record before persisted windows restore. New built-ins default enabled and unknown disable requests fail closed.
+- Control Panel and the legacy Settings surface expose Plugin Manager. Archives, Orion, XDesign, Hermes, and Command Center can be enabled/disabled live; running or data-loss-sensitive work blocks deactivation, and ordinary disable retains plugin data.
+- Every first-party app surface now participates in the internal lifecycle. Feature extraction and public SDK boundaries remain P2 work; this does not make private trusted compatibility adapters public plugin APIs.
 
 This is an internal trusted-plugin runtime only. It does not load packages or grant community code React/Tauri authority. A future community app renderer must be an opaque-origin sandbox renderer, not the current `trusted-react` renderer.
 
@@ -250,7 +251,7 @@ This is an internal trusted-plugin runtime only. It does not load packages or gr
 - Commands, menus, Spotlight, settings, status, and AI-tool contribution ownership
 - Built-in plugin bootstrap
 - Enable/disable persistence and Plugin Manager
-- Archives, XDesign, Hermes, and Command Center lifecycle pilots
+- Archives, Orion, XDesign, Hermes, and Command Center lifecycle pilots
 
 ### P2 — First-party modularization
 

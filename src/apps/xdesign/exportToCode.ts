@@ -9,6 +9,9 @@ import { ipc } from "@/lib/ipc";
 import { toast } from "@/store/toastStore";
 import { log } from "@/lib/log";
 import { generateComponent } from "@/apps/xdesign/designToReact";
+import { appRegistry } from "@/plugins/appRegistry";
+import { beginXDesignActivity } from "@/apps/xdesign/runtimeActivity";
+import { beginOrionActivity } from "@/apps/orion/runtimeActivity";
 
 /**
  * Export the selected frame to React + Orion design tokens, written into the
@@ -17,6 +20,12 @@ import { generateComponent } from "@/apps/xdesign/designToReact";
  * real code into the real repo next door, accept/reject like any AI edit.
  */
 export async function exportSelectionToCode(): Promise<void> {
+  if (!appRegistry.has("orion")) {
+    toast.warning("Enable the Orion editor plugin first", {
+      body: "Design→code uses Orion's project and review workflow.",
+    });
+    return;
+  }
   const xd = useXDesign.getState();
   const project = useProjectStore.getState().active;
   if (!project) {
@@ -46,6 +55,14 @@ export async function exportSelectionToCode(): Promise<void> {
 
   const path = `${project.root_path}/src/components/${gen.componentName}.tsx`;
   const code = `${gen.code}`;
+  const endXDesignActivity = beginXDesignActivity(
+    "export-to-orion",
+    "Wait for XDesign to finish exporting code before disabling the plugin.",
+  );
+  const endOrionActivity = beginOrionActivity(
+    "xdesign-export",
+    "Wait for XDesign's Orion export to finish before disabling the editor plugin.",
+  );
   try {
     let original = "";
     let existed = false;
@@ -72,5 +89,8 @@ export async function exportSelectionToCode(): Promise<void> {
     toast.error("Export to code failed", {
       body: e instanceof Error ? e.message : String(e),
     });
+  } finally {
+    endXDesignActivity();
+    endOrionActivity();
   }
 }

@@ -14,6 +14,7 @@ import { overlayRegistry } from "./overlayRegistry";
 import { COMMAND_CENTER_EVENT_IDS } from "@/apps/command/pluginContributions";
 import { ARCHIVES_CONTRIBUTION_IDS } from "@/apps/archives/pluginContributions";
 import { XDESIGN_CONTRIBUTION_IDS } from "@/apps/xdesign/pluginContributions";
+import { ORION_CONTRIBUTION_IDS } from "@/apps/orion/pluginContributions";
 import { newRun } from "@/apps/command/ccRun";
 import { useCommand } from "@/store/commandStore";
 import { allTabs, useWorkspace } from "@/components/workspace/workspaceStore";
@@ -76,6 +77,28 @@ describe("built-in app plugins", () => {
     expect(overlayRegistry.ownerOf(ARCHIVES_CONTRIBUTION_IDS.askOverlay)).toBeUndefined();
     expect(useShell.getState().windows.some((windowState) => windowState.id === windowId)).toBe(false);
     expect(allTabs(useWorkspace.getState().root).some((tab) => tab.descriptor.kind === "note")).toBe(false);
+  });
+
+  it("deactivating Orion removes editor commands, actions, events, and its window", async () => {
+    ensureBuiltinAppPlugins();
+    const windowId = useShell.getState().openApp("orion");
+    expect(registry.ownerOf("file.openProject")).toBe(BUILTIN_APP_PLUGIN_IDS.orion);
+    expect(internalActionRegistry.ownerOf(ORION_CONTRIBUTION_IDS.openFileAction)).toBe(
+      BUILTIN_APP_PLUGIN_IDS.orion,
+    );
+    expect(internalEventRegistry.ownerOf(ORION_CONTRIBUTION_IDS.claudeEvent)).toBe(
+      BUILTIN_APP_PLUGIN_IDS.orion,
+    );
+    await expect(
+      internalActionRegistry.dispatch(ORION_CONTRIBUTION_IDS.openFileAction, { path: 47 }),
+    ).rejects.toThrow(/path must be a non-empty string/);
+
+    expect(deactivateBuiltinAppPlugin(BUILTIN_APP_PLUGIN_IDS.orion)).toEqual([]);
+    expect(appRegistry.has("orion")).toBe(false);
+    expect(registry.has("file.openProject")).toBe(false);
+    expect(internalActionRegistry.has(ORION_CONTRIBUTION_IDS.openFileAction)).toBe(false);
+    expect(internalEventRegistry.has(ORION_CONTRIBUTION_IDS.claudeEvent)).toBe(false);
+    expect(useShell.getState().windows.some((windowState) => windowState.id === windowId)).toBe(false);
   });
 
   it("deactivating XDesign removes its app, commands, bridge actions, and window", async () => {

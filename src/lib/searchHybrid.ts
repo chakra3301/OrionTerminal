@@ -7,6 +7,7 @@ import {
   type ChatOrigin,
 } from "@/lib/db";
 import { semanticSearch, type SemanticHit } from "@/lib/semanticSearch";
+import { appRegistry } from "@/plugins/appRegistry";
 
 /** Minimum cosine score for a semantic-only hit to surface. The query
  * embedding is L2-normalized so this is a dot product; ~0.35 keeps loose
@@ -127,12 +128,15 @@ export async function searchHybrid(
     semanticSearch(trimmed, limit, SEMANTIC_FLOOR),
   ]);
 
+  const visible = (hit: SearchHit) =>
+    (hit.chatOrigin !== "orion" || appRegistry.has("orion")) &&
+    (hit.chatOrigin !== "xdesign" || appRegistry.has("xdesign"));
   const seen = new Set<string>();
   const merged: SearchHit[] = [];
   for (const h of ftsHits) {
     const key = `${h.entityType}:${h.entityId}`;
     seen.add(key);
-    merged.push(h);
+    if (visible(h)) merged.push(h);
   }
   if (merged.length >= limit) return merged.slice(0, limit);
 
@@ -148,14 +152,15 @@ export async function searchHybrid(
     if (merged.length >= limit) break;
     const e = enriched.get(`${h.kind}:${h.id}`);
     if (!e) continue;
-    merged.push({
+    const hit: SearchHit = {
       entityId: e.id,
       entityType: e.entity_type,
       title: e.title,
       snippet: e.body_excerpt,
       noteKind: e.note_kind,
       chatOrigin: e.chat_origin,
-    });
+    };
+    if (visible(hit)) merged.push(hit);
   }
   return merged;
 }

@@ -20,6 +20,14 @@ import {
   clearXDesignActivities,
   setXDesignActivity,
 } from "@/apps/xdesign/runtimeActivity";
+import { useChatStore } from "@/store/chatStore";
+import { useInlineEditStore } from "@/store/inlineEditStore";
+import {
+  clearOrionActivities,
+  setOrionActivity,
+} from "@/apps/orion/runtimeActivity";
+import { ORION_CONTRIBUTION_IDS } from "@/apps/orion/pluginContributions";
+import { beginLiveTerminal } from "@/apps/orion/terminalActivity";
 import { usePluginManager } from "./pluginManagerStore";
 
 vi.mock("@/lib/db", () => ({ setAppState: vi.fn(async () => {}) }));
@@ -50,6 +58,9 @@ function reset() {
   overlayRegistry.clear();
   clearArchivesActivities();
   clearXDesignActivities();
+  clearOrionActivities();
+  useChatStore.setState({ active: null, running: false, pendingAssistantId: null });
+  useInlineEditStore.getState().reset();
   const threads = useAppChat.getState().threads;
   useAppChat.setState({
     threads: {
@@ -178,6 +189,66 @@ describe("plugin enablement persistence", () => {
     expect(setAppState).not.toHaveBeenCalled();
     expect(appRegistry.has("archives")).toBe(true);
     expect(usePluginManager.getState().error).toBe("Archives Learn is running.");
+  });
+
+  it("persists and disposes Orion commands, actions, and event handlers", async () => {
+    usePluginManager.getState().hydrate(null);
+    expect(registry.ownerOf("file.openProject")).toBe(BUILTIN_APP_PLUGIN_IDS.orion);
+    expect(internalActionRegistry.ownerOf(ORION_CONTRIBUTION_IDS.openFileAction)).toBe(
+      BUILTIN_APP_PLUGIN_IDS.orion,
+    );
+    expect(internalEventRegistry.ownerOf(ORION_CONTRIBUTION_IDS.claudeEvent)).toBe(
+      BUILTIN_APP_PLUGIN_IDS.orion,
+    );
+
+    const ok = await usePluginManager
+      .getState()
+      .setEnabled(BUILTIN_APP_PLUGIN_IDS.orion, false);
+
+    expect(ok).toBe(true);
+    expect(setAppState).toHaveBeenCalledWith("plugins.state", {
+      version: 1,
+      disabled: [BUILTIN_APP_PLUGIN_IDS.orion],
+    });
+    expect(appRegistry.has("orion")).toBe(false);
+    expect(registry.has("file.openProject")).toBe(false);
+    expect(internalActionRegistry.has(ORION_CONTRIBUTION_IDS.openFileAction)).toBe(false);
+    expect(internalEventRegistry.has(ORION_CONTRIBUTION_IDS.claudeEvent)).toBe(false);
+  });
+
+  it("blocks Orion disable during AI work and owned background work", async () => {
+    usePluginManager.getState().hydrate(null);
+    useChatStore.setState({ running: true });
+    let ok = await usePluginManager
+      .getState()
+      .setEnabled(BUILTIN_APP_PLUGIN_IDS.orion, false);
+    expect(ok).toBe(false);
+    expect(usePluginManager.getState().error).toMatch(/AI response/);
+
+    useChatStore.setState({ running: false });
+    usePluginManager.setState({ error: null });
+    setOrionActivity("git-push", true, "Orion Git push is running.");
+    ok = await usePluginManager
+      .getState()
+      .setEnabled(BUILTIN_APP_PLUGIN_IDS.orion, false);
+    expect(ok).toBe(false);
+    expect(usePluginManager.getState().error).toBe("Orion Git push is running.");
+    expect(setAppState).not.toHaveBeenCalled();
+  });
+
+  it("blocks Orion disable while an interactive terminal is live", async () => {
+    usePluginManager.getState().hydrate(null);
+    const endTerminal = beginLiveTerminal();
+    try {
+      const ok = await usePluginManager
+        .getState()
+        .setEnabled(BUILTIN_APP_PLUGIN_IDS.orion, false);
+      expect(ok).toBe(false);
+      expect(usePluginManager.getState().error).toMatch(/Close every Orion terminal/);
+      expect(setAppState).not.toHaveBeenCalled();
+    } finally {
+      endTerminal();
+    }
   });
 
   it("persists and disposes XDesign commands and bridge actions", async () => {
@@ -312,12 +383,15 @@ describe("plugin enablement persistence", () => {
     expect(usePluginManager.getState().error).toMatch(/Stop every running Hermes task/);
   });
 
-  it("ignores persisted disable requests for migration-locked apps", () => {
+  it("hydrates Orion as disabled and ignores unknown plugin ids", () => {
     usePluginManager.getState().hydrate({
       version: 1,
-      disabled: [BUILTIN_APP_PLUGIN_IDS.orion],
+      disabled: [BUILTIN_APP_PLUGIN_IDS.orion, "@orion/unknown"],
     });
-    expect(usePluginManager.getState().disabledIds).toEqual([]);
-    expect(appRegistry.has("orion")).toBe(true);
+    expect(usePluginManager.getState().disabledIds).toEqual([
+      BUILTIN_APP_PLUGIN_IDS.orion,
+    ]);
+    expect(appRegistry.has("orion")).toBe(false);
+    expect(registry.has("file.openProject")).toBe(false);
   });
 });

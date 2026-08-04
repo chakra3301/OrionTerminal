@@ -36,6 +36,9 @@ export function WelcomeOverlay() {
   const switchToProject = useProjectStore((s) => s.switchToProject);
   const appDescriptors = useAppDescriptors();
   const enabledApps = new Set(appDescriptors.map((descriptor) => descriptor.id));
+  const orionEnabled = enabledApps.has("orion");
+  const archivesEnabled = enabledApps.has("archives");
+  const xdesignEnabled = enabledApps.has("xdesign");
   const [now, setNow] = useState(() => new Date());
   const [stats, setStats] = useState<Stats | null>(null);
 
@@ -52,22 +55,33 @@ export function WelcomeOverlay() {
   useEffect(() => {
     if (hasVisibleWindows) return;
     let cancelled = false;
-    Promise.all([countNotes(), countAssets(), listAllChats(1)])
+    Promise.all([
+      archivesEnabled ? countNotes() : Promise.resolve(0),
+      archivesEnabled ? countAssets() : Promise.resolve(0),
+      listAllChats(500),
+    ])
       .then(([notes, assets, chats]) => {
         if (cancelled) return;
-        setStats({ notes, assets, chats: chats.length });
+        const visibleChats = chats.filter(
+          (chat) =>
+            chat.origin === "rosie" ||
+            (chat.origin === "orion" && orionEnabled) ||
+            (chat.origin === "xdesign" && xdesignEnabled) ||
+            ((chat.origin === "archives" || chat.origin === null) && archivesEnabled),
+        );
+        setStats({ notes, assets, chats: visibleChats.length });
       })
       .catch((e) => log.warn("welcome stats failed", e));
     return () => {
       cancelled = true;
     };
-  }, [hasVisibleWindows]);
+  }, [hasVisibleWindows, archivesEnabled, orionEnabled, xdesignEnabled]);
 
   // Pull recent projects so the switch chips below have data.
   useEffect(() => {
-    if (hasVisibleWindows) return;
+    if (hasVisibleWindows || !orionEnabled) return;
     void loadRecents();
-  }, [hasVisibleWindows, loadRecents]);
+  }, [hasVisibleWindows, orionEnabled, loadRecents]);
 
   if (hasVisibleWindows) return null;
 
@@ -119,7 +133,7 @@ export function WelcomeOverlay() {
         ) : stats ? (
           <>
             <div className="ot-welcome-stats">
-              {project ? (
+              {orionEnabled && project ? (
                 <span className="ot-welcome-stat">
                   <span className="dot cyan" />
                   {project.name}
@@ -137,7 +151,7 @@ export function WelcomeOverlay() {
                 {stats.assets.toLocaleString()} {stats.assets === 1 ? "asset" : "assets"}
               </span>
             </div>
-            {recents.filter((p) => p.id !== project?.id).length > 0 && (
+            {orionEnabled && recents.filter((p) => p.id !== project?.id).length > 0 && (
               <div className="ot-welcome-recents">
                 {recents
                   .filter((p) => p.id !== project?.id)

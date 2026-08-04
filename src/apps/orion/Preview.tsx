@@ -293,7 +293,7 @@ function WebPreview() {
         className="or-preview-iframe"
         src={url}
         title="Web preview"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+        sandbox="allow-scripts allow-forms"
         onLoad={() => setPhase("loaded")}
       />
       {phase === "unreachable" && (

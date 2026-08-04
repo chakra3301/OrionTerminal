@@ -2,6 +2,7 @@ import type { Command } from "@/commands/registry";
 import { registry } from "@/commands/registry";
 import type { DisposableScope } from "@/plugins/contracts";
 import { internalActionRegistry } from "@/plugins/internalActionRegistry";
+import { appRegistry } from "@/plugins/appRegistry";
 import { useShell } from "@/shell/store/useShell";
 import { useAppChat } from "@/store/appChatStore";
 import { useAssetsStore } from "@/store/assetsStore";
@@ -47,6 +48,7 @@ function xdesignCommands(): Command[] {
       label: "XDesign: Export Selection to React",
       keywords: ["xdesign", "export", "react", "code", "design", "component", "tsx"],
       group: "View",
+      when: () => appRegistry.has("orion"),
       run: () => {
         void import("@/apps/xdesign/exportToCode").then((module) =>
           module.exportSelectionToCode(),
