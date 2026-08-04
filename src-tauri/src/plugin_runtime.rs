@@ -36,9 +36,9 @@ pub struct PluginEngines {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PluginEntrypoints {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ui: Option<String>,
 }
 
@@ -70,7 +70,7 @@ pub struct PluginManifest {
     pub api_version: String,
     pub engines: PluginEngines,
     pub publisher: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entrypoints: Option<PluginEntrypoints>,
     #[serde(default)]
     pub activation_events: Vec<String>,
@@ -1243,6 +1243,8 @@ mod tests {
         assert_eq!(scan.manifest.id, "dev.orion.hello");
         assert_eq!(scan.files.len(), 2);
         assert_eq!(scan.fingerprint.len(), 64);
+        let serialized = serde_json::to_value(&scan.manifest).unwrap();
+        assert!(serialized["entrypoints"].get("background").is_none());
         let _ = fs::remove_dir_all(dir);
     }
 
