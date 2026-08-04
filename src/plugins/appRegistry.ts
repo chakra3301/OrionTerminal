@@ -4,14 +4,22 @@ import { OwnerRegistry } from "@/plugins/ownerRegistry";
 
 export type AppId = string;
 
+export type TrustedReactRenderer = {
+  kind: "trusted-react";
+  component: LazyExoticComponent<ComponentType>;
+};
+
+export type SandboxedPluginRenderer = {
+  kind: "sandboxed-plugin";
+  pluginId: string;
+  contributionId: string;
+};
+
 export type AppDescriptor = {
   id: AppId;
   name: string;
   order: number;
-  renderer: {
-    kind: "trusted-react";
-    component: LazyExoticComponent<ComponentType>;
-  };
+  renderer: TrustedReactRenderer | SandboxedPluginRenderer;
   window: {
     title: string;
     subtitle: string;

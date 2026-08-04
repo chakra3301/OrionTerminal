@@ -1,6 +1,6 @@
 # Orion Terminal plugin platform
 
-Status: P1 internal contribution runtime underway; Plugin API v1 is not yet frozen
+Status: P3 local community SDK underway; Plugin API v1 is not yet frozen
 Date: 2026-08-04
 
 ## Product definition
@@ -233,7 +233,11 @@ As of 2026-08-03, the first internal-runtime slice is implemented:
 - Control Panel and the legacy Settings surface expose Plugin Manager. Archives, Orion, XDesign, Hermes, and Command Center can be enabled/disabled live; running or data-loss-sensitive work blocks deactivation, and ordinary disable retains plugin data.
 - Every first-party app surface now participates in the internal lifecycle. Feature extraction and public SDK boundaries remain P2 work; this does not make private trusted compatibility adapters public plugin APIs.
 
-This is an internal trusted-plugin runtime only. It does not load packages or grant community code React/Tauri authority. A future community app renderer must be an opaque-origin sandbox renderer, not the current `trusted-react` renderer.
+The internal trusted runtime now has a separate community path. Local directory packages are inspected and copied by Rust, declarative app/command contributions are owner-disposable, and community UI/background entrypoints render only through the `sandboxed-plugin` renderer. That renderer uses a blob document inside `sandbox="allow-scripts"` without same-origin authority, a network-denied frame CSP, a source/session/version-bound RPC channel, and a native broker that currently exposes only quota-controlled namespaced storage and notifications. Community packages never receive the `trusted-react` renderer or internal contribution adapters.
+
+`src/store/communityPluginStore.ts` hydrates installed packages before window restoration, resolves dependencies and cycles, activates eligible packages, rolls lifecycle failures back, and preserves namespaced data on removal. Native startup markers provide a kernel-only safe mode after incomplete community startup; runtime errors quarantine the offending package. The local sample at `examples/plugins/hello-orion.orion-plugin` and `docs/plugin-sdk/getting-started.md` exercise the SDK.
+
+This is the first P3 slice, not the distribution boundary. Workspace resource handles, brokered network/clipboard/assets/process/terminal/AI capabilities, signed archive packages, publisher verification, update rollback, and marketplace delivery remain unavailable and fail closed.
 
 ## Ranked delivery slices
 
@@ -263,10 +267,13 @@ This is an internal trusted-plugin runtime only. It does not load packages or gr
 
 ### P3 — Local community SDK
 
-- `.orion-plugin` package validation
-- Opaque-origin UI sandbox and background runtime
-- Typed RPC and capability broker
-- Local install, developer mode, sample plugin, diagnostics, and safe mode
+- ✅ Directory-form `.orion-plugin` validation with traversal/symlink/file-count/file-size/package-size limits and review-bound fingerprints
+- ✅ Opaque-origin UI sandbox and isolated startup background frame
+- ✅ Typed, source-bound RPC plus deny-by-default native broker
+- ✅ Quota-controlled `storage.plugin` and brokered `notifications`
+- ✅ Local install/update/remove, declarative apps/commands, dependency ordering/cycle detection, sample plugin, quarantine, audit log, and safe mode
+- ⬜ Opaque workspace/resource handles and remaining capability vocabulary
+- ⬜ Signed archive ingestion, cryptographic publisher identity, and package rollback
 
 ### P4 — Distribution hardening
 

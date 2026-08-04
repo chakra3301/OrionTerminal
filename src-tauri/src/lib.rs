@@ -8,6 +8,7 @@ mod claude_cli;
 mod cli_engine;
 mod cursor_engine;
 mod pi_engine;
+mod plugin_runtime;
 mod db_backup;
 mod fs_ops;
 mod fs_watch;
@@ -295,6 +296,18 @@ pub fn run() {
             provider_keys::provider_key_set,
             provider_keys::provider_key_clear,
             provider_keys::provider_key_status,
+            plugin_runtime::plugin_inspect_directory,
+            plugin_runtime::plugin_install_directory,
+            plugin_runtime::plugin_list_installed,
+            plugin_runtime::plugin_set_enabled,
+            plugin_runtime::plugin_quarantine,
+            plugin_runtime::plugin_remove,
+            plugin_runtime::plugin_read_entrypoint,
+            plugin_runtime::plugin_broker_call,
+            plugin_runtime::plugin_boot_status,
+            plugin_runtime::plugin_runtime_begin,
+            plugin_runtime::plugin_runtime_ready,
+            plugin_runtime::plugin_safe_mode_clear,
             nous_oauth::nous_device_start,
             nous_oauth::nous_device_poll,
             nous_oauth::nous_oauth_status,
@@ -369,8 +382,9 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app_handle, event| {
+        .run(|app_handle, event| {
             if let tauri::RunEvent::Exit = event {
+                crate::plugin_runtime::runtime_shutdown(app_handle);
                 crate::terminal::kill_all();
                 crate::lsp::kill_all();
             }

@@ -496,6 +496,36 @@ export const ipc = {
   characterClearFile: (filePath: string): Promise<void> =>
     invoke("character_clear_file", { filePath }),
 
+  pluginInspectDirectory: (sourcePath: string): Promise<import("@/plugins/communityTypes").CommunityPluginInspection> =>
+    invoke("plugin_inspect_directory", { sourcePath }),
+  pluginInstallDirectory: (
+    sourcePath: string,
+    expectedFingerprint: string,
+    approvedPermissions: string[],
+  ): Promise<import("@/plugins/communityTypes").InstalledCommunityPlugin> =>
+    invoke("plugin_install_directory", { sourcePath, expectedFingerprint, approvedPermissions }),
+  pluginListInstalled: (): Promise<import("@/plugins/communityTypes").InstalledCommunityPlugin[]> =>
+    invoke("plugin_list_installed"),
+  pluginSetEnabled: (pluginId: string, enabled: boolean): Promise<void> =>
+    invoke("plugin_set_enabled", { pluginId, enabled }),
+  pluginQuarantine: (pluginId: string, reason: string): Promise<void> =>
+    invoke("plugin_quarantine", { pluginId, reason }),
+  pluginRemove: (pluginId: string): Promise<void> =>
+    invoke("plugin_remove", { pluginId }),
+  pluginReadEntrypoint: (
+    pluginId: string,
+    kind: "ui" | "background",
+  ): Promise<import("@/plugins/communityTypes").CommunityPluginEntrypoint> =>
+    invoke("plugin_read_entrypoint", { pluginId, kind }),
+  pluginBrokerCall: (pluginId: string, method: string, params: unknown): Promise<unknown> =>
+    invoke("plugin_broker_call", { pluginId, method, params }),
+  pluginBootStatus: (): Promise<import("@/plugins/communityTypes").CommunityPluginSafeMode> =>
+    invoke("plugin_boot_status"),
+  pluginRuntimeBegin: (pluginIds: string[]): Promise<void> =>
+    invoke("plugin_runtime_begin", { pluginIds }),
+  pluginRuntimeReady: (): Promise<void> => invoke("plugin_runtime_ready"),
+  pluginSafeModeClear: (): Promise<void> => invoke("plugin_safe_mode_clear"),
+
   systemStats: (): Promise<SystemStats> => invoke("system_stats"),
   claudeUsage: (): Promise<ClaudeUsage> => invoke("claude_usage"),
   claudeLimits: (): Promise<ClaudeLimits> => invoke("claude_limits"),

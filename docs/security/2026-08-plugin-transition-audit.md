@@ -70,19 +70,27 @@ Remaining verification: launch the packaged app, test embeddings/model download,
 ### OTSEC-003 — Native commands assume the entire frontend is trusted
 
 Severity: **High** today; **Critical** before community plugins  
-Status: architectural remediation required
+Status: partially remediated; local community renderer and initial broker implemented
 
 The main webview registers 100+ custom commands, including arbitrary workspace reads/writes/deletes, terminal input, process-backed agents, provider calls, and secret-setting operations. `capabilities/default.json` also grants broad SQL and opener access.
 
 These commands are necessary for the first-party workstation but cannot be inherited by plugin UI.
 
-Required fix:
+Applied controls for the local SDK slice:
 
-- Community UI must run in a separate opaque origin with no Tauri IPC object.
-- Introduce a native capability broker keyed by plugin identity and stored grants.
-- Commands exposed to plugins accept broker-issued resource handles, not arbitrary host paths or key references.
-- Keep the existing broad IPC facade private to the trusted compatibility layer while first-party migration proceeds.
-- Add audit events for privileged plugin actions.
+- Community UI and startup background entrypoints run in `sandbox="allow-scripts"` blob frames without `allow-same-origin`; a frame-local CSP denies connections, navigation helpers, frames, objects, forms, external scripts/styles, and ambient media/font authority.
+- The shell binds plugin identity to the frame. RPC validates `event.source`, a 192-bit frame session, channel/version, method, request ID, payload size, concurrency, and rate before crossing native IPC.
+- Rust re-reads enabled/quarantine state and reviewed grants on every broker call. Unknown methods deny by default; currently only host identity, quota-controlled namespaced storage, and notifications are exposed.
+- Broker calls append payload-free audit events. In-flight calls block disable.
+- Package inspection and installation reject unknown authority fields, symlinks, traversal, special files, oversized packages/files/entrypoints/manifests, missing entrypoints, permission mismatches, publisher changes, downgrades, and review/install fingerprint changes.
+- Startup markers hold all community code out after an incomplete plugin boot; uncaught runtime errors quarantine the offending package.
+
+Remaining fix:
+
+- Issue opaque resource handles for workspace, asset, terminal, process, network, clipboard, and AI operations; do not add path-bearing community RPC.
+- Prove the packaged webview does not inject Tauri authority into an adversarial opaque frame.
+- Add signed archive ingestion and cryptographic publisher identity before distribution.
+- Keep the existing broad IPC facade private to the trusted compatibility layer.
 
 ### OTSEC-004 — Embedded agents bypass permission prompts
 
@@ -191,12 +199,17 @@ Status: open
 
 Some commands cap reads, but asset copy and bytes-in paths can allocate or accept arbitrarily large payloads. Recursive tree/search/watch operations also need broker-level quotas before plugins can request them.
 
-Required fix:
+Partial remediation for plugin packages and storage:
 
-- Stream copied assets instead of reading the entire file.
-- Set per-operation and per-plugin limits.
-- Cap tree depth, result counts, payload size, concurrent watches, and background tasks.
-- Reject special files and re-check symlink/canonical path boundaries at execution time.
+- Directory packages reject symlinks and special files, cap manifests at 64 KiB, entrypoints at 2 MiB, files at 5 MiB, total package size at 25 MiB, and file count at 512.
+- Broker payloads and storage values cap at 64 KiB; storage caps at 256 keys and 1 MiB per plugin; RPC caps concurrent and per-minute requests.
+- Package paths and entrypoints are canonicalized/revalidated before execution.
+
+Remaining fix:
+
+- Stream copied core assets instead of reading the entire file.
+- Add limits and opaque handles for future workspace trees, search, watches, network, assets, and background tasks.
+- Reject special files and re-check symlink/canonical boundaries in every future broker operation.
 
 ### OTSEC-011 — Release builds include Tauri devtools support
 

@@ -1,0 +1,50 @@
+{
+  "id": "dev.orion.hello",
+  "name": "Hello Orion",
+  "version": "1.0.0",
+  "apiVersion": "1",
+  "engines": {
+    "orion": "*"
+  },
+  "publisher": "Orion SDK samples",
+  "entrypoints": {
+    "ui": "ui.html"
+  },
+  "activationEvents": [
+    "onApp:hello"
+  ],
+  "dependencies": {},
+  "contributes": {
+    "apps": [
+      {
+        "id": "hello",
+        "name": "Hello Orion",
+        "description": "Capability broker and opaque sandbox test bench",
+        "accent": "violet",
+        "window": {
+          "title": "HELLO ORION",
+          "subtitle": "community sandbox",
+          "width": 760,
+          "height": 560
+        }
+      }
+    ],
+    "commands": [
+      {
+        "id": "hello.open",
+        "title": "Open Hello Orion sample",
+        "app": "hello",
+        "keywords": ["sample", "sandbox", "sdk"]
+      }
+    ],
+    "views": [],
+    "settings": [],
+    "statusItems": [],
+    "fileHandlers": [],
+    "aiTools": []
+  },
+  "permissions": [
+    "storage.plugin",
+    "notifications"
+  ]
+}

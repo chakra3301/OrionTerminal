@@ -11,6 +11,7 @@ import { installSpotifyCommands } from "@/shell/commands/spotifyCommands";
 import { BUILTIN_APP_PLUGIN_IDS } from "@/plugins/builtinApps";
 import { appRegistry } from "@/plugins/appRegistry";
 import { usePluginManager, type PluginEnablementV1 } from "@/store/pluginManagerStore";
+import { useCommunityPlugins } from "@/store/communityPluginStore";
 import { HotkeyHost } from "@/lib/hotkeys";
 import { getAppState, getDb } from "@/lib/db";
 import { useHermes } from "@/store/hermesStore";
@@ -88,6 +89,7 @@ async function hydrate() {
   if (wallpaper) useWallpaperStore.getState().hydrate(wallpaper);
   if (characters) useCharacterStore.getState().hydrate(characters);
   usePluginManager.getState().hydrate(pluginState);
+  await useCommunityPlugins.getState().hydrate();
   useModelPrefs.getState().hydrate(modelPrefs);
   useAppConfig.getState().hydrate(appConfigs);
 

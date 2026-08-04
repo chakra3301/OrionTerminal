@@ -162,6 +162,9 @@ export const usePluginManager = create<PluginManagerState>((set, get) => ({
       if (failures.length > 0) throw new Error("Plugin cleanup reported an error.");
       await setAppState("plugins.state", persisted(next));
       if (enabled) await loadPluginData(pluginId);
+      await import("@/store/communityPluginStore").then((module) =>
+        module.syncCommunityDependencies(),
+      );
       return true;
     } catch (error) {
       set({ disabledIds: previous });
@@ -169,6 +172,9 @@ export const usePluginManager = create<PluginManagerState>((set, get) => ({
       try {
         syncBuiltinAppPlugins(new Set(previous));
         if (!previous.includes(pluginId)) await loadPluginData(pluginId);
+        await import("@/store/communityPluginStore").then((module) =>
+          module.syncCommunityDependencies(),
+        );
       } catch (rollbackError) {
         runtimeRollbackFailed = true;
         log.error("plugin enablement runtime rollback failed", rollbackError);

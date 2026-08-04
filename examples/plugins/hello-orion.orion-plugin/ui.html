@@ -1,0 +1,68 @@
+<style>
+  :root { font-family: "Space Grotesk", system-ui, sans-serif; color-scheme: dark; }
+  body {
+    display: grid;
+    place-items: center;
+    min-height: 100%;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 75% 15%, rgba(177, 76, 255, .18), transparent 36%),
+      radial-gradient(circle at 10% 90%, rgba(0, 224, 255, .1), transparent 38%),
+      #03060a;
+  }
+  main { width: min(590px, calc(100% - 48px)); }
+  .eyebrow { color: #b14cff; font: 10px/1 ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; }
+  h1 { margin: 14px 0 8px; font-size: clamp(32px, 7vw, 58px); line-height: .92; letter-spacing: -.06em; }
+  .lede { max-width: 520px; color: #9ab0a8; font: 13px/1.6 ui-monospace, monospace; }
+  .rack { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 26px; }
+  .card { padding: 15px; border: 1px solid rgba(177, 76, 255, .22); border-radius: 10px; background: rgba(10, 16, 21, .72); }
+  .card span { display: block; color: #5a706a; font: 9px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+  .card strong { display: block; margin-top: 10px; color: #e6f4ec; font: 500 15px/1.2 ui-monospace, monospace; overflow-wrap: anywhere; }
+  .controls { display: flex; gap: 9px; margin-top: 12px; }
+  button { padding: 10px 13px; color: #e6f4ec; border: 1px solid rgba(177, 76, 255, .35); border-radius: 7px; background: rgba(177, 76, 255, .09); cursor: pointer; font: 11px/1 ui-monospace, monospace; }
+  button:hover { border-color: #b14cff; background: rgba(177, 76, 255, .16); }
+  #status { margin-top: 15px; color: #5a706a; font: 10px/1.5 ui-monospace, monospace; }
+</style>
+<main>
+  <div class="eyebrow">Community SDK · API v1</div>
+  <h1>Authority,<br>on a leash.</h1>
+  <p class="lede">This page is untrusted. It has no Tauri object, shell DOM, SQLite, filesystem, process, or network access. Its counter crosses the native broker only through the granted private-storage capability.</p>
+  <div class="rack">
+    <div class="card"><span>Persistent counter</span><strong id="count">—</strong></div>
+    <div class="card"><span>Host identity</span><strong id="host">Checking…</strong></div>
+  </div>
+  <div class="controls">
+    <button id="increment">Increment through broker</button>
+    <button id="notify">Broker notification</button>
+  </div>
+  <div id="status">Waiting for the opaque sandbox handshake…</div>
+</main>
+<script>
+  const count = document.querySelector("#count");
+  const host = document.querySelector("#host");
+  const status = document.querySelector("#status");
+  let value = 0;
+
+  async function boot() {
+    const info = await window.orion.request("host.getInfo");
+    host.textContent = `${info.platform} · ${info.pluginId}`;
+    value = Number(await window.orion.storage.get("count")) || 0;
+    count.textContent = String(value).padStart(2, "0");
+    const tauriVisible = "__TAURI_INTERNALS__" in window;
+    status.textContent = `Ready · Tauri authority visible: ${tauriVisible ? "YES (unexpected)" : "no"}`;
+  }
+
+  document.querySelector("#increment").addEventListener("click", async () => {
+    value += 1;
+    await window.orion.storage.set("count", value);
+    count.textContent = String(value).padStart(2, "0");
+    status.textContent = "Stored atomically in this plugin's private 1 MiB namespace.";
+  });
+
+  document.querySelector("#notify").addEventListener("click", async () => {
+    await window.orion.notifications.show("Hello from the sandbox", `Brokered counter is ${value}.`);
+    status.textContent = "The native broker approved a notification request.";
+  });
+
+  boot().catch((error) => { status.textContent = error.message; });
+</script>

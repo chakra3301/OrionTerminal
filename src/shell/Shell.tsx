@@ -12,6 +12,8 @@ import { PromptModalHost } from "@/components/PromptModal";
 import { ConfirmModalHost } from "@/components/ConfirmModal";
 import { ToastHost } from "@/components/ToastHost";
 import { PluginOverlays } from "@/plugins/PluginOverlays";
+import { CommunityPluginRuntimeHost } from "@/plugins/CommunityPluginRuntimeHost";
+import { SandboxPluginFrame } from "@/plugins/SandboxPluginFrame";
 import { WelcomeOverlay } from "@/shell/WelcomeOverlay";
 import { WakeFlash } from "@/shell/WakeFlash";
 import { RosieTaskChip } from "@/shell/RosieTaskChip";
@@ -59,6 +61,9 @@ function AppLoading() {
 }
 
 function AppBody({ descriptor }: { descriptor: AppDescriptor }) {
+  if (descriptor.renderer.kind === "sandboxed-plugin") {
+    return <SandboxPluginFrame pluginId={descriptor.renderer.pluginId} kind="ui" />;
+  }
   const Component = descriptor.renderer.component;
   return (
     <Suspense fallback={<AppLoading />}>
@@ -126,6 +131,7 @@ export function Shell() {
       <ConfirmModalHost />
       <ToastHost />
       <PluginOverlays />
+      <CommunityPluginRuntimeHost />
       <MonitorWidget />
       <ErrorBoundary label="R.O.S.I.E" compact>
         <RosieMount />

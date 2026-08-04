@@ -70,4 +70,40 @@ describe("plugin manifest v1 validation", () => {
     expect(contribution.ok).toBe(false);
     expect(activation.ok).toBe(false);
   });
+
+  it("validates declarative sandbox app and command contributions", () => {
+    const result = validatePluginManifest({
+      ...validManifest(),
+      contributes: {
+        apps: [{
+          id: "dashboard",
+          name: "Dashboard",
+          accent: "violet",
+          window: { width: 800, height: 600 },
+        }],
+        commands: [{ id: "dashboard.open", title: "Open dashboard", app: "dashboard" }],
+      },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("fails closed on nested app authority and unsupported live contributions", () => {
+    const nested = validatePluginManifest({
+      ...validManifest(),
+      contributes: {
+        apps: [{ id: "bad", name: "Bad", tauri: true }],
+      },
+    });
+    const unsupported = validatePluginManifest({
+      ...validManifest(),
+      contributes: { aiTools: [{ name: "escape" }] },
+    });
+    expect(nested.ok).toBe(false);
+    if (!nested.ok) {
+      expect(nested.issues).toContain(
+        "manifest.contributes.apps[0].tauri is not supported",
+      );
+    }
+    expect(unsupported.ok).toBe(false);
+  });
 });

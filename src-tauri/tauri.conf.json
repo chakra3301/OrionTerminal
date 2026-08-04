@@ -29,7 +29,7 @@
         "script-src": "'self' blob: 'unsafe-eval'",
         "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
         "worker-src": "'self' blob:",
-        "frame-src": "http: https: about:",
+        "frame-src": "http: https: about: blob:",
         "object-src": "'none'",
         "base-uri": "'none'",
         "form-action": "'none'"
@@ -43,7 +43,7 @@
         "script-src": "'self' blob: 'unsafe-eval'",
         "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
         "worker-src": "'self' blob:",
-        "frame-src": "http: https: about:",
+        "frame-src": "http: https: about: blob:",
         "object-src": "'none'",
         "base-uri": "'none'",
         "form-action": "'none'"
