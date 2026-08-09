@@ -517,6 +517,12 @@ export const ipc = {
     kind: "ui" | "background",
   ): Promise<import("@/plugins/communityTypes").CommunityPluginEntrypoint> =>
     invoke("plugin_read_entrypoint", { pluginId, kind }),
+  pluginWorkspaceGrant: (
+    pluginId: string,
+    selectedPath: string,
+    mode: "read" | "readwrite",
+  ): Promise<import("@/plugins/communityTypes").CommunityWorkspaceHandle> =>
+    invoke("plugin_workspace_grant", { pluginId, selectedPath, mode }),
   pluginBrokerCall: (pluginId: string, method: string, params: unknown): Promise<unknown> =>
     invoke("plugin_broker_call", { pluginId, method, params }),
   pluginBootStatus: (): Promise<import("@/plugins/communityTypes").CommunityPluginSafeMode> =>

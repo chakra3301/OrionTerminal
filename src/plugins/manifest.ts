@@ -347,6 +347,9 @@ export function validatePluginManifest(input: unknown): ManifestValidation {
         seen.add(permission);
       }
     });
+    if (seen.has("workspace.write") && !seen.has("workspace.read")) {
+      issues.push("manifest.permissions workspace.write requires workspace.read");
+    }
   }
 
   return issues.length > 0

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { AlertTriangle, Loader2, Shield } from "lucide-react";
 import { beginCommunityPluginCall } from "@/plugins/communityActivity";
 import { ipc } from "@/lib/ipc";
@@ -16,6 +17,12 @@ const BROKER_METHODS = new Set([
   "storage.get",
   "storage.set",
   "storage.delete",
+  "workspace.requestAccess",
+  "workspace.listHandles",
+  "workspace.listFiles",
+  "workspace.readText",
+  "workspace.writeText",
+  "workspace.revoke",
   "notifications.show",
 ]);
 
@@ -46,18 +53,24 @@ function scriptJson(value: string): string {
   return JSON.stringify(value).replaceAll("<", "\\u003c");
 }
 
-function bootstrapScript(sessionId: string): string {
+function bootstrapScript(sessionId: string, gestureToken: string): string {
   return `(() => {
   "use strict";
   const channel = ${scriptJson(PLUGIN_RPC_CHANNEL)};
   const version = ${PLUGIN_RPC_VERSION};
   const sessionId = ${scriptJson(sessionId)};
+  const gestureToken = ${scriptJson(gestureToken)};
   const pending = new Map();
   let sequence = 0;
   for (const name of ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "WebTransport", "Worker", "SharedWorker", "RTCPeerConnection", "webkitRTCPeerConnection", "open"]) {
     try { Object.defineProperty(window, name, { value: undefined, writable: false, configurable: false }); } catch {}
   }
   try { Object.defineProperty(navigator, "sendBeacon", { value: () => false, writable: false, configurable: false }); } catch {}
+  const trustedGesture = (event) => {
+    if (event.isTrusted) parent.postMessage({ channel, version, sessionId, gestureToken, type: "gesture" }, "*");
+  };
+  addEventListener("pointerdown", trustedGesture, true);
+  addEventListener("keydown", trustedGesture, true);
   const request = (method, params = {}) => new Promise((resolve, reject) => {
     if (typeof method !== "string" || method.length > 80) {
       reject(new Error("invalid broker method"));
@@ -74,6 +87,14 @@ function bootstrapScript(sessionId: string): string {
       get: (key) => request("storage.get", { key }),
       set: (key, value) => request("storage.set", { key, value }),
       delete: (key) => request("storage.delete", { key }),
+    }),
+    workspace: Object.freeze({
+      requestAccess: (mode = "read") => request("workspace.requestAccess", { mode }),
+      handles: () => request("workspace.listHandles"),
+      list: (handle, path = "") => request("workspace.listFiles", { handle, path }),
+      readText: (handle, path) => request("workspace.readText", { handle, path }),
+      writeText: (handle, path, contents) => request("workspace.writeText", { handle, path, contents }),
+      revoke: (handle) => request("workspace.revoke", { handle }),
     }),
     notifications: Object.freeze({
       show: (title, body = "") => request("notifications.show", { title, body }),
@@ -97,6 +118,7 @@ function bootstrapScript(sessionId: string): string {
   addEventListener("error", (event) => runtimeError(event.error || event.message));
   addEventListener("unhandledrejection", (event) => runtimeError(event.reason));
   addEventListener("beforeunload", () => runtimeError("Sandbox navigation attempt blocked"));
+  document.currentScript?.remove();
   parent.postMessage({ channel, version, sessionId, type: "ready" }, "*");
 })();`;
 }
@@ -113,6 +135,7 @@ export function buildPluginDocument(
   content: string,
   kind: "ui" | "background",
   sessionId: string,
+  gestureToken = `${sessionId}-gesture`,
 ): string {
   const csp = [
     "default-src 'none'",
@@ -137,7 +160,7 @@ export function buildPluginDocument(
   const pluginScript = kind === "background"
     ? `<script>(()=>{const code=${scriptJson(content)};const url=URL.createObjectURL(new Blob([code],{type:"text/javascript"}));const script=document.createElement("script");script.src=url;script.onload=()=>URL.revokeObjectURL(url);document.head.appendChild(script)})()</script>`
     : "";
-  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="referrer" content="no-referrer"><style>${baseStyle}</style><script>${bootstrapScript(sessionId)}</script>${parsed.head}</head><body>${parsed.body}${pluginScript}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="referrer" content="no-referrer"><style>${baseStyle}</style><script>${bootstrapScript(sessionId, gestureToken)}</script>${parsed.head}</head><body>${parsed.body}${pluginScript}</body></html>`;
 }
 
 export function isPluginRequest(value: unknown, sessionId: string): value is PluginRequest {
@@ -162,6 +185,26 @@ export function isPluginRequest(value: unknown, sessionId: string): value is Plu
   }
 }
 
+export function isPluginGesture(
+  value: unknown,
+  sessionId: string,
+  gestureToken: string,
+): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const gesture = value as {
+    channel?: unknown;
+    version?: unknown;
+    sessionId?: unknown;
+    gestureToken?: unknown;
+    type?: unknown;
+  };
+  return gesture.channel === PLUGIN_RPC_CHANNEL
+    && gesture.version === PLUGIN_RPC_VERSION
+    && gesture.sessionId === sessionId
+    && gesture.gestureToken === gestureToken
+    && gesture.type === "gesture";
+}
+
 function isRuntimeError(value: unknown, sessionId: string): value is PluginRuntimeError {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const error = value as Partial<PluginRuntimeError>;
@@ -182,7 +225,9 @@ export function SandboxPluginFrame({
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const disposingRef = useRef(false);
+  const trustedGestureAtRef = useRef(0);
   const sessionId = useMemo(randomSessionId, [pluginId, kind]);
+  const gestureToken = useMemo(randomSessionId, [pluginId, kind]);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const reportRuntimeFailure = useCommunityPlugins((state) => state.reportRuntimeFailure);
@@ -200,7 +245,7 @@ export function SandboxPluginFrame({
     void ipc.pluginReadEntrypoint(pluginId, kind)
       .then((entrypoint) => {
         if (disposed) return;
-        const document = buildPluginDocument(entrypoint.content, kind, sessionId);
+        const document = buildPluginDocument(entrypoint.content, kind, sessionId, gestureToken);
         objectUrl = URL.createObjectURL(new Blob([document], { type: "text/html" }));
         setUrl(objectUrl);
       })
@@ -213,7 +258,7 @@ export function SandboxPluginFrame({
       disposed = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [kind, pluginId, reportRuntimeFailure, sessionId]);
+  }, [gestureToken, kind, pluginId, reportRuntimeFailure, sessionId]);
 
   useEffect(() => {
     const inFlight = new Set<string>();
@@ -248,8 +293,18 @@ export function SandboxPluginFrame({
         }
         return;
       }
+      const candidate = event.data as {
+        channel?: unknown;
+        version?: unknown;
+        sessionId?: unknown;
+        type?: unknown;
+        gestureToken?: unknown;
+      } | null;
+      if (isPluginGesture(candidate, sessionId, gestureToken)) {
+        trustedGestureAtRef.current = Date.now();
+        return;
+      }
       if (!isPluginRequest(event.data, sessionId)) {
-        const candidate = event.data as { channel?: unknown } | null;
         if (candidate?.channel === PLUGIN_RPC_CHANNEL) fail("Plugin sent repeated malformed RPC messages.");
         return;
       }
@@ -269,7 +324,35 @@ export function SandboxPluginFrame({
       requestTimes.push(now);
       inFlight.add(request.requestId);
       const endActivity = beginCommunityPluginCall(pluginId);
-      void ipc.pluginBrokerCall(pluginId, request.method, request.params ?? {})
+      const execute = async (): Promise<unknown> => {
+        if (request.method !== "workspace.requestAccess") {
+          return ipc.pluginBrokerCall(pluginId, request.method, request.params ?? {});
+        }
+        if (kind !== "ui") throw new Error("workspace access requires a visible plugin window");
+        if (Date.now() - trustedGestureAtRef.current > 1500) {
+          throw new Error("workspace access requires a recent trusted click or key press");
+        }
+        trustedGestureAtRef.current = 0;
+        const mode = (request.params as { mode?: unknown } | null)?.mode;
+        if (mode !== "read" && mode !== "readwrite") {
+          throw new Error("workspace access mode must be read or readwrite");
+        }
+        const installed = useCommunityPlugins.getState().installed.find(
+          (plugin) => plugin.manifest.id === pluginId,
+        );
+        const permissions = installed?.grantedPermissions ?? [];
+        if (!permissions.includes("workspace.read") || (mode === "readwrite" && !permissions.includes("workspace.write"))) {
+          throw new Error("plugin did not receive the requested workspace permission");
+        }
+        const selected = await openDialog({
+          directory: true,
+          multiple: false,
+          title: `${installed?.manifest.name ?? pluginId} · choose workspace`,
+        });
+        if (typeof selected !== "string") return null;
+        return ipc.pluginWorkspaceGrant(pluginId, selected, mode);
+      };
+      void execute()
         .then((result) => {
           if (request.method === "notifications.show" && result && typeof result === "object") {
             const notification = result as { title?: unknown; body?: unknown };
@@ -292,7 +375,7 @@ export function SandboxPluginFrame({
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [pluginId, reportRuntimeFailure, sessionId]);
+  }, [gestureToken, kind, pluginId, reportRuntimeFailure, sessionId]);
 
   if (kind === "background") {
     return url ? (

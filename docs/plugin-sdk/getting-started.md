@@ -19,6 +19,8 @@ The sandbox gets one frozen `window.orion` object. Calls cross a source-bound, v
 
 The sample proves namespaced persistence and brokered notifications while showing that Tauri authority is absent.
 
+For opaque filesystem access, install `examples/plugins/workspace-lens.orion-plugin`. Its **Choose folder** button must be triggered by a real click or key press. Orion's trusted host opens the folder picker and returns only a random resource handle, display label, and read/write flags—never an absolute path.
+
 ## Package layout
 
 A developer-preview package is a directory, conventionally ending in `.orion-plugin`:
@@ -74,6 +76,14 @@ const previous = await window.orion.storage.get("counter");
 await window.orion.storage.set("counter", Number(previous || 0) + 1);
 await window.orion.storage.delete("counter");
 await window.orion.notifications.show("Saved", "The counter is durable.");
+
+// Requires a real user gesture and manifest workspace permissions.
+const workspace = await window.orion.workspace.requestAccess("readwrite");
+const entries = await window.orion.workspace.list(workspace.id, "");
+const text = await window.orion.workspace.readText(workspace.id, "README.md");
+await window.orion.workspace.writeText(workspace.id, "notes.txt", "Brokered write");
+const handles = await window.orion.workspace.handles();
+await window.orion.workspace.revoke(workspace.id);
 ```
 
 Available broker methods:
@@ -85,6 +95,14 @@ Available broker methods:
 | `storage.set` | `storage.plugin` | 64 KiB request/value |
 | `storage.delete` | `storage.plugin` | scoped key only |
 | `notifications.show` | `notifications` | 100-char title / 500-char body |
+| `workspace.requestAccess` | `workspace.read` and optionally `workspace.write` | visible UI + recent trusted gesture + native folder picker |
+| `workspace.listHandles` | `workspace.read` | opaque IDs and labels only |
+| `workspace.listFiles` | `workspace.read` | one directory / 500 regular entries; symlinks omitted |
+| `workspace.readText` | `workspace.read` | relative path / regular UTF-8 file / 256 KiB |
+| `workspace.writeText` | `workspace.write` | relative path / 64 KiB / atomic save |
+| `workspace.revoke` | `workspace.read` | plugin-owned handle only |
+
+`workspace.write` requires `workspace.read`. Workspace paths must be package-supplied relative paths without traversal. Rust resolves every operation against the canonical grant root, rejects symlinks and special files, and never returns the root path to plugin code.
 
 Unknown methods are denied in both the frame bridge and native broker. Broker operations are audit-logged without payloads.
 
@@ -100,4 +118,4 @@ Unknown methods are denied in both the frame bridge and native broker. Broker op
 
 ## Not yet public
 
-Workspace/resource handles, brokered network, clipboard, assets, terminal/Git, AI chat/tools, signed archive packages, publisher verification, update rollback, and marketplace distribution remain disabled until their broker contracts and security tests land. Declaring an unsupported contribution fails installation rather than silently granting authority.
+Workspace watch streams, brokered network, clipboard, assets, terminal/Git, AI chat/tools, signed archive packages, publisher verification, update rollback, and marketplace distribution remain disabled until their broker contracts and security tests land. Declaring an unsupported contribution fails installation rather than silently granting authority.

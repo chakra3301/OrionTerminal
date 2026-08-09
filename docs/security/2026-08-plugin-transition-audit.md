@@ -80,14 +80,15 @@ Applied controls for the local SDK slice:
 
 - Community UI and startup background entrypoints run in `sandbox="allow-scripts"` blob frames without `allow-same-origin`; a frame-local CSP denies connections, navigation helpers, frames, objects, forms, external scripts/styles, and ambient media/font authority.
 - The shell binds plugin identity to the frame. RPC validates `event.source`, a 192-bit frame session, channel/version, method, request ID, payload size, concurrency, and rate before crossing native IPC.
-- Rust re-reads enabled/quarantine state and reviewed grants on every broker call. Unknown methods deny by default; currently only host identity, quota-controlled namespaced storage, and notifications are exposed.
+- Rust re-reads enabled/quarantine state and reviewed grants on every broker call. Unknown methods deny by default. Host identity, quota-controlled namespaced storage, notifications, and opaque workspace handles are exposed.
 - Broker calls append payload-free audit events. In-flight calls block disable.
+- Workspace access requires a visible sandbox plus a recent unforgeable bootstrap gesture signal before the trusted host opens a native directory picker. Plugins receive only random 256-bit handles and labels. Native list/read/write operations accept relative paths, re-check canonical boundaries, reject symlinks/special files, cap results and bytes, and never disclose roots.
 - Package inspection and installation reject unknown authority fields, symlinks, traversal, special files, oversized packages/files/entrypoints/manifests, missing entrypoints, permission mismatches, publisher changes, downgrades, and review/install fingerprint changes.
 - Startup markers hold all community code out after an incomplete plugin boot; uncaught runtime errors quarantine the offending package.
 
 Remaining fix:
 
-- Issue opaque resource handles for workspace, asset, terminal, process, network, clipboard, and AI operations; do not add path-bearing community RPC.
+- Extend the opaque-handle pattern from workspace access to assets, terminals, processes, network/provider origins, clipboard grants, and AI operations; do not add path-bearing community RPC.
 - Prove the packaged webview does not inject Tauri authority into an adversarial opaque frame.
 - Add signed archive ingestion and cryptographic publisher identity before distribution.
 - Keep the existing broad IPC facade private to the trusted compatibility layer.
@@ -208,7 +209,7 @@ Partial remediation for plugin packages and storage:
 Remaining fix:
 
 - Stream copied core assets instead of reading the entire file.
-- Add limits and opaque handles for future workspace trees, search, watches, network, assets, and background tasks.
+- Add limits and opaque handles for future workspace search/watches, network, assets, and background tasks.
 - Reject special files and re-check symlink/canonical boundaries in every future broker operation.
 
 ### OTSEC-011 — Release builds include Tauri devtools support

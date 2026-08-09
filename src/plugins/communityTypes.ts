@@ -22,6 +22,13 @@ export type CommunityPluginEntrypoint = {
   content: string;
 };
 
+export type CommunityWorkspaceHandle = {
+  id: string;
+  label: string;
+  read: boolean;
+  write: boolean;
+};
+
 export type CommunityPluginSafeMode = {
   active: boolean;
   pluginIds: string[];

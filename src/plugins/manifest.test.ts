@@ -87,6 +87,19 @@ describe("plugin manifest v1 validation", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("requires read authority whenever workspace writes are requested", () => {
+    const result = validatePluginManifest({
+      ...validManifest(),
+      permissions: ["workspace.write"],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toContain(
+        "manifest.permissions workspace.write requires workspace.read",
+      );
+    }
+  });
+
   it("fails closed on nested app authority and unsupported live contributions", () => {
     const nested = validatePluginManifest({
       ...validManifest(),

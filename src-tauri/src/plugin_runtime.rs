@@ -21,6 +21,8 @@ const MAX_PACKAGE_FILES: usize = 512;
 const MAX_BROKER_PAYLOAD: usize = 64 * 1024;
 const MAX_STORAGE_BYTES: usize = 1024 * 1024;
 const MAX_STORAGE_KEYS: usize = 256;
+const MAX_WORKSPACE_READ_BYTES: u64 = 256 * 1024;
+const MAX_WORKSPACE_ENTRIES: usize = 500;
 const MAX_AUDIT_BYTES: u64 = 2 * 1024 * 1024;
 
 static PACKAGE_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
@@ -84,6 +86,37 @@ pub struct PluginManifest {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct WorkspaceGrant {
+    id: String,
+    root: PathBuf,
+    label: String,
+    read: bool,
+    write: bool,
+    created_at: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceHandle {
+    pub id: String,
+    pub label: String,
+    pub read: bool,
+    pub write: bool,
+}
+
+impl From<&WorkspaceGrant> for WorkspaceHandle {
+    fn from(value: &WorkspaceGrant) -> Self {
+        Self {
+            id: value.id.clone(),
+            label: value.label.clone(),
+            read: value.read,
+            write: value.write,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct InstalledState {
     manifest: PluginManifest,
     enabled: bool,
@@ -94,6 +127,8 @@ struct InstalledState {
     quarantined: bool,
     #[serde(default)]
     quarantine_reason: Option<String>,
+    #[serde(default)]
+    workspace_grants: Vec<WorkspaceGrant>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -198,6 +233,16 @@ fn plugin_key(plugin_id: &str) -> String {
     format!("{:x}", hash.finalize())
 }
 
+fn random_handle_id() -> Result<String, String> {
+    let mut bytes = [0u8; 32];
+    getrandom::getrandom(&mut bytes).map_err(|error| format!("create resource handle: {error}"))?;
+    Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+fn valid_handle_id(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn package_dir(app: &AppHandle, plugin_id: &str) -> Result<PathBuf, String> {
     Ok(packages_root(app)?.join(plugin_key(plugin_id)))
 }
@@ -249,6 +294,22 @@ fn validate_state(state: &InstalledState) -> Result<(), String> {
             .all(|byte| byte.is_ascii_hexdigit())
     {
         return Err("plugin fingerprint is invalid".into());
+    }
+    let may_read = requested.contains("workspace.read");
+    let may_write = requested.contains("workspace.write");
+    let mut handles = BTreeSet::new();
+    for grant in &state.workspace_grants {
+        if !may_read
+            || !grant.read
+            || (grant.write && !may_write)
+            || !valid_handle_id(&grant.id)
+            || !grant.root.is_absolute()
+            || grant.label.is_empty()
+            || grant.label.len() > 120
+            || !handles.insert(&grant.id)
+        {
+            return Err("plugin workspace grant state is invalid".into());
+        }
     }
     Ok(())
 }
@@ -556,7 +617,10 @@ fn validate_manifest(manifest: &PluginManifest) -> Result<(), String> {
         if !valid_permission(permission) {
             return Err(format!("unknown or invalid permission: {permission}"));
         }
-        if !matches!(permission.as_str(), "storage.plugin" | "notifications") {
+        if !matches!(
+            permission.as_str(),
+            "storage.plugin" | "notifications" | "workspace.read" | "workspace.write"
+        ) {
             return Err(format!(
                 "permission is not available in this host build: {permission}"
             ));
@@ -564,6 +628,15 @@ fn validate_manifest(manifest: &PluginManifest) -> Result<(), String> {
         if !permissions.insert(permission) {
             return Err(format!("duplicated permission: {permission}"));
         }
+    }
+    if permissions
+        .iter()
+        .any(|value| value.as_str() == "workspace.write")
+        && !permissions
+            .iter()
+            .any(|value| value.as_str() == "workspace.read")
+    {
+        return Err("workspace.write requires workspace.read".into());
     }
     if manifest.contributes.apps.len() > 8 || manifest.contributes.commands.len() > 64 {
         return Err("manifest contribution limit exceeded".into());
@@ -800,6 +873,28 @@ pub fn plugin_install_directory(
             installed_at: now_ms(),
             quarantined: false,
             quarantine_reason: None,
+            workspace_grants: existing
+                .as_ref()
+                .map(|state| {
+                    state
+                        .workspace_grants
+                        .iter()
+                        .filter(|grant| {
+                            scan.manifest
+                                .permissions
+                                .iter()
+                                .any(|value| value == "workspace.read")
+                                && (!grant.write
+                                    || scan
+                                        .manifest
+                                        .permissions
+                                        .iter()
+                                        .any(|value| value == "workspace.write"))
+                        })
+                        .cloned()
+                        .collect()
+                })
+                .unwrap_or_default(),
         };
         let bytes = serde_json::to_vec_pretty(&state)
             .map_err(|error| format!("encode plugin state: {error}"))?;
@@ -931,6 +1026,264 @@ pub fn plugin_read_entrypoint(
     Ok(PluginEntrypointContent { kind, content })
 }
 
+fn grant_workspace(
+    app: &AppHandle,
+    plugin_id: &str,
+    selected_path: &str,
+    mode: &str,
+) -> Result<WorkspaceHandle, String> {
+    let _guard = PACKAGE_LOCK.lock();
+    let mut state = read_state(app, plugin_id)?;
+    if !state.enabled || state.quarantined {
+        return Err("plugin is disabled or quarantined".into());
+    }
+    let write = match mode {
+        "read" => false,
+        "readwrite" => true,
+        _ => return Err("workspace access mode must be read or readwrite".into()),
+    };
+    if !state
+        .granted_permissions
+        .iter()
+        .any(|permission| permission == "workspace.read")
+        || (write
+            && !state
+                .granted_permissions
+                .iter()
+                .any(|permission| permission == "workspace.write"))
+    {
+        return Err("plugin did not receive the requested workspace permission".into());
+    }
+    let root = Path::new(selected_path)
+        .canonicalize()
+        .map_err(|error| format!("open selected workspace: {error}"))?;
+    if !root.is_dir() {
+        return Err("selected workspace must be a directory".into());
+    }
+    if let Some(index) = state
+        .workspace_grants
+        .iter()
+        .position(|grant| grant.root == root)
+    {
+        if write {
+            state.workspace_grants[index].write = true;
+            write_state(app, &state)?;
+        }
+        return Ok(WorkspaceHandle::from(&state.workspace_grants[index]));
+    }
+    if state.workspace_grants.len() >= 16 {
+        return Err("plugin workspace handle quota exceeded".into());
+    }
+    let label = root
+        .file_name()
+        .map(|value| value.to_string_lossy().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "Workspace".into());
+    let grant = WorkspaceGrant {
+        id: random_handle_id()?,
+        root,
+        label: label.chars().take(120).collect(),
+        read: true,
+        write,
+        created_at: now_ms(),
+    };
+    let public = WorkspaceHandle::from(&grant);
+    state.workspace_grants.push(grant);
+    write_state(app, &state)?;
+    Ok(public)
+}
+
+#[tauri::command]
+pub fn plugin_workspace_grant(
+    app: AppHandle,
+    plugin_id: String,
+    selected_path: String,
+    mode: String,
+) -> Result<WorkspaceHandle, String> {
+    let result = grant_workspace(&app, &plugin_id, &selected_path, &mode);
+    append_audit(&app, &plugin_id, "workspace.requestAccess", result.is_ok());
+    result
+}
+
+fn workspace_grant<'a>(
+    state: &'a InstalledState,
+    params: &Value,
+) -> Result<&'a WorkspaceGrant, String> {
+    let handle = params
+        .get("handle")
+        .and_then(Value::as_str)
+        .filter(|value| valid_handle_id(value))
+        .ok_or_else(|| "valid workspace handle is required".to_string())?;
+    state
+        .workspace_grants
+        .iter()
+        .find(|grant| grant.id == handle)
+        .ok_or_else(|| "workspace handle is unknown or revoked".into())
+}
+
+fn workspace_relative(params: &Value, allow_empty: bool) -> Result<PathBuf, String> {
+    let value = params
+        .get("path")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if value.len() > 512 || value.contains('\0') || value.contains('\\') {
+        return Err("workspace path is invalid".into());
+    }
+    if value.is_empty() {
+        return if allow_empty {
+            Ok(PathBuf::new())
+        } else {
+            Err("workspace path is required".into())
+        };
+    }
+    let path = Path::new(value);
+    if path.is_absolute()
+        || path
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err("workspace path must be relative and cannot traverse".into());
+    }
+    Ok(path.to_path_buf())
+}
+
+fn checked_workspace_path(
+    grant: &WorkspaceGrant,
+    relative: &Path,
+    allow_missing_leaf: bool,
+) -> Result<PathBuf, String> {
+    let mut current = grant.root.clone();
+    let components: Vec<_> = relative.components().collect();
+    for (index, component) in components.iter().enumerate() {
+        let Component::Normal(name) = component else {
+            return Err("workspace path is invalid".into());
+        };
+        current.push(name);
+        match fs::symlink_metadata(&current) {
+            Ok(metadata) => {
+                if metadata.file_type().is_symlink() {
+                    return Err("workspace paths cannot cross symlinks".into());
+                }
+            }
+            Err(error)
+                if error.kind() == std::io::ErrorKind::NotFound
+                    && allow_missing_leaf
+                    && index + 1 == components.len() => {}
+            Err(error) => return Err(format!("inspect workspace path: {error}")),
+        }
+    }
+    let boundary = grant
+        .root
+        .canonicalize()
+        .map_err(|error| format!("open workspace root: {error}"))?;
+    let comparison = if current.exists() {
+        current
+            .canonicalize()
+            .map_err(|error| format!("open workspace path: {error}"))?
+    } else {
+        current
+            .parent()
+            .ok_or_else(|| "workspace path has no parent".to_string())?
+            .canonicalize()
+            .map_err(|error| format!("open workspace parent: {error}"))?
+    };
+    if !comparison.starts_with(&boundary) {
+        return Err("workspace path escaped its granted root".into());
+    }
+    Ok(current)
+}
+
+fn list_workspace(grant: &WorkspaceGrant, params: &Value) -> Result<Value, String> {
+    if !grant.read {
+        return Err("workspace handle does not allow reads".into());
+    }
+    let relative = workspace_relative(params, true)?;
+    let directory = checked_workspace_path(grant, &relative, false)?;
+    if !directory.is_dir() {
+        return Err("workspace list target must be a directory".into());
+    }
+    let mut entries = Vec::new();
+    for entry in fs::read_dir(directory).map_err(|error| format!("list workspace: {error}"))? {
+        let entry = entry.map_err(|error| format!("list workspace entry: {error}"))?;
+        let metadata = fs::symlink_metadata(entry.path())
+            .map_err(|error| format!("inspect workspace entry: {error}"))?;
+        if metadata.file_type().is_symlink() || !(metadata.is_file() || metadata.is_dir()) {
+            continue;
+        }
+        entries.push(json!({
+            "name": entry.file_name().to_string_lossy(),
+            "kind": if metadata.is_dir() { "directory" } else { "file" },
+            "size": if metadata.is_file() { metadata.len() } else { 0 },
+        }));
+        if entries.len() >= MAX_WORKSPACE_ENTRIES {
+            break;
+        }
+    }
+    entries.sort_by(|left, right| {
+        left["kind"]
+            .as_str()
+            .cmp(&right["kind"].as_str())
+            .then_with(|| left["name"].as_str().cmp(&right["name"].as_str()))
+    });
+    Ok(Value::Array(entries))
+}
+
+fn read_workspace_text(grant: &WorkspaceGrant, params: &Value) -> Result<Value, String> {
+    if !grant.read {
+        return Err("workspace handle does not allow reads".into());
+    }
+    let relative = workspace_relative(params, false)?;
+    let path = checked_workspace_path(grant, &relative, false)?;
+    let metadata =
+        fs::metadata(&path).map_err(|error| format!("inspect workspace file: {error}"))?;
+    if !metadata.is_file() || metadata.len() > MAX_WORKSPACE_READ_BYTES {
+        return Err("workspace text reads require a regular file under 256 KiB".into());
+    }
+    let text = fs::read_to_string(path).map_err(|error| format!("read workspace text: {error}"))?;
+    Ok(Value::String(text))
+}
+
+fn write_workspace_text(grant: &WorkspaceGrant, params: &Value) -> Result<Value, String> {
+    if !grant.write {
+        return Err("workspace handle does not allow writes".into());
+    }
+    let relative = workspace_relative(params, false)?;
+    let contents = params
+        .get("contents")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "workspace text contents are required".to_string())?;
+    if contents.len() > MAX_BROKER_PAYLOAD {
+        return Err("workspace text write exceeds 64 KiB".into());
+    }
+    let path = checked_workspace_path(grant, &relative, true)?;
+    if path.exists() {
+        let metadata =
+            fs::metadata(&path).map_err(|error| format!("inspect workspace file: {error}"))?;
+        if !metadata.is_file() {
+            return Err("workspace write target must be a regular file".into());
+        }
+    }
+    atomic_write(&path, contents.as_bytes())?;
+    Ok(json!({ "ok": true }))
+}
+
+fn revoke_workspace(app: &AppHandle, plugin_id: &str, params: &Value) -> Result<Value, String> {
+    let handle = params
+        .get("handle")
+        .and_then(Value::as_str)
+        .filter(|value| valid_handle_id(value))
+        .ok_or_else(|| "valid workspace handle is required".to_string())?;
+    let _guard = PACKAGE_LOCK.lock();
+    let mut state = read_state(app, plugin_id)?;
+    let before = state.workspace_grants.len();
+    state.workspace_grants.retain(|grant| grant.id != handle);
+    if state.workspace_grants.len() == before {
+        return Err("workspace handle is unknown or revoked".into());
+    }
+    write_state(app, &state)?;
+    Ok(json!({ "ok": true }))
+}
+
 fn storage_path(app: &AppHandle, plugin_id: &str) -> Result<PathBuf, String> {
     Ok(storage_root(app)?.join(format!("{}.json", plugin_key(plugin_id))))
 }
@@ -1003,6 +1356,11 @@ fn permission_for_method(method: &str) -> Result<Option<&'static str>, String> {
     match method {
         "host.getInfo" => Ok(None),
         "storage.get" | "storage.set" | "storage.delete" => Ok(Some("storage.plugin")),
+        "workspace.listHandles"
+        | "workspace.listFiles"
+        | "workspace.readText"
+        | "workspace.revoke" => Ok(Some("workspace.read")),
+        "workspace.writeText" => Ok(Some("workspace.write")),
         "notifications.show" => Ok(Some("notifications")),
         _ => Err("broker method is not supported".into()),
     }
@@ -1038,6 +1396,15 @@ fn broker_call(
             "pluginId": plugin_id,
             "platform": std::env::consts::OS,
         })),
+        "workspace.listHandles" => Ok(json!(state
+            .workspace_grants
+            .iter()
+            .map(WorkspaceHandle::from)
+            .collect::<Vec<_>>())),
+        "workspace.listFiles" => list_workspace(workspace_grant(&state, params)?, params),
+        "workspace.readText" => read_workspace_text(workspace_grant(&state, params)?, params),
+        "workspace.writeText" => write_workspace_text(workspace_grant(&state, params)?, params),
+        "workspace.revoke" => revoke_workspace(app, plugin_id, params),
         "storage.get" => {
             let _guard = STORAGE_LOCK.lock();
             let key = storage_key(params)?;
@@ -1300,6 +1667,14 @@ mod tests {
             permission_for_method("notifications.show").unwrap(),
             Some("notifications")
         );
+        assert_eq!(
+            permission_for_method("workspace.readText").unwrap(),
+            Some("workspace.read")
+        );
+        assert_eq!(
+            permission_for_method("workspace.writeText").unwrap(),
+            Some("workspace.write")
+        );
         assert!(permission_for_method("tauri.invoke").is_err());
         assert!(permission_for_method("process.spawn").is_err());
         assert!(permission_for_method("filesystem.read").is_err());
@@ -1321,6 +1696,54 @@ mod tests {
         assert!(save_storage(&path, &too_many)
             .unwrap_err()
             .contains("key quota"));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn workspace_handles_confine_text_io_to_the_granted_root() {
+        let dir = temp_dir("workspace");
+        fs::write(dir.join("readme.txt"), "hello").unwrap();
+        fs::create_dir(dir.join("nested")).unwrap();
+        let grant = WorkspaceGrant {
+            id: "a".repeat(64),
+            root: dir.canonicalize().unwrap(),
+            label: "workspace".into(),
+            read: true,
+            write: true,
+            created_at: now_ms(),
+        };
+
+        let listed = list_workspace(&grant, &json!({ "path": "" })).unwrap();
+        assert!(listed
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["name"] == "readme.txt"));
+        assert_eq!(
+            read_workspace_text(&grant, &json!({ "path": "readme.txt" })).unwrap(),
+            "hello"
+        );
+        write_workspace_text(
+            &grant,
+            &json!({ "path": "nested/output.txt", "contents": "safe" }),
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read_to_string(dir.join("nested/output.txt")).unwrap(),
+            "safe"
+        );
+        assert!(workspace_relative(&json!({ "path": "../escape.txt" }), false).is_err());
+        assert!(workspace_relative(&json!({ "path": "/tmp/escape.txt" }), false).is_err());
+
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink("/tmp", dir.join("escape")).unwrap();
+            assert!(
+                checked_workspace_path(&grant, Path::new("escape/file"), true)
+                    .unwrap_err()
+                    .contains("symlinks")
+            );
+        }
         let _ = fs::remove_dir_all(dir);
     }
 }

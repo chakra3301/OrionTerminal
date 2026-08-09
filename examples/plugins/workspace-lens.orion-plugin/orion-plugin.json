@@ -1,0 +1,26 @@
+{
+  "id": "dev.orion.workspace-lens",
+  "name": "Workspace Lens",
+  "version": "1.0.0",
+  "apiVersion": "1",
+  "engines": { "orion": "*" },
+  "publisher": "Orion SDK samples",
+  "entrypoints": { "ui": "ui.html" },
+  "activationEvents": ["onApp:workspace-lens"],
+  "dependencies": {},
+  "contributes": {
+    "apps": [
+      {
+        "id": "workspace-lens",
+        "name": "Workspace Lens",
+        "description": "Read and write text through an opaque workspace handle",
+        "accent": "cyan",
+        "window": { "title": "WORKSPACE LENS", "subtitle": "opaque handles", "width": 900, "height": 640 }
+      }
+    ],
+    "commands": [
+      { "id": "workspace-lens.open", "title": "Open Workspace Lens", "app": "workspace-lens", "keywords": ["workspace", "handle", "sdk"] }
+    ]
+  },
+  "permissions": ["workspace.read", "workspace.write"]
+}

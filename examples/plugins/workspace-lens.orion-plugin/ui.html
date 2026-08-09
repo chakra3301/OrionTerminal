@@ -1,0 +1,112 @@
+<style>
+  :root { font-family: ui-monospace, "SFMono-Regular", monospace; color-scheme: dark; }
+  body { min-height: 100%; background: #03060a; color: #e6f4ec; }
+  main { height: 100%; display: grid; grid-template-rows: auto 1fr; }
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(0,224,255,.14); background: #060a0f; }
+  header strong { margin-right: auto; font: 600 13px/1 system-ui, sans-serif; }
+  button { padding: 8px 11px; color: #e6f4ec; border: 1px solid rgba(0,224,255,.28); border-radius: 6px; background: rgba(0,224,255,.07); cursor: pointer; font: 10px/1 ui-monospace, monospace; }
+  button:hover { border-color: #00e0ff; }
+  button:disabled { opacity: .45; cursor: default; }
+  .handle { color: #5a706a; font-size: 9px; }
+  .body { min-height: 0; display: grid; grid-template-columns: 260px 1fr; }
+  nav { min-height: 0; overflow: auto; padding: 10px; border-right: 1px solid rgba(255,255,255,.07); }
+  nav button { width: 100%; display: flex; justify-content: space-between; margin-bottom: 5px; text-align: left; border-color: transparent; background: transparent; }
+  nav button:hover { background: rgba(0,224,255,.06); }
+  nav span { color: #5a706a; }
+  section { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .path { padding: 10px 13px; color: #5a706a; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 10px; }
+  textarea { flex: 1; min-height: 0; resize: none; padding: 16px; color: #d7e8df; background: #03060a; border: 0; outline: 0; font: 12px/1.65 ui-monospace, monospace; }
+  .status { padding: 8px 13px; color: #5a706a; border-top: 1px solid rgba(255,255,255,.06); font-size: 9px; }
+</style>
+<main>
+  <header>
+    <strong>Workspace Lens</strong>
+    <span class="handle" id="handle">No path authority</span>
+    <button id="grant">Choose folder</button>
+    <button id="save" disabled>Save text</button>
+  </header>
+  <div class="body">
+    <nav id="files"></nav>
+    <section>
+      <div class="path" id="path">Select a text file</div>
+      <textarea id="editor" spellcheck="false" disabled></textarea>
+      <div class="status" id="status">The plugin receives a random handle and display label—never the folder's absolute path.</div>
+    </section>
+  </div>
+</main>
+<script>
+  const files = document.querySelector("#files");
+  const editor = document.querySelector("#editor");
+  const pathLabel = document.querySelector("#path");
+  const status = document.querySelector("#status");
+  const handleLabel = document.querySelector("#handle");
+  const save = document.querySelector("#save");
+  let handle = null;
+  let directory = "";
+  let activePath = "";
+
+  const join = (left, right) => left ? `${left}/${right}` : right;
+
+  async function showDirectory(path) {
+    directory = path;
+    activePath = "";
+    editor.value = "";
+    editor.disabled = true;
+    save.disabled = true;
+    pathLabel.textContent = path || "/";
+    const entries = await window.orion.workspace.list(handle.id, path);
+    files.replaceChildren();
+    if (path) {
+      const up = document.createElement("button");
+      up.textContent = "← parent";
+      up.addEventListener("click", () => showDirectory(path.split("/").slice(0, -1).join("/")));
+      files.append(up);
+    }
+    for (const entry of entries) {
+      const button = document.createElement("button");
+      const name = document.createElement("b");
+      const meta = document.createElement("span");
+      name.textContent = entry.name;
+      meta.textContent = entry.kind === "directory" ? "dir" : `${entry.size}b`;
+      button.append(name, meta);
+      button.addEventListener("click", async () => {
+        const target = join(path, entry.name);
+        if (entry.kind === "directory") return showDirectory(target);
+        try {
+          editor.value = await window.orion.workspace.readText(handle.id, target);
+          activePath = target;
+          editor.disabled = false;
+          save.disabled = false;
+          pathLabel.textContent = target;
+          status.textContent = "Read through the native handle boundary.";
+        } catch (error) {
+          status.textContent = error.message;
+        }
+      });
+      files.append(button);
+    }
+  }
+
+  document.querySelector("#grant").addEventListener("click", async () => {
+    try {
+      const granted = await window.orion.workspace.requestAccess("readwrite");
+      if (!granted) return;
+      handle = granted;
+      handleLabel.textContent = `${granted.label} · ${granted.id.slice(0, 8)}…`;
+      await showDirectory("");
+      status.textContent = "Read/write handle granted by an explicit folder picker.";
+    } catch (error) {
+      status.textContent = error.message;
+    }
+  });
+
+  save.addEventListener("click", async () => {
+    if (!handle || !activePath) return;
+    try {
+      await window.orion.workspace.writeText(handle.id, activePath, editor.value);
+      status.textContent = "Saved atomically through the native broker.";
+    } catch (error) {
+      status.textContent = error.message;
+    }
+  });
+</script>

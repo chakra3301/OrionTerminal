@@ -4,6 +4,7 @@ import {
   PLUGIN_RPC_VERSION,
   PLUGIN_SANDBOX,
   buildPluginDocument,
+  isPluginGesture,
   isPluginRequest,
 } from "@/plugins/SandboxPluginFrame";
 
@@ -31,6 +32,19 @@ describe("community plugin sandbox", () => {
     expect(document).not.toContain("attacker.test");
   });
 
+  it("requires an unforgeable bootstrap token for trusted gesture grants", () => {
+    const gesture = {
+      channel: PLUGIN_RPC_CHANNEL,
+      version: PLUGIN_RPC_VERSION,
+      sessionId: "session-1",
+      gestureToken: "secret-gesture-token",
+      type: "gesture",
+    };
+    expect(isPluginGesture(gesture, "session-1", "secret-gesture-token")).toBe(true);
+    expect(isPluginGesture({ ...gesture, gestureToken: undefined }, "session-1", "secret-gesture-token")).toBe(false);
+    expect(isPluginGesture({ ...gesture, sessionId: "other" }, "session-1", "secret-gesture-token")).toBe(false);
+  });
+
   it("accepts only source-bound, versioned, size-bounded broker calls", () => {
     const valid = {
       channel: PLUGIN_RPC_CHANNEL,
@@ -43,6 +57,8 @@ describe("community plugin sandbox", () => {
     };
     expect(isPluginRequest(valid, "session-1")).toBe(true);
     expect(isPluginRequest({ ...valid, sessionId: "other" }, "session-1")).toBe(false);
+    expect(isPluginRequest({ ...valid, method: "workspace.requestAccess" }, "session-1")).toBe(true);
+    expect(isPluginRequest({ ...valid, method: "workspace.readText" }, "session-1")).toBe(true);
     expect(isPluginRequest({ ...valid, method: "tauri.invoke" }, "session-1")).toBe(false);
     expect(isPluginRequest({ ...valid, params: { value: "x".repeat(70_000) } }, "session-1")).toBe(false);
   });
