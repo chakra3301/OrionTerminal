@@ -523,6 +523,11 @@ export const ipc = {
     mode: "read" | "readwrite",
   ): Promise<import("@/plugins/communityTypes").CommunityWorkspaceHandle> =>
     invoke("plugin_workspace_grant", { pluginId, selectedPath, mode }),
+  pluginWorkspaceRevoke: (
+    pluginId: string,
+    handle: string,
+  ): Promise<import("@/plugins/communityTypes").CommunityWorkspaceHandle[]> =>
+    invoke("plugin_workspace_revoke", { pluginId, handle }),
   pluginBrokerCall: (pluginId: string, method: string, params: unknown): Promise<unknown> =>
     invoke("plugin_broker_call", { pluginId, method, params }),
   pluginBootStatus: (): Promise<import("@/plugins/communityTypes").CommunityPluginSafeMode> =>

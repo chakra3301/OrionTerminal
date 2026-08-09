@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
   AlertTriangle,
   Blocks,
   Check,
+  FolderKey,
   FolderPlus,
   Loader2,
   LockKeyhole,
@@ -13,6 +14,7 @@ import {
   ShieldCheck,
   ShieldOff,
   Trash2,
+  X,
 } from "lucide-react";
 import { confirmAction } from "@/components/ConfirmModal";
 import { ipc } from "@/lib/ipc";
@@ -75,9 +77,15 @@ export function PluginManagerPanel() {
   const installCommunity = useCommunityPlugins((state) => state.install);
   const setCommunityEnabled = useCommunityPlugins((state) => state.setEnabled);
   const removeCommunity = useCommunityPlugins((state) => state.remove);
+  const refreshCommunityResources = useCommunityPlugins((state) => state.refreshResources);
+  const revokeCommunityWorkspace = useCommunityPlugins((state) => state.revokeWorkspace);
   const clearSafeMode = useCommunityPlugins((state) => state.clearSafeMode);
   const clearCommunityError = useCommunityPlugins((state) => state.clearError);
   const [inspecting, setInspecting] = useState(false);
+
+  useEffect(() => {
+    if (installed.length > 0) void refreshCommunityResources();
+  }, [installed.length, refreshCommunityResources]);
 
   const builtinEnabled = BUILTIN_APP_PLUGIN_CATALOG.length - disabledIds.length;
   const communityEnabled = installed.filter((plugin) => plugin.enabled && !plugin.quarantined).length;
@@ -162,6 +170,21 @@ export function PluginManagerPanel() {
       danger: true,
     });
     if (approved) await removeCommunity(pluginId);
+  };
+
+  const revokeWorkspace = async (
+    pluginId: string,
+    pluginName: string,
+    handle: string,
+    label: string,
+  ) => {
+    const approved = await confirmAction({
+      title: `Revoke ${label}?`,
+      body: `${pluginName} will immediately lose access to this workspace. The folder and its files will not be changed. Access can only be restored through another folder-picker gesture.`,
+      confirmLabel: "Revoke access",
+      danger: true,
+    });
+    if (approved) await revokeCommunityWorkspace(pluginId, handle);
   };
 
   const retrySafeMode = async () => {
@@ -326,6 +349,31 @@ export function PluginManagerPanel() {
                       ))
                     : <span>No grants</span>}
                 </div>
+                {plugin.workspaceHandles.length > 0 && (
+                  <div className="pm-resource-grants">
+                    <div className="pm-resource-title"><FolderKey size={11} /> Approved workspaces</div>
+                    {plugin.workspaceHandles.map((workspace) => (
+                      <div className="pm-resource-row" key={workspace.id}>
+                        <span>
+                          <strong>{workspace.label}</strong>
+                          <small>{workspace.write ? "Read + write" : "Read only"}</small>
+                        </span>
+                        <button
+                          type="button"
+                          title={`Revoke access to ${workspace.label}`}
+                          aria-label={`Revoke ${plugin.manifest.name} access to ${workspace.label}`}
+                          disabled={busy}
+                          onClick={() => void revokeWorkspace(
+                            plugin.manifest.id,
+                            plugin.manifest.name,
+                            workspace.id,
+                            workspace.label,
+                          )}
+                        ><X size={11} /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {issue && <div className="pm-plugin-issue">{issue}</div>}
                 <footer className="pm-card-foot">
                   <div><span>Local</span><span>v{plugin.manifest.version}</span><span>{plugin.manifest.publisher}</span></div>

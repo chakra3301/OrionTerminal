@@ -8,6 +8,7 @@ export type InstalledCommunityPlugin = {
   installedAt: number;
   quarantined: boolean;
   quarantineReason: string | null;
+  workspaceHandles: CommunityWorkspaceHandle[];
 };
 
 export type CommunityPluginInspection = {

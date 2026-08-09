@@ -404,6 +404,15 @@ textarea.cp-input { resize: vertical; line-height: 1.55; font-family: var(--f-mo
 .pm-card.warned { border-color: rgba(var(--neon-yellow-rgb), .25); }
 .pm-state.warn { color: var(--neon-yellow); border: 1px solid rgba(var(--neon-yellow-rgb), .32); background: rgba(var(--neon-yellow-rgb), .06); }
 .pm-plugin-issue { margin-top: 11px; padding: 8px 9px; color: var(--neon-yellow); background: rgba(var(--neon-yellow-rgb), .04); border-left: 2px solid rgba(var(--neon-yellow-rgb), .5); font: 9px/1.45 var(--f-mono); }
+.pm-resource-grants { display: grid; gap: 5px; margin-top: 11px; padding-top: 10px; border-top: 1px dashed var(--glass-border); }
+.pm-resource-title { display: flex; align-items: center; gap: 5px; margin-bottom: 1px; color: var(--t-tertiary); font: 8px/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
+.pm-resource-row { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 8px; border: 1px solid rgba(var(--neon-cyan-rgb), .16); border-radius: var(--r-sm); background: rgba(var(--neon-cyan-rgb), .035); }
+.pm-resource-row > span { min-width: 0; display: flex; align-items: baseline; gap: 7px; }
+.pm-resource-row strong { overflow: hidden; text-overflow: ellipsis; color: var(--t-secondary); font: 500 10px/1 var(--f-mono); white-space: nowrap; }
+.pm-resource-row small { flex: 0 0 auto; color: var(--t-faint); font: 8px/1 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; }
+.pm-resource-row button { width: 21px; height: 21px; flex: 0 0 auto; display: grid; place-items: center; padding: 0; color: var(--t-tertiary); border: 1px solid transparent; border-radius: 5px; background: transparent; cursor: pointer; }
+.pm-resource-row button:hover { color: var(--neon-magenta); border-color: rgba(var(--neon-magenta-rgb), .28); background: rgba(var(--neon-magenta-rgb), .06); }
+.pm-resource-row button:disabled { opacity: .45; cursor: wait; }
 .pm-card-actions { align-items: center; }
 .pm-remove { width: 25px; height: 25px; display: grid; place-items: center; color: var(--t-tertiary); background: transparent; border: 1px solid var(--glass-border); border-radius: var(--r-sm); cursor: pointer; }
 .pm-remove:hover { color: var(--neon-magenta); border-color: rgba(var(--neon-magenta-rgb), .35); background: rgba(var(--neon-magenta-rgb), .06); }

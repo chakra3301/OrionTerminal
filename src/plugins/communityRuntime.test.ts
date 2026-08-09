@@ -29,6 +29,7 @@ const record: InstalledCommunityPlugin = {
   installedAt: 1,
   quarantined: false,
   quarantineReason: null,
+  workspaceHandles: [],
 };
 
 afterEach(() => {

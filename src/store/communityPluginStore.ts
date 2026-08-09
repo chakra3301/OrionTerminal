@@ -47,7 +47,11 @@ function validated(records: readonly InstalledCommunityPlugin[]): {
       issues[record.manifest.id || "unknown"] = result.issues.join(" ");
       continue;
     }
-    clean.push({ ...record, manifest: result.manifest });
+    clean.push({
+      ...record,
+      manifest: result.manifest,
+      workspaceHandles: Array.isArray(record.workspaceHandles) ? record.workspaceHandles : [],
+    });
   }
   return { records: clean, issues };
 }
@@ -110,6 +114,8 @@ type CommunityPluginState = {
   install: (sourcePath: string, inspection: CommunityPluginInspection) => Promise<boolean>;
   setEnabled: (pluginId: string, enabled: boolean) => Promise<boolean>;
   remove: (pluginId: string) => Promise<boolean>;
+  refreshResources: () => Promise<void>;
+  revokeWorkspace: (pluginId: string, handle: string) => Promise<boolean>;
   clearSafeMode: () => Promise<boolean>;
   reportRuntimeFailure: (pluginId: string, reason: string) => Promise<void>;
   clearError: () => void;
@@ -283,6 +289,50 @@ export const useCommunityPlugins = create<CommunityPluginState>((set, get) => ({
         error: removed ? `Package removed, but runtime refresh failed: ${message}` : message,
       });
       return removed;
+    } finally {
+      set((current) => ({ busyIds: current.busyIds.filter((id) => id !== pluginId) }));
+    }
+  },
+
+  refreshResources: async () => {
+    try {
+      const checked = validated(await ipc.pluginListInstalled());
+      const resources = new Map(
+        checked.records.map((plugin) => [plugin.manifest.id, plugin.workspaceHandles] as const),
+      );
+      set((state) => ({
+        installed: state.installed.map((plugin) => ({
+          ...plugin,
+          workspaceHandles: resources.get(plugin.manifest.id) ?? plugin.workspaceHandles,
+        })),
+      }));
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) });
+    }
+  },
+
+  revokeWorkspace: async (pluginId, handle) => {
+    const state = get();
+    if (!state.installed.some((plugin) => plugin.manifest.id === pluginId)) {
+      set({ error: `Unknown community plugin: ${pluginId}` });
+      return false;
+    }
+    if (state.busyIds.length > 0) {
+      set({ error: "Wait for the current plugin change to finish." });
+      return false;
+    }
+    set((current) => ({ busyIds: [...current.busyIds, pluginId], error: null }));
+    try {
+      const workspaceHandles = await ipc.pluginWorkspaceRevoke(pluginId, handle);
+      set((current) => ({
+        installed: current.installed.map((plugin) =>
+          plugin.manifest.id === pluginId ? { ...plugin, workspaceHandles } : plugin,
+        ),
+      }));
+      return true;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return false;
     } finally {
       set((current) => ({ busyIds: current.busyIds.filter((id) => id !== pluginId) }));
     }

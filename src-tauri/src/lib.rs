@@ -304,6 +304,7 @@ pub fn run() {
             plugin_runtime::plugin_remove,
             plugin_runtime::plugin_read_entrypoint,
             plugin_runtime::plugin_workspace_grant,
+            plugin_runtime::plugin_workspace_revoke,
             plugin_runtime::plugin_broker_call,
             plugin_runtime::plugin_boot_status,
             plugin_runtime::plugin_runtime_begin,

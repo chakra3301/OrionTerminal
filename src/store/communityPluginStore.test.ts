@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   enabled: vi.fn(),
   quarantine: vi.fn(),
   remove: vi.fn(),
+  revokeWorkspace: vi.fn(),
   clearSafe: vi.fn(),
 }));
 
@@ -25,6 +26,7 @@ vi.mock("@/lib/ipc", () => ({
     pluginSetEnabled: mocks.enabled,
     pluginQuarantine: mocks.quarantine,
     pluginRemove: mocks.remove,
+    pluginWorkspaceRevoke: mocks.revokeWorkspace,
     pluginSafeModeClear: mocks.clearSafe,
   },
 }));
@@ -49,6 +51,7 @@ const record: InstalledCommunityPlugin = {
   installedAt: 1,
   quarantined: false,
   quarantineReason: null,
+  workspaceHandles: [{ id: "b".repeat(64), label: "Notes", read: true, write: false }],
 };
 
 beforeEach(() => {
@@ -72,6 +75,7 @@ beforeEach(() => {
   mocks.enabled.mockResolvedValue(undefined);
   mocks.quarantine.mockResolvedValue(undefined);
   mocks.remove.mockResolvedValue(undefined);
+  mocks.revokeWorkspace.mockResolvedValue([]);
   mocks.clearSafe.mockResolvedValue(undefined);
 });
 
@@ -119,5 +123,14 @@ describe("community plugin store", () => {
     expect(mocks.enabled).not.toHaveBeenCalled();
     expect(useCommunityPlugins.getState().error).toContain("privileged plugin request");
     end();
+  });
+
+  it("revokes a workspace grant through the host even when plugin code is not involved", async () => {
+    await useCommunityPlugins.getState().hydrate();
+    const handle = record.workspaceHandles[0]!.id;
+    const changed = await useCommunityPlugins.getState().revokeWorkspace(record.manifest.id, handle);
+    expect(changed).toBe(true);
+    expect(mocks.revokeWorkspace).toHaveBeenCalledWith(record.manifest.id, handle);
+    expect(useCommunityPlugins.getState().installed[0]?.workspaceHandles).toEqual([]);
   });
 });

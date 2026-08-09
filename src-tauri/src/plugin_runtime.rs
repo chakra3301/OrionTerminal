@@ -141,10 +141,16 @@ pub struct InstalledPlugin {
     pub installed_at: u64,
     pub quarantined: bool,
     pub quarantine_reason: Option<String>,
+    pub workspace_handles: Vec<WorkspaceHandle>,
 }
 
 impl From<InstalledState> for InstalledPlugin {
     fn from(value: InstalledState) -> Self {
+        let workspace_handles = value
+            .workspace_grants
+            .iter()
+            .map(WorkspaceHandle::from)
+            .collect();
         Self {
             manifest: value.manifest,
             enabled: value.enabled,
@@ -153,6 +159,7 @@ impl From<InstalledState> for InstalledPlugin {
             installed_at: value.installed_at,
             quarantined: value.quarantined,
             quarantine_reason: value.quarantine_reason,
+            workspace_handles,
         }
     }
 }
@@ -1105,6 +1112,26 @@ pub fn plugin_workspace_grant(
     result
 }
 
+#[tauri::command]
+pub fn plugin_workspace_revoke(
+    app: AppHandle,
+    plugin_id: String,
+    handle: String,
+) -> Result<Vec<WorkspaceHandle>, String> {
+    if !valid_id(&plugin_id) {
+        return Err("invalid plugin id".into());
+    }
+    let result = revoke_workspace(&app, &plugin_id, &json!({ "handle": handle })).and_then(|_| {
+        Ok(read_state(&app, &plugin_id)?
+            .workspace_grants
+            .iter()
+            .map(WorkspaceHandle::from)
+            .collect())
+    });
+    append_audit(&app, &plugin_id, "host.workspace.revoke", result.is_ok());
+    result
+}
+
 fn workspace_grant<'a>(
     state: &'a InstalledState,
     params: &Value,
@@ -1712,6 +1739,9 @@ mod tests {
             write: true,
             created_at: now_ms(),
         };
+        let public = serde_json::to_value(WorkspaceHandle::from(&grant)).unwrap();
+        assert_eq!(public["label"], "workspace");
+        assert!(public.get("root").is_none());
 
         let listed = list_workspace(&grant, &json!({ "path": "" })).unwrap();
         assert!(listed

@@ -20,6 +20,7 @@ function plugin(id: string, dependencies: Record<string, string> = {}): Installe
     installedAt: 1,
     quarantined: false,
     quarantineReason: null,
+    workspaceHandles: [],
   };
 }
 

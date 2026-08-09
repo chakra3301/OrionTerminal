@@ -102,7 +102,7 @@ Available broker methods:
 | `workspace.writeText` | `workspace.write` | relative path / 64 KiB / atomic save |
 | `workspace.revoke` | `workspace.read` | plugin-owned handle only |
 
-`workspace.write` requires `workspace.read`. Workspace paths must be package-supplied relative paths without traversal. Rust resolves every operation against the canonical grant root, rejects symlinks and special files, and never returns the root path to plugin code.
+`workspace.write` requires `workspace.read`. Workspace paths must be package-supplied relative paths without traversal. Rust resolves every operation against the canonical grant root, rejects symlinks and special files, and never returns the root path to plugin code. Users can inspect every workspace label and access mode in **Control Panel → Plugins** and revoke a handle even while your plugin is disabled; the host never reveals the root there either.
 
 Unknown methods are denied in both the frame bridge and native broker. Broker operations are audit-logged without payloads.
 

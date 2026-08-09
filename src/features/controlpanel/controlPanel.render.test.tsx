@@ -14,9 +14,13 @@ import { SkillEditor } from "./SkillEditor";
 import { PluginManagerPanel } from "./PluginManagerPanel";
 import { ModelSelect } from "@/components/ModelSelect";
 import type { Skill } from "@/features/agents/agentTypes";
+import { useCommunityPlugins } from "@/store/communityPluginStore";
 
 // Tauri modules pulled in by these components (only called in handlers).
-vi.mock("@tauri-apps/api/core", () => ({ convertFileSrc: (s: string) => s }));
+vi.mock("@tauri-apps/api/core", () => ({
+  convertFileSrc: (s: string) => s,
+  invoke: vi.fn(async (command: string) => command === "plugin_list_installed" ? [] : null),
+}));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 
 beforeAll(() => {
@@ -71,5 +75,48 @@ describe("Control Panel surfaces render without a Zustand v5 selector loop", () 
   });
   it("PluginManagerPanel mounts", () => {
     expect(rendersWithoutLoop(<PluginManagerPanel />)).toEqual({ ok: true, detail: "" });
+  });
+});
+
+describe("Plugin Manager resource grants", () => {
+  it("shows workspace labels and modes without exposing opaque IDs", async () => {
+    const handle = "b".repeat(64);
+    const refreshResources = useCommunityPlugins.getState().refreshResources;
+    act(() => useCommunityPlugins.setState({
+      refreshResources: async () => {},
+      installed: [{
+        manifest: {
+          id: "dev.orion.workspace-lens",
+          name: "Workspace Lens",
+          version: "1.0.0",
+          apiVersion: "1",
+          engines: { orion: "*" },
+          publisher: "Orion SDK Examples",
+          permissions: ["workspace.read"],
+        },
+        enabled: false,
+        grantedPermissions: ["workspace.read"],
+        fingerprint: "a".repeat(64),
+        installedAt: 1,
+        quarantined: false,
+        quarantineReason: null,
+        workspaceHandles: [{ id: handle, label: "Notes", read: true, write: false }],
+      }],
+    }));
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(<PluginManagerPanel />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain("Approved workspaces");
+    expect(container.textContent).toContain("Notes");
+    expect(container.textContent).toContain("Read only");
+    expect(container.textContent).not.toContain(handle);
+    await act(async () => {
+      root.unmount();
+    });
+    act(() => useCommunityPlugins.setState({ installed: [], refreshResources }));
   });
 });

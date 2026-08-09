@@ -272,7 +272,7 @@ This is the first P3 slice, not the distribution boundary. Workspace resource ha
 - ✅ Typed, source-bound RPC plus deny-by-default native broker
 - ✅ Quota-controlled `storage.plugin` and brokered `notifications`
 - ✅ Local install/update/remove, declarative apps/commands, dependency ordering/cycle detection, sample plugin, quarantine, audit log, and safe mode
-- ✅ User-gesture-gated opaque workspace handles with bounded list/read/write/revoke operations and no path disclosure
+- ✅ User-gesture-gated opaque workspace handles with bounded list/read/write/revoke operations, host-owned grant inspection/revocation, and no path disclosure
 - ⬜ Workspace watches and remaining capability vocabulary
 - ⬜ Signed archive ingestion, cryptographic publisher identity, and package rollback
 
