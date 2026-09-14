@@ -108,7 +108,7 @@ fn dispatch(method: &str, params: &Value) -> Result<Value, RpcError> {
 }
 
 pub fn tool_definitions() -> Value {
-    json!([
+    let mut definitions = json!([
         {
             "name": "orion_list_recent_notes",
             "description": "List the user's most recently updated notes from \
@@ -709,6 +709,282 @@ pub fn tool_definitions() -> Value {
             }
         },
         {
+            "name": "orion_model_get_spec",
+            "description": "img2model — read the full current ObjectSculptSpec: pass status, object class, complexity, quality contract, components, materials, repetition systems, feature targets, and detail-inventory completeness. Call this first each turn you don't already know the state. XDesign must have an open '3D model' project (or call orion_open_app xdesign and create one first).",
+            "inputSchema": { "type": "object", "properties": {} }
+        },
+        {
+            "name": "orion_model_set_object_class",
+            "description": "img2model — set preSpecAssessment.objectClass from direct visual inspection of the reference image. primaryDomain MUST be object|character|hybrid.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "primaryType": { "type": "string" },
+                    "primaryDomain": { "type": "string", "enum": ["object", "character", "hybrid"] },
+                    "formLanguage": { "type": "array", "items": { "type": "string" } },
+                    "structureKind": { "type": "array", "items": { "type": "string" } },
+                    "motionPotential": { "type": "array", "items": { "type": "string" } },
+                    "materialFamilies": { "type": "array", "items": { "type": "string" } },
+                    "notes": { "type": "string" }
+                },
+                "required": ["primaryType", "primaryDomain"]
+            }
+        },
+        {
+            "name": "orion_model_set_complexity",
+            "description": "img2model — set the complexity assessment. tier drives targetMinDetails and minimumSpecDepth (simple/moderate/complex/ultra-complex). Score each axis 0-3: silhouetteComplexity, componentCount, hierarchyDepth, repetitionDensity, materialLayerCount, localDetailDensity, occlusionRisk, actionReadinessNeed. Also pass estimatedCounts: macroComponents, mesoComponents, microFeatureGroups, materialLayers, repetitionSystems.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "tier": { "type": "string", "enum": ["simple", "moderate", "complex", "ultra-complex"] },
+                    "silhouetteComplexity": { "type": "number" }, "componentCount": { "type": "number" }, "hierarchyDepth": { "type": "number" },
+                    "repetitionDensity": { "type": "number" }, "materialLayerCount": { "type": "number" }, "localDetailDensity": { "type": "number" },
+                    "occlusionRisk": { "type": "number" }, "actionReadinessNeed": { "type": "number" },
+                    "macroComponents": { "type": "number" }, "mesoComponents": { "type": "number" }, "microFeatureGroups": { "type": "number" },
+                    "materialLayers": { "type": "number" }, "repetitionSystems": { "type": "number" },
+                    "reasoning": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["tier"]
+            }
+        },
+        {
+            "name": "orion_model_set_quality_contract",
+            "description": "img2model — define what 'good enough' means for THIS object: definitionOfDone + antiShallowSpecRules. Replace the generic starter contract with specifics (e.g. 'leaf clusters must form irregular overlapping canopy masses', not 'make leaves look good').",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "definitionOfDone": { "type": "array", "items": { "type": "string" } },
+                    "antiShallowSpecRules": { "type": "array", "items": { "type": "string" } },
+                    "visualDeltaChecks": { "type": "array", "items": { "type": "string" } }
+                }
+            }
+        },
+        {
+            "name": "orion_model_scan_zones",
+            "description": "img2model — get normalized zone rects (grid-3x3 or grid-4x4) to scan systematically for the detail inventory, instead of eyeballing the whole reference image once.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "mode": { "type": "string", "enum": ["grid-3x3", "grid-4x4"] } },
+                "required": ["mode"]
+            }
+        },
+        {
+            "name": "orion_model_add_detail",
+            "description": "img2model — record one identity-defining detail found while scanning a zone (gloss/bevel/fastener/linework/contour/seam/stitch/stain/scratch/chip/decal/emissive/hole/groove/ridge). mapsTo MUST be a real component localFeature id or material localOverride id you already created (or will create this turn) — a detail without mapsTo never reaches the render.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "kind": { "type": "string" },
+                    "region": { "type": "object", "properties": { "x": {"type":"number"}, "y": {"type":"number"}, "w": {"type":"number"}, "h": {"type":"number"} }, "required": ["x","y","w","h"] },
+                    "affects": { "type": "string", "enum": ["geometry", "material"] },
+                    "scale": { "type": "number" }, "evidenceRef": { "type": "string" }, "confidence": { "type": "number" },
+                    "mapsTo": { "type": ["string", "null"] }, "notes": { "type": "string" }
+                },
+                "required": ["kind", "region", "affects", "evidenceRef", "confidence"]
+            }
+        },
+        {
+            "name": "orion_model_add_material",
+            "description": "img2model — add a SculptMaterial (MeshPhysicalMaterial scalars: roughness/metalness/clearcoat/transmission/ior/anisotropy). Returns the material id.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string" }, "baseColor": { "type": "string" },
+                    "roughnessBase": { "type": "number" }, "roughnessVariation": { "type": "number" },
+                    "metalness": { "type": "number" }, "opacity": { "type": "number" },
+                    "clearcoat": { "type": "number" }, "clearcoatRoughness": { "type": "number" },
+                    "transmission": { "type": "number" }, "ior": { "type": "number" }, "anisotropy": { "type": "number" },
+                    "emissive": { "type": "string" }, "emissiveIntensity": { "type": "number" }
+                },
+                "required": ["id", "baseColor"]
+            }
+        },
+        {
+            "name": "orion_model_add_material_override",
+            "description": "img2model — add a localOverride region to an existing material (stains/scratches/gloss/emissive/decals). Returns the override id — use it as a detail's mapsTo.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "materialId": { "type": "string" }, "kind": { "type": "string" },
+                    "region": { "type": "object", "properties": { "x": {"type":"number"}, "y": {"type":"number"}, "w": {"type":"number"}, "h": {"type":"number"} }, "required": ["x","y","w","h"] },
+                    "roughnessDelta": { "type": "number" }, "clearcoat": { "type": "number" }, "colorShift": { "type": "string" },
+                    "dirtAmount": { "type": "number" }, "cavityBias": { "type": "boolean" },
+                    "emissive": { "type": "string" }, "emissiveIntensity": { "type": "number" }
+                },
+                "required": ["materialId", "kind", "region"]
+            }
+        },
+        {
+            "name": "orion_model_add_component",
+            "description": "img2model — add a SculptComponent to the tree. level=macro for overall masses, meso for sub-assemblies, micro for tiny/repeated detail groups. Classify topologyClass BEFORE picking primitive — a continuous organic form must not be forced into a box. Appendages (limbs/branches/handles/tubes) need `attachment` (localStart/localEnd/contactType) or they float. Returns the component id.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string" }, "level": { "type": "string", "enum": ["macro", "meso", "micro"] }, "role": { "type": "string" },
+                    "importance": { "type": "string", "enum": ["critical", "important", "minor"] }, "confidence": { "type": "number" },
+                    "primitive": { "type": "string", "enum": ["box", "sphere", "cylinder", "cone", "torus", "capsule", "tube", "extrude", "lathe", "plane", "group"] },
+                    "topologyClass": { "type": "string" }, "topologyRationale": { "type": "string" },
+                    "parent": { "type": ["string", "null"] }, "materialId": { "type": "string" },
+                    "position": { "type": "array", "items": { "type": "number" } }, "rotation": { "type": "array", "items": { "type": "number" } }, "scale": { "type": "array", "items": { "type": "number" } },
+                    "width": { "type": "number" }, "height": { "type": "number" }, "depth": { "type": "number" },
+                    "bevelType": { "type": "string", "enum": ["none", "chamfer", "fillet"] }, "bevelRadius": { "type": "number" }, "bevelSegments": { "type": "number" },
+                    "geometryParams": { "type": "object", "description": "Extra numeric knobs the primitive builder reads: radialSegments, profile (lathe [r,y,...]), outline (extrude [[x,y],...]), path (tube [[x,y,z],...])" },
+                    "attachment": {
+                        "type": "object",
+                        "properties": {
+                            "parentSocket": { "type": "string" },
+                            "localStart": { "type": "array", "items": { "type": "number" } }, "localEnd": { "type": "array", "items": { "type": "number" } },
+                            "baseRadius": { "type": "number" }, "endRadius": { "type": "number" },
+                            "contactType": { "type": "string", "enum": ["embedded", "socket", "overlap", "hinge", "surface-contact", "glued"] },
+                            "gapTolerance": { "type": "number" }, "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+                        }
+                    },
+                    "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["name", "level", "role", "primitive", "topologyClass", "topologyRationale", "materialId", "position", "width", "height", "depth"]
+            }
+        },
+        {
+            "name": "orion_model_add_local_feature",
+            "description": "img2model — add a localFeature to an existing component: a groove/ridge/hole/chamfer geometry effect, or an instanced repetition (e.g. fasteners). Returns the feature id.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "componentId": { "type": "string" }, "kind": { "type": "string" },
+                    "region": { "type": "object", "properties": { "x": {"type":"number"}, "y": {"type":"number"}, "w": {"type":"number"}, "h": {"type":"number"} }, "required": ["x","y","w","h"] },
+                    "geometryEffectType": { "type": "string", "enum": ["groove", "ridge", "hole", "chamfer"] },
+                    "path": { "type": "array", "items": { "type": "array", "items": { "type": "number" } } },
+                    "width": { "type": "number" }, "depth": { "type": "number" },
+                    "instanceCount": { "type": "number" }, "instanceDistribution": { "type": "string", "enum": ["linear", "radial", "grid"] },
+                    "confidence": { "type": "number" }, "evidenceRef": { "type": "string" }
+                },
+                "required": ["componentId", "kind", "region", "confidence", "evidenceRef"]
+            }
+        },
+        {
+            "name": "orion_model_add_repetition_system",
+            "description": "img2model — register a repeated-parts system (rivets/leaves/scales/needles) so the strict-quality gate credits it.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "componentRef": { "type": "string" }, "count": { "type": "number" },
+                    "distribution": { "type": "string", "enum": ["linear", "radial", "grid", "scatter"] },
+                    "scaleVariance": { "type": "number" }, "rotationVariance": { "type": "number" }, "positionJitter": { "type": "number" }
+                },
+                "required": ["componentRef", "count", "distribution"]
+            }
+        },
+        {
+            "name": "orion_model_set_feature_targets",
+            "description": "img2model — REPLACE featureReviewTargets with the object's real identity-defining systems (≤5 critical, ≤3 important per pass). Never leave the generic starter targets — the strict-quality gate rejects generic names.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": { "type": "string" }, "name": { "type": "string" }, "tier": { "type": "string", "enum": ["critical", "important"] },
+                                "passIds": { "type": "array", "items": { "type": "string" } }, "minimumScore": { "type": "number" },
+                                "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+                            },
+                            "required": ["id", "name", "tier", "passIds"]
+                        }
+                    }
+                },
+                "required": ["targets"]
+            }
+        },
+        {
+            "name": "orion_model_set_anatomy",
+            "description": "img2model — fill the character anatomy block (required when primaryDomain is character/hybrid). Measure in head-units from the actual image — don't assume realistic proportions.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "styleHeads": { "type": "number" }, "headUnit": { "type": "number" }, "torso": { "type": "number" }, "legs": { "type": "number" },
+                    "shoulderWidth": { "type": "number" }, "hipWidth": { "type": "number" }, "poseType": { "type": "string" },
+                    "eyeLine": { "type": "number" }, "eyeSpacing": { "type": "number" }, "noseBase": { "type": "number" }, "mouthLine": { "type": "number" }, "hairline": { "type": "number" },
+                    "confidence": { "type": "number" }
+                },
+                "required": ["styleHeads", "confidence"]
+            }
+        },
+        {
+            "name": "orion_model_validate",
+            "description": "img2model — run structural + strict-quality validation NOW. Call before requesting a render — a shallow spec should be fixed here, not discovered after a failed review. Returns { ok, errors, warnings }.",
+            "inputSchema": { "type": "object", "properties": { "strict": { "type": "boolean" } } }
+        },
+        {
+            "name": "orion_model_solve_camera",
+            "description": "img2model — get a heuristic reference-camera guess (FOV/distance/position) for the reference image — a starting point, not a measurement.",
+            "inputSchema": { "type": "object", "properties": {} }
+        },
+        {
+            "name": "orion_model_extract_pbr",
+            "description": "img2model — extract reference-derived material evidence (palette, de-lit albedo, roughness estimate, confidence) from a normalized crop region of the reference image, and attach it to a material's referencePbr. Confidence < 0.7 is a request-input signal, not a pass.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "materialId": { "type": "string" },
+                    "region": { "type": "object", "properties": { "x": {"type":"number"}, "y": {"type":"number"}, "w": {"type":"number"}, "h": {"type":"number"} }, "required": ["x","y","w","h"] }
+                },
+                "required": ["materialId", "region"]
+            }
+        },
+        {
+            "name": "orion_model_project_texture",
+            "description": "img2model — the single biggest fidelity lever for a reference-matched surface: de-light a reference crop and project it onto a component's mesh UVs via the solved camera, instead of a procedural material approximation. Returns projection coverage — low coverage means the mesh has geometry this one view can't see.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "componentId": { "type": "string" }, "materialId": { "type": "string" },
+                    "region": { "type": "object", "properties": { "x": {"type":"number"}, "y": {"type":"number"}, "w": {"type":"number"}, "h": {"type":"number"} }, "required": ["x","y","w","h"] }
+                },
+                "required": ["componentId", "materialId", "region"]
+            }
+        },
+        {
+            "name": "orion_model_request_render",
+            "description": "img2model — render the CURRENT unlocked pass, package a reference|render comparison sheet, and run the deterministic Divine Eye ensemble (silhouette IoU, scale, proportion, symmetry, pHash, SSIM, edges, objectness). Returns Divine Eye scores plus `comparisonSheetPath` — use YOUR Read tool on that path to actually SEE the comparison before deciding. This does not by itself accept or reject a pass; you still call orion_model_submit_review with your own judgment.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "multiAngle": { "type": "boolean", "description": "Also capture 3 orbit angles and run the degenerate-view gate (recommended for non-planar forms during structural-pass/form-refinement)." }
+                }
+            }
+        },
+        {
+            "name": "orion_model_submit_review",
+            "description": "img2model — record your review decision for the current pass: continue | refine-spec | refine-code | request-input | stop. `continue` on a visual pass is HARD-BLOCKED if the last render's Divine Eye result had a hard-gate failure, or if any critical feature you score is below its threshold — the tool downgrades your action and tells you why.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "fidelity": { "type": "number" }, "action": { "type": "string", "enum": ["continue", "refine-spec", "refine-code", "request-input", "stop"] },
+                    "summary": { "type": "string" },
+                    "matched": { "type": "array", "items": { "type": "string" } }, "mismatches": { "type": "array", "items": { "type": "string" } },
+                    "specFixes": { "type": "array", "items": { "type": "string" } }, "codeFixes": { "type": "array", "items": { "type": "string" } },
+                    "featureScores": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": { "id": { "type": "string" }, "score": { "type": "number" }, "visible": { "type": "boolean" } },
+                            "required": ["id", "score"]
+                        }
+                    },
+                    "layerScores": {
+                        "type": "object",
+                        "properties": {
+                            "silhouetteProportion": { "type": "number" }, "componentStructure": { "type": "number" },
+                            "formDetail": { "type": "number" }, "materialSurface": { "type": "number" }, "lightingCamera": { "type": "number" }
+                        }
+                    },
+                    "aiVisionScore": { "type": "number" }, "aiVisionNotes": { "type": "string" }, "cameraView": { "type": "string" }
+                },
+                "required": ["fidelity", "action", "summary", "aiVisionScore"]
+            }
+        },
+        {
             "name": "orion_recent_activity",
             "description": "Read the ambient activity log — a lightweight trail of \
                 what the user (and Hermes swarms) have been doing across the whole \
@@ -731,7 +1007,112 @@ pub fn tool_definitions() -> Value {
                 }
             }
         }
-    ])
+    ]);
+    let fx: Vec<Value> = serde_json::from_str(include_str!("../../resources/fx-tools.json"))
+        .expect("checked-in FX tool schemas must be valid JSON");
+    definitions.as_array_mut().unwrap().extend(fx);
+    definitions
+}
+
+fn call_tool(params: &Value) -> Result<Value, RpcError> {
+    let name = params
+        .get("name")
+        .and_then(|n| n.as_str())
+        .ok_or_else(|| RpcError {
+            code: -32602,
+            message: "tools/call missing `name`".into(),
+        })?;
+    let args = params.get("arguments").cloned().unwrap_or(json!({}));
+
+    match dispatch_tool(name, &args) {
+        Ok(text) => Ok(json!({
+            "content": [{ "type": "text", "text": text }],
+            "isError": false,
+        })),
+        Err(msg) => Ok(json!({
+            "content": [{ "type": "text", "text": format!("error: {}", msg) }],
+            "isError": true,
+        })),
+    }
+}
+
+/// Shared tool dispatcher. The stdio serve loop (`call_tool`) and the
+/// in-process runtime both call this — one implementation, no duplication.
+pub fn dispatch_tool(name: &str, args: &Value) -> Result<String, String> {
+    if !crate::mcp_grants::permits(name) {
+        return Err("Tool is not authorized for this run".into());
+    }
+    ensure_tool_plugin_enabled(name)?;
+    match name {
+        "orion_list_recent_notes" => tool_list_recent_notes(args),
+        "orion_search_archive" => tool_search_archive(args),
+        "orion_list_projects" => tool_list_projects(args),
+        "orion_create_note" => tool_create_note(args),
+        "orion_create_project" => tool_create_project(args),
+        "orion_update_note_body" => tool_update_note_body(args),
+        "orion_read_note" => tool_read_note(args),
+        "orion_open_app" => tool_open_app(args),
+        "orion_switch_project" => tool_switch_project(args),
+        "orion_open_file" => tool_open_file(args),
+        "orion_apply_edit" => tool_apply_edit(args),
+        "orion_write_file" => tool_write_file(args),
+        "orion_read_file" => tool_read_file(args),
+        "orion_get_context" => tool_get_context(args),
+        "orion_search_files" => tool_search_files(args),
+        "orion_list_assets" => tool_list_assets(args),
+        "orion_search_assets" => tool_search_assets(args),
+        "orion_run_in_terminal" => tool_run_in_terminal(args),
+        "orion_xdesign_add_rect" => tool_xdesign_add_rect(args),
+        "orion_xdesign_add_text" => tool_xdesign_add_text(args),
+        "orion_xdesign_add_ellipse" => tool_xdesign_add_ellipse(args),
+        "orion_xdesign_add_frame" => tool_xdesign_add_frame(args),
+        "orion_xdesign_get_canvas" => tool_xdesign_get_canvas(args),
+        "orion_xdesign_get_selection" => tool_xdesign_get_selection(args),
+        "orion_xdesign_apply" => tool_xdesign_apply(args),
+        "orion_create_mood_board" => tool_create_mood_board(args),
+        "orion_add_to_mood_board" => tool_add_to_mood_board(args),
+        "orion_attach_tag" => tool_attach_tag(args),
+        "orion_delete_note" => tool_delete_note(args),
+        "orion_hermes_list_tasks" => tool_hermes_list_tasks(args),
+        "orion_hermes_get_task" => tool_hermes_get_task(args),
+        "orion_hermes_create_task" => tool_hermes_create_task(args),
+        "orion_hermes_add_agent" => tool_hermes_add_agent(args),
+        "orion_hermes_update_task" => tool_hermes_update_task(args),
+        "orion_hermes_move_task" => tool_hermes_move_task(args),
+        "orion_hermes_decompose" => tool_hermes_decompose(args),
+        "orion_recent_activity" => tool_recent_activity(args),
+        name if name.starts_with("orion_fx_") => tool_model_bridge(&name["orion_".len()..], args),
+        "orion_model_get_spec" => tool_model_bridge("model_get_spec", args),
+        "orion_model_set_object_class" => tool_model_bridge("model_set_object_class", args),
+        "orion_model_set_complexity" => tool_model_bridge("model_set_complexity", args),
+        "orion_model_set_quality_contract" => tool_model_bridge("model_set_quality_contract", args),
+        "orion_model_scan_zones" => tool_model_bridge("model_scan_zones", args),
+        "orion_model_add_detail" => tool_model_bridge("model_add_detail", args),
+        "orion_model_add_material" => tool_model_bridge("model_add_material", args),
+        "orion_model_add_material_override" => {
+            tool_model_bridge("model_add_material_override", args)
+        }
+        "orion_model_add_component" => tool_model_bridge("model_add_component", args),
+        "orion_model_add_local_feature" => tool_model_bridge("model_add_local_feature", args),
+        "orion_model_add_repetition_system" => {
+            tool_model_bridge("model_add_repetition_system", args)
+        }
+        "orion_model_set_feature_targets" => tool_model_bridge("model_set_feature_targets", args),
+        "orion_model_set_anatomy" => tool_model_bridge("model_set_anatomy", args),
+        "orion_model_validate" => tool_model_bridge("model_validate", args),
+        "orion_model_solve_camera" => tool_model_bridge("model_solve_camera", args),
+        "orion_model_extract_pbr" => tool_model_bridge("model_extract_pbr", args),
+        "orion_model_project_texture" => tool_model_bridge("model_project_texture", args),
+        "orion_model_request_render" => tool_model_bridge("model_request_render", args),
+        "orion_model_submit_review" => tool_model_bridge("model_submit_review", args),
+        other => Err(format!("unknown tool: {}", other)),
+    }
+}
+
+fn open_db() -> Result<Connection, String> {
+    let path =
+        std::env::var("ORION_DB_PATH").map_err(|_| "ORION_DB_PATH env var not set".to_string())?;
+    Connection::open(&path).map_err(|e| format!("open db: {}", e))
 }
 
 fn plugin_for_tool(name: &str) -> Option<&'static str> {
@@ -763,7 +1144,7 @@ fn plugin_for_tool(name: &str) -> Option<&'static str> {
         | "orion_xdesign_get_canvas"
         | "orion_xdesign_get_selection"
         | "orion_xdesign_apply" => Some(XDESIGN_PLUGIN_ID),
-        name if name.starts_with("orion_model_") => Some(XDESIGN_PLUGIN_ID),
+        name if name.starts_with("orion_model_") || name.starts_with("orion_fx_") => Some(XDESIGN_PLUGIN_ID),
         "orion_hermes_list_tasks"
         | "orion_hermes_get_task"
         | "orion_hermes_create_task"
@@ -857,81 +1238,7 @@ pub(crate) fn available_tool_definitions() -> Value {
             HERMES_PLUGIN_ID.to_string(),
         ])
     });
-    filter_tool_definitions_for_disabled(tool_definitions(), &disabled)
-}
-
-fn call_tool(params: &Value) -> Result<Value, RpcError> {
-    let name = params
-        .get("name")
-        .and_then(|n| n.as_str())
-        .ok_or_else(|| RpcError {
-            code: -32602,
-            message: "tools/call missing `name`".into(),
-        })?;
-    let args = params.get("arguments").cloned().unwrap_or(json!({}));
-
-    match dispatch_tool(name, &args) {
-        Ok(text) => Ok(json!({
-            "content": [{ "type": "text", "text": text }],
-            "isError": false,
-        })),
-        Err(msg) => Ok(json!({
-            "content": [{ "type": "text", "text": format!("error: {}", msg) }],
-            "isError": true,
-        })),
-    }
-}
-
-/// Shared tool dispatcher. The stdio serve loop (`call_tool`) and the
-/// in-process runtime both call this — one implementation, no duplication.
-pub fn dispatch_tool(name: &str, args: &Value) -> Result<String, String> {
-    ensure_tool_plugin_enabled(name)?;
-    match name {
-        "orion_list_recent_notes" => tool_list_recent_notes(args),
-        "orion_search_archive" => tool_search_archive(args),
-        "orion_list_projects" => tool_list_projects(args),
-        "orion_create_note" => tool_create_note(args),
-        "orion_create_project" => tool_create_project(args),
-        "orion_update_note_body" => tool_update_note_body(args),
-        "orion_read_note" => tool_read_note(args),
-        "orion_open_app" => tool_open_app(args),
-        "orion_switch_project" => tool_switch_project(args),
-        "orion_open_file" => tool_open_file(args),
-        "orion_apply_edit" => tool_apply_edit(args),
-        "orion_write_file" => tool_write_file(args),
-        "orion_read_file" => tool_read_file(args),
-        "orion_get_context" => tool_get_context(args),
-        "orion_search_files" => tool_search_files(args),
-        "orion_list_assets" => tool_list_assets(args),
-        "orion_search_assets" => tool_search_assets(args),
-        "orion_run_in_terminal" => tool_run_in_terminal(args),
-        "orion_xdesign_add_rect" => tool_xdesign_add_rect(args),
-        "orion_xdesign_add_text" => tool_xdesign_add_text(args),
-        "orion_xdesign_add_ellipse" => tool_xdesign_add_ellipse(args),
-        "orion_xdesign_add_frame" => tool_xdesign_add_frame(args),
-        "orion_xdesign_get_canvas" => tool_xdesign_get_canvas(args),
-        "orion_xdesign_get_selection" => tool_xdesign_get_selection(args),
-        "orion_xdesign_apply" => tool_xdesign_apply(args),
-        "orion_create_mood_board" => tool_create_mood_board(args),
-        "orion_add_to_mood_board" => tool_add_to_mood_board(args),
-        "orion_attach_tag" => tool_attach_tag(args),
-        "orion_delete_note" => tool_delete_note(args),
-        "orion_hermes_list_tasks" => tool_hermes_list_tasks(args),
-        "orion_hermes_get_task" => tool_hermes_get_task(args),
-        "orion_hermes_create_task" => tool_hermes_create_task(args),
-        "orion_hermes_add_agent" => tool_hermes_add_agent(args),
-        "orion_hermes_update_task" => tool_hermes_update_task(args),
-        "orion_hermes_move_task" => tool_hermes_move_task(args),
-        "orion_hermes_decompose" => tool_hermes_decompose(args),
-        "orion_recent_activity" => tool_recent_activity(args),
-        other => Err(format!("unknown tool: {}", other)),
-    }
-}
-
-fn open_db() -> Result<Connection, String> {
-    let path = std::env::var("ORION_DB_PATH")
-        .map_err(|_| "ORION_DB_PATH env var not set".to_string())?;
-    Connection::open(&path).map_err(|e| format!("open db: {}", e))
+    crate::mcp_grants::filter(filter_tool_definitions_for_disabled(tool_definitions(), &disabled))
 }
 
 fn tool_list_recent_notes(args: &Value) -> Result<String, String> {
@@ -972,7 +1279,13 @@ fn tool_search_archive(args: &Value) -> Result<String, String> {
         .ok_or_else(|| "query required".to_string())?;
     let cleaned: String = raw_query
         .chars()
-        .map(|c| if matches!(c, '"' | '*' | '(' | ')') { ' ' } else { c })
+        .map(|c| {
+            if matches!(c, '"' | '*' | '(' | ')') {
+                ' '
+            } else {
+                c
+            }
+        })
         .collect();
     let cleaned = cleaned.trim();
     if cleaned.is_empty() {
@@ -1090,7 +1403,9 @@ fn parse_inline(s: &str) -> Value {
                 if close > i + 1 {
                     push_run(&mut plain, &mut out, json!({}));
                     let inner: String = chars[i + 1..close].iter().collect();
-                    out.push(json!({ "type": "text", "text": inner, "styles": { "italic": true } }));
+                    out.push(
+                        json!({ "type": "text", "text": inner, "styles": { "italic": true } }),
+                    );
                     i = close + 1;
                     continue;
                 }
@@ -1146,18 +1461,34 @@ fn md_to_blocks(body: &str) -> String {
         }
         if let Some(rest) = line.strip_prefix("### ") {
             flush_para(&mut para, &mut blocks);
-            blocks.push(md_block("heading", parse_inline(rest.trim()), json!({ "level": 3 })));
+            blocks.push(md_block(
+                "heading",
+                parse_inline(rest.trim()),
+                json!({ "level": 3 }),
+            ));
         } else if let Some(rest) = line.strip_prefix("## ") {
             flush_para(&mut para, &mut blocks);
-            blocks.push(md_block("heading", parse_inline(rest.trim()), json!({ "level": 2 })));
+            blocks.push(md_block(
+                "heading",
+                parse_inline(rest.trim()),
+                json!({ "level": 2 }),
+            ));
         } else if let Some(rest) = line.strip_prefix("# ") {
             flush_para(&mut para, &mut blocks);
-            blocks.push(md_block("heading", parse_inline(rest.trim()), json!({ "level": 1 })));
+            blocks.push(md_block(
+                "heading",
+                parse_inline(rest.trim()),
+                json!({ "level": 1 }),
+            ));
         } else if line == "---" || line == "***" || line == "___" {
             flush_para(&mut para, &mut blocks);
         } else if let Some(rest) = line.strip_prefix("- ").or_else(|| line.strip_prefix("* ")) {
             flush_para(&mut para, &mut blocks);
-            blocks.push(md_block("bulletListItem", parse_inline(rest.trim()), json!({})));
+            blocks.push(md_block(
+                "bulletListItem",
+                parse_inline(rest.trim()),
+                json!({}),
+            ));
         } else if let Some(rest) = strip_numbered(line) {
             flush_para(&mut para, &mut blocks);
             blocks.push(md_block("numberedListItem", parse_inline(&rest), json!({})));
@@ -1179,10 +1510,17 @@ fn tool_create_note(args: &Value) -> Result<String, String> {
     if title.is_empty() {
         return Err("title cannot be blank".to_string());
     }
-    let body = args.get("body").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let body = args
+        .get("body")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
     let kind = args.get("kind").and_then(|v| v.as_str()).unwrap_or("note");
     if !matches!(kind, "note" | "journal" | "project") {
-        return Err(format!("invalid kind: {} (must be note|journal|project)", kind));
+        return Err(format!(
+            "invalid kind: {} (must be note|journal|project)",
+            kind
+        ));
     }
 
     // Optional parent for nesting (Notion-style project subpages). When set,
@@ -1210,10 +1548,7 @@ fn tool_create_note(args: &Value) -> Result<String, String> {
     // Auto-navigate: open Archives behind the Core panel and surface the
     // new note so the user sees it without needing to click around. Bridge
     // failures are non-fatal — the note is in the DB regardless.
-    let _ = send_ui_action(
-        "open_note",
-        json!({ "id": id, "kind": kind }),
-    );
+    let _ = send_ui_action("open_note", json!({ "id": id, "kind": kind }));
     Ok(json!({
         "ok": true,
         "id": id,
@@ -1235,7 +1570,11 @@ fn tool_create_project(args: &Value) -> Result<String, String> {
         .map(str::trim)
         .filter(|t| !t.is_empty())
         .ok_or_else(|| "title required".to_string())?;
-    let overview = args.get("overview").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let overview = args
+        .get("overview")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
     let pages = args
         .get("pages")
         .and_then(|v| v.as_array())
@@ -1263,7 +1602,11 @@ fn tool_create_project(args: &Value) -> Result<String, String> {
         else {
             continue;
         };
-        let pbody = page.get("body").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let pbody = page
+            .get("body")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
         let pid = ulid::Ulid::new().to_string();
         let cts = now + i as i64; // keep page order stable
         conn.execute(
@@ -1312,16 +1655,11 @@ fn tool_update_note_body(args: &Value) -> Result<String, String> {
     // Look up kind so the navigation lands on the right Archives view.
     // Falls back to 'note' if the lookup fails for any reason.
     let kind: String = conn
-        .query_row(
-            "SELECT kind FROM notes WHERE id = ?1",
-            params![id],
-            |r| r.get::<_, String>(0),
-        )
+        .query_row("SELECT kind FROM notes WHERE id = ?1", params![id], |r| {
+            r.get::<_, String>(0)
+        })
         .unwrap_or_else(|_| "note".to_string());
-    let _ = send_ui_action(
-        "open_note",
-        json!({ "id": id, "kind": kind }),
-    );
+    let _ = send_ui_action("open_note", json!({ "id": id, "kind": kind }));
     Ok(json!({ "ok": true, "id": id, "updated_at": now }).to_string())
 }
 
@@ -1329,8 +1667,16 @@ fn tool_update_note_body(args: &Value) -> Result<String, String> {
 /// paste anything. Resolve by `id` (preferred) or fuzzy `title`.
 fn tool_read_note(args: &Value) -> Result<String, String> {
     let conn = open_db()?;
-    let id = args.get("id").and_then(|v| v.as_str()).map(str::trim).filter(|s| !s.is_empty());
-    let title = args.get("title").and_then(|v| v.as_str()).map(str::trim).filter(|s| !s.is_empty());
+    let id = args
+        .get("id")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let title = args
+        .get("title")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
 
     let map = |r: &rusqlite::Row| {
         Ok((
@@ -1385,17 +1731,17 @@ fn tool_open_app(args: &Value) -> Result<String, String> {
         .and_then(|v| v.as_str())
         .ok_or_else(|| "app required".to_string())?;
     if !matches!(app, "archives" | "orion" | "xdesign" | "hermes") {
-        return Err(format!("invalid app: {} (archives|orion|xdesign|hermes)", app));
+        return Err(format!(
+            "invalid app: {} (archives|orion|xdesign|hermes)",
+            app
+        ));
     }
     if let Some(plugin_id) = plugin_for_app(app) {
         if !plugin_enabled(plugin_id)? {
             return Err(format!("plugin disabled: {plugin_id}"));
         }
     }
-    send_ui_action(
-        "open_app",
-        serde_json::json!({ "app": app }),
-    )?;
+    send_ui_action("open_app", serde_json::json!({ "app": app }))?;
     Ok(json!({ "ok": true, "opened": app }).to_string())
 }
 
@@ -1404,10 +1750,7 @@ fn tool_switch_project(args: &Value) -> Result<String, String> {
         .get("name_or_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| "name_or_id required".to_string())?;
-    send_ui_action(
-        "switch_project",
-        serde_json::json!({ "name_or_id": q }),
-    )?;
+    send_ui_action("switch_project", serde_json::json!({ "name_or_id": q }))?;
     Ok(json!({ "ok": true, "requested": q }).to_string())
 }
 
@@ -1440,9 +1783,8 @@ fn resolve_path(path: &str) -> Result<std::path::PathBuf, String> {
     if p.is_absolute() {
         return Ok(p.to_path_buf());
     }
-    let root = project_root_from_context().ok_or_else(|| {
-        "relative path but no active project — pass an absolute path".to_string()
-    })?;
+    let root = project_root_from_context()
+        .ok_or_else(|| "relative path but no active project — pass an absolute path".to_string())?;
     Ok(std::path::Path::new(&root).join(path))
 }
 
@@ -1450,16 +1792,10 @@ fn write_atomic(path: &std::path::Path, contents: &str) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    let fname = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "file".into());
-    let tmp = path.with_file_name(format!(".{}.orion-mcp.tmp", fname));
-    std::fs::write(&tmp, contents).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp, path).map_err(|e| {
-        let _ = std::fs::remove_file(&tmp);
-        e.to_string()
-    })
+    crate::fs_ops::save_file_atomic(
+        path.to_str().ok_or("File path must be UTF-8")?.to_string(),
+        contents.to_string(),
+    )
 }
 
 /// Replace an exact string in a file, write it, and stage the change for the
@@ -1492,8 +1828,8 @@ fn tool_apply_edit(args: &Value) -> Result<String, String> {
         );
     }
     let abs = resolve_path(path)?;
-    let original = std::fs::read_to_string(&abs)
-        .map_err(|e| format!("read {}: {}", abs.display(), e))?;
+    let original =
+        std::fs::read_to_string(&abs).map_err(|e| format!("read {}: {}", abs.display(), e))?;
     let count = original.matches(old).count();
     if count == 0 {
         return Err(
@@ -1589,8 +1925,17 @@ fn tool_read_file(args: &Value) -> Result<String, String> {
         return Err("path cannot be blank".to_string());
     }
     let abs = resolve_path(path)?;
-    let body = std::fs::read_to_string(&abs)
-        .map_err(|e| format!("read {}: {}", abs.display(), e))?;
+    use std::io::Read;
+    if !std::fs::metadata(&abs).map_err(|e| e.to_string())?.is_file() {
+        return Err("Only regular files can be read".into());
+    }
+    let file = std::fs::File::open(&abs).map_err(|e| e.to_string())?;
+    if !file.metadata().map_err(|e| e.to_string())?.is_file() {
+        return Err("Only regular files can be read".into());
+    }
+    let mut bytes = Vec::new();
+    file.take(4 * 65536 + 4).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+    let body = String::from_utf8_lossy(&bytes).into_owned();
     let truncated = body.chars().count() > 65536;
     let body: String = if truncated {
         body.chars().take(65536).collect::<String>() + "\n…[truncated]"
@@ -1605,9 +1950,8 @@ fn tool_read_file(args: &Value) -> Result<String, String> {
 /// Returns an empty stub if the file doesn't exist yet (first-launch race
 /// before the frontend's snapshotter runs) so the agent doesn't choke.
 fn tool_get_context(_args: &Value) -> Result<String, String> {
-    let path = std::env::var("ORION_CONTEXT_PATH").map_err(|_| {
-        "ORION_CONTEXT_PATH not set — context snapshot unavailable".to_string()
-    })?;
+    let path = std::env::var("ORION_CONTEXT_PATH")
+        .map_err(|_| "ORION_CONTEXT_PATH not set — context snapshot unavailable".to_string())?;
     match std::fs::read_to_string(&path) {
         Ok(s) => Ok(s),
         Err(_) => Ok(json!({
@@ -1636,11 +1980,10 @@ fn tool_search_files(args: &Value) -> Result<String, String> {
         .unwrap_or(30)
         .clamp(1, 200) as usize;
 
-    let context_path = std::env::var("ORION_CONTEXT_PATH").map_err(|_| {
-        "ORION_CONTEXT_PATH not set".to_string()
-    })?;
-    let snapshot_str = std::fs::read_to_string(&context_path)
-        .map_err(|e| format!("read context: {}", e))?;
+    let context_path = std::env::var("ORION_CONTEXT_PATH")
+        .map_err(|_| "ORION_CONTEXT_PATH not set".to_string())?;
+    let snapshot_str =
+        std::fs::read_to_string(&context_path).map_err(|e| format!("read context: {}", e))?;
     let snapshot: Value =
         serde_json::from_str(&snapshot_str).map_err(|e| format!("parse: {}", e))?;
     let root_path = snapshot
@@ -1791,10 +2134,7 @@ fn tool_run_in_terminal(args: &Value) -> Result<String, String> {
     if trimmed.is_empty() {
         return Err("command cannot be blank".to_string());
     }
-    send_ui_action(
-        "run_in_terminal",
-        serde_json::json!({ "command": trimmed }),
-    )?;
+    send_ui_action("run_in_terminal", serde_json::json!({ "command": trimmed }))?;
     Ok(json!({ "ok": true, "sent": trimmed }).to_string())
 }
 
@@ -1803,7 +2143,10 @@ fn tool_xdesign_add_rect(args: &Value) -> Result<String, String> {
     let y = args.get("y").and_then(|v| v.as_f64()).ok_or("y required")?;
     let w = args.get("w").and_then(|v| v.as_f64()).ok_or("w required")?;
     let h = args.get("h").and_then(|v| v.as_f64()).ok_or("h required")?;
-    let fill = args.get("fill").and_then(|v| v.as_str()).unwrap_or("#00e0ff");
+    let fill = args
+        .get("fill")
+        .and_then(|v| v.as_str())
+        .unwrap_or("#00e0ff");
     let radius = args.get("radius").and_then(|v| v.as_f64()).unwrap_or(0.0);
     send_ui_action(
         "xdesign_add_rect",
@@ -1821,8 +2164,14 @@ fn tool_xdesign_add_text(args: &Value) -> Result<String, String> {
         .get("text")
         .and_then(|v| v.as_str())
         .ok_or("text required")?;
-    let font_size = args.get("fontSize").and_then(|v| v.as_f64()).unwrap_or(24.0);
-    let fill = args.get("fill").and_then(|v| v.as_str()).unwrap_or("#e6f4ec");
+    let font_size = args
+        .get("fontSize")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(24.0);
+    let fill = args
+        .get("fill")
+        .and_then(|v| v.as_str())
+        .unwrap_or("#e6f4ec");
     send_ui_action(
         "xdesign_add_text",
         json!({
@@ -1837,7 +2186,10 @@ fn tool_xdesign_add_ellipse(args: &Value) -> Result<String, String> {
     let y = args.get("y").and_then(|v| v.as_f64()).ok_or("y required")?;
     let w = args.get("w").and_then(|v| v.as_f64()).ok_or("w required")?;
     let h = args.get("h").and_then(|v| v.as_f64()).ok_or("h required")?;
-    let fill = args.get("fill").and_then(|v| v.as_str()).unwrap_or("#00e0ff");
+    let fill = args
+        .get("fill")
+        .and_then(|v| v.as_str())
+        .unwrap_or("#00e0ff");
     send_ui_action(
         "xdesign_add_ellipse",
         json!({ "x": x, "y": y, "w": w, "h": h, "fill": fill }),
@@ -1882,6 +2234,16 @@ fn tool_xdesign_apply(args: &Value) -> Result<String, String> {
         return Err("ops is empty — nothing to apply".to_string());
     }
     let data = send_ui_action("xdesign_apply", json!({ "ops": ops }))?;
+    Ok(data.to_string())
+}
+
+/// Generic bridge for every `orion_model_*` (img2model) tool: the real
+/// implementation lives in the frontend (`modelAssistTools.ts::executeModelTool`)
+/// against the live spec/viewport, so we just forward `kind` + raw args over
+/// the UI bridge and pass the JSON text straight back. One function for all
+/// 19 tools — no per-tool Rust logic to keep in sync with the TS schema.
+fn tool_model_bridge(kind: &str, args: &Value) -> Result<String, String> {
+    let data = send_ui_action(kind, args.clone())?;
     Ok(data.to_string())
 }
 
@@ -2072,39 +2434,37 @@ fn send_ui_action(kind: &str, payload: Value) -> Result<Value, String> {
     use std::net::TcpStream;
     use std::time::Duration;
 
-    let port = std::env::var("ORION_BRIDGE_PORT").map_err(|_| {
-        "ORION_BRIDGE_PORT not set — UI bridge unavailable".to_string()
-    })?;
-    let token = std::env::var("ORION_BRIDGE_TOKEN").map_err(|_| {
-        "ORION_BRIDGE_TOKEN not set — UI bridge unavailable".to_string()
-    })?;
+    let port = std::env::var("ORION_BRIDGE_PORT")
+        .map_err(|_| "ORION_BRIDGE_PORT not set — UI bridge unavailable".to_string())?;
+    let token = std::env::var("ORION_BRIDGE_TOKEN")
+        .map_err(|_| "ORION_BRIDGE_TOKEN not set — UI bridge unavailable".to_string())?;
     let addr = format!("127.0.0.1:{}", port);
-    let stream =
-        TcpStream::connect(&addr).map_err(|e| format!("connect: {}", e))?;
+    let stream = TcpStream::connect(&addr).map_err(|e| format!("connect: {}", e))?;
     // Read window must comfortably exceed the bridge's frontend-wait timeout
     // (5s) so we don't cut the connection before the reply lands.
-    stream
-        .set_read_timeout(Some(Duration::from_secs(8)))
-        .ok();
-    stream
-        .set_write_timeout(Some(Duration::from_secs(2)))
-        .ok();
+    stream.set_read_timeout(Some(Duration::from_secs(8))).ok();
+    stream.set_write_timeout(Some(Duration::from_secs(2))).ok();
     let body = serde_json::json!({
         "token": token,
         "kind": kind,
         "payload": payload,
+        "runId": std::env::var("ORION_UI_RUN_ID").ok(),
     });
     let mut line = body.to_string();
     line.push('\n');
     {
         let mut writer = &stream;
-        writer.write_all(line.as_bytes()).map_err(|e| format!("write: {}", e))?;
+        writer
+            .write_all(line.as_bytes())
+            .map_err(|e| format!("write: {}", e))?;
     }
     let mut buf = String::new();
     let mut reader = BufReader::new(&stream);
-    reader.read_line(&mut buf).map_err(|e| format!("read: {}", e))?;
-    let resp: Value = serde_json::from_str(buf.trim())
-        .map_err(|e| format!("bad bridge response: {}", e))?;
+    reader
+        .read_line(&mut buf)
+        .map_err(|e| format!("read: {}", e))?;
+    let resp: Value =
+        serde_json::from_str(buf.trim()).map_err(|e| format!("bad bridge response: {}", e))?;
     if resp.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
         Ok(resp.get("data").cloned().unwrap_or_else(|| json!({})))
     } else {
@@ -2165,9 +2525,8 @@ fn tool_recent_activity(args: &Value) -> Result<String, String> {
         .and_then(|v| v.as_f64())
         .map(|h| chrono_like_millis() - (h * 3_600_000.0) as i64);
 
-    let mut sql = String::from(
-        "SELECT ts, source, kind, title, summary FROM activity_log WHERE 1=1",
-    );
+    let mut sql =
+        String::from("SELECT ts, source, kind, title, summary FROM activity_log WHERE 1=1");
     if source.is_some() {
         sql.push_str(" AND source = ?1");
     } else {
@@ -2220,7 +2579,9 @@ fn tool_recent_activity(args: &Value) -> Result<String, String> {
 fn tool_list_projects(_args: &Value) -> Result<String, String> {
     let conn = open_db()?;
     let mut stmt = conn
-        .prepare("SELECT id, name, root_path, last_opened_at FROM projects ORDER BY last_opened_at DESC")
+        .prepare(
+            "SELECT id, name, root_path, last_opened_at FROM projects ORDER BY last_opened_at DESC",
+        )
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([], |r| {
@@ -2310,7 +2671,7 @@ fn tool_hermes_get_task(args: &Value) -> Result<String, String> {
             let output: String = r.get(4)?;
             // Cap each agent's output so a gather call can't blow the context.
             let capped = if output.len() > 4000 {
-                format!("{}…[truncated]", &output[..4000])
+                format!("{}…[truncated]", output.chars().take(4000).collect::<String>())
             } else {
                 output
             };
@@ -2337,8 +2698,15 @@ fn tool_hermes_create_task(args: &Value) -> Result<String, String> {
     if title.is_empty() {
         return Err("title cannot be blank".to_string());
     }
-    let prompt = args.get("prompt").and_then(|v| v.as_str()).unwrap_or("").trim();
-    let column = args.get("column").and_then(|v| v.as_str()).unwrap_or("backlog");
+    let prompt = args
+        .get("prompt")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+    let column = args
+        .get("column")
+        .and_then(|v| v.as_str())
+        .unwrap_or("backlog");
     if !HERMES_COLUMNS.contains(&column) {
         return Err(format!(
             "invalid column: {} — ROSIE cannot create in 'running' (dispatch is approval-gated)",
@@ -2370,8 +2738,16 @@ fn tool_hermes_add_agent(args: &Value) -> Result<String, String> {
         .get("task_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| "task_id required".to_string())?;
-    let prompt = args.get("prompt").and_then(|v| v.as_str()).unwrap_or("").trim();
-    let label = args.get("label").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let prompt = args
+        .get("prompt")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+    let label = args
+        .get("label")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
     let conn = open_db()?;
     let exists: i64 = conn
         .query_row(
@@ -2447,9 +2823,11 @@ fn tool_hermes_move_task(args: &Value) -> Result<String, String> {
         .and_then(|v| v.as_str())
         .ok_or_else(|| "column required".to_string())?;
     if column == "running" {
-        return Err("ROSIE can't move a task to 'running' — dispatching the swarm is \
+        return Err(
+            "ROSIE can't move a task to 'running' — dispatching the swarm is \
                     approval-gated. Move it to 'ready' and the user will dispatch."
-            .to_string());
+                .to_string(),
+        );
     }
     if !HERMES_COLUMNS.contains(&column) {
         return Err(format!("invalid column: {}", column));
@@ -2508,11 +2886,19 @@ fn tool_hermes_decompose(args: &Value) -> Result<String, String> {
         )
         .unwrap_or(0);
     for st in subtasks {
-        let title = st.get("title").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let title = st
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
         if title.is_empty() {
             continue;
         }
-        let prompt = st.get("prompt").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let prompt = st
+            .get("prompt")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
         let id = ulid::Ulid::new().to_string();
         let res = conn.execute(
             "INSERT INTO hermes_tasks \
@@ -2530,6 +2916,35 @@ fn tool_hermes_decompose(args: &Value) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn file_reads_are_bounded_and_reject_non_regular_files() {
+        let dir = std::env::temp_dir().join(format!("orion-mcp-read-{}", ulid::Ulid::new()));
+        std::fs::create_dir(&dir).unwrap();
+        let path = dir.join("large.txt");
+        std::fs::write(&path, "🙂".repeat(70000)).unwrap();
+        let body = super::tool_read_file(&serde_json::json!({"path": path})).unwrap();
+        assert!(body.starts_with(&"🙂".repeat(65536)));
+        assert!(body.ends_with("[truncated]"));
+        assert!(body.len() < 4 * 65536 + 32);
+        assert!(super::tool_read_file(&serde_json::json!({"path": dir})).unwrap_err().contains("regular files"));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn mcp_writes_use_private_unique_atomic_saves() {
+        let dir = std::env::temp_dir().join(format!("orion-mcp-write-{}", ulid::Ulid::new()));
+        let path = dir.join("new.txt");
+        super::write_atomic(&path, "first").unwrap();
+        super::write_atomic(&path, "second").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "second");
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+        #[cfg(unix)] {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     #[test]
     fn plugin_tools_are_owned_by_their_app_plugins() {
         assert_eq!(
@@ -2606,11 +3021,13 @@ mod tests {
         let dir = std::env::temp_dir();
         let p = dir.join("orion_read_file_test.txt");
         std::fs::write(&p, "hello world").unwrap();
-        let ok = super::tool_read_file(&serde_json::json!({ "path": p.to_string_lossy() })).unwrap();
+        let ok =
+            super::tool_read_file(&serde_json::json!({ "path": p.to_string_lossy() })).unwrap();
         assert!(ok.contains("hello world"));
         let _ = std::fs::remove_file(&p);
 
-        let missing = super::tool_read_file(&serde_json::json!({ "path": "/no/such/orion/file.xyz" }));
+        let missing =
+            super::tool_read_file(&serde_json::json!({ "path": "/no/such/orion/file.xyz" }));
         assert!(missing.is_err());
     }
 
@@ -2623,9 +3040,13 @@ mod tests {
 
     #[test]
     fn call_tool_wraps_dispatch_result_in_envelope() {
-        let out = super::call_tool(&serde_json::json!({ "name": "nope", "arguments": {} })).unwrap();
+        let out =
+            super::call_tool(&serde_json::json!({ "name": "nope", "arguments": {} })).unwrap();
         assert_eq!(out["isError"], true);
-        assert!(out["content"][0]["text"].as_str().unwrap().contains("unknown tool"));
+        assert!(out["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("unknown tool"));
     }
 
     #[test]
@@ -2649,14 +3070,37 @@ mod md_tests {
         let blocks: Vec<Value> = serde_json::from_str(&md_to_blocks(md)).unwrap();
         let types: Vec<&str> = blocks.iter().map(|b| b["type"].as_str().unwrap()).collect();
         // h1, h2, paragraph, 2 bullets, 1 numbered, paragraph(tail), trailing empty para
-        assert_eq!(types, ["heading","heading","paragraph","bulletListItem","bulletListItem","numberedListItem","paragraph","paragraph"]);
+        assert_eq!(
+            types,
+            [
+                "heading",
+                "heading",
+                "paragraph",
+                "bulletListItem",
+                "bulletListItem",
+                "numberedListItem",
+                "paragraph",
+                "paragraph"
+            ]
+        );
         assert_eq!(blocks[0]["props"]["level"], 1);
         assert_eq!(blocks[1]["props"]["level"], 2);
         // bold/italic styling present in the paragraph
         let para = &blocks[2]["content"];
-        assert!(para.as_array().unwrap().iter().any(|r| r["styles"]["bold"] == true));
-        assert!(para.as_array().unwrap().iter().any(|r| r["styles"]["italic"] == true));
+        assert!(para
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["styles"]["bold"] == true));
+        assert!(para
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["styles"]["italic"] == true));
         // last block is an empty paragraph (cursor landing)
-        assert_eq!(blocks.last().unwrap()["content"].as_array().unwrap().len(), 0);
+        assert_eq!(
+            blocks.last().unwrap()["content"].as_array().unwrap().len(),
+            0
+        );
     }
 }

@@ -4,20 +4,29 @@ import { registry } from "@/commands/registry";
 import { log } from "@/lib/log";
 
 function HotkeyBinding({ hotkey, commandId }: { hotkey: string; commandId: string }) {
+  const capture = ["palette.open", "palette.openCommands", "controlpanel.open"].includes(commandId);
   useHotkeys(
     hotkey,
     (event) => {
       const cmd = registry.get(commandId);
       if (!cmd) return;
       if (cmd.when && !cmd.when()) return;
+      // Native modals own the interaction; background save/close commands are
+      // just as unsafe here as opening an inert palette behind the dialog.
+      if (document.querySelector("dialog[open]")) return;
       event.preventDefault();
+      if (capture) event.stopPropagation();
       registry.run(commandId).catch((err) =>
         log.error("hotkey run failed", commandId, err),
       );
     },
     {
       enableOnFormTags: true,
-      enableOnContentEditable: false,
+      enableOnContentEditable: capture,
+      // Monaco consumes its own chords before a bubbling document listener.
+      eventListenerOptions: { capture },
+      // Registry entries are single chords; comma must not split the binding.
+      splitKey: "\u0000",
       preventDefault: false,
     },
     [commandId],

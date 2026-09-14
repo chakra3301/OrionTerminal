@@ -1,5 +1,7 @@
 import Database from "@tauri-apps/plugin-sql";
+import { invoke } from "@tauri-apps/api/core";
 import { log } from "@/lib/log";
+import { decodeVectorBytes, encodeVectorBytes } from "./vectorStorage";
 
 const DB_URL = "sqlite:orion.db";
 
@@ -37,11 +39,14 @@ export type AppStateKey =
   | "xdesign.projects"
   | `xdesign.project.${string}`
   | `xdesign.fx.${string}`
+  | `xdesign.model.${string}`
   | "shell.focusedWindowId"
   | "rosie.ttsEnabled"
   | "voice.listenMode"
   | "mcp.servers"
   | "models"
+  | "ai.sessionOwners"
+  | "ai.background"
   | "appconfig"
   | "plugins.state"
   | "widget.monitor"
@@ -56,6 +61,7 @@ export type AppStateKey =
 
 export async function getAppState<T = unknown>(
   key: AppStateKey,
+  strict = false,
 ): Promise<T | null> {
   const db = await getDb();
   const rows = await db.select<{ value: string }[]>(
@@ -65,8 +71,11 @@ export async function getAppState<T = unknown>(
   const row = rows[0];
   if (!row) return null;
   try {
-    return JSON.parse(row.value) as T;
+    const value = JSON.parse(row.value) as T;
+    if (strict && value === null) throw new Error("Unexpected null state");
+    return value;
   } catch {
+    if (strict) throw new Error(`Stored ${key} data is invalid. Restore a database backup; it has not been overwritten.`);
     return null;
   }
 }
@@ -81,6 +90,13 @@ export async function setAppState<T = unknown>(
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
     [key, JSON.stringify(value)],
   );
+}
+
+export async function setXDesignStateAtomic(writes: Array<{ key: AppStateKey; value: unknown }>): Promise<void> {
+  await getDb();
+  await invoke("xdesign_state_commit", {
+    writes: writes.map(({ key, value }) => ({ key, value: value === null ? null : JSON.stringify(value) })),
+  });
 }
 
 /** Delete a single app_state key. Used by the auth reset escape hatch to wipe
@@ -819,7 +835,7 @@ export type StoredEmbedding = {
 type EmbeddingRow = {
   entity_kind: EmbeddingKind;
   entity_id: string;
-  vector: number[] | Uint8Array;
+  vector: unknown;
   text_hash: string;
 };
 
@@ -842,20 +858,16 @@ export async function listEmbeddingHashes(): Promise<Map<string, string>> {
   return out;
 }
 
-/** All embedding rows. The vector column comes back as either a Uint8Array
- * or a number[] depending on tauri-plugin-sql's BLOB handling — callers run
- * it through `deserializeVector` to get a Float32Array. */
+/** Normalize JSON-text and legacy binary vectors before semantic ranking. */
 export async function listEmbeddings(): Promise<StoredEmbedding[]> {
   const db = await getDb();
   const rows = await db.select<EmbeddingRow[]>(
     "SELECT entity_kind, entity_id, vector, text_hash FROM embeddings",
   );
-  return rows.map((r) => ({
-    kind: r.entity_kind,
-    id: r.entity_id,
-    vector: r.vector instanceof Uint8Array ? r.vector : new Uint8Array(r.vector),
-    textHash: r.text_hash,
-  }));
+  return rows.flatMap((r) => {
+    const vector = decodeVectorBytes(r.vector);
+    return vector ? [{ kind: r.entity_kind, id: r.entity_id, vector, textHash: r.text_hash }] : [];
+  });
 }
 
 export async function upsertEmbedding(
@@ -872,7 +884,7 @@ export async function upsertEmbedding(
        vector = excluded.vector,
        text_hash = excluded.text_hash,
        updated_at = excluded.updated_at`,
-    [kind, id, Array.from(vectorBytes), textHash, Date.now()],
+    [kind, id, encodeVectorBytes(vectorBytes), textHash, Date.now()],
   );
 }
 
@@ -926,11 +938,15 @@ export async function listCodeChunks(
   projectId: string,
 ): Promise<CodeChunkRow[]> {
   const db = await getDb();
-  return db.select<CodeChunkRow[]>(
+  const rows = await db.select<Array<Omit<CodeChunkRow, "vector"> & { vector: unknown }>>(
     `SELECT path, chunk_idx, start_line, end_line, hash, vector
      FROM code_embeddings WHERE project_id = $1`,
     [projectId],
   );
+  return rows.flatMap((row) => {
+    const vector = decodeVectorBytes(row.vector);
+    return vector ? [{ ...row, vector }] : [];
+  });
 }
 
 /** Replace every chunk row for a file in one pass (delete + insert). */
@@ -955,7 +971,7 @@ export async function replaceCodeChunks(
     await db.execute(
       `INSERT INTO code_embeddings(project_id, path, chunk_idx, start_line, end_line, hash, vector, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [projectId, path, c.idx, c.startLine, c.endLine, hash, Array.from(c.vector), now],
+      [projectId, path, c.idx, c.startLine, c.endLine, hash, encodeVectorBytes(c.vector), now],
     );
   }
 }
@@ -1381,6 +1397,8 @@ export async function updateNote(
     plaintext?: string;
     parent_id?: string | null;
     location?: string;
+    collection_id?: string | null;
+    favorite?: number;
     updated_at: number;
   },
 ): Promise<void> {
@@ -1408,34 +1426,27 @@ export async function updateNote(
     sets.push(`location = $${i++}`);
     vals.push(patch.location);
   }
+  if (patch.collection_id !== undefined) {
+    sets.push(`collection_id = $${i++}`);
+    vals.push(patch.collection_id);
+  }
+  if (patch.favorite !== undefined) {
+    sets.push(`favorite = $${i++}`);
+    vals.push(patch.favorite);
+  }
   sets.push(`updated_at = $${i++}`);
   vals.push(patch.updated_at);
   vals.push(id);
-  await db.execute(
+  const result = await db.execute(
     `UPDATE notes SET ${sets.join(", ")} WHERE id = $${i}`,
     vals,
   );
+  if (result.rowsAffected !== 1) throw new Error("The note no longer exists in storage. Your unsaved draft has not been saved.");
 }
 
 export async function deleteNote(id: string): Promise<void> {
   const db = await getDb();
   await db.execute("DELETE FROM notes WHERE id = $1", [id]);
-}
-
-// Removes empty placeholder notes left over from "Mod+N then closed without
-// typing." Safe at app start: a note with no title, no plaintext, and no
-// children is effectively non-existent to the user.
-export async function purgeEmptyNotes(): Promise<number> {
-  const db = await getDb();
-  const result = await db.execute(
-    `DELETE FROM notes
-     WHERE COALESCE(title, '') = ''
-       AND COALESCE(plaintext, '') = ''
-       AND id NOT IN (
-         SELECT parent_id FROM notes WHERE parent_id IS NOT NULL
-       )`,
-  );
-  return result.rowsAffected ?? 0;
 }
 
 // ─────────────────────────────────────────────────────────────

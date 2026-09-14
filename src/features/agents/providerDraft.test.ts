@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  OPENAI_GPT_MODELS,
   requiresBaseUrl,
   usesOAuth,
   validateProviderDraft,
@@ -52,10 +53,23 @@ describe("validateProviderDraft", () => {
 });
 
 describe("PROVIDER_PRESETS", () => {
+  it("includes OpenAI with the current GPT model family", () => {
+    const openai = PROVIDER_PRESETS.find((p) => p.label === "OpenAI");
+    expect(openai?.kind).toBe("openai");
+    expect(openai?.baseUrl).toBe("");
+    expect(openai?.modelIds).toEqual(OPENAI_GPT_MODELS.map((m) => m.id));
+    expect(openai?.modelIds).toContain("gpt-5.6-sol");
+    expect(openai?.modelIds).toContain("gpt-5.6-terra");
+    expect(openai?.modelIds).toContain("gpt-5.6-luna");
+    expect(openai?.modelIds).toContain("gpt-5.3-codex");
+  });
   it("includes NVIDIA pointing at integrate.api.nvidia.com", () => {
     const nv = PROVIDER_PRESETS.find((p) => p.label === "NVIDIA");
     expect(nv?.baseUrl).toBe("https://integrate.api.nvidia.com/v1");
     expect(nv?.kind).toBe("openai_compat");
+  });
+  it("does not expose the retired localhost OAuth proxy preset", () => {
+    expect(PROVIDER_PRESETS.some((p) => p.label === "OpenAI OAuth")).toBe(false);
   });
   it("includes NousResearch as an OAuth provider", () => {
     const nr = PROVIDER_PRESETS.find((p) => p.label === "NousResearch");
@@ -65,7 +79,7 @@ describe("PROVIDER_PRESETS", () => {
   });
   it("every preset that names a non-openai host carries a base URL", () => {
     for (const p of PROVIDER_PRESETS) {
-      expect(p.baseUrl.trim().length).toBeGreaterThan(0);
+      if (p.kind !== "openai") expect(p.baseUrl.trim().length).toBeGreaterThan(0);
       expect(p.exampleModel.trim().length).toBeGreaterThan(0);
     }
   });

@@ -1,0 +1,63 @@
+[
+  {
+    "name": "repolens",
+    "repository": "https://github.com/New1Direction/repolens",
+    "inspectedRevision": "94816c57d2b7dd6aa87b95e8c416f99fb32fc8d6",
+    "license": "MIT",
+    "notice": "THIRD_PARTY_LICENSES/RepoLens-MIT.txt",
+    "noticeSha256": "41797d46a3e8c02be8920a26d53e81b04f762f3ed4fe323cfd5425b384180a58",
+    "scope": [
+      "src/apps/archives/repolens/"
+    ],
+    "originalPortRevisionKnown": false
+  },
+  {
+    "name": "webgl-noise",
+    "repository": "https://github.com/ashima/webgl-noise",
+    "inspectedRevision": "6abed1e77ed1e18b181627c35f688eb30c9fe75e",
+    "license": "MIT",
+    "notice": "THIRD_PARTY_LICENSES/webgl-noise-MIT.txt",
+    "noticeSha256": "bdafce1bb01517c9ae6c4f3620c01340790b5e9d039ae9e356347d1174250916",
+    "scope": [
+      "src/shell/Splash/snoise.ts",
+      "src/apps/xdesign/fx/fxModel.ts"
+    ],
+    "originalPortRevisionKnown": false
+  },
+  {
+    "name": "shadcn",
+    "repository": "https://github.com/shadcn-ui/ui",
+    "inspectedRevision": "2b3e6d4f8d9161fe5c19340dc383aade392012dd",
+    "license": "MIT",
+    "notice": "THIRD_PARTY_LICENSES/shadcn-ui-MIT.txt",
+    "noticeSha256": "1564074e13439397221ffd522e2e504d56561994a23d371aa5e3ad43e4f5423f",
+    "scope": [
+      "resources/website-cloner-scaffold/src/components/ui/button.tsx"
+    ],
+    "originalPortRevisionKnown": false
+  },
+  {
+    "name": "img2threejs Apache baseline",
+    "repository": "https://github.com/hoainho/img2threejs",
+    "inspectedRevision": "6e60b5e22419464b4853e01ddb6c0e6f6659a733",
+    "license": "Apache-2.0",
+    "notice": "THIRD_PARTY_LICENSES/img2threejs-Apache-2.0.txt",
+    "noticeSha256": "4595055948a67e91177115c57e154804046878e77ff223de22accc880012827a",
+    "scope": [
+      "src/apps/xdesign/model3d/"
+    ],
+    "originalPortRevisionKnown": false
+  },
+  {
+    "name": "img2threejs historical MIT",
+    "repository": "https://github.com/hoainho/img2threejs",
+    "inspectedRevision": "a27272dfcaa15ce874f29d3a32742b1e7c88fb03",
+    "license": "MIT",
+    "notice": "THIRD_PARTY_LICENSES/img2threejs-historical-MIT.txt",
+    "noticeSha256": "0b6e35eea2b4ea880511779e4ffca369976847770c71f9babac5fc76d0e992ef",
+    "scope": [
+      "src/apps/xdesign/model3d/"
+    ],
+    "originalPortRevisionKnown": false
+  }
+]

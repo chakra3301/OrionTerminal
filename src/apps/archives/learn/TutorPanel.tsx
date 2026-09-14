@@ -28,7 +28,7 @@ import { useModelPrefs } from "@/store/modelPrefsStore";
 import { useLearn } from "./useLearn";
 import { tutorSystemPrompt } from "./pedagogy";
 import { parseLesson } from "./learnTypes";
-import { ipc } from "@/lib/ipc";
+import { dispatchSend, dispatchCancel, toRuntimeHistory, forgetDispatch } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
 import { setArchivesActivity } from "@/apps/archives/runtimeActivity";
 
@@ -104,6 +104,10 @@ export function TutorPanel() {
   const inputRef    = useRef<HTMLTextAreaElement>(null);
   // Pending assistant message id for streaming updates
   const pendingIdRef = useRef<string | null>(null);
+  const activeTurn = useRef<{ chatId: string; model: string } | null>(null);
+  const sessionModel = useRef<string | null>(null);
+  const listenersReady = useRef<Promise<void>>(Promise.resolve());
+  const [error, setError] = useState("");
 
   useEffect(() => {
     setArchivesActivity(
@@ -121,15 +125,19 @@ export function TutorPanel() {
     setMessages([]);
     setRunning(false);
     setInput("");
+    setError("");
+    sessionModel.current = null;
     pendingIdRef.current = null;
   }, [openNodeId]);
 
   // Subscribe to claude:event and filter by our chatId
   useEffect(() => {
-    let unlisten: (() => void) | null = null;
-
+    let disposed = false;
+    const unlisteners: Array<() => void> = [];
+    const keep = (unlisten: () => void) => { if (disposed) unlisten(); else unlisteners.push(unlisten); };
     const setup = async () => {
-      unlisten = await listen<ClaudeEnvelope>("claude:event", (e) => {
+      keep(await listen<ClaudeEnvelope>("claude:event", (e) => {
+        if (disposed) return;
         const env = e.payload;
         if (env.chatId !== chatId) return;
 
@@ -169,20 +177,40 @@ export function TutorPanel() {
               ),
             );
           }
-          pendingIdRef.current = null;
-          setRunning(false);
+          const result = ev as { is_error?: boolean; errors?: string[] };
+          if (result.is_error) setError(result.errors?.join("\n") || "The selected model could not complete this response.");
           return;
         }
 
         if (ev.type === "stderr") {
           log.warn("[tutor stderr]", (ev as { text?: string }).text);
         }
-      });
+      }));
+      keep(await listen<{ chatId: string; code: number | null; error: string | null }>("claude:exit", ({ payload }) => {
+        if (disposed || payload.chatId !== chatId) return;
+        const pid = pendingIdRef.current;
+        setMessages((prev) => prev.map((m) => m.id === pid ? { ...m, pending: false } : m));
+        if (payload.error || (payload.code !== null && payload.code !== 0)) {
+          setError(payload.error || `The selected model exited with code ${payload.code}.`);
+          setSessionId(null);
+        }
+        pendingIdRef.current = null;
+        activeTurn.current = null;
+        forgetDispatch(chatId);
+        setRunning(false);
+      }));
     };
 
-    setup().catch((err) => log.error("tutor listen setup failed", err));
+    listenersReady.current = setup();
+    void listenersReady.current.catch((err) => { if (!disposed) setError(String(err)); });
     return () => {
-      if (unlisten) unlisten();
+      disposed = true;
+      unlisteners.forEach((u) => u());
+      const turn = activeTurn.current;
+      if (turn?.chatId === chatId) {
+        activeTurn.current = null;
+        void dispatchCancel(turn.chatId, turn.model).catch((e) => log.warn("tutor cancel failed", e));
+      }
     };
   }, [chatId]);
 
@@ -191,7 +219,7 @@ export function TutorPanel() {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages.length, running]);
+  }, [messages, running]);
 
   // Build system prompt from the open node
   const buildSystemPrompt = useCallback((): string => {
@@ -224,7 +252,10 @@ export function TutorPanel() {
 
   const send = useCallback(async (text?: string) => {
     const value = (text ?? input).trim();
-    if (!value || running || !openNodeId) return;
+    if (!value || running || activeTurn.current || !openNodeId) return;
+    const model = useModelPrefs.getState().modelFor("learn");
+    activeTurn.current = { chatId, model };
+    setError("");
     setInput("");
 
     // Append user message
@@ -238,24 +269,34 @@ export function TutorPanel() {
     setRunning(true);
 
     try {
-      const model = useModelPrefs.getState().modelFor("learn");
-      const isFirst = !sessionId;
-      // On the first turn, prepend the system prompt as a leading context block
-      // (same pattern as ArchivesApp.handleSend).
-      const prompt = isFirst ? `${buildSystemPrompt()}\n\n---\n\n${value}` : value;
-      await ipc.claudeSend(chatId, prompt, null, sessionId, null, model);
+      await listenersReady.current;
+      if (activeTurn.current?.chatId !== chatId) return;
+      const resume = sessionModel.current === model ? sessionId : null;
+      sessionModel.current = model;
+      const history = [...toRuntimeHistory(messages), { role: "user" as const, content: value }];
+      const prompt = resume ? value : history.map((m) => `${m.role}: ${m.content}`).join("\n\n");
+      await dispatchSend({
+        chatId, value: model, prompt, history, sessionId: resume,
+        extra: { systemAppend: buildSystemPrompt(), allowedTools: [] },
+      });
     } catch (err) {
+      if (activeTurn.current?.chatId !== chatId) return;
       log.error("tutor send failed", err);
+      setError(String(err));
+      activeTurn.current = null;
+      forgetDispatch(chatId);
       // Remove the pending placeholder on error
       setMessages((prev) => prev.filter((m) => m.id !== pendingIdRef.current));
       pendingIdRef.current = null;
       setRunning(false);
     }
-  }, [input, running, openNodeId, sessionId, chatId, buildSystemPrompt]);
+  }, [input, running, openNodeId, sessionId, chatId, buildSystemPrompt, messages]);
 
   const cancel = useCallback(() => {
-    void ipc.claudeCancel(chatId).catch(() => {});
-  }, [chatId]);
+    const turn = activeTurn.current;
+    if (!turn) return;
+    void dispatchCancel(turn.chatId, turn.model).catch((e) => setError(String(e)));
+  }, []);
 
   if (!openNodeId) return null;
 
@@ -284,7 +325,7 @@ export function TutorPanel() {
           <span className="learn-tutor-name">Tutor</span>
           {scope && <span className="learn-tutor-scope">{scope}</span>}
         </div>
-        <ModelSelect surface="learn" />
+        <ModelSelect surface="learn" disabled={running} />
         <button
           type="button"
           className="learn-tutor-collapse-btn"
@@ -324,6 +365,7 @@ export function TutorPanel() {
         ))}
       </div>
 
+      {error && <div role="alert" className="cp-form-error">{error}</div>}
       {/* ── Divider ─────────────────────────────────────────────── */}
       <div className="learn-tutor-divider" aria-hidden />
 

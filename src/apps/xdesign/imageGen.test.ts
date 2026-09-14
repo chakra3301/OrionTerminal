@@ -4,7 +4,10 @@ import {
   isImageProvider,
   imageCapableProviders,
   defaultImageModel,
+  defaultImageModelForProvider,
+  hasPotentialImageProvider,
   resolveImageModel,
+  resolveImageModelForProvider,
   pickImageProvider,
   base64ToBytes,
   sizeAspect,
@@ -33,7 +36,7 @@ describe("imageCapableKind", () => {
     expect(imageCapableKind("custom")).toBe(true);
     expect(imageCapableKind("google")).toBe(true);
     expect(imageCapableKind("anthropic")).toBe(false);
-    expect(imageCapableKind("codex_cli")).toBe(false);
+    expect(imageCapableKind("codex_cli")).toBe(true);
     expect(imageCapableKind("gemini_cli")).toBe(false);
     expect(imageCapableKind("nous_oauth")).toBe(false);
   });
@@ -47,14 +50,30 @@ describe("isImageProvider / imageCapableProviders", () => {
     expect(isImageProvider(prov({ kind: "anthropic", keyRef: "x" }))).toBe(false);
   });
 
+  it("enables Codex images only when native subscription status is ready", () => {
+    const codex = prov({ kind: "codex_cli", keyRef: "", builtin: true });
+    expect(isImageProvider(codex)).toBe(false);
+    expect(isImageProvider(codex, true)).toBe(true);
+    expect(defaultImageModelForProvider(codex)).toBe("gpt-image-2");
+    expect(resolveImageModelForProvider(codex, "")).toBe("gpt-image-2");
+  });
+
+  it("treats enabled Codex as a potential provider before runtime status resolves", () => {
+    expect(hasPotentialImageProvider([
+      prov({ kind: "codex_cli", keyRef: "", builtin: true }),
+    ])).toBe(true);
+  });
+
   it("filters a list", () => {
     const list = [
       prov({ id: "a", kind: "anthropic", builtin: true, keyRef: "" }),
       prov({ id: "b", kind: "openai", keyRef: "provider:b" }),
       prov({ id: "c", kind: "google", keyRef: "provider:c" }),
       prov({ id: "d", kind: "openai", keyRef: "", enabled: true }),
+      prov({ id: "e", kind: "codex_cli", keyRef: "", builtin: true }),
     ];
     expect(imageCapableProviders(list).map((p) => p.id)).toEqual(["b", "c"]);
+    expect(imageCapableProviders(list, true).map((p) => p.id)).toEqual(["b", "c", "e"]);
   });
 });
 
@@ -75,7 +94,7 @@ describe("resolveImageModel", () => {
 });
 
 describe("pickImageProvider", () => {
-  it("prefers openai, then compat/custom, then anything capable", () => {
+  it("prefers a ready Codex subscription, then openai, compat/custom, and others", () => {
     expect(pickImageProvider([])).toBeNull();
     const g = prov({ id: "g", kind: "google", keyRef: "k" });
     expect(pickImageProvider([g])!.id).toBe("g");
@@ -83,6 +102,9 @@ describe("pickImageProvider", () => {
     expect(pickImageProvider([g, o])!.id).toBe("o");
     const c = prov({ id: "c", kind: "openai_compat", keyRef: "k" });
     expect(pickImageProvider([g, c])!.id).toBe("c");
+    const subscription = prov({ id: "s", kind: "codex_cli", keyRef: "", builtin: true });
+    expect(pickImageProvider([o, subscription], false)!.id).toBe("o");
+    expect(pickImageProvider([o, subscription], true)!.id).toBe("s");
   });
 });
 

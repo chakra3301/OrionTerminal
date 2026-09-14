@@ -6,6 +6,7 @@ import { withTone } from "./tone";
 import { parseClaudeResponse } from "./parser";
 import { enqueueClaude } from "./claude";
 import { defaultModelConfig, modelFor } from "./models";
+import { runRepoLensModel } from "./modelCall";
 import { ipc } from "@/lib/ipc";
 import {
   buildAtomsPrompt,
@@ -392,8 +393,9 @@ export const useRepoLens = create<State>((set, get) => ({
     try {
       const repo = await ipc.repolensFetchRepo(job.platform, job.repoId);
       const prompt = withTone(get().tone, buildPrompt(repo));
-      const reply = await ipc.repolensClaudeCall(prompt, modelFor(get().model, "core"));
-      const analysis = parseClaudeResponse(reply.result);
+      const model = modelFor(get().model, "core");
+      const reply = await runRepoLensModel(prompt, model);
+      const analysis = parseClaudeResponse(reply);
       analysis.repoId = repo.repo_id;
       analysis.platform = repo.platform;
       analysis.language = repo.language;
@@ -404,7 +406,7 @@ export const useRepoLens = create<State>((set, get) => ({
       await saveScan({
         repo_id: repo.repo_id,
         platform: repo.platform,
-        model: get().model.default_model,
+        model,
         tone: get().tone,
         analysis,
       });

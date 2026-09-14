@@ -153,11 +153,11 @@ fn extract_usage(v: &serde_json::Value) -> Option<(Usage, String)> {
 #[tauri::command]
 pub fn claude_usage() -> ClaudeUsage {
     let mut out = ClaudeUsage::default();
-    let home = match std::env::var("HOME") {
-        Ok(h) => h,
+    let scope = match crate::cli_auth::cli_auth_scope("claude".into()) {
+        Ok(scope) => scope,
         Err(_) => return out,
     };
-    let root = std::path::Path::new(&home).join(".claude").join("projects");
+    let root = std::path::Path::new(&scope.directory).join("projects");
     let now = now_ms();
     let cut_24h = now - 24 * 3_600_000;
 
@@ -247,6 +247,7 @@ pub struct ClaudeLimits {
 /// Parse the trailing `… NN% used · resets <when>` of a `/usage` line into the
 /// percentage and the raw reset phrase. `split_once(':')` upstream already
 /// removed the label, so the first `%` here is always the figure.
+#[cfg(test)]
 fn parse_pct_rest(rest: &str) -> Option<(u32, Option<String>)> {
     let rest = rest.trim();
     let pct: u32 = rest.split('%').next()?.trim().parse().ok()?;
@@ -259,6 +260,7 @@ fn parse_pct_rest(rest: &str) -> Option<(u32, Option<String>)> {
 /// Parse the plain-text `claude --print '/usage'` panel. Tolerant: only the
 /// three limit lines are read; everything else (the "what's contributing"
 /// breakdown) is ignored, and missing lines just stay `None`.
+#[cfg(test)]
 fn parse_usage_panel(text: &str) -> ClaudeLimits {
     let mut out = ClaudeLimits::default();
     for line in text.lines() {
@@ -290,30 +292,11 @@ fn parse_usage_panel(text: &str) -> ClaudeLimits {
     out
 }
 
-/// Scrape the real subscription limits by running `claude --print '/usage'`
-/// (~2–4s; the monitor polls this on a slow interval). Mirrors the
-/// `claude_oneshot` spawn setup so the CLI is found and no API-key env leaks
-/// in. Any failure returns `ok: false` rather than erroring.
 #[tauri::command]
 pub async fn claude_limits() -> ClaudeLimits {
-    use std::process::Stdio;
-    use tokio::process::Command;
-    let mut cmd = Command::new("claude");
-    cmd.args(["--print", "/usage"]);
-    if let Some(home) = std::env::var_os("HOME") {
-        cmd.current_dir(home);
-    }
-    cmd.env("PATH", crate::claude_cli::augmented_path());
-    cmd.env_remove("ANTHROPIC_API_KEY");
-    cmd.env_remove("ANTHROPIC_AUTH_TOKEN");
-    cmd.stdin(Stdio::null());
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
-    cmd.kill_on_drop(true);
-    match cmd.output().await {
-        Ok(o) if o.status.success() => parse_usage_panel(&String::from_utf8_lossy(&o.stdout)),
-        _ => ClaudeLimits::default(),
-    }
+    // Print-mode slash commands are not a verified non-generative quota API.
+    // Keep the unavailable response for older clients without starting a model from a monitor poll.
+    ClaudeLimits::default()
 }
 
 #[cfg(test)]

@@ -1,5 +1,4 @@
 import { open as openDialog, confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { registry, type Command } from "@/commands/registry";
 import type { DisposableScope } from "@/plugins/contracts";
 import { useProjectStore } from "@/store/projectStore";
@@ -24,9 +23,9 @@ import { useAuth } from "@/features/auth/authStore";
 import { useHelp } from "@/features/help/helpStore";
 import { useOnboarding } from "@/features/onboarding/onboardingStore";
 import { ipc } from "@/lib/ipc";
-import { listChatsForProject, logActivity } from "@/lib/db";
+import { listChatsForProject } from "@/lib/db";
 import { log } from "@/lib/log";
-import { trackOrionActivity } from "@/apps/orion/runtimeActivity";
+import { saveFileBuffer } from "@/apps/orion/saveFileBuffer";
 
 let installed = false;
 const orionCommandDefinitions = new Map<string, Command>();
@@ -67,34 +66,6 @@ const ORION_COMMAND_IDS = new Set([
   "panel.toggleRightRail",
 ]);
 
-async function saveFileBuffer(path: string): Promise<boolean> {
-  const buf = useTabsStore.getState().fileBuffers[path];
-  if (!buf?.loaded) return false;
-  return trackOrionActivity(
-    `file-save:${path}`,
-    "Wait for Orion to finish saving files before disabling the plugin.",
-    async () => {
-      try {
-        await ipc.saveFileAtomic(path, buf.contents);
-        useTabsStore.getState().markSaved(path);
-        void logActivity({
-          source: "orion",
-          kind: "file.save",
-          title: path.split("/").pop() || path,
-          refId: path,
-        });
-        void import("@/features/context/codebaseIndexer").then((module) =>
-          module.scheduleCodeFileReindex(path),
-        );
-        return true;
-      } catch (error) {
-        log.error("save failed", path, error);
-        return false;
-      }
-    },
-  );
-}
-
 function focusedTab() {
   const ws = useWorkspace.getState();
   return activeTabInFocusedPanel(ws.root, ws.focusedPanelId);
@@ -115,6 +86,13 @@ function orionFocused() {
 export function installBuiltinCommands() {
   if (installed) return;
   installed = true;
+
+  registry.register({
+    id: "recovery.review",
+    label: "Review local draft recovery",
+    group: "View",
+    run: async () => { const { useRecovery } = await import("@/features/recovery/recoveryStore"); useRecovery.setState({ open: true }); },
+  });
 
   registry.register({
     id: "palette.open",
@@ -612,6 +590,17 @@ export function installBuiltinCommands() {
   });
 
   registry.register({
+    id: "companion.dismiss",
+    label: "Hide R.O.S.I.E Companion",
+    keywords: ["rosie", "companion", "avatar", "hide", "dismiss"],
+    group: "View",
+    run: async () => {
+      const { useRosie } = await import("@/features/rosie/rosieStore");
+      useRosie.getState().dismissCompanion();
+    },
+  });
+
+  registry.register({
     id: "companion.clipTest",
     label: "Companion: Test Animation Clips",
     hotkey: "alt+shift+r",
@@ -733,11 +722,10 @@ export function installBuiltinCommands() {
     id: "dev.openDevtools",
     label: "Open Devtools",
     group: "Dev",
+    when: () => import.meta.env.DEV,
     run: async () => {
       try {
-        const w = getCurrentWindow();
-        await (w as unknown as { internalToggleDevtools?: () => Promise<void> })
-          .internalToggleDevtools?.();
+        await ipc.openDevtools();
       } catch (err) {
         log.warn("devtools not available", err);
       }

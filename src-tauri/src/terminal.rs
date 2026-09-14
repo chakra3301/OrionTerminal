@@ -13,8 +13,7 @@ struct PtyHandle {
     killer: Box<dyn ChildKiller + Send + Sync>,
 }
 
-static PTYS: Lazy<Mutex<HashMap<String, PtyHandle>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static PTYS: Lazy<Mutex<HashMap<String, PtyHandle>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Serialize, Clone)]
 struct DataPayload {
@@ -68,9 +67,9 @@ fn standard_env(builder: &mut CommandBuilder, cwd: &str) {
     } else {
         builder.env("TERM", "xterm-256color");
     }
-    if let Ok(path) = std::env::var("PATH") {
-        builder.env("PATH", path);
-    }
+    // Packaged macOS apps inherit launchd's stripped PATH (no Homebrew /
+    // ~/.local/bin). Augment so agent CLIs (pi, hermes, claude) resolve.
+    builder.env("PATH", crate::claude_cli::augmented_path());
 }
 
 fn spawn_pty_with(
@@ -94,7 +93,10 @@ fn spawn_pty_with(
         })
         .map_err(|e| e.to_string())?;
 
-    let mut child = pair.slave.spawn_command(builder).map_err(|e| e.to_string())?;
+    let mut child = pair
+        .slave
+        .spawn_command(builder)
+        .map_err(|e| e.to_string())?;
     drop(pair.slave);
     let killer = child.clone_killer();
 

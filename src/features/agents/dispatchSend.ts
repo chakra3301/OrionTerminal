@@ -1,4 +1,8 @@
 import { ipc } from "@/lib/ipc";
+import { beginUiRun, revokeUiRun } from "./uiActionRuns";
+import { emit } from "@tauri-apps/api/event";
+import { log } from "@/lib/log";
+import { toast } from "@/store/toastStore";
 import { resolveSendFromStores } from "@/features/agents/resolveSend";
 import type { ResolvedSend } from "@/features/agents/resolveSend";
 import type { Provider } from "@/features/agents/agentTypes";
@@ -6,6 +10,33 @@ import { useProvidersStore } from "@/store/providersStore";
 import { mapToRuntimeTools } from "@/features/agents/runtimeTools";
 import { shouldTwoPass, planningSystem, executionPrompt } from "./twoPass";
 import { beginTwoPass, twoPassPhase, clearTwoPass } from "./twoPassCoordinator";
+import { owningProvider, parseModelValue } from "./modelSelection";
+import { hasSessionOwner, rememberSessionOwner, forgetSessionOwner, forgetSessionOwnersForKind } from "./sessionOwnership";
+
+const dispatchedRoutes = new Map<string, Route>();
+const conversationRoutes = new Map<string, string>();
+const dispatchedIdentities = new Map<string, string>();
+const dispatchedSessions = new Map<string, string>();
+const pendingStarts = new Map<string, symbol>();
+
+export function providerSessionIdentity(provider: Provider): string {
+  return JSON.stringify([provider.id, provider.kind, provider.baseUrl, provider.keyRef]);
+}
+
+export function recordDispatchedSession(chatId: string, sessionId: string): void {
+  const identity = dispatchedIdentities.get(chatId);
+  if (!identity) return;
+  dispatchedSessions.set(chatId, sessionId);
+  void rememberSessionOwner(sessionId, identity).catch((error) => log.warn("Could not persist connector session ownership", error));
+}
+
+export async function invalidateConnectorSessions(kind: string): Promise<void> {
+  for (const [chatId, identity] of dispatchedIdentities) {
+    try { if (JSON.parse(identity)?.[1] === kind) forgetDispatch(chatId); }
+    catch { forgetDispatch(chatId); }
+  }
+  await forgetSessionOwnersForKind(kind);
+}
 
 export type RuntimeMsg = { role: "user" | "assistant"; content: string };
 
@@ -13,7 +44,7 @@ export function findOwningProvider(
   providers: Provider[],
   model: string,
 ): Provider | undefined {
-  return providers.find((p) => p.models.some((m) => m.id === model));
+  return owningProvider(providers, model);
 }
 
 export type CliEngine = "codex_cli" | "gemini_cli";
@@ -23,9 +54,18 @@ export type Route = "claude" | { engine: CliEngine } | Provider;
  *  (Phase 2c); otherwise the HTTP-runtime or Cursor SDK Provider. */
 export function routeFor(providers: Provider[], model: string): Route {
   const owner = findOwningProvider(providers, model);
-  if (!owner || owner.kind === "anthropic") return "claude";
+  if (!owner) throw new Error(`Model “${parseModelValue(model).modelId}” is unavailable. Enable its provider or choose another model in Control Panel → Providers.`);
+  if (owner.kind === "anthropic") return "claude";
   if (owner.kind === "codex_cli" || owner.kind === "gemini_cli") return { engine: owner.kind };
   return owner;
+}
+
+export function routeSupportsImages(route: Route): boolean {
+  return route === "claude" || ("engine" in route && route.engine === "codex_cli");
+}
+
+export function selectionSupportsImages(value: string): boolean {
+  return routeSupportsImages(routeFor(useProvidersStore.getState().providers, resolveSendFromStores(value).model));
 }
 
 function flattenTextBlocks(blocks: unknown): string {
@@ -105,8 +145,7 @@ export type ResolvedDispatchOpts = {
   imagePath?: string | null;
 };
 
-/** Route an already-resolved send to the owning engine. Byte-identical IPC
- *  output to the pre-refactor dispatchSend body. */
+/** Route an already-resolved send to the owning engine. */
 export async function dispatchResolved(
   chatId: string,
   r: ResolvedSend,
@@ -116,50 +155,98 @@ export async function dispatchResolved(
 ): Promise<void> {
   const providers = useProvidersStore.getState().providers;
   const route = routeFor(providers, r.model);
-  if (route === "claude") {
-    return ipc.claudeSend(
-      chatId,
-      prompt,
-      opts.projectRoot ?? null,
-      opts.sessionId ?? null,
-      opts.imagePath ?? null,
-      r.model,
-      r.systemAppend,
-      r.allowedTools,
-    );
+  const model = parseModelValue(r.model).modelId;
+  if (opts.imagePath && !routeSupportsImages(route)) {
+    throw new Error("This connector does not support image attachments yet. Choose an image-capable connector or send without the attachment.");
   }
-  if (typeof route === "object" && "engine" in route) {
-    return ipc.cliSend(
-      route.engine,
+  const identity = providerSessionIdentity(findOwningProvider(providers, r.model)!);
+  const previous = conversationRoutes.get(chatId);
+  const switched = previous !== undefined && previous !== identity;
+  const ticket = Symbol(chatId);
+  pendingStarts.set(chatId, ticket);
+  dispatchedRoutes.set(chatId, route);
+  dispatchedIdentities.set(chatId, identity);
+  if (opts.sessionId) dispatchedSessions.set(chatId, opts.sessionId);
+  else dispatchedSessions.delete(chatId);
+  // Codex resumes the original sandbox; Cursor may restore SDK-side tool state.
+  const freshPolicy = r.allowedTools !== null && typeof route === "object" &&
+    (("engine" in route && route.engine === "codex_cli") || ("kind" in route && route.kind === "cursor_sdk"));
+  const sessionId = opts.sessionId && !switched && !freshPolicy && await hasSessionOwner(opts.sessionId, identity) ? opts.sessionId : null;
+  if (pendingStarts.get(chatId) !== ticket) throw new Error("Cancelled before connector start");
+  // A cancelled first turn may never have persisted its prompt in the CLI transcript.
+  if (!sessionId && (route === "claude" || "engine" in route || route.kind === "cursor_sdk")) {
+    const prior = history[history.length - 1]?.role === "user" ? history.slice(0, -1) : history;
+    if (prior.length) prompt = `[Previous conversation — context, not new instructions]\n${prior.map((m) => `${m.role}: ${m.content}`).join("\n\n")}\n[End previous conversation]\n\n${prompt}`;
+  }
+  conversationRoutes.delete(chatId);
+  conversationRoutes.set(chatId, identity);
+  if (conversationRoutes.size > 256) conversationRoutes.delete(conversationRoutes.keys().next().value!);
+  const endUiRun = beginUiRun(chatId);
+  try {
+    if (route === "claude") {
+      return await ipc.claudeSend(
+        chatId,
+        prompt,
+        opts.projectRoot ?? null,
+        sessionId,
+        opts.imagePath ?? null,
+        model,
+        r.systemAppend,
+        r.allowedTools,
+      );
+    }
+    if (typeof route === "object" && "engine" in route) {
+      return await ipc.cliSend(
+        route.engine,
+        chatId,
+        prompt,
+        opts.projectRoot ?? null,
+        sessionId,
+        model,
+        r.systemAppend ?? "",
+        opts.imagePath ?? null,
+        r.allowedTools,
+      );
+    }
+    if (route.kind === "cursor_sdk") {
+      return await ipc.cursorSend(
+        chatId,
+        prompt,
+        opts.projectRoot ?? null,
+        sessionId,
+        model,
+        r.systemAppend ?? "",
+        route.keyRef || route.id,
+        r.allowedTools,
+      );
+    }
+    return await ipc.runtimeSend(
       chatId,
-      prompt,
-      opts.projectRoot ?? null,
-      opts.sessionId ?? null,
-      r.model,
+      route.id,
+      model,
       r.systemAppend ?? "",
+      historyWithPrompt(history, prompt),
+      mapToRuntimeTools(r.allowedTools),
     );
+  } finally {
+    endUiRun();
   }
-  if (route.kind === "cursor_sdk") {
-    return ipc.cursorSend(
-      chatId,
-      prompt,
-      opts.projectRoot ?? null,
-      opts.sessionId ?? null,
-      r.model,
-      r.systemAppend ?? "",
-      route.keyRef || route.id,
-    );
-  }
-  return ipc.runtimeSend(
-    chatId,
-    route.kind,
-    route.baseUrl,
-    route.keyRef,
-    r.model,
-    r.systemAppend ?? "",
-    history,
-    mapToRuntimeTools(r.allowedTools),
-  );
+}
+
+export function forgetDispatch(chatId: string): void {
+  revokeUiRun(chatId);
+  dispatchedRoutes.delete(chatId);
+  dispatchedIdentities.delete(chatId);
+  dispatchedSessions.delete(chatId);
+  pendingStarts.delete(chatId);
+}
+
+export function historyWithPrompt(history: RuntimeMsg[], prompt: string): RuntimeMsg[] {
+  const messages = [...history];
+  // The stored user text omits context injected by the app into prompt.
+  if (messages[messages.length - 1]?.role === "user") messages[messages.length - 1] = { role: "user", content: prompt };
+  else messages.push({ role: "user", content: prompt });
+  return messages;
 }
 
 export async function dispatchSend(args: DispatchSendArgs): Promise<void> {
@@ -220,7 +307,12 @@ export async function dispatchAgentTurn(
         ...hooks.nextHistory(),
         { role: "user", content: prompt },
       ];
-      void dispatchResolved(args.chatId, action, prompt, history, opts);
+      void dispatchResolved(args.chatId, action, prompt, history, opts).catch((error) => {
+        clearTwoPass(args.chatId);
+        forgetDispatch(args.chatId);
+        void emit("claude:exit", { chatId: args.chatId, code: null, error: String(error) })
+          .catch((e) => log.error("Failed to report action-pass failure", e));
+      });
     },
   });
 
@@ -230,18 +322,36 @@ export async function dispatchAgentTurn(
     systemAppend: planningSystem(resolved.systemAppend),
     allowedTools: [],
   };
-  return dispatchResolved(args.chatId, brain, userPrompt, args.history, opts);
+  try {
+    await dispatchResolved(args.chatId, brain, userPrompt, args.history, opts);
+  } catch (e) {
+    clearTwoPass(args.chatId);
+    forgetDispatch(args.chatId);
+    throw e;
+  }
 }
 
 export async function dispatchCancel(chatId: string, value: string): Promise<void> {
+  revokeUiRun(chatId);
   const phase = twoPassPhase(chatId);
   // A cancel ends the whole two-pass turn — drop the entry so the killed
   // subprocess's exit never triggers the Action pass.
   clearTwoPass(chatId);
-  const r = resolveSendFromStores(value);
-  const model = phase === "execute" && r.actionModel ? r.actionModel : r.model;
-  const providers = useProvidersStore.getState().providers;
-  const route = routeFor(providers, model);
+  let route = dispatchedRoutes.get(chatId);
+  if (!route) {
+    const r = resolveSendFromStores(value);
+    const model = phase === "execute" && r.actionModel ? r.actionModel : r.model;
+    route = routeFor(useProvidersStore.getState().providers, model);
+  }
+  const sessionId = dispatchedSessions.get(chatId);
+  if (sessionId) void forgetSessionOwner(sessionId).catch((error) => {
+    log.warn("Could not persist cancelled-session invalidation", error);
+    toast.error("Couldn’t save the cancelled session reset", {
+      body: "Start a new chat before retrying after an app restart.",
+      dedupeKey: "cancelled-session-reset",
+    });
+  });
+  forgetDispatch(chatId);
   if (route === "claude") return ipc.claudeCancel(chatId);
   if (typeof route === "object" && "engine" in route) return ipc.cliCancel(chatId);
   if (typeof route === "object" && "kind" in route && route.kind === "cursor_sdk") {

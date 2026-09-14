@@ -10,22 +10,23 @@ describe("mapToRuntimeTools", () => {
     expect(out).toContain("orion_search_files");
   });
 
-  it("drops Bash and WebSearch", () => {
-    const out = mapToRuntimeTools(["Bash", "WebSearch", "Read"]);
-    expect(out).toEqual(["orion_read_file"]);
+  it("rejects unsupported built-ins rather than silently dropping grants", () => {
+    for (const tool of ["Bash", "WebSearch", "WebFetch", "Unknown"]) {
+      expect(() => mapToRuntimeTools([tool, "Read"])).toThrow("does not support");
+    }
   });
 
-  it("keeps mcp__orion verbatim and drops other mcp servers", () => {
-    const out = mapToRuntimeTools(["mcp__orion", "mcp__other"]);
-    expect(out).toEqual(["mcp__orion"]);
+  it("keeps Orion but rejects unsupported external MCP servers", () => {
+    expect(mapToRuntimeTools(["mcp__orion"])).toEqual(["mcp__orion"]);
+    expect(() => mapToRuntimeTools(["mcp__orion", "mcp__other"])).toThrow("Orion MCP only");
   });
 
   it("keeps explicit orion_* tool names", () => {
     expect(mapToRuntimeTools(["orion_create_note"])).toEqual(["orion_create_note"]);
   });
 
-  it("null or empty → empty list", () => {
-    expect(mapToRuntimeTools(null)).toEqual([]);
+  it("unrestricted exposes Orion tools; an explicit empty list stays tool-less", () => {
+    expect(mapToRuntimeTools(null)).toEqual(["mcp__orion"]);
     expect(mapToRuntimeTools([])).toEqual([]);
   });
 

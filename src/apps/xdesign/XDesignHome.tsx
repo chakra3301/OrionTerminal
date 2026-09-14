@@ -10,10 +10,12 @@ import {
   Film,
   ImageIcon,
   Sparkles,
+  Box,
   type LucideIcon,
 } from "lucide-react";
 import { confirmAction } from "@/components/ConfirmModal";
 import { toast } from "@/store/toastStore";
+import { log } from "@/lib/log";
 import {
   useXDProjects,
   loadDoc,
@@ -22,6 +24,8 @@ import {
 } from "./projectsStore";
 import { useRailIntent, type RailIntentMode } from "./railIntentStore";
 import { ProjectThumb } from "./ProjectThumb";
+import { ProjectNameInput } from "./ProjectNameInput";
+import { useXDesignSaveState } from "./saveState";
 
 // Project start types. "Blank canvas" is the default normal project; the rest
 // create a project then arm the matching AI flow in the Claude rail.
@@ -33,17 +37,18 @@ type StartType = {
   /** Tool flow to arm after creating the project (null = plain canvas). */
   intent: RailIntentMode | null;
   name: string;
-  /** Project kind — "fx" opens the shader compositor instead of the canvas. */
-  kind?: "fx";
+  /** Project kind — "fx" opens the shader compositor, "model" opens the img2model studio, instead of the canvas. */
+  kind?: "fx" | "model";
 };
 
 const START_TYPES: StartType[] = [
   { id: "blank", label: "Blank canvas", desc: "Start from an empty board", Icon: LayoutGrid, intent: null, name: "Untitled" },
-  { id: "webpage", label: "Webpage", desc: "Generate a shippable HTML page", Icon: Globe, intent: "webpage", name: "Webpage" },
+  { id: "webpage", label: "Webpage", desc: "Experimental · webpage saved with project", Icon: Globe, intent: "webpage", name: "Webpage" },
   { id: "deck", label: "Slide deck", desc: "Build a presentable deck", Icon: Presentation, intent: "deck", name: "Deck" },
-  { id: "motion", label: "Motion", desc: "A looping motion graphic", Icon: Film, intent: "motion", name: "Motion" },
+  { id: "motion", label: "Motion", desc: "Experimental · verify playback and export", Icon: Film, intent: "motion", name: "Motion" },
   { id: "image", label: "Image generator", desc: "Generate a raster image", Icon: ImageIcon, intent: "image", name: "Image" },
-  { id: "fx", label: "FX scene", desc: "Shader-driven motion graphics", Icon: Sparkles, intent: null, name: "FX Scene", kind: "fx" },
+  { id: "fx", label: "FX scene", desc: "Basic FX tested · advanced output experimental", Icon: Sparkles, intent: null, name: "FX Scene", kind: "fx" },
+  { id: "model", label: "3D model", desc: "Experimental · reference image to procedural 3D", Icon: Box, intent: null, name: "3D Model", kind: "model" },
 ];
 
 async function startProject(t: StartType): Promise<void> {
@@ -74,18 +79,9 @@ function ProjectCard({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
-  const [draft, setDraft] = useState(meta.name);
+  const draft = useXDesignSaveState((s) => s.names[meta.id]);
 
-  const open = () => void useXDProjects.getState().openProject(meta.id);
-
-  const commitRename = () => {
-    setRenaming(false);
-    if (draft.trim() && draft.trim() !== meta.name) {
-      void useXDProjects.getState().renameProject(meta.id, draft);
-    } else {
-      setDraft(meta.name);
-    }
-  };
+  const open = () => { void useXDProjects.getState().openProject(meta.id).catch(() => {}); };
 
   const remove = async () => {
     setMenuOpen(false);
@@ -112,31 +108,19 @@ function ProjectCard({
       >
         <ProjectThumb doc={doc} />
         {meta.kind === "fx" && <span className="xd-fx-badge">FX</span>}
+        {meta.kind === "model" && <span className="xd-fx-badge xd-model-badge">3D</span>}
       </button>
       <div className="xd-home-card-meta">
         <div className="xd-home-card-info">
-          {renaming ? (
-            <input
-              className="xd-home-rename-input"
-              value={draft}
-              autoFocus
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={commitRename}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") commitRename();
-                if (e.key === "Escape") {
-                  setDraft(meta.name);
-                  setRenaming(false);
-                }
-              }}
-            />
+          {renaming || draft ? (
+            <ProjectNameInput id={meta.id} name={meta.name} className="xd-home-rename-input"
+              onFinish={() => setRenaming(false)} />
           ) : (
             <button
               type="button"
               className="xd-home-card-name"
               onClick={open}
               onDoubleClick={() => {
-                setDraft(meta.name);
                 setRenaming(true);
               }}
             >
@@ -165,13 +149,12 @@ function ProjectCard({
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
-                    setDraft(meta.name);
                     setRenaming(true);
                   }}
                 >
                   <Pencil size={13} /> Rename
                 </button>
-                <button type="button" className="danger" onClick={() => void remove()}>
+                <button type="button" className="danger" onClick={() => { void remove().catch(() => {}); }}>
                   <Trash2 size={13} /> Delete
                 </button>
               </div>
@@ -205,7 +188,7 @@ function NewProjectMenu() {
                 className="xd-home-start-item"
                 onClick={() => {
                   setOpen(false);
-                  void startProject(t);
+                  void startProject(t).catch(() => {});
                 }}
               >
                 <t.Icon size={16} />
@@ -224,6 +207,8 @@ function NewProjectMenu() {
 
 export function XDesignHome() {
   const registry = useXDProjects((s) => s.registry);
+  const ready = useXDProjects((s) => s.ready);
+  const loadError = useXDProjects((s) => s.loadError);
   const [docs, setDocs] = useState<Record<string, XDDoc | null>>({});
 
   // Lazy-load each project's doc for its thumbnail. Re-runs when the registry
@@ -234,11 +219,18 @@ export function XDesignHome() {
       registry.map(async (m) => [m.id, await loadDoc(m.id)] as const),
     ).then((pairs) => {
       if (!cancelled) setDocs(Object.fromEntries(pairs));
-    });
+    }).catch((error) => log.warn("XDesign thumbnail load failed", error));
     return () => {
       cancelled = true;
     };
   }, [registry]);
+
+  if (!ready) return <div className="xd-home">
+    <h1>XDesign</h1>
+    <p role={loadError ? "alert" : "status"}>{loadError ?? "Loading projects…"}</p>
+    {loadError && <button type="button" className="xd-home-new"
+      onClick={() => { void useXDProjects.getState().init().catch(() => {}); }}>Retry loading projects</button>}
+  </div>;
 
   const sorted = [...registry].sort((a, b) => b.updatedAt - a.updatedAt);
 
@@ -260,7 +252,7 @@ export function XDesignHome() {
               key={t.id}
               type="button"
               className="xd-home-start-card"
-              onClick={() => void startProject(t)}
+              onClick={() => void startProject(t).catch(() => {})}
             >
               <t.Icon size={20} />
               <span className="xd-home-start-label">{t.label}</span>

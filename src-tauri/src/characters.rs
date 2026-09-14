@@ -5,7 +5,6 @@
 use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 
 #[derive(Serialize)]
@@ -27,16 +26,7 @@ fn characters_dir(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn ulid_string() -> String {
-    let ms = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    let entropy: u64 = {
-        let x: u8 = 0;
-        let addr = &x as *const u8 as usize as u64;
-        addr ^ ms as u64
-    };
-    format!("{:013x}{:012x}", ms, entropy & 0xFFF_FFFF_FFFF_FFFF)
+    ulid::Ulid::new().to_string()
 }
 
 fn ext_of(path: &Path) -> String {
@@ -69,8 +59,7 @@ pub async fn character_store_file(
     let id = ulid_string();
     let target = dir.join(format!("{id}.{ext}"));
 
-    let bytes = fs::read(&src).map_err(|e| format!("read source: {e}"))?;
-    fs::write(&target, &bytes).map_err(|e| format!("write target: {e}"))?;
+    crate::fs_ops::copy_regular_file(&src, &target, 256 * 1024 * 1024)?;
 
     let file_path = target
         .to_str()

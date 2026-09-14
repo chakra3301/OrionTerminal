@@ -17,13 +17,13 @@ export function resolveSend(value: string, agents: Agent[], skills: Skill[]): Re
     return { model: sel.id, actionModel: null, systemAppend: null, allowedTools: null };
   }
   const agent = agents.find((a) => a.id === sel.id);
-  if (!agent) return { model: value, actionModel: null, systemAppend: null, allowedTools: null };
+  if (!agent) throw new Error("This agent no longer exists. Choose another agent or model.");
   const c = composeAgent(agent, skills);
   return {
     model: c.model,
     actionModel: c.actionModel || null,
     systemAppend: c.appendSystemPrompt || null,
-    allowedTools: c.allowedTools.length ? c.allowedTools : null,
+    allowedTools: c.allowedTools,
   };
 }
 

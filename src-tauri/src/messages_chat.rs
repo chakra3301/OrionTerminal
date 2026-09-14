@@ -403,7 +403,7 @@ fn find_double_newline(buf: &[u8]) -> Option<usize> {
 #[tauri::command]
 pub fn messages_chat_cancel(chat_id: String) -> Result<(), String> {
     if let Some(n) = STREAMS.lock().remove(&chat_id) {
-        n.notify_waiters();
+        n.notify_one();
     }
     Ok(())
 }

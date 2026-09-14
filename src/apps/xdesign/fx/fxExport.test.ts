@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { sceneToJson, sceneFromJson, buildEmbedHtml } from "./fxExport";
 import { emptyScene } from "./fxModel";
 import { emptyFxDoc } from "./fxStore";
+import noiseLicense from "../../../../THIRD_PARTY_LICENSES/webgl-noise-MIT.txt?raw";
 
 describe("scene JSON round trip", () => {
   it("survives export → import", () => {
@@ -56,6 +57,10 @@ describe("buildEmbedHtml", () => {
     expect(html).toContain("#version 300 es"); // prebuilt shaders inline
     expect(html).toContain('getContext("webgl2"'); // player present
     expect(html).toContain('<canvas id="fx">');
+    expect(html).toContain('Copyright (C) 2011 by Ashima Arts');
+    expect(html).toContain('Stefan Gustavson');
+    expect(html).toContain('Permission is hereby granted, free of charge');
+    expect(html).toContain(JSON.stringify(noiseLicense).slice(1, -1));
   });
 
   it("escapes </script> inside embedded data", () => {

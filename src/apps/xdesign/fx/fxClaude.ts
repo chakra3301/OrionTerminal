@@ -1,12 +1,5 @@
-/**
- * Claude → shader. Streams one Messages API turn through the existing
- * `messages_chat_run` Rust command (OS-keychain key) and extracts a GLSL
- * fxMain body from the reply. No new backend surface.
- */
-
-import { listen } from "@tauri-apps/api/event";
-import { ulid } from "ulid";
-import { ipc } from "@/lib/ipc";
+import { runTextModel } from "@/features/agents/textCall";
+import { useModelPrefs } from "@/store/modelPrefsStore";
 import { trackXDesignActivity } from "@/apps/xdesign/runtimeActivity";
 
 const SYSTEM = `You write GLSL ES 3.00 fragment-shader bodies for a layer-based WebGL compositor (like Unicorn Studio).
@@ -47,37 +40,11 @@ export async function generateFxShader(
     "shader-generation",
     "Wait for XDesign shader generation to finish before disabling the plugin.",
     async () => {
-  const chatId = `fxshader-${ulid()}`;
-  let text = "";
-
-  const done = new Promise<void>((resolve, reject) => {
-    const unlisteners: Array<() => void> = [];
-    const finish = (err?: Error) => {
-      for (const u of unlisteners) u();
-      err ? reject(err) : resolve();
-    };
-    void listen<{ chatId: string; text?: string }>("chat:delta", (e) => {
-      if (e.payload.chatId === chatId) text += e.payload.text ?? "";
-    }).then((u) => unlisteners.push(u));
-    void listen<{ chatId: string }>("chat:done", (e) => {
-      if (e.payload.chatId === chatId) finish();
-    }).then((u) => unlisteners.push(u));
-    void listen<{ chatId: string; message: string }>("chat:error", (e) => {
-      if (e.payload.chatId === chatId) finish(new Error(e.payload.message));
-    }).then((u) => unlisteners.push(u));
-    // Hard cap so a dropped stream can't hang the modal forever.
-    setTimeout(() => finish(new Error("shader generation timed out")), 90_000);
-  });
-
-  const user = `Write an fxMain body for this request:\n\n${prompt}\n\nCurrent code (replace it entirely):\n\`\`\`glsl\n${currentCode}\n\`\`\``;
-  await ipc.messagesChatRun(chatId, SYSTEM, [
-    { role: "user", content: user },
-  ]);
-  await done;
-
-  const body = extractGlslBody(text);
-  if (!body) throw new Error("Claude's reply contained no fxMain body");
-  return body;
+      const user = `Write an fxMain body for this request:\n\n${prompt}\n\nCurrent code (replace it entirely):\n\`\`\`glsl\n${currentCode}\n\`\`\``;
+      const text = await runTextModel(`${SYSTEM}\n\n${user}`, useModelPrefs.getState().modelFor("fx"));
+      const body = extractGlslBody(text);
+      if (!body) throw new Error("The selected model's reply contained no fxMain body");
+      return body;
     },
   );
 }

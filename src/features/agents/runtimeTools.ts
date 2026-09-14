@@ -13,20 +13,25 @@ const BUILTIN_TO_ORION: Record<string, string[]> = {
 };
 
 export function mapToRuntimeTools(allowedTools: string[] | null): string[] {
-  if (!allowedTools) return [];
+  if (allowedTools === null) return ["mcp__orion"];
   const out = new Set<string>();
   for (const t of allowedTools) {
     if (t === "mcp__orion") {
       out.add("mcp__orion");
       continue;
     }
-    if (t.startsWith("mcp__")) continue; // non-Orion MCP not dispatched in-process
+    if (t.startsWith("mcp__orion__")) {
+      out.add(t.slice("mcp__orion__".length));
+      continue;
+    }
+    if (t.startsWith("mcp__")) throw new Error("This connector supports Orion MCP only, not the selected external MCP server.");
     if (t.startsWith("orion_")) {
       out.add(t);
       continue;
     }
     const mapped = BUILTIN_TO_ORION[t];
-    if (mapped) mapped.forEach((m) => out.add(m));
+    if (!mapped) throw new Error(`This connector does not support the selected ${t} tool. Choose a compatible connector or remove that grant.`);
+    mapped.forEach((m) => out.add(m));
   }
   return [...out];
 }

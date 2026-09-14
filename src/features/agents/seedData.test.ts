@@ -21,7 +21,8 @@ describe("CLI engine built-in providers", () => {
     expect(CODEX_CLI_PROVIDER.kind).toBe("codex_cli");
     expect(CODEX_CLI_PROVIDER.builtin).toBe(true);
     expect(CODEX_CLI_PROVIDER.keyRef).toBe("");
-    expect(CODEX_CLI_PROVIDER.models.length).toBeGreaterThan(0);
+    expect(CODEX_CLI_PROVIDER.name).toContain("ChatGPT subscription");
+    expect(CODEX_CLI_PROVIDER.models.some((m) => m.id === "gpt-5.6-sol")).toBe(true);
   });
   it("gemini provider is a builtin gemini_cli with models", () => {
     expect(GEMINI_CLI_PROVIDER.id).toBe("builtin:gemini-cli");

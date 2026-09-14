@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import { useControlPanel, type CpSection } from "@/store/controlPanelStore";
 import { useAppDescriptors } from "@/plugins/appRegistry";
 import { ProvidersPanel } from "./ProvidersPanel";
+import { useControlPanelFocus } from "./useControlPanelFocus";
 import { SkillLibraryPanel } from "./SkillLibraryPanel";
 import { AgentForge } from "./AgentForge";
 import { PluginManagerPanel } from "./PluginManagerPanel";
@@ -57,20 +58,13 @@ export function ControlPanel() {
     if (!nav.some((item) => item.key === section)) setSection("plugins");
   }, [nav, section, setSection]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") hide();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, hide]);
+  const surfaceRef = useControlPanelFocus(open, hide);
 
   if (!open) return null;
 
   return (
     <div className="cp-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) hide(); }}>
-      <div className="cp-surface" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="cp-surface" ref={surfaceRef} role="dialog" aria-modal="true" aria-label="Control Panel" tabIndex={-1} onMouseDown={(e) => e.stopPropagation()}>
         <aside className="cp-rail">
           <div className="cp-rail-title">Control Panel</div>
           {nav.map((n) => (

@@ -1,0 +1,38 @@
+name: Verification
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: npm run verify
+      - name: Rehearse cold recovery on disposable profiles
+        run: |
+          cargo build --locked --manifest-path src-tauri/Cargo.toml
+          python3 scripts/rehearse-profile-recovery.py --binary "$PWD/src-tauri/target/debug/orion-terminal" --report "$RUNNER_TEMP/profile-recovery.json"
+      - run: npm run audit:production
+      - run: cargo install cargo-audit --version 0.22.2 --locked
+      - run: npm run audit:native:target -- --target aarch64-apple-darwin

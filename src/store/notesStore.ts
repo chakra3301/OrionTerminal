@@ -6,8 +6,6 @@ import {
   updateNote,
   deleteNote,
   logActivity,
-  setNoteCollection as dbSetNoteCollection,
-  setNoteFavorite as dbSetNoteFavorite,
   listAllNoteTags,
   attachNoteTags,
   detachNoteTagByName,
@@ -18,6 +16,8 @@ import {
 import { walkBlocksToPlaintext } from "@/features/notes/plaintext";
 import { useWorkspace, allTabs } from "@/components/workspace/workspaceStore";
 import { log } from "@/lib/log";
+import { serialQueue } from "@/lib/serialQueue";
+import { toast } from "@/store/toastStore";
 import {
   scheduleReindex,
   removeEntityEmbedding,
@@ -44,6 +44,7 @@ export type Note = {
   favorite: boolean;
   createdAt: number;
   updatedAt: number;
+  readError?: string;
 };
 
 export type { NoteKind };
@@ -52,11 +53,13 @@ const EMPTY_DOC: NoteBlocks = [];
 
 function rowToNote(r: NoteRow, tags: string[] = []): Note {
   let blocks: NoteBlocks = EMPTY_DOC;
+  let readError: string | undefined;
   try {
-    const parsed = JSON.parse(r.blocks_json);
-    if (Array.isArray(parsed)) blocks = parsed;
+    const parsed: unknown = JSON.parse(r.blocks_json);
+    if (!Array.isArray(parsed)) throw new Error("Invalid note body");
+    blocks = parsed;
   } catch {
-    blocks = EMPTY_DOC;
+    readError = "This note's stored body is invalid. Restore a backup; it has not been replaced with an empty note.";
   }
   return {
     id: r.id,
@@ -71,14 +74,27 @@ function rowToNote(r: NoteRow, tags: string[] = []): Note {
     favorite: !!r.favorite,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    ...(readError ? { readError } : {}),
   };
 }
+
+type NotePatch = Parameters<typeof updateNote>[1];
+type NoteDraft = { revision: number; patch: NotePatch };
 
 type NotesState = {
   notes: Map<string, Note>;
   loaded: boolean;
+  /** Includes staged and failed writes, not only active database requests. */
   pendingWrites: Set<string>;
+  saving: Set<string>;
+  deleting: Set<string>;
+  drafts: Map<string, NoteDraft>;
+  saveErrors: Map<string, string>;
+  loadError: string | null;
 
+  stageBlocks: (id: string, blocks: NoteBlocks) => void;
+  stageTitle: (id: string, title: string) => void;
+  flushNote: (id: string) => Promise<void>;
   load: () => Promise<void>;
   get: (id: string) => Note | undefined;
   list: () => Note[];
@@ -96,29 +112,136 @@ type NotesState = {
   remove: (id: string) => Promise<void>;
 };
 
+let revision = 0;
+let loadTicket = 0;
+const queues = new Map<string, ReturnType<typeof serialQueue>>();
+const jobs = new Map<string, number>();
+
+function queueFor(id: string): ReturnType<typeof serialQueue> {
+  let queue = queues.get(id);
+  if (!queue) { queue = serialQueue(); queues.set(id, queue); }
+  return queue;
+}
+
+function stageNote(id: string, change: Partial<Note>, patch: NotePatch): void {
+  const state = useNotesStore.getState(), note = state.notes.get(id);
+  if (!note) throw new Error("This note no longer exists.");
+  if (note.readError) throw new Error(note.readError);
+  if (state.deleting.has(id)) throw new Error("This note is being deleted.");
+  const notes = new Map(state.notes), drafts = new Map(state.drafts), pendingWrites = new Set(state.pendingWrites);
+  notes.set(id, { ...note, ...change, updatedAt: patch.updated_at });
+  drafts.set(id, { revision: ++revision, patch: { ...drafts.get(id)?.patch, ...patch } });
+  pendingWrites.add(id);
+  useNotesStore.setState({ notes, drafts, pendingWrites });
+}
+
+function noteJob<T>(id: string, work: () => Promise<T>): Promise<T> {
+  jobs.set(id, (jobs.get(id) ?? 0) + 1);
+  useNotesStore.setState((s) => ({ saving: new Set(s.saving).add(id), pendingWrites: new Set(s.pendingWrites).add(id) }));
+  const result = queueFor(id)(work).finally(() => {
+    const remaining = (jobs.get(id) ?? 1) - 1;
+    if (remaining) jobs.set(id, remaining);
+    else { jobs.delete(id); queues.delete(id); }
+    useNotesStore.setState((s) => {
+      const saving = new Set(s.saving), pendingWrites = new Set(s.pendingWrites);
+      if (!remaining) saving.delete(id);
+      if (!remaining && !s.drafts.has(id) && !s.deleting.has(id)) pendingWrites.delete(id);
+      return { saving, pendingWrites };
+    });
+  });
+  // Some command/UI callers intentionally fire and forget; awaited callers still receive rejection.
+  void result.catch(() => {});
+  return result;
+}
+
+function afterNoteSave(id: string, patch: NotePatch): void {
+  if (useNotesStore.getState().deleting.has(id)) return;
+  scheduleReindex("note", id, () => {
+    const note = useNotesStore.getState().notes.get(id);
+    return note ? `${note.title || "Untitled"}\n${note.plaintext}` : null;
+  });
+  if (patch.blocks_json === undefined) return;
+  void import("@/features/notes/noteAutoTag").then((m) => m.scheduleNoteAutoTag(id))
+    .catch((error) => log.warn("note tagging schedule failed", error));
+  const note = useNotesStore.getState().notes.get(id);
+  void logActivity({ source: "archives", kind: `${note?.kind ?? "note"}.edit`, title: note?.title || "Untitled", refId: id })
+    .catch((error) => log.warn("note activity log failed", error));
+}
+
+function flushNote(id: string): Promise<void> {
+  const state = useNotesStore.getState(), draft = state.drafts.get(id);
+  if (!draft || state.deleting.has(id)) return Promise.resolve();
+  return noteJob(id, async () => {
+    if (!useNotesStore.getState().drafts.has(id)) return;
+    try {
+      await updateNote(id, draft.patch);
+    } catch (error) {
+      useNotesStore.setState((s) => ({ saveErrors: new Map(s.saveErrors).set(id, String(error)) }));
+      toast.error("Note was not saved", {
+        body: `${String(error)}. Your changes remain in memory; retry before quitting.`,
+        dedupeKey: `note-save-${id}`,
+        action: { label: "Retry save", run: () => { void flushNote(id); } },
+      });
+      throw error;
+    }
+    if (useNotesStore.getState().drafts.get(id)?.revision === draft.revision) {
+      useNotesStore.setState((s) => {
+        const drafts = new Map(s.drafts), saveErrors = new Map(s.saveErrors);
+        drafts.delete(id); saveErrors.delete(id); return { drafts, saveErrors };
+      });
+      try { afterNoteSave(id, draft.patch); } catch (error) { log.warn("note post-save activity failed", error); }
+    }
+  });
+}
+
 export const useNotesStore = create<NotesState>((set, get) => ({
   notes: new Map(),
   loaded: false,
   pendingWrites: new Set(),
+  saving: new Set(),
+  deleting: new Set(),
+  drafts: new Map(),
+  saveErrors: new Map(),
+  loadError: null,
+  flushNote,
+
+  stageBlocks: (id, blocks) => {
+    const blocks_json = JSON.stringify(blocks);
+    const snapshot = JSON.parse(blocks_json) as unknown;
+    if (!Array.isArray(snapshot)) throw new Error("Invalid note body");
+    const plaintext = walkBlocksToPlaintext(snapshot);
+    stageNote(id, { blocks: snapshot, plaintext }, { blocks_json, plaintext, updated_at: Date.now() });
+  },
+  stageTitle: (id, title) => {
+    stageNote(id, { title }, { title, updated_at: Date.now() });
+    syncTabLabel(id, title || "Untitled");
+  },
 
   load: async () => {
+    const ticket = ++loadTicket;
+    const changed = new Set<string>();
+    const off = useNotesStore.subscribe((state, previous) => {
+      if (state.notes === previous.notes) return;
+      for (const [id, note] of state.notes) if (previous.notes.get(id) !== note) changed.add(id);
+      for (const id of previous.notes.keys()) if (!state.notes.has(id)) changed.add(id);
+    });
     try {
-      const [rows, tagsByNote] = await Promise.all([
-        listNotes(),
-        listAllNoteTags(),
-      ]);
-      const map = new Map<string, Note>();
-      for (const r of rows) {
-        map.set(r.id, rowToNote(r, tagsByNote.get(r.id) ?? []));
+      const [rows, tagsByNote] = await Promise.all([listNotes(), listAllNoteTags()]);
+      if (ticket !== loadTicket) return;
+      const notes = new Map(rows.map((r) => [r.id, rowToNote(r, tagsByNote.get(r.id) ?? [])]));
+      for (const id of new Set([...changed, ...get().pendingWrites])) {
+        const current = get().notes.get(id);
+        if (current) notes.set(id, current);
+        else notes.delete(id);
       }
-      set({ notes: map, loaded: true });
-    } catch (e) {
-      // Always flip `loaded` true so views can render their empty state
-      // instead of sticking on "Loading notes…". The actual failure stays
-      // visible in the logs.
-      log.error("notes load failed", e);
-      set({ loaded: true });
-    }
+      set({ notes, loaded: true, loadError: null });
+    } catch (error) {
+      if (ticket !== loadTicket) return;
+      log.error("notes load failed", error);
+      set({ loaded: true, loadError: String(error) });
+      toast.error("Notes could not be loaded", { body: String(error), dedupeKey: "notes-load",
+        action: { label: "Retry", run: () => get().load() } });
+    } finally { off(); }
   },
 
   get: (id) => get().notes.get(id),
@@ -171,119 +294,35 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     return note;
   },
 
-  // The ONE write path for note bodies. Walker runs synchronously here
-  // before the DB write — no other code path touches notes.blocks_json.
-  saveBlocks: async (id, blocks) => {
-    const existing = get().notes.get(id);
-    if (!existing) {
-      log.warn("saveBlocks: note not found", id);
-      return;
-    }
-    const plaintext = walkBlocksToPlaintext(blocks);
-    const updated_at = Date.now();
-    set((s) => {
-      const next = new Map(s.notes);
-      next.set(id, { ...existing, blocks, plaintext, updatedAt: updated_at });
-      const pending = new Set(s.pendingWrites);
-      pending.add(id);
-      return { notes: next, pendingWrites: pending };
-    });
-    try {
-      await updateNote(id, {
-        blocks_json: JSON.stringify(blocks),
-        plaintext,
-        updated_at,
-      });
-      scheduleReindex("note", id, () => {
-        const n = get().notes.get(id);
-        return n ? `${n.title || "Untitled"}\n${n.plaintext ?? ""}` : null;
-      });
-      // Auto-suggest tags once a note settles (zero-tag notes only; lazy
-      // import keeps the AI path out of the store's dependency graph).
-      void import("@/features/notes/noteAutoTag").then((m) =>
-        m.scheduleNoteAutoTag(id),
-      );
-      void logActivity({
-        source: "archives",
-        kind: `${existing.kind || "note"}.edit`,
-        title: existing.title || "Untitled",
-        refId: id,
-      });
-    } finally {
-      set((s) => {
-        const pending = new Set(s.pendingWrites);
-        pending.delete(id);
-        return { pendingWrites: pending };
-      });
-    }
+  saveBlocks: (id, blocks) => {
+    get().stageBlocks(id, blocks);
+    return flushNote(id);
   },
 
-  saveTitle: async (id, title) => {
-    const existing = get().notes.get(id);
-    if (!existing) return;
-    const updated_at = Date.now();
-    set((s) => {
-      const next = new Map(s.notes);
-      next.set(id, { ...existing, title, updatedAt: updated_at });
-      return { notes: next };
-    });
-    // Also keep the open tab label in sync (sidebar + tab strip read this).
-    syncTabLabel(id, title || "Untitled");
-    await updateNote(id, { title, updated_at });
-    scheduleReindex("note", id, () => {
-      const n = get().notes.get(id);
-      return n ? `${n.title || "Untitled"}\n${n.plaintext ?? ""}` : null;
-    });
+  saveTitle: (id, title) => {
+    get().stageTitle(id, title);
+    return flushNote(id);
   },
 
-  saveLocation: async (id, location) => {
-    const existing = get().notes.get(id);
-    if (!existing) return;
-    const updated_at = Date.now();
-    set((s) => {
-      const next = new Map(s.notes);
-      next.set(id, { ...existing, location, updatedAt: updated_at });
-      return { notes: next };
-    });
-    await updateNote(id, { location, updated_at });
+  saveLocation: (id, location) => {
+    stageNote(id, { location }, { location, updated_at: Date.now() });
+    return flushNote(id);
   },
 
-  saveCollection: async (id, collectionId) => {
-    const existing = get().notes.get(id);
-    if (!existing) return;
-    const updated_at = Date.now();
-    set((s) => {
-      const next = new Map(s.notes);
-      next.set(id, { ...existing, collectionId, updatedAt: updated_at });
-      return { notes: next };
-    });
-    await dbSetNoteCollection(id, collectionId, updated_at);
+  saveCollection: (id, collectionId) => {
+    stageNote(id, { collectionId }, { collection_id: collectionId, updated_at: Date.now() });
+    return flushNote(id);
   },
 
-  toggleFavorite: async (id, favorite) => {
-    const existing = get().notes.get(id);
-    if (!existing) return;
-    const next = favorite ?? !existing.favorite;
-    const updated_at = Date.now();
-    set((s) => {
-      const map = new Map(s.notes);
-      map.set(id, { ...existing, favorite: next, updatedAt: updated_at });
-      return { notes: map };
-    });
-    await dbSetNoteFavorite(id, next, updated_at);
+  toggleFavorite: (id, favorite) => {
+    const next = favorite ?? !get().notes.get(id)?.favorite;
+    stageNote(id, { favorite: next }, { favorite: next ? 1 : 0, updated_at: Date.now() });
+    return flushNote(id);
   },
 
-  saveParent: async (id, parentId) => {
-    const existing = get().notes.get(id);
-    if (!existing) return;
-    if (existing.parentId === parentId) return;
-    const updated_at = Date.now();
-    set((s) => {
-      const next = new Map(s.notes);
-      next.set(id, { ...existing, parentId, updatedAt: updated_at });
-      return { notes: next };
-    });
-    await updateNote(id, { parent_id: parentId, updated_at });
+  saveParent: (id, parentId) => {
+    stageNote(id, { parentId }, { parent_id: parentId, updated_at: Date.now() });
+    return flushNote(id);
   },
 
   addTag: async (id, raw) => {
@@ -307,6 +346,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       });
     } catch (e) {
       log.error("addTag failed", e);
+      toast.error("Note tag was not saved", { body: String(e) });
     }
   },
 
@@ -324,18 +364,30 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       });
     } catch (e) {
       log.error("removeTag failed", e);
+      toast.error("Note tag was not removed", { body: String(e) });
     }
   },
 
-  remove: async (id) => {
-    await deleteNote(id);
-    set((s) => {
-      const next = new Map(s.notes);
-      next.delete(id);
-      return { notes: next };
+  remove: (id) => {
+    if (get().deleting.has(id)) return Promise.reject(new Error("This note is already being deleted."));
+    set((s) => ({ deleting: new Set(s.deleting).add(id) }));
+    return noteJob(id, async () => {
+      try {
+        await deleteNote(id);
+        set((s) => {
+          const notes = new Map(s.notes), drafts = new Map(s.drafts), saveErrors = new Map(s.saveErrors);
+          notes.delete(id); drafts.delete(id); saveErrors.delete(id);
+          return { notes, drafts, saveErrors };
+        });
+        closeTabsForNote(id);
+        void removeEntityEmbedding("note", id).catch((error) => log.warn("note embedding removal failed", error));
+      } catch (error) {
+        toast.error("Note was not deleted", { body: String(error) });
+        throw error;
+      } finally {
+        set((s) => { const deleting = new Set(s.deleting); deleting.delete(id); return { deleting }; });
+      }
     });
-    closeTabsForNote(id);
-    void removeEntityEmbedding("note", id);
   },
 }));
 

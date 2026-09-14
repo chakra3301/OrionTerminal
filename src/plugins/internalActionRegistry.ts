@@ -3,7 +3,7 @@ import type { Disposable } from "@/plugins/contracts";
 
 export type InternalActionContribution = {
   id: string;
-  handle: (payload: unknown) => unknown | Promise<unknown>;
+  handle: (payload: unknown, assertActive?: () => void) => unknown | Promise<unknown>;
 };
 
 export type InternalActionResult =
@@ -17,10 +17,11 @@ class InternalActionRegistry {
     return this.entries.register(ownerId, contribution);
   }
 
-  async dispatch(action: string, payload: unknown): Promise<InternalActionResult> {
+  async dispatch(action: string, payload: unknown, assertActive: () => void = () => {}): Promise<InternalActionResult> {
+    assertActive();
     const contribution = this.entries.get(action);
     if (!contribution) return { handled: false };
-    return { handled: true, value: await contribution.handle(payload) };
+    return { handled: true, value: await contribution.handle(payload, assertActive) };
   }
 
   ownerOf(id: string): string | undefined {

@@ -1,7 +1,6 @@
 import { useVoice } from "@/store/voiceStore";
 import { useRosie } from "@/features/rosie/rosieStore";
-import { resampleTo16k, transcribeSamples } from "@/lib/voiceTranscribe";
-import { configureTransformers } from "@/lib/transformersEnv";
+import { resampleTo16k, transcribeSamples, warmSpeech } from "@/lib/voiceTranscribe";
 import { earconWake } from "@/lib/earcon";
 import { matchTrigger } from "@/lib/wakePhrase";
 import { log } from "@/lib/log";
@@ -63,7 +62,7 @@ export async function startListening(): Promise<void> {
 
   // Pre-warm Whisper so the first detected utterance isn't delayed by a
   // model download mid-conversation.
-  void configureTransformers();
+  void warmSpeech().catch((error) => log.warn("Speech warm-up failed", error));
 
   const audioContext = new AudioContext();
   if (audioContext.state === "suspended") {

@@ -6,7 +6,7 @@ use std::process::Stdio;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::{Child, Command};
+use tokio::process::Command;
 use tokio::sync::Notify;
 
 /// The Opus model every subscription Claude surface runs on (chat rails,
@@ -16,6 +16,20 @@ pub const OPUS_MODEL: &str = "claude-opus-4-8";
 
 static CHILDREN: Lazy<Mutex<HashMap<String, Arc<Notify>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
+
+struct ClaudeRun { id: String, cancel: Arc<Notify> }
+impl ClaudeRun {
+    fn start(id: &str) -> Result<Self, String> {
+        let mut runs = CHILDREN.lock();
+        if runs.contains_key(id) { return Err("A Claude turn is already running or stopping for this chat".into()); }
+        let cancel = Arc::new(Notify::new());
+        runs.insert(id.into(), cancel.clone());
+        Ok(Self { id: id.into(), cancel })
+    }
+}
+impl Drop for ClaudeRun {
+    fn drop(&mut self) { CHILDREN.lock().remove(&self.id); }
+}
 
 #[derive(Serialize, Clone)]
 struct EventPayload {
@@ -68,10 +82,21 @@ fn agent_args(system_append: &Option<String>, allowed_tools: &Option<Vec<String>
     }
     if let Some(tools) = allowed_tools {
         let tools: Vec<&String> = tools.iter().filter(|t| !t.trim().is_empty()).collect();
+        let builtins: Vec<&str> = tools.iter().map(|t| t.as_str())
+            .filter(|t| !t.starts_with("mcp__") && !t.starts_with("orion_") && !matches!(*t, "Edit" | "Write")).collect();
+        out.extend(["--tools".into(), builtins.join(","), "--strict-mcp-config".into(), "--setting-sources".into(), "".into()]);
         if !tools.is_empty() {
             out.push("--allowed-tools".into());
             for t in tools {
-                out.push(t.clone());
+                out.push(match t.as_str() {
+                    "Edit" => "mcp__orion__orion_apply_edit".into(),
+                    "Write" => "mcp__orion__orion_write_file".into(),
+                    name if name.starts_with("orion_") => format!("mcp__orion__{name}"),
+                    name => name.into(),
+                });
+                if matches!(t.as_str(), "Read" | "Grep" | "Glob") {
+                    out.push(format!("mcp__orion__{}", if t == "Read" { "orion_read_file" } else { "orion_search_files" }));
+                }
             }
         }
     }
@@ -82,23 +107,49 @@ fn agent_args(system_append: &Option<String>, allowed_tools: &Option<Vec<String>
 mod agent_args_tests {
     use super::agent_args;
 
+    #[tokio::test]
+    async fn cancelled_claude_preflight_retains_ownership_until_cleanup() {
+        let id = format!("claude-pending-{}", ulid::Ulid::new());
+        let run = super::ClaudeRun::start(&id).unwrap();
+        super::claude_cancel(id.clone()).unwrap();
+        assert!(super::ClaudeRun::start(&id).is_err());
+        tokio::time::timeout(std::time::Duration::from_millis(50), run.cancel.notified()).await.unwrap();
+        drop(run);
+        assert!(super::ClaudeRun::start(&id).is_ok());
+    }
+
     #[test]
     fn none_yields_no_args() {
         assert!(agent_args(&None, &None).is_empty());
-        assert!(agent_args(&Some("   ".into()), &Some(vec![])).is_empty());
+        assert_eq!(agent_args(&Some("   ".into()), &Some(vec![])), vec!["--tools", "", "--strict-mcp-config", "--setting-sources", ""]);
     }
 
     #[test]
     fn builds_system_and_tools() {
         let out = agent_args(&Some("be terse".into()), &Some(vec!["WebSearch".into(), "mcp__playwright".into()]));
-        assert_eq!(out, vec!["--append-system-prompt", "be terse", "--allowed-tools", "WebSearch", "mcp__playwright"]);
+        assert_eq!(out, vec!["--append-system-prompt", "be terse", "--tools", "WebSearch", "--strict-mcp-config", "--setting-sources", "", "--allowed-tools", "WebSearch", "mcp__playwright"]);
     }
 }
 
-/// Build a single stream-json `user` message line carrying the prompt text
-/// plus a base64-encoded PNG, ready to write to claude's stdin.
+fn image_media_type(bytes: &[u8]) -> Result<&'static str, String> {
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") { Ok("image/png") }
+    else if bytes.starts_with(&[0xff, 0xd8, 0xff]) { Ok("image/jpeg") }
+    else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") { Ok("image/gif") }
+    else if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") { Ok("image/webp") }
+    else { Err("This image attachment must be PNG, JPEG, GIF, or WebP.".into()) }
+}
+
 fn build_user_image_message(prompt: &str, image_path: &str) -> Result<String, String> {
-    let bytes = std::fs::read(image_path).map_err(|e| format!("read snapshot: {e}"))?;
+    use std::io::Read;
+    const LIMIT: u64 = 20 * 1024 * 1024;
+    let metadata = std::fs::metadata(image_path).map_err(|e| format!("read image: {e}"))?;
+    if !metadata.is_file() || metadata.len() > LIMIT { return Err("Image attachment must be a regular file of at most 20MB.".into()); }
+    let input = std::fs::File::open(image_path).map_err(|e| e.to_string())?;
+    if !input.metadata().map_err(|e| e.to_string())?.is_file() { return Err("Image attachment must be a regular file.".into()); }
+    let mut bytes = Vec::new();
+    input.take(LIMIT + 1).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+    if bytes.len() as u64 > LIMIT { return Err("Image attachment exceeds 20MB.".into()); }
+    let media_type = image_media_type(&bytes)?;
     let b64 = base64_encode(&bytes);
     let msg = serde_json::json!({
         "type": "user",
@@ -110,7 +161,7 @@ fn build_user_image_message(prompt: &str, image_path: &str) -> Result<String, St
                     "type": "image",
                     "source": {
                         "type": "base64",
-                        "media_type": "image/png",
+                        "media_type": media_type,
                         "data": b64
                     }
                 }
@@ -121,6 +172,29 @@ fn build_user_image_message(prompt: &str, image_path: &str) -> Result<String, St
         "{}\n",
         serde_json::to_string(&msg).map_err(|e| e.to_string())?
     ))
+}
+
+#[cfg(test)]
+mod image_tests {
+    use super::*;
+    #[test]
+    fn detects_supported_signatures_instead_of_claiming_everything_is_png() {
+        for (bytes, mime) in [(b"\x89PNG\r\n\x1a\n".as_slice(), "image/png"), (&[0xff, 0xd8, 0xff], "image/jpeg"), (b"GIF89a", "image/gif"), (b"RIFF1234WEBP", "image/webp")] {
+            assert_eq!(image_media_type(bytes).unwrap(), mime);
+        }
+        assert!(image_media_type(b"BMbitmap").is_err());
+        assert!(image_media_type(b"RIFF").is_err());
+    }
+    #[test]
+    fn rejects_directory_and_oversized_attachment_before_encoding() {
+        let dir = std::env::temp_dir().join(format!("orion-image-{}", ulid::Ulid::new()));
+        std::fs::create_dir(&dir).unwrap();
+        assert!(build_user_image_message("look", dir.to_str().unwrap()).is_err());
+        let path = dir.join("big.png");
+        std::fs::File::create(&path).unwrap().set_len(20 * 1024 * 1024 + 1).unwrap();
+        assert!(build_user_image_message("look", path.to_str().unwrap()).is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }
 
 #[tauri::command]
@@ -134,7 +208,18 @@ pub async fn claude_send(
     model: Option<String>,
     system_append: Option<String>,
     allowed_tools: Option<Vec<String>>,
+    ui_run_id: Option<String>,
 ) -> Result<(), String> {
+    crate::ui_bridge::validate_run_id(ui_run_id.as_deref())?;
+    let _account = crate::cli_auth::use_account("claude")?;
+    let run = ClaudeRun::start(&chat_id)?;
+    let cancel = run.cancel.clone();
+    let allowed_tools = crate::mcp_grants::normalized(allowed_tools.as_deref())?;
+    tokio::select! {
+        biased;
+        _ = cancel.notified() => return Err("Cancelled before Claude start".into()),
+        auth = crate::connector_status::require_claude_subscription() => auth?,
+    }
     // Resolve cwd: explicit project_root wins, otherwise fall back to the
     // user's home dir so chat surfaces without a project context (Archives,
     // XDesign) still work. The CLI just needs a valid directory.
@@ -162,13 +247,15 @@ pub async fn claude_send(
         .unwrap_or(OPUS_MODEL);
 
     let mut cmd = Command::new("claude");
+    crate::connector_status::subscription_environment(&mut cmd);
+    crate::cli_auth::apply_profile(&mut cmd);
     cmd.args([
         "--print",
         "--output-format",
         "stream-json",
         "--verbose",
         "--permission-mode",
-        "bypassPermissions",
+        "acceptEdits",
         "--model",
         model_id,
     ]);
@@ -188,13 +275,12 @@ pub async fn claude_send(
     for a in agent_args(&system_append, &allowed_tools) {
         cmd.arg(a);
     }
-    // Hand claude our Orion MCP server so this chat has access to the
-    // Orion-aware tools (list_recent_notes, search_archive, etc.) alongside
-    // claude-code's built-in Bash/Read/Edit/Write toolset. Failure to write
-    // the config is non-fatal — the chat still runs, just without our tools.
-    if let Some(mcp_config_path) = crate::mcp_config::write(&app) {
-        cmd.args(["--mcp-config", &mcp_config_path]);
-    }
+    // Each subprocess gets an immutable grant snapshot, retained until exit.
+    let _mcp_config = if !allowed_tools.as_ref().is_some_and(|tools| tools.is_empty()) {
+        let config = crate::mcp_config::write_scoped(&app, allowed_tools.as_deref(), ui_run_id.as_deref())?;
+        cmd.arg("--mcp-config").arg(config.path());
+        Some(config)
+    } else { None };
     if let Some(sid) = session_id.as_deref() {
         if !sid.is_empty() {
             cmd.args(["--resume", sid]);
@@ -224,7 +310,12 @@ pub async fn claude_send(
     cmd.stderr(Stdio::piped());
     cmd.kill_on_drop(true);
 
-    let mut child: Child = cmd.spawn().map_err(|e| {
+    tokio::select! {
+        biased;
+        _ = cancel.notified() => return Err("Cancelled before Claude start".into()),
+        _ = std::future::ready(()) => {}
+    }
+    let (mut child, mut process_group) = crate::process_group::spawn(&mut cmd).map_err(|e| {
         format!(
             "failed to spawn `claude` — is the CLI installed and on PATH? ({})",
             e
@@ -255,8 +346,6 @@ pub async fn claude_send(
         .take()
         .ok_or_else(|| "no stderr from child".to_string())?;
 
-    let cancel = Arc::new(Notify::new());
-    CHILDREN.lock().insert(chat_id.clone(), cancel.clone());
 
     let app_clone = app.clone();
     let chat_id_clone = chat_id.clone();
@@ -291,6 +380,7 @@ pub async fn claude_send(
         loop {
             tokio::select! {
                 _ = cancel_for_loop.notified() => {
+                    process_group.terminate();
                     let _ = child.kill().await;
                     let _ = child.wait().await;
                     return Ok(None);
@@ -307,9 +397,11 @@ pub async fn claude_send(
                         }
                         Ok(None) => {
                             let status = child.wait().await.map_err(|e| e.to_string())?;
+                            process_group.disarm();
                             return Ok(status.code());
                         }
                         Err(e) => {
+                            process_group.terminate();
                             let _ = child.kill().await;
                             return Err(e.to_string());
                         }
@@ -320,7 +412,6 @@ pub async fn claude_send(
     }
     .await;
 
-    CHILDREN.lock().remove(&chat_id);
 
     match result {
         Ok(code) => {
@@ -350,91 +441,10 @@ pub async fn claude_send(
 
 #[tauri::command]
 pub fn claude_cancel(chat_id: String) -> Result<(), String> {
-    if let Some(n) = CHILDREN.lock().remove(&chat_id) {
-        n.notify_waiters();
+    if let Some(n) = CHILDREN.lock().get(&chat_id) {
+        n.notify_one();
     }
     Ok(())
-}
-
-/// Vision variant of `claude_oneshot`: attaches an image file via the CLI's
-/// `@<path>` syntax so Claude sees the actual pixels (used for asset auto-
-/// tagging of images). Falls back to a normal text-only call if the path is
-/// empty.
-#[tauri::command]
-pub async fn claude_oneshot_with_image(
-    prompt: String,
-    image_path: String,
-) -> Result<String, String> {
-    use std::process::Stdio;
-    if image_path.trim().is_empty() {
-        return claude_oneshot(prompt).await;
-    }
-    let mut cmd = Command::new("claude");
-    cmd.args(["--print", "--output-format", "text"]);
-    // The CLI reads `@<path>` references inline. Putting it at the END of the
-    // prompt keeps the user's instruction first.
-    let full_prompt = format!("{prompt}\n\n@{image_path}");
-    cmd.arg(&full_prompt);
-    if let Some(home) = std::env::var_os("HOME") {
-        cmd.current_dir(home);
-    }
-    cmd.env("PATH", augmented_path());
-    cmd.env_remove("ANTHROPIC_API_KEY");
-    cmd.env_remove("ANTHROPIC_AUTH_TOKEN");
-    cmd.stdin(Stdio::null());
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
-    cmd.kill_on_drop(true);
-
-    let output = cmd
-        .output()
-        .await
-        .map_err(|e| format!("spawn claude: {e}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!(
-            "claude exited with {} ({})",
-            output.status,
-            stderr.trim()
-        ));
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-}
-
-/// Fire-and-forget one-shot CLI call: send a prompt, return the assistant's
-/// reply as a single string. Used for background work like asset tagging.
-/// No tools, no streaming, no session — just `claude --print` capturing
-/// stdout. Runs against the user's subscription auth (same as `claude_send`).
-#[tauri::command]
-pub async fn claude_oneshot(prompt: String) -> Result<String, String> {
-    use std::process::Stdio;
-    let mut cmd = Command::new("claude");
-    cmd.args(["--print", "--output-format", "text"]);
-    cmd.arg(&prompt);
-    if let Some(home) = std::env::var_os("HOME") {
-        cmd.current_dir(home);
-    }
-    cmd.env("PATH", augmented_path());
-    cmd.env_remove("ANTHROPIC_API_KEY");
-    cmd.env_remove("ANTHROPIC_AUTH_TOKEN");
-    cmd.stdin(Stdio::null());
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
-    cmd.kill_on_drop(true);
-
-    let output = cmd
-        .output()
-        .await
-        .map_err(|e| format!("spawn claude: {e}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!(
-            "claude exited with {} ({})",
-            output.status,
-            stderr.trim()
-        ));
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 
@@ -447,7 +457,7 @@ pub(crate) fn augmented_path() -> String {
     let extras = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"];
     let home_bins = std::env::var("HOME")
         .ok()
-        .map(|h| vec![format!("{}/.local/bin", h), format!("{}/.claude/local", h)])
+        .map(|h| vec![format!("{}/.local/bin", h), format!("{}/.cargo/bin", h), format!("{}/.claude/local", h)])
         .unwrap_or_default();
     let existing = std::env::var("PATH").unwrap_or_default();
     let mut parts: Vec<String> = extras.iter().map(|s| s.to_string()).collect();

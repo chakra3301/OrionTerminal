@@ -594,8 +594,7 @@ summary:focus-visible,
 .ot-rosie-overlay {
   position: fixed;
   inset: 0;
-  /* Above everything when active: windows (growing inline z), menubar/dock
-     (1000), companion (1400), spotlight (2000). */
+  /* Shell dialogs must stay reachable while ROSIE is open. */
   z-index: 2600;
   display: flex;
   align-items: flex-end;
@@ -1508,13 +1507,15 @@ summary:focus-visible,
   background: rgba(0,0,0,0.7);
   display: flex;
   justify-content: center;
-  z-index: 2000;
+  align-items: flex-start;
+  z-index: 6300;
   padding-top: 16vh;
 }
 
 .ot-spotlight {
   width: 520px;
   max-width: 90vw;
+  max-height: calc(84vh - 16px);
   border-radius: var(--r-lg);
   background: var(--glass-bg-deep);
   border: 1px solid var(--glass-border-bright);
@@ -1530,6 +1531,7 @@ summary:focus-visible,
 }
 
 .ot-spotlight-input {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1557,6 +1559,7 @@ summary:focus-visible,
 }
 
 .ot-spotlight-list {
+  min-height: 0;
   max-height: 50vh;
   overflow-y: auto;
   padding: 6px 6px 8px;
@@ -1643,7 +1646,9 @@ summary:focus-visible,
 
 .ot-claude-rail {
   flex: 1;
-  min-width: 240px;
+  min-width: 0;
+  container-type: inline-size;
+  container-name: assistant-rail;
   background: linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.15));
   display: flex;
   flex-direction: column;
@@ -1654,7 +1659,23 @@ summary:focus-visible,
   width: 100%;
 }
 
+.ot-claude-identity { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+@container assistant-rail (max-width: 320px) {
+  .ot-claude-rail > .ot-claude-header {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr) 22px;
+  }
+  .ot-claude-header > .ot-model-select {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .ot-claude-action { grid-column: 3; grid-row: 1; }
+}
 .ot-claude-header {
+  flex-shrink: 0;
   padding: 12px 14px;
   border-bottom: 1px solid rgba(255,255,255,0.05);
   display: flex;
@@ -1679,6 +1700,25 @@ summary:focus-visible,
 /* Dismissed: keep the Canvas mounted (one WebGL context, no leak) but hidden
    and non-interactive; its render loop is parked via frameloop="never". */
 .ot-companion.hidden { visibility: hidden; pointer-events: none; }
+.ot-companion-hide {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--t-faint);
+  border-radius: var(--r-pill);
+  background: var(--bg-1);
+  color: var(--t-secondary);
+  opacity: 0;
+  cursor: pointer;
+}
+.ot-companion:hover .ot-companion-hide,
+.ot-companion-hide:focus-visible { opacity: 1; }
+.ot-companion-hide:focus-visible { outline: 2px solid var(--neon-cyan); }
 
 /* Clip-test overlay (companion.clipTest) — bottom-center bar. */
 .ot-clip-tester {
@@ -6700,6 +6740,23 @@ summary:focus-visible,
   position: relative;
 }
 
+.note-save-status {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 44px 8px 18px;
+  color: var(--neon-yellow);
+  font-size: 12px;
+}
+.note-save-status button {
+  padding: 4px 8px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-sm);
+}
+.note-save-status button:disabled { opacity: .5; }
+
 /* ── Blueprint visualizer — live wireframe drafting layer behind the page ─ */
 .note-blueprint-layer {
   position: absolute;
@@ -7200,6 +7257,17 @@ summary:focus-visible,
 }
 .xd-tab-home:hover,
 .xd-tab-new:hover { color: var(--xd-text); background: var(--xd-hover); }
+.xd-tab-save {
+  flex-shrink: 0;
+  margin: 4px 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--xd-border);
+  border-radius: var(--r-sm);
+  color: var(--neon-yellow);
+  font-size: 12px;
+}
+.xd-tab-save:hover { background: var(--xd-hover); }
+.xd-tab-save:disabled { opacity: .6; }
 .xd-tabs-strip {
   display: flex;
   align-items: stretch;
@@ -9052,6 +9120,7 @@ summary:focus-visible,
 }
 .xd-artifact-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
@@ -9066,6 +9135,13 @@ summary:focus-visible,
   max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.xd-artifact-save-status {
+  font-family: var(--f-ui);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--t-secondary);
   white-space: nowrap;
 }
 .xd-artifact-viewports {
@@ -10826,9 +10902,24 @@ summary:focus-visible,
   justify-content: center;
   animation: ot-ctx-in 120ms ease-out;
 }
+dialog.ot-prompt-overlay {
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+dialog.ot-prompt-overlay:not([open]) { display: none; }
+dialog.ot-prompt-overlay::backdrop { background: transparent; }
 .ot-prompt-card {
+  box-sizing: border-box;
   width: 380px;
   max-width: calc(100vw - 48px);
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
   background: var(--bg-1);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--r-lg);
@@ -10843,6 +10934,7 @@ summary:focus-visible,
   margin-bottom: 4px;
 }
 .ot-prompt-label {
+  display: block;
   font-family: var(--f-mono);
   font-size: 10.5px;
   letter-spacing: 0.06em;
@@ -10869,6 +10961,7 @@ summary:focus-visible,
 }
 .ot-prompt-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
 }
@@ -11311,7 +11404,7 @@ summary:focus-visible,
   position: fixed;
   right: 16px;
   bottom: 16px;
-  z-index: 2800; /* above ROSIE (2600), below modal overlays (6500) */
+  z-index: 6200; /* above settings (6000), below confirmations (6500) */
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -16632,6 +16725,7 @@ html.ot-reduce-glass .note-page .note-editor-body {
 
 /* ── Viewport ── */
 .xd-fx-viewport {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: grid;
@@ -16656,6 +16750,39 @@ html.ot-reduce-glass .note-page .note-editor-body {
 .xd-fx-gl-lost {
   font-size: 12px;
   color: var(--xd-text-3);
+}
+.xd-fx-viewport.drop-over .xd-fx-canvas-holder {
+  filter: brightness(0.72) saturate(0.75);
+}
+.xd-fx-drop-overlay {
+  position: absolute;
+  inset: 18px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+  border: 1.5px dashed rgba(var(--xd-accent-rgb), 0.85);
+  border-radius: 12px;
+  background: rgba(8, 5, 12, 0.66);
+  box-shadow: inset 0 0 48px rgba(var(--xd-accent-rgb), 0.08);
+  color: var(--xd-text);
+  backdrop-filter: blur(8px);
+}
+.xd-fx-drop-overlay strong { font-size: 13px; font-weight: 600; }
+.xd-fx-drop-overlay > span:last-child { font-size: 11px; color: var(--xd-text-2); }
+.xd-fx-drop-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 3px;
+  border-radius: 10px;
+  background: rgba(var(--xd-accent-rgb), 0.14);
+  color: var(--xd-accent);
+  box-shadow: 0 0 24px rgba(var(--xd-accent-rgb), 0.18);
 }
 
 /* ── On-canvas transform gizmo (source layers) ── */
@@ -17293,4 +17420,204 @@ html.ot-reduce-glass .note-page .note-editor-body {
   background: rgba(var(--xd-accent-rgb), 0.9);
   color: #fff;
   pointer-events: none;
+}
+.xd-model-badge { background: rgba(177, 76, 255, 0.9); }
+
+/* ── img2model studio ── */
+.xd-model-studio {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--xd-bg);
+}
+.xd-model-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--xd-border);
+  background: var(--xd-panel);
+}
+.xd-model-toolbar button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--xd-raised);
+  color: var(--xd-text-2);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.xd-model-toolbar button:hover { border-color: var(--xd-accent); color: var(--xd-text); }
+.xd-model-toolbar button.active { background: rgba(var(--xd-accent-rgb), 0.28); color: var(--xd-accent); }
+.xd-model-toolbar button:disabled { opacity: 0.4; cursor: not-allowed; }
+.xd-model-toolbar-pass {
+  font-size: 10.5px;
+  color: var(--xd-text-3);
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--xd-raised);
+  white-space: nowrap;
+}
+.xd-model-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+}
+.xd-model-viewport { flex: 1; min-width: 0; position: relative; }
+.xd-model-viewport canvas { display: block; }
+
+/* ── img2model assist ── */
+.xd-model-assist {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  bottom: 10px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(20, 22, 26, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--xd-border);
+  border-radius: 12px;
+  box-shadow: 0 18px 50px -14px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+  z-index: 20;
+}
+.xd-model-assist-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px 9px 12px;
+  border-bottom: 1px solid var(--xd-border);
+}
+.xd-model-assist-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--xd-accent);
+}
+.xd-model-assist-pass {
+  font-size: 10px;
+  color: var(--xd-text-3);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.xd-model-assist-actions { display: flex; gap: 2px; }
+.xd-model-assist-actions button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  color: var(--xd-text-3);
+  cursor: pointer;
+  border-radius: 5px;
+}
+.xd-model-assist-actions button:hover { color: var(--xd-text); background: var(--xd-hover); }
+.xd-model-assist-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.xd-model-assist-empty { font-size: 11.5px; color: var(--xd-text-3); }
+.xd-model-assist-empty p { margin: 0; }
+.xd-model-assist-msg {
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 7px 10px;
+  border-radius: 9px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.xd-model-assist-msg.user {
+  align-self: flex-end;
+  max-width: 90%;
+  background: rgba(var(--xd-accent-rgb), 0.2);
+  color: var(--xd-text);
+}
+.xd-model-assist-msg.assistant { background: var(--xd-raised); color: var(--xd-text-2); }
+.xd-model-assist-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  background: rgba(57, 255, 136, 0.12);
+  color: #39ff88;
+}
+.xd-model-assist-chip.err { background: rgba(255, 62, 165, 0.12); color: #ff3ea5; }
+.xd-model-assist-render {
+  align-self: stretch;
+  border: 1px solid var(--xd-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.xd-model-assist-render img { display: block; width: 100%; height: auto; }
+.xd-model-assist-loopstop {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(230, 255, 58, 0.12);
+  color: #e6ff3a;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.xd-model-assist-input {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--xd-border);
+}
+.xd-model-assist-input input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--xd-border);
+  border-radius: 7px;
+  background: var(--xd-raised);
+  color: var(--xd-text);
+  font-size: 12px;
+}
+.xd-model-assist-input button {
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 7px;
+  background: rgba(var(--xd-accent-rgb), 0.28);
+  color: var(--xd-accent);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.xd-model-assist-input button:disabled { opacity: 0.4; cursor: not-allowed; }
+.xd-model-spin { animation: xd-model-spin-kf 0.9s linear infinite; }
+@keyframes xd-model-spin-kf { to { transform: rotate(360deg); } }
+.xd-model-assist-busy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--xd-text-3);
+  padding: 2px 2px 6px;
 }

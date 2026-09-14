@@ -1,3 +1,6 @@
+import bootstrapSource from "./preview-bootstrap.js?raw";
+import bootstrapIntegrity from "../../../resources/preview-bootstrap-integrity.json";
+
 export const HTML_PREVIEW_CHANNEL = "orion:xdesign-preview";
 export const HTML_PREVIEW_VERSION = 1;
 export const HTML_PREVIEW_SANDBOX = "allow-scripts";
@@ -25,6 +28,8 @@ export type PreviewSelection = {
 
 export type PreviewEvent =
   | { type: "ready" }
+  | { type: "loading" }
+  | { type: "startup-error"; error: string }
   | { type: "selection"; selection: PreviewSelection | null }
   | { type: "persist"; html: string }
   | { type: "external-link"; url: string }
@@ -38,11 +43,6 @@ export type PreviewCommand =
   | { type: "duplicate-selection" }
   | { type: "move-selection"; direction: -1 | 1 }
   | { type: "record-canvas"; requestId: string; durationMs: number };
-
-type ScriptUrlFactory = {
-  create: (source: string) => string;
-  revoke: (url: string) => void;
-};
 
 export type PreparedPreview = {
   srcDoc: string;
@@ -63,11 +63,6 @@ const FRAME_CSP = [
   "base-uri 'none'",
   "form-action 'none'",
 ].join("; ");
-
-const DEFAULT_URL_FACTORY: ScriptUrlFactory = {
-  create: (source) => URL.createObjectURL(new Blob([source], { type: "text/javascript" })),
-  revoke: (url) => URL.revokeObjectURL(url),
-};
 
 function bridgeRuntime() {
   const CHANNEL = "orion:xdesign-preview";
@@ -379,7 +374,9 @@ function bridgeRuntime() {
     ) {
       return;
     }
-    if (message.type === "set-edit" && typeof message.enabled === "boolean") {
+    if (message.type === "ping") {
+      send({ type: "ready" });
+    } else if (message.type === "set-edit" && typeof message.enabled === "boolean") {
       setEditing(message.enabled);
     } else if (message.type === "patch-style") {
       patchStyle(message.patch);
@@ -412,63 +409,51 @@ function ensureDocumentHead(doc: Document): HTMLHeadElement {
   return head;
 }
 
-export function prepareHtmlPreview(
-  html: string,
-  urlFactory: ScriptUrlFactory = DEFAULT_URL_FACTORY,
-): PreparedPreview {
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  const urls: string[] = [];
-  const createUrl = (source: string) => {
-    const url = urlFactory.create(source);
-    urls.push(url);
-    return url;
-  };
-
-  for (const meta of Array.from(doc.querySelectorAll("meta[http-equiv]"))) {
-    if (meta.getAttribute("http-equiv")?.toLowerCase() === "content-security-policy") {
-      meta.remove();
-    }
-  }
-
-  for (const script of Array.from(doc.querySelectorAll("script"))) {
-    if (script.src) {
-      script.remove();
-      continue;
-    }
-    const source = script.textContent ?? "";
-    if (!source.trim()) {
-      script.remove();
-      continue;
-    }
-    script.textContent = "";
-    script.removeAttribute("integrity");
-    script.removeAttribute("crossorigin");
-    script.removeAttribute("nonce");
-    script.src = createUrl(source);
-  }
-
+function installBootstrap(doc: Document, payload: object, guard: boolean) {
   const head = ensureDocumentHead(doc);
   const csp = doc.createElement("meta");
   csp.id = HTML_PREVIEW_CSP_ID;
-  csp.setAttribute("http-equiv", "Content-Security-Policy");
-  csp.setAttribute("content", FRAME_CSP);
+  csp.httpEquiv = "Content-Security-Policy";
+  csp.content = FRAME_CSP
+    .replace("script-src blob:", `script-src ${bootstrapIntegrity.scriptSource} 'unsafe-eval'`)
+    .replace("frame-src 'none'", guard ? "frame-src about:" : "frame-src 'none'");
+  const data = doc.createElement("script");
+  data.id = "xd-preview-payload";
+  data.type = "application/json";
+  data.textContent = JSON.stringify(payload).replace(/</g, "\\u003c");
+  const bootstrap = doc.createElement("script");
+  bootstrap.id = HTML_PREVIEW_BRIDGE_ID;
+  bootstrap.textContent = bootstrapSource.replace(/\r\n?/g, "\n");
+  head.prepend(csp, data);
+  doc.body.append(bootstrap);
+}
 
-  const bridge = doc.createElement("script");
-  bridge.id = HTML_PREVIEW_BRIDGE_ID;
-  bridge.src = createUrl(bridgeSource());
-
-  head.prepend(bridge);
-  head.prepend(csp);
-
-  const doctype = html.trimStart().toLowerCase().startsWith("<!doctype")
-    ? "<!doctype html>\n"
-    : "";
-  return {
-    srcDoc: doctype + doc.documentElement.outerHTML,
-    release: () => {
-      for (const url of urls) urlFactory.revoke(url);
-    },
-  };
+export function prepareHtmlPreview(html: string): PreparedPreview {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("#xd-preview-payload, #xd-preview-bridge, #xd-preview-csp, base").forEach((node) => node.remove());
+  for (const meta of Array.from(doc.querySelectorAll<HTMLMetaElement>("meta[http-equiv]"))) {
+    if (["content-security-policy", "refresh"].includes(meta.httpEquiv.toLowerCase())) meta.remove();
+  }
+  for (const script of Array.from(doc.querySelectorAll("script"))) {
+    script.removeAttribute("data-xd-script-type");
+    if (script.hasAttribute("src")) {
+      script.remove();
+      continue;
+    }
+    const type = script.type.trim().toLowerCase();
+    if (!["", "text/javascript", "application/javascript", "module"].includes(type)) continue;
+    script.setAttribute("data-xd-script-type", type);
+    script.type = "application/x-orion-preview-script";
+  }
+  installBootstrap(doc, { role: "content", bridge: bridgeSource() }, false);
+  const innerHtml = "<!doctype html>\n" + doc.documentElement.outerHTML;
+  const guard = new DOMParser().parseFromString(
+    "<!doctype html><html><head><style>html,body{margin:0;height:100%;overflow:hidden}</style></head><body></body></html>",
+    "text/html",
+  );
+  // A document CSP does not stop self-navigation. Its trusted parent's frame-src does.
+  installBootstrap(guard, { role: "guard", html: innerHtml }, true);
+  return { srcDoc: "<!doctype html>\n" + guard.documentElement.outerHTML, release: () => {} };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -543,6 +528,10 @@ export function parsePreviewEvent(value: unknown): PreviewEvent | null {
     return null;
   }
   if (value.type === "ready") return { type: "ready" };
+  if (value.type === "loading") return { type: "loading" };
+  if (value.type === "startup-error" && isBoundedString(value.error, 2000)) {
+    return { type: "startup-error", error: value.error };
+  }
   if (value.type === "selection") {
     const selection = parseSelection(value.selection);
     return selection === undefined ? null : { type: "selection", selection };

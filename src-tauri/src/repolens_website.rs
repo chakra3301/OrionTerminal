@@ -16,14 +16,15 @@ use rusqlite::{params, Connection};
 use serde::Serialize;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::Notify;
 
-use crate::claude_cli::{augmented_path, OPUS_MODEL};
+use crate::claude_cli::augmented_path;
 
 const MAX_TURNS: &str = "50";
 const IMAGE_EXTS: [&str; 4] = ["png", "webp", "jpg", "jpeg"];
+const PLAYWRIGHT_ARGS: [&str; 4] = ["-y", "@playwright/mcp@0.0.80", "--headless", "--isolated"];
 
 const DESIGN_PROMPT: &str = "You are a senior design systems analyst. Reverse-engineer the design system of this website from the attached original-site screenshots and the extracted CSS/DOM artifacts below.\n\n\
 Return ONLY one fenced ```json code block, with no prose before or after, matching this TypeScript type exactly:\n\n\
@@ -41,8 +42,7 @@ Colors: extract the real palette as hex from the CSS/screenshots; group into nam
 If a field is unknown, use a short honest string or an empty array — never invent.\n";
 
 /// Live rip subprocesses keyed by rip id, for cancellation.
-static RIPS: Lazy<Mutex<HashMap<String, Arc<Notify>>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static RIPS: Lazy<Mutex<HashMap<String, Arc<Notify>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Clone, Serialize)]
 struct WebsiteEvent {
@@ -155,24 +155,22 @@ fn pick_design_screenshots(file_names: &[String], cap: usize) -> Vec<String> {
 /// Read a file fail-soft, capped to `cap` chars (char-boundary safe). Returns a
 /// labeled block, or empty string if the file is missing/unreadable/empty.
 fn read_capped(path: &Path, label: &str, cap: usize) -> String {
-    match std::fs::read_to_string(path) {
+    let read = || -> std::io::Result<String> {
+        use std::io::Read;
+        if !std::fs::symlink_metadata(path)?.file_type().is_file() {
+            return Err(std::io::Error::other("Not a regular artifact file"));
+        }
+        let mut bytes = Vec::new();
+        std::fs::File::open(path)?.take(cap.saturating_mul(4) as u64).read_to_end(&mut bytes)?;
+        Ok(String::from_utf8_lossy(&bytes).into_owned())
+    };
+    match read() {
         Ok(s) if !s.trim().is_empty() => {
             let body: String = s.chars().take(cap).collect();
             format!("\n\n===== {label} =====\n{body}")
         }
         _ => String::new(),
     }
-}
-
-fn ulid_like() -> String {
-    // Time-ordered, collision-resistant enough for local rip ids.
-    let t = now_ms();
-    let r: u64 = {
-        use std::collections::hash_map::RandomState;
-        use std::hash::{BuildHasher, Hasher};
-        RandomState::new().build_hasher().finish()
-    };
-    format!("rip_{:x}{:x}", t, r)
 }
 
 fn websites_root(app: &AppHandle) -> Result<PathBuf, String> {
@@ -188,12 +186,9 @@ fn websites_root(app: &AppHandle) -> Result<PathBuf, String> {
 
 fn scaffold_dir(app: &AppHandle) -> Result<PathBuf, String> {
     // Bundled resource in release; resolves from the project in dev.
-    if let Ok(p) = app
-        .path()
-        .resolve("website-cloner-scaffold", tauri::path::BaseDirectory::Resource)
-    {
-        if p.exists() {
-            return Ok(p);
+    for resource in ["website-cloner-scaffold", "_up_/resources/website-cloner-scaffold", "resources/website-cloner-scaffold"] {
+        if let Ok(p) = app.path().resolve(resource, tauri::path::BaseDirectory::Resource) {
+            if p.is_dir() { return Ok(p); }
         }
     }
     // Dev fallback: repo-relative resources dir.
@@ -224,47 +219,101 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RipEngine {
+    Claude,
+    Codex,
+}
+
+fn rip_engine(provider_kind: &str) -> Result<RipEngine, String> {
+    match provider_kind {
+        "anthropic" => Ok(RipEngine::Claude),
+        "codex_cli" => Ok(RipEngine::Codex),
+        _ => Err("Website reconstruction requires a Claude or Codex subscription connector. Choose one explicitly.".into()),
+    }
+}
+
+fn resolve_rip_model(app: &AppHandle, selection: Option<&str>) -> Result<(RipEngine, String, String), String> {
+    let selection = selection.ok_or("Choose a website agent model")?;
+    let provider = crate::provider_selection::resolve(&open_conn(app)?, selection)?;
+    Ok((rip_engine(&provider.kind)?, provider.model.clone(), provider.value()))
+}
+
+fn rip_codex_args(model: &str, cwd: &str, resume: Option<&str>) -> Vec<String> {
+    let mut args = crate::cli_engine::codex::codex_args(model, cwd, resume);
+    args.splice(1..1, [
+        "-c".into(), "mcp_servers.playwright.command=\"npx\"".into(),
+        "-c".into(), format!("mcp_servers.playwright.args={}", serde_json::to_string(&PLAYWRIGHT_ARGS).unwrap()),
+        "-c".into(), "mcp_servers.playwright.default_tools_approval_mode=\"approve\"".into(),
+    ]);
+    args
+}
+
 /// Dedicated rip MCP config: headless Playwright only. Returns the file path.
 fn write_rip_mcp(project: &Path) -> Result<String, String> {
     let cfg = serde_json::json!({
         "mcpServers": {
             "playwright": {
                 "command": "npx",
-                "args": ["-y", "@playwright/mcp@latest", "--headless", "--isolated"]
+                "args": PLAYWRIGHT_ARGS
             }
         }
     });
     let path = project.join(".rip-mcp.json");
-    std::fs::write(&path, cfg.to_string()).map_err(|e| e.to_string())?;
+    crate::mcp_config::write_private(&path, cfg.to_string().as_bytes()).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().into_owned())
 }
 
-fn clone_prompt(url: &str) -> String {
+fn validate_rip_id(id: &str) -> Result<(), String> {
+    if id.is_empty() || id.len() > 128 || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-') {
+        return Err("Invalid website project ID".into());
+    }
+    Ok(())
+}
+
+fn rip_codex_home(app: &AppHandle, id: &str) -> Result<PathBuf, String> {
+    validate_rip_id(id)?;
+    Ok(app
+        .path()
+        .app_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("cli-engines")
+        .join("repolens-codex")
+        .join(id))
+}
+
+fn clone_prompt(url: &str, engine: RipEngine) -> String {
+    let skill_path = match engine {
+        RipEngine::Claude => ".claude/skills/clone-website/SKILL.md",
+        RipEngine::Codex => ".codex/skills/clone-website/SKILL.md",
+    };
+    let parallel_note = match engine {
+        RipEngine::Claude => {
+            "Create worktrees for parallel builders and merge them back as instructed."
+        }
+        RipEngine::Codex => {
+            "If subagents are unavailable, build the extracted sections sequentially in this workspace. Respect permission denials and report blocked actions; never bypass restrictions."
+        }
+    };
     format!(
         "You are cloning a website into THIS Next.js project (your current working directory).\n\n\
 Target URL: {url}\n\n\
-Follow the clone-website skill verbatim. Read the full instructions at \
-`.claude/skills/clone-website/SKILL.md` in this project and execute every phase \
-(recon, foundation, component specs, parallel builders in git worktrees, assembly, visual QA).\n\n\
-Browser automation: a headless Playwright MCP server is attached (tools prefixed \
-`mcp__playwright__`). Use it for all navigation, screenshots, and DOM/CSS extraction.\n\n\
+Follow the clone-website skill verbatim. Read the full instructions at `{skill_path}` \
+in this project and execute every phase (recon, foundation, component specs, construction, assembly, visual QA).\n\n\
+Browser automation: a headless Playwright MCP server named `playwright` is attached. \
+Use its browser tools for all navigation, screenshots, and DOM/CSS extraction.\n\n\
 IMPORTANT for progress reporting:\n\
 - Very early in recon, save a full-page desktop screenshot (1440px) into \
 `docs/design-references/` (e.g. `home-desktop.png`). This is used as the rip's preview thumbnail, so do it before deep extraction.\n\
-- This project is already a git repository with an initial commit; create worktrees off the current branch for parallel builders and merge them back.\n\
-- Verify `npm run build` passes before you finish.\n",
-        url = url
+- This project is already a git repository with an initial commit. {parallel_note}\n\
+- Verify `npm run build` passes before you finish.\n"
     )
 }
 
-fn preflight() -> Result<(), String> {
-    let out = std::process::Command::new("node")
-        .arg("--version")
-        .env("PATH", augmented_path())
-        .output()
-        .map_err(|_| {
-            "Node.js not found on PATH. Install Node 24+ to use the website ripper.".to_string()
-        })?;
+async fn preflight() -> Result<(), String> {
+    let out = crate::connector_status::probe("node", &["--version"]).await
+        .filter(|output| output.status.success())
+        .ok_or("Node.js probe failed or timed out. Install Node 24+ to use the website ripper.")?;
     let ver = String::from_utf8_lossy(&out.stdout);
     match parse_node_major(&ver) {
         Some(n) if n >= 24 => Ok(()),
@@ -273,6 +322,22 @@ fn preflight() -> Result<(), String> {
         )),
         None => Err("Could not determine the Node.js version.".into()),
     }
+}
+
+async fn preflight_agent(engine: RipEngine) -> Result<(), String> {
+    let program = if engine == RipEngine::Codex { "codex" } else { "claude" };
+    crate::connector_status::probe(program, &["--version"]).await
+        .filter(|output| output.status.success())
+        .ok_or_else(|| format!("{program} is unavailable or timed out. Connect it in Control Panel → Providers."))?;
+    if engine == RipEngine::Codex {
+        let output = crate::connector_status::probe("codex", &["login", "status"]).await
+            .ok_or("Codex login status timed out. Reconnect ChatGPT in Control Panel → Providers.")?;
+        let status = format!("{}{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+        if !output.status.success() || !status.to_lowercase().contains("logged in using chatgpt") {
+            return Err("ChatGPT subscription login required. API-key auth is not used for website reconstruction.".into());
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -290,13 +355,11 @@ pub async fn repolens_website_rip(
         .unwrap_or("site")
         .trim_start_matches("www.")
         .to_string();
-    let id = ulid_like();
+    let id = format!("rip_{}", ulid::Ulid::new());
     let root = websites_root(&app)?;
     let dir = root.join(&id);
     let project = dir.join("project");
-    let model = model
-        .filter(|m| !m.is_empty())
-        .unwrap_or_else(|| OPUS_MODEL.to_string());
+    let (_, _, model) = resolve_rip_model(&app, model.as_deref())?;
 
     // Insert the row up front so the card appears immediately.
     {
@@ -328,7 +391,9 @@ async fn setup_and_run(
     project: PathBuf,
     model: String,
 ) -> Result<(), String> {
-    preflight()?;
+    preflight().await?;
+    let (engine, _, _) = resolve_rip_model(&app, Some(&model))?;
+    preflight_agent(engine).await?;
 
     // 1. Copy scaffold.
     set_phase(&app, &id, "running", "recon");
@@ -457,8 +522,12 @@ fn collect_tool_uses(v: &Value) -> Vec<(String, String, String)> {
                     .and_then(|x| x.as_str())
                     .unwrap_or("")
                     .to_string();
-                let name = prettify_tool(block.get("name").and_then(|x| x.as_str()).unwrap_or("tool"));
-                let brief = block.get("input").map(summarize_tool_input).unwrap_or_default();
+                let name =
+                    prettify_tool(block.get("name").and_then(|x| x.as_str()).unwrap_or("tool"));
+                let brief = block
+                    .get("input")
+                    .map(summarize_tool_input)
+                    .unwrap_or_default();
                 out.push((id, name, brief));
             }
         }
@@ -477,7 +546,10 @@ fn collect_tool_errors(v: &Value) -> Vec<(String, String)> {
     {
         for block in content {
             if block.get("type").and_then(|t| t.as_str()) == Some("tool_result")
-                && block.get("is_error").and_then(|x| x.as_bool()).unwrap_or(false)
+                && block
+                    .get("is_error")
+                    .and_then(|x| x.as_bool())
+                    .unwrap_or(false)
             {
                 let id = block
                     .get("tool_use_id")
@@ -602,6 +674,22 @@ async fn run_agent(
     mcp: String,
     resume: Option<String>,
 ) -> Result<(), String> {
+    let (engine, model, _) = resolve_rip_model(&app, Some(&model))?;
+    match engine {
+        RipEngine::Claude => run_claude_agent(app, id, url, project, model, mcp, resume).await,
+        RipEngine::Codex => run_codex_agent(app, id, url, project, model, resume).await,
+    }
+}
+
+async fn run_claude_agent(
+    app: AppHandle,
+    id: String,
+    url: String,
+    project: PathBuf,
+    model: String,
+    mcp: String,
+    resume: Option<String>,
+) -> Result<(), String> {
     let mut cmd = Command::new("claude");
     cmd.args([
         "--print",
@@ -609,7 +697,7 @@ async fn run_agent(
         "stream-json",
         "--verbose",
         "--permission-mode",
-        "bypassPermissions",
+        "acceptEdits",
         "--model",
         &model,
         "--mcp-config",
@@ -622,7 +710,7 @@ async fn run_agent(
         cmd.args(["--resume", &sid]);
     }
     // `--mcp-config` is variadic; the `--` sentinel stops it eating the prompt.
-    cmd.arg("--").arg(clone_prompt(&url));
+    cmd.arg("--").arg(clone_prompt(&url, RipEngine::Claude));
     cmd.current_dir(&project);
     cmd.env("PATH", augmented_path());
     cmd.env_remove("ANTHROPIC_API_KEY");
@@ -722,6 +810,138 @@ async fn run_agent(
         Ok(()) if paused => {
             mark(&app, &id, "paused", None, session);
             Ok(())
+        }
+        Ok(()) => {
+            mark(&app, &id, "done", None, session);
+            Ok(())
+        }
+    }
+}
+
+async fn run_codex_agent(
+    app: AppHandle,
+    id: String,
+    url: String,
+    project: PathBuf,
+    model: String,
+    resume: Option<String>,
+) -> Result<(), String> {
+    let _account = crate::cli_auth::use_account("codex_cli")?;
+    let mut cmd = Command::new("codex");
+    crate::cli_auth::apply_profile(&mut cmd);
+    crate::cli_engine::subscription_environment(crate::cli_engine::CliEngine::Codex, &mut cmd);
+    cmd.args(rip_codex_args(&model, &project.to_string_lossy(), resume.as_deref()));
+    cmd.current_dir(&project);
+    cmd.env("PATH", augmented_path());
+    cmd.stdin(Stdio::piped());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+    cmd.kill_on_drop(true);
+
+    let mut child = cmd.spawn().map_err(|e| format!("spawn codex: {e}"))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(clone_prompt(&url, RipEngine::Codex).as_bytes())
+            .await
+            .map_err(|e| format!("write Codex prompt: {e}"))?;
+        stdin.shutdown().await.map_err(|e| e.to_string())?;
+    }
+    let stdout = child.stdout.take().ok_or("no Codex stdout")?;
+    let mut lines = BufReader::new(stdout).lines();
+    let mut stderr = child.stderr.take().ok_or("no Codex stderr")?;
+    let stderr_task = tokio::spawn(async move {
+        let mut text = String::new();
+        let _ = stderr.read_to_string(&mut text).await;
+        text
+    });
+
+    let cancel = Arc::new(Notify::new());
+    RIPS.lock().insert(id.clone(), cancel.clone());
+    spawn_thumbnail_watcher(app.clone(), id.clone(), project.clone());
+
+    let mut log = String::new();
+    let mut session: Option<String> = None;
+    let mut seen_tools: HashSet<String> = HashSet::new();
+    let mut tool_names: HashMap<String, String> = HashMap::new();
+    let mut run_error: Option<String> = None;
+    let mut codex_state = crate::cli_engine::transcode::CodexState::default();
+
+    let result: Result<(), ()> = 'stream: loop {
+        tokio::select! {
+            _ = cancel.notified() => {
+                let _ = child.kill().await;
+                break Err(());
+            }
+            line = lines.next_line() => {
+                match line {
+                    Ok(Some(raw)) => {
+                        if let Ok(value) = serde_json::from_str::<Value>(&raw) {
+                            match value.get("type").and_then(|kind| kind.as_str()) {
+                                Some("turn.failed") | Some("error") => {
+                                    run_error = Some(
+                                        value.get("error")
+                                            .and_then(|error| error.get("message"))
+                                            .and_then(|message| message.as_str())
+                                            .or_else(|| value.get("message").and_then(|message| message.as_str()))
+                                            .unwrap_or("Codex website agent failed")
+                                            .to_string(),
+                                    );
+                                }
+                                _ => {}
+                            }
+                        }
+                        for event in crate::cli_engine::transcode::codex_line_to_events(
+                            &raw,
+                            &mut codex_state,
+                        ) {
+                            if event.get("type").and_then(|kind| kind.as_str()) == Some("system") {
+                                if let Some(sid) = event.get("session_id").and_then(|value| value.as_str()) {
+                                    session = Some(sid.to_string());
+                                }
+                            }
+                            if let Some(delta) = hermes_style_feed_line(
+                                &event,
+                                &mut seen_tools,
+                                &mut tool_names,
+                            ) {
+                                log.push_str(&delta);
+                                log.push('\n');
+                                persist_log(&app, &id, &log);
+                                emit(
+                                    &app,
+                                    &id,
+                                    "running",
+                                    &infer_phase(&log),
+                                    Some(delta),
+                                    None,
+                                    session.clone(),
+                                );
+                            }
+                            if event.get("type").and_then(|kind| kind.as_str()) == Some("result") {
+                                break 'stream Ok(());
+                            }
+                        }
+                    }
+                    Ok(None) => break Ok(()),
+                    Err(_) => break Err(()),
+                }
+            }
+        }
+    };
+    RIPS.lock().remove(&id);
+
+    let status = child.wait().await.map_err(|e| e.to_string())?;
+    let stderr_text = stderr_task.await.unwrap_or_default();
+    if let Some(message) = run_error {
+        return Err(message);
+    }
+    match result {
+        Err(_) => {
+            mark(&app, &id, "cancelled", None, session);
+            Ok(())
+        }
+        Ok(()) if !status.success() => {
+            Err(format!("Codex exited {}: {}", status, stderr_text.trim()))
         }
         Ok(()) => {
             mark(&app, &id, "done", None, session);
@@ -847,7 +1067,7 @@ fn spawn_thumbnail_watcher(app: AppHandle, id: String, project: PathBuf) {
 #[tauri::command]
 pub fn repolens_website_cancel(id: String) -> Result<(), String> {
     if let Some(n) = RIPS.lock().remove(&id) {
-        n.notify_waiters();
+        n.notify_one();
     }
     Ok(())
 }
@@ -870,18 +1090,198 @@ pub async fn repolens_website_continue(app: AppHandle, id: String) -> Result<(),
         )
         .map_err(|e| e.to_string())?
     };
-    set_phase(&app, &id, "running", "building");
+    validate_rip_id(&id)?;
+    let (engine, _, selected) = resolve_rip_model(&app, Some(&model))?;
+    preflight_agent(engine).await?;
+    // Legacy Codex threads lived in an isolated auth home. Recover from the
+    // saved project rather than resuming a thread in the wrong credential home.
+    let session = if model.starts_with("provider:") { session } else { None };
     let project = PathBuf::from(project);
     let mcp = write_rip_mcp(&project)?;
+    {
+        let conn = open_conn(&app)?;
+        let changed = conn.execute(
+            "UPDATE repolens_websites SET model = ?2, session_id = ?3, status = 'running', phase = 'building', updated_at = ?4 WHERE id = ?1 AND status != 'running'",
+            params![id, selected, session, now_ms()],
+        ).map_err(|e| e.to_string())?;
+        if changed == 0 { return Err("This website agent is already running.".into()); }
+    }
+    let model = selected;
+    emit(&app, &id, "running", "building", None, None, session.clone());
     let app2 = app.clone();
     let id2 = id.clone();
     tauri::async_runtime::spawn(async move {
-        if let Err(e) = run_agent(app2.clone(), id2.clone(), url, project, model, mcp, session).await
+        if let Err(e) =
+            run_agent(app2.clone(), id2.clone(), url, project, model, mcp, session).await
         {
             fail(&app2, &id2, &e);
         }
     });
     Ok(())
+}
+
+async fn run_claude_design_call(
+    project: &Path,
+    prompt: &str,
+    model: &str,
+) -> Result<String, String> {
+    let mut cmd = Command::new("claude");
+    cmd.args([
+        "-p",
+        "--output-format",
+        "json",
+        "--strict-mcp-config",
+        "--model",
+        model,
+    ]);
+    cmd.current_dir(project);
+    cmd.env("PATH", augmented_path());
+    cmd.env_remove("ANTHROPIC_API_KEY");
+    cmd.env_remove("ANTHROPIC_AUTH_TOKEN");
+    cmd.stdin(Stdio::piped());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+    cmd.kill_on_drop(true);
+
+    let mut child = cmd.spawn().map_err(|e| format!("spawn claude: {e}"))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(prompt.as_bytes())
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    let out = match tokio::time::timeout(Duration::from_secs(180), child.wait_with_output()).await {
+        Ok(result) => result.map_err(|e| e.to_string())?,
+        Err(_) => return Err("claude timed out after 180s — try again or a smaller model".into()),
+    };
+    if !out.status.success() {
+        return Err(format!(
+            "claude exited {}: {}",
+            out.status,
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    let envelope: Value =
+        serde_json::from_slice(&out.stdout).map_err(|e| format!("bad claude envelope: {e}"))?;
+    let is_error = envelope
+        .get("is_error")
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false);
+    let bad_subtype = envelope
+        .get("subtype")
+        .and_then(|value| value.as_str())
+        .map(|value| value != "success")
+        .unwrap_or(false);
+    if is_error || bad_subtype {
+        return Err(format!(
+            "claude returned error: {}",
+            envelope
+                .get("result")
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown")
+        ));
+    }
+    envelope
+        .get("result")
+        .and_then(|value| value.as_str())
+        .map(str::to_string)
+        .ok_or_else(|| "no .result in claude envelope".to_string())
+}
+
+async fn run_codex_design_call(
+    project: &Path,
+    prompt: &str,
+    model: &str,
+    images: &[PathBuf],
+) -> Result<String, String> {
+    let mut args = vec![
+        "exec".to_string(),
+        "--json".to_string(),
+        "--model".to_string(),
+        model.to_string(),
+        "--sandbox".to_string(),
+        "read-only".to_string(),
+        "--skip-git-repo-check".to_string(),
+        "--ignore-user-config".to_string(),
+        "--ephemeral".to_string(),
+        "--cd".to_string(),
+        project.to_string_lossy().into_owned(),
+    ];
+    for image in images {
+        args.push("--image".to_string());
+        args.push(image.to_string_lossy().into_owned());
+    }
+    args.push("-".to_string());
+
+    let _account = crate::cli_auth::use_account("codex_cli")?;
+    let mut cmd = Command::new("codex");
+    crate::cli_auth::apply_profile(&mut cmd);
+    crate::cli_engine::subscription_environment(crate::cli_engine::CliEngine::Codex, &mut cmd);
+    cmd.args(args);
+    cmd.current_dir(project);
+    cmd.env("PATH", augmented_path());
+    cmd.stdin(Stdio::piped());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+    cmd.kill_on_drop(true);
+
+    let mut child = cmd.spawn().map_err(|e| format!("spawn codex: {e}"))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(prompt.as_bytes())
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    let out = match tokio::time::timeout(Duration::from_secs(180), child.wait_with_output()).await {
+        Ok(result) => result.map_err(|e| e.to_string())?,
+        Err(_) => return Err("Codex timed out after 180s — try again or a smaller model".into()),
+    };
+    if !out.status.success() {
+        return Err(format!(
+            "Codex exited {}: {}",
+            out.status,
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+
+    let mut answer = String::new();
+    for line in String::from_utf8_lossy(&out.stdout).lines() {
+        let Ok(value) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        if value.get("type").and_then(|kind| kind.as_str()) == Some("item.completed")
+            && value
+                .get("item")
+                .and_then(|item| item.get("type"))
+                .and_then(|kind| kind.as_str())
+                == Some("agent_message")
+        {
+            if let Some(text) = value
+                .get("item")
+                .and_then(|item| item.get("text"))
+                .and_then(|text| text.as_str())
+            {
+                answer.push_str(text);
+            }
+        }
+        if matches!(
+            value.get("type").and_then(|kind| kind.as_str()),
+            Some("turn.failed") | Some("error")
+        ) {
+            return Err(value
+                .get("error")
+                .and_then(|error| error.get("message"))
+                .and_then(|message| message.as_str())
+                .or_else(|| value.get("message").and_then(|message| message.as_str()))
+                .unwrap_or("Codex design extraction failed")
+                .to_string());
+        }
+    }
+    if answer.trim().is_empty() {
+        Err("Codex returned no design spec".into())
+    } else {
+        Ok(answer)
+    }
 }
 
 #[tauri::command]
@@ -890,8 +1290,6 @@ pub async fn repolens_website_extract_design(
     id: String,
     model: Option<String>,
 ) -> Result<String, String> {
-    use tokio::io::AsyncWriteExt;
-
     // 1. Resolve project_path.
     let project = {
         let conn = open_conn(&app)?;
@@ -904,21 +1302,48 @@ pub async fn repolens_website_extract_design(
             .map_err(|e| e.to_string())?;
         PathBuf::from(p)
     };
-    let model = model
-        .filter(|m| !m.is_empty())
-        .unwrap_or_else(|| OPUS_MODEL.to_string());
+    let (engine, model, _) = resolve_rip_model(&app, model.as_deref())?;
+    preflight_agent(engine).await?;
 
     // 2. Gather artifacts (fail-soft, size-capped per file; ~80k total budget).
     let docs = project.join("docs");
     let research = docs.join("research");
     let mut artifacts = String::new();
-    artifacts.push_str(&read_capped(&research.join("style.css"), "ORIGINAL SITE CSS (style.css)", 24_000));
-    artifacts.push_str(&read_capped(&research.join("dom-structure.json"), "DOM STRUCTURE", 12_000));
-    artifacts.push_str(&read_capped(&research.join("global-ui-structure.json"), "GLOBAL UI STRUCTURE", 12_000));
-    artifacts.push_str(&read_capped(&project.join("src").join("app").join("globals.css"), "GENERATED TOKENS (globals.css)", 12_000));
-    artifacts.push_str(&read_capped(&research.join("BEHAVIORS.md"), "BEHAVIORS", 8_000));
-    artifacts.push_str(&read_capped(&research.join("PAGE_TOPOLOGY.md"), "PAGE TOPOLOGY", 4_000));
-    artifacts.push_str(&read_capped(&research.join("source.html"), "SOURCE HTML (head excerpt)", 6_000));
+    artifacts.push_str(&read_capped(
+        &research.join("style.css"),
+        "ORIGINAL SITE CSS (style.css)",
+        24_000,
+    ));
+    artifacts.push_str(&read_capped(
+        &research.join("dom-structure.json"),
+        "DOM STRUCTURE",
+        12_000,
+    ));
+    artifacts.push_str(&read_capped(
+        &research.join("global-ui-structure.json"),
+        "GLOBAL UI STRUCTURE",
+        12_000,
+    ));
+    artifacts.push_str(&read_capped(
+        &project.join("src").join("app").join("globals.css"),
+        "GENERATED TOKENS (globals.css)",
+        12_000,
+    ));
+    artifacts.push_str(&read_capped(
+        &research.join("BEHAVIORS.md"),
+        "BEHAVIORS",
+        8_000,
+    ));
+    artifacts.push_str(&read_capped(
+        &research.join("PAGE_TOPOLOGY.md"),
+        "PAGE TOPOLOGY",
+        4_000,
+    ));
+    artifacts.push_str(&read_capped(
+        &research.join("source.html"),
+        "SOURCE HTML (head excerpt)",
+        6_000,
+    ));
 
     // 3. Pick up to 2 recon screenshots.
     let refs_dir = docs.join("design-references");
@@ -931,59 +1356,22 @@ pub async fn repolens_website_extract_design(
         .unwrap_or_default();
     let shots = pick_design_screenshots(&names, 2);
 
-    // 4. Build the prompt; append @<abs path> per screenshot (CLI reads inline).
-    let mut prompt = format!("{DESIGN_PROMPT}{artifacts}");
-    for shot in &shots {
-        let abs = refs_dir.join(shot);
-        prompt.push_str(&format!("\n\n@{}", abs.to_string_lossy()));
-    }
-
-    // 5. Call claude (json envelope, subscription auth) — mirrors repolens.rs.
-    let mut cmd = Command::new("claude");
-    cmd.args(["-p", "--output-format", "json", "--strict-mcp-config", "--model", &model]);
-    cmd.current_dir(&project);
-    cmd.env("PATH", augmented_path());
-    cmd.env_remove("ANTHROPIC_API_KEY");
-    cmd.env_remove("ANTHROPIC_AUTH_TOKEN");
-    cmd.stdin(Stdio::piped());
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
-    cmd.kill_on_drop(true);
-
-    let mut child = cmd.spawn().map_err(|e| format!("spawn claude: {e}"))?;
-    {
-        let mut stdin = child.stdin.take().ok_or("no stdin")?;
-        stdin.write_all(prompt.as_bytes()).await.map_err(|e| e.to_string())?;
-    }
-    let out = match tokio::time::timeout(Duration::from_secs(180), child.wait_with_output()).await {
-        Ok(r) => r.map_err(|e| e.to_string())?,
-        Err(_) => return Err("claude timed out after 180s — try again or a smaller model".into()),
+    // 4. Route extraction through the selected subscription engine. Claude
+    // reads @path image mentions; Codex receives native --image attachments.
+    let base_prompt = format!("{DESIGN_PROMPT}{artifacts}");
+    let image_paths: Vec<PathBuf> = shots.iter().map(|shot| refs_dir.join(shot)).collect();
+    let result = match engine {
+        RipEngine::Claude => {
+            let mut prompt = base_prompt;
+            for image in &image_paths {
+                prompt.push_str(&format!("\n\n@{}", image.to_string_lossy()));
+            }
+            run_claude_design_call(&project, &prompt, &model).await?
+        }
+        RipEngine::Codex => {
+            run_codex_design_call(&project, &base_prompt, &model, &image_paths).await?
+        }
     };
-    if !out.status.success() {
-        return Err(format!(
-            "claude exited {}: {}",
-            out.status,
-            String::from_utf8_lossy(&out.stderr).trim()
-        ));
-    }
-    let env: Value = serde_json::from_slice(&out.stdout).map_err(|e| format!("bad claude envelope: {e}"))?;
-    let is_error = env.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false);
-    let bad_subtype = env
-        .get("subtype")
-        .and_then(|v| v.as_str())
-        .map(|s| s != "success")
-        .unwrap_or(false);
-    if is_error || bad_subtype {
-        return Err(format!(
-            "claude returned error: {}",
-            env.get("result").and_then(|v| v.as_str()).unwrap_or("unknown")
-        ));
-    }
-    let result = env
-        .get("result")
-        .and_then(|v| v.as_str())
-        .ok_or("no .result in claude envelope")?
-        .to_string();
 
     // 6. Persist.
     {
@@ -997,28 +1385,40 @@ pub async fn repolens_website_extract_design(
     Ok(result)
 }
 
+fn checked_rip_directory(root: &Path, id: &str, project: &Path) -> Result<PathBuf, String> {
+    validate_rip_id(id)?;
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
+    let dir = project.parent().ok_or("Invalid website project directory")?;
+    let parent = dir.parent().ok_or("Invalid website project directory")?.canonicalize().map_err(|e| e.to_string())?;
+    if parent != root || dir.file_name().and_then(|name| name.to_str()) != Some(id) {
+        return Err("Website project is outside its managed directory".into());
+    }
+    if let Ok(metadata) = std::fs::symlink_metadata(dir) {
+        if !metadata.file_type().is_dir() { return Err("Website directory must not be a symlink or special file".into()); }
+    }
+    Ok(dir.to_path_buf())
+}
+
 #[tauri::command]
 pub async fn repolens_website_delete(app: AppHandle, id: String) -> Result<(), String> {
-    if let Some(n) = RIPS.lock().remove(&id) {
-        n.notify_waiters();
+    validate_rip_id(&id)?;
+    let conn = open_conn(&app)?;
+    let (project, status): (String, String) = conn.query_row(
+        "SELECT project_path, status FROM repolens_websites WHERE id = ?1", params![id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    ).map_err(|e| e.to_string())?;
+    if status == "running" || RIPS.lock().contains_key(&id) {
+        return Err("Stop the website agent and wait for it to finish before deleting its project.".into());
     }
-    let dir = {
-        let conn = open_conn(&app)?;
-        let p: String = conn
-            .query_row(
-                "SELECT project_path FROM repolens_websites WHERE id = ?1",
-                params![id],
-                |r| r.get(0),
-            )
-            .map_err(|e| e.to_string())?;
-        conn.execute("DELETE FROM repolens_websites WHERE id = ?1", params![id])
-            .map_err(|e| e.to_string())?;
-        // project_path is <dir>/project — delete the parent rip dir.
-        PathBuf::from(p).parent().map(|p| p.to_path_buf())
-    };
-    if let Some(d) = dir {
-        let _ = std::fs::remove_dir_all(d);
+    let dir = checked_rip_directory(&websites_root(&app)?, &id, Path::new(&project))?;
+    if let Err(error) = std::fs::remove_dir_all(&dir) {
+        if error.kind() != std::io::ErrorKind::NotFound { return Err(format!("Website project was not deleted: {error}")); }
     }
+    let home = rip_codex_home(&app, &id)?;
+    if let Err(error) = std::fs::remove_dir_all(home) {
+        if error.kind() != std::io::ErrorKind::NotFound { return Err(format!("Legacy website session cleanup failed: {error}")); }
+    }
+    conn.execute("DELETE FROM repolens_websites WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -1044,11 +1444,60 @@ mod tests {
     }
 
     #[test]
+    fn website_agent_routes_subscription_models_to_their_cli() {
+        assert_eq!(rip_engine("anthropic").unwrap(), RipEngine::Claude);
+        assert_eq!(rip_engine("codex_cli").unwrap(), RipEngine::Codex);
+        assert!(rip_engine("openai").is_err());
+        assert!(rip_engine("gpt-5.6-sol").is_err());
+        assert!(clone_prompt("https://example.com", RipEngine::Claude)
+            .contains(".claude/skills/clone-website/SKILL.md"));
+        let codex = clone_prompt("https://example.com", RipEngine::Codex);
+        assert!(codex.contains(".codex/skills/clone-website/SKILL.md"));
+        assert!(codex.contains("Playwright MCP server"));
+    }
+
+    #[test]
+    fn codex_website_uses_real_auth_with_isolated_pinned_mcp_config() {
+        for session in [None, Some("thread-1")] {
+            let args = rip_codex_args("model-alias", "/test/project", session);
+            assert!(args.contains(&"--ignore-user-config".into()));
+            assert!(args.iter().any(|arg| arg.contains("@playwright/mcp@0.0.80")));
+            assert!(!args.iter().any(|arg| arg.contains("auth.json") || arg.contains("@latest") || arg.contains("CODEX_HOME")));
+            assert_eq!(args.last().map(String::as_str), Some("-"));
+            if session.is_some() { assert!(!args.contains(&"-s".into())); }
+        }
+    }
+
+    #[test]
+    fn deletion_scope_and_artifact_read_bounds() {
+        let root = std::env::temp_dir().join(format!("orion-rip-scope-{}", ulid::Ulid::new()));
+        std::fs::create_dir_all(root.join("rip_one/project")).unwrap();
+        assert!(checked_rip_directory(&root, "rip_one", &root.join("rip_one/project")).is_ok());
+        assert!(checked_rip_directory(&root, "rip_other", &root.join("rip_one/project")).is_err());
+        assert!(checked_rip_directory(&root, "rip_one", &root.join("project")).is_err());
+        let artifact = root.join("artifact.txt");
+        std::fs::write(&artifact, "🙂".repeat(10_000)).unwrap();
+        assert_eq!(read_capped(&artifact, "TEST", 3), "\n\n===== TEST =====\n🙂🙂🙂");
+        #[cfg(unix)] {
+            std::os::unix::fs::symlink(root.join("rip_one"), root.join("rip_link")).unwrap();
+            assert!(checked_rip_directory(&root, "rip_link", &root.join("rip_link/project")).is_err());
+            std::os::unix::fs::symlink(&artifact, root.join("linked.txt")).unwrap();
+            assert!(read_capped(&root.join("linked.txt"), "TEST", 3).is_empty());
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rejects_rip_path_traversal_ids() {
+        for id in ["../x", "a/b", "", ".", "a\\b"] { assert!(validate_rip_id(id).is_err()); }
+        assert!(validate_rip_id("rip_01ABC-123").is_ok());
+    }
+
+    #[test]
     fn earliest_new_image_skips_scaffold_and_picks_first_real_screenshot() {
-        let initial: HashSet<String> =
-            ["comparison.png".to_string(), ".gitkeep".to_string()]
-                .into_iter()
-                .collect();
+        let initial: HashSet<String> = ["comparison.png".to_string(), ".gitkeep".to_string()]
+            .into_iter()
+            .collect();
         // (name, mtime) — comparison.png exists from t=0 (scaffold) and must be
         // ignored; among the agent's screenshots the earliest-saved one wins.
         let entries = vec![
@@ -1077,10 +1526,16 @@ mod tests {
         ];
         assert_eq!(
             pick_design_screenshots(&imgs, 2),
-            vec!["home-desktop.png".to_string(), "home-mobile.png".to_string()]
+            vec![
+                "home-desktop.png".to_string(),
+                "home-mobile.png".to_string()
+            ]
         );
         let plain = vec!["comparison.png".to_string(), "screenshot.png".to_string()];
-        assert_eq!(pick_design_screenshots(&plain, 2), vec!["screenshot.png".to_string()]);
+        assert_eq!(
+            pick_design_screenshots(&plain, 2),
+            vec!["screenshot.png".to_string()]
+        );
         let many = vec![
             "a-desktop.png".to_string(),
             "b-desktop.png".to_string(),

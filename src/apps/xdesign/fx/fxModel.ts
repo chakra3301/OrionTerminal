@@ -6,6 +6,8 @@
  * transform it. Pure module: no WebGL, no DOM — fully unit-testable.
  */
 
+import noiseLicense from "../../../../THIRD_PARTY_LICENSES/webgl-noise-MIT.txt?raw";
+
 export type FxParamSpec = (
   | {
       key: string;
@@ -197,6 +199,9 @@ void main() {
 /** Shared GLSL helpers available to every effect body. Kept intentionally
  * small — grows with the library (slices 3/4). */
 export const FX_GLSL_LIB = `
+/* Simplex noise adapted from Ashima Arts / Stefan Gustavson, webgl-noise.
+${noiseLicense}
+*/
 float fxHash21(vec2 p) {
   p = fract(p * vec2(234.34, 435.345));
   p += dot(p, p + 34.23);

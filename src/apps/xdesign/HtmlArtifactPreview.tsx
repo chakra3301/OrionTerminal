@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 import { useHtmlArtifact, type ArtifactViewport } from "@/apps/xdesign/htmlArtifactStore";
 import { useAppChat } from "@/store/appChatStore";
+import { flushActive, useXDProjects } from "./projectsStore";
+import { useXDesignSaveState } from "./saveState";
 import { useToasts } from "@/store/toastStore";
 import { useDesignSystems } from "@/store/designSystemStore";
 import { isDeckHtml, deckToPptxBase64 } from "@/apps/xdesign/deckToPptx";
@@ -60,6 +62,9 @@ type PendingRecording = {
 };
 
 export function HtmlArtifactPreview() {
+  const projectId = useHtmlArtifact((s) => s.projectId);
+  const pageSave = useXDesignSaveState((s) => projectId ? s.documents[projectId] : undefined);
+  const transitioning = useXDProjects((s) => s.transitioning);
   const open = useHtmlArtifact((s) => s.open);
   const html = useHtmlArtifact((s) => s.html);
   const title = useHtmlArtifact((s) => s.title);
@@ -88,14 +93,23 @@ export function HtmlArtifactPreview() {
   const [liveHtml, setLiveHtml] = useState<string | null>(html);
   const [previewSrcDoc, setPreviewSrcDoc] = useState<string | undefined>();
   const selfSavedRef = useRef<string | null>(null);
+  const liveViewRef = useRef({ projectId, open });
 
   useEffect(() => {
-    if (html !== null && html !== selfSavedRef.current) {
+    const changedView = liveViewRef.current.projectId !== projectId || (open && !liveViewRef.current.open);
+    liveViewRef.current = { projectId, open };
+    if (changedView) {
+      selfSavedRef.current = null;
+      editModeRef.current = false;
+      persistAllowedUntil.current = 0;
+      setEditMode(false);
+    }
+    if (changedView || (html !== null && html !== selfSavedRef.current)) {
       setLiveHtml(html);
       setSelection(null);
       setToolbarPos(null);
     }
-  }, [html]);
+  }, [html, projectId, open]);
 
   useEffect(() => {
     if (!liveHtml) {
@@ -108,7 +122,7 @@ export function HtmlArtifactPreview() {
     setToolbarPos(null);
     setPreviewSrcDoc(prepared.srcDoc);
     return prepared.release;
-  }, [liveHtml]);
+  }, [liveHtml, projectId]);
 
   useEffect(
     () => () => {
@@ -156,12 +170,19 @@ export function HtmlArtifactPreview() {
       if (message.type === "ready") {
         setBridgeReady(true);
         sendToPreview({ type: "set-edit", enabled: editModeRef.current });
+      } else if (message.type === "loading") {
+        setBridgeReady(false);
+        setSelection(null);
+        setToolbarPos(null);
+      } else if (message.type === "startup-error") {
+        setBridgeReady(false);
+        toast.error("Preview scripts unavailable", { body: message.error });
       } else if (message.type === "selection") {
         if (editModeRef.current) updateSelection(message.selection);
       } else if (message.type === "persist") {
         if (!editModeRef.current && Date.now() > persistAllowedUntil.current) return;
-        selfSavedRef.current = message.html;
-        useHtmlArtifact.getState().setArtifact(message.html, title);
+        if (useXDProjects.getState().transitioning) return;
+        if (useHtmlArtifact.getState().setArtifact(message.html, title, projectId)) selfSavedRef.current = message.html;
       } else if (message.type === "external-link") {
         void confirmAction({
           title: "Open external link?",
@@ -186,7 +207,7 @@ export function HtmlArtifactPreview() {
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [sendToPreview, title, updateSelection]);
+  }, [sendToPreview, title, updateSelection, projectId]);
 
   const recordPreviewCanvas = useCallback(
     (durationMs: number): Promise<RecordedPreview> =>
@@ -325,6 +346,11 @@ export function HtmlArtifactPreview() {
     <div className="xd-artifact-overlay">
       <header className="xd-artifact-bar">
         <span className="xd-artifact-title">{title}</span>
+        <span className="xd-artifact-save-status" role="status">{pageSave?.error ? "Page not saved" : pageSave ? "Unsaved page" : "Page saved in project"}</span>
+        {pageSave && <button type="button" className="xd-artifact-btn" disabled={transitioning}
+          onClick={() => void flushActive().catch(() => {})}>
+          {pageSave.error ? "Retry save" : "Save now"}
+        </button>}
         <div className="xd-artifact-viewports">
           {VIEWPORTS.map((v) => (
             <button
@@ -386,6 +412,7 @@ export function HtmlArtifactPreview() {
           style={vp.w ? { width: vp.w, maxWidth: "100%" } : { width: "100%" }}
         >
           <iframe
+            key={projectId}
             ref={iframeRef}
             className="xd-artifact-iframe"
             title="Webpage preview"

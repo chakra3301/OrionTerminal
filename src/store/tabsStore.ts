@@ -18,7 +18,7 @@ type TabsState = {
   fileBuffers: Record<string, FileBuffer>;
   updateBuffer: (path: string, contents: string) => void;
   markLoaded: (path: string, contents: string) => void;
-  markSaved: (path: string) => void;
+  markSaved: (path: string, savedContents: string) => void;
   dropBuffer: (path: string) => void;
 };
 
@@ -48,14 +48,14 @@ export const useTabsStore = create<TabsState>((set) => ({
     }));
   },
 
-  markSaved: (path) => {
+  markSaved: (path, savedContents) => {
     set((s) => {
       const buf = s.fileBuffers[path];
       if (!buf) return s;
       return {
         fileBuffers: {
           ...s.fileBuffers,
-          [path]: { ...buf, original: buf.contents },
+          [path]: { ...buf, original: savedContents },
         },
       };
     });

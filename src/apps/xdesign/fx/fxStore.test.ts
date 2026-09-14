@@ -29,6 +29,18 @@ describe("layer CRUD", () => {
     expect(useFxStore.getState().scene.layers).toHaveLength(0);
   });
 
+  it("adds a dropped image as a selected source layer", () => {
+    useFxStore.getState().addImageLayer("/app/assets/photo.png", "photo.png");
+    const { scene, selectedLayerId } = useFxStore.getState();
+    expect(scene.layers).toHaveLength(1);
+    expect(scene.layers[0]).toMatchObject({
+      effectId: "srcImage",
+      name: "photo.png",
+      params: { file: "/app/assets/photo.png" },
+    });
+    expect(selectedLayerId).toBe(scene.layers[0]!.id);
+  });
+
   it("names duplicates uniquely", () => {
     useFxStore.getState().addLayer("gradient");
     useFxStore.getState().addLayer("gradient");

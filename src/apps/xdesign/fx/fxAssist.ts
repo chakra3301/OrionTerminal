@@ -8,9 +8,11 @@
  */
 
 import { create } from "zustand";
-import { listen } from "@tauri-apps/api/event";
 import { ulid } from "ulid";
-import { ipc } from "@/lib/ipc";
+import { runAgentTurn } from "@/features/agents/agentTurn";
+import type { RuntimeMsg } from "@/features/agents/dispatchSend";
+import { useModelPrefs } from "@/store/modelPrefsStore";
+import { beginXDesignActivity } from "../runtimeActivity";
 import { log } from "@/lib/log";
 import { useFxStore } from "./fxStore";
 import { validateFxShader } from "./compositor";
@@ -165,7 +167,7 @@ function catalog(): string {
 }
 
 export function fxAssistSystem(): string {
-  return `You are FX Assist inside Orion Terminal's XDesign — an expert motion/shader designer who BUILDS by calling tools, like a Unicorn Studio power user.
+  const prompt = `You are FX Assist inside Orion Terminal's XDesign — an expert motion/shader designer who BUILDS by calling tools, like a Unicorn Studio power user.
 
 The scene is a layer stack rendered bottom→top on WebGL2. Each layer is a shader pass over the accumulated result below it.
 
@@ -181,6 +183,7 @@ ${catalog()}
 - Only source layers (srcShape/srcText/srcImage) can be masks.
 - Call fx_get_scene first when the user refers to existing layers.
 - Keep spoken replies to 1–3 sentences; let the tools do the talking. Finish by telling the user what to try (e.g. "move your mouse across the canvas").`;
+  return FX_TOOLS.reduce((text, tool) => text.split(tool.name).join(`orion_${tool.name}`), prompt);
 }
 
 // ── Tool executor ──────────────────────────────────────────────────────────
@@ -411,72 +414,23 @@ export function toolLabel(name: string, input: Record<string, unknown>): string 
 
 // ── Agent loop + panel store ───────────────────────────────────────────────
 
-type ApiMsg = { role: "user" | "assistant"; content: unknown };
 export type AssistItem =
   | { kind: "user"; text: string }
   | { kind: "assistant"; text: string }
   | { kind: "tool"; label: string; ok: boolean };
 
-type StreamResult = {
-  text: string;
-  tools: { id: string; name: string; input: Record<string, unknown> }[];
-  stopReason: string | null;
-};
-
-function streamTurn(chatId: string, messages: ApiMsg[]): Promise<StreamResult> {
-  return new Promise((resolve, reject) => {
-    const res: StreamResult = { text: "", tools: [], stopReason: null };
-    const unlisteners: Array<() => void> = [];
-    let settled = false;
-    const finish = (err?: Error) => {
-      if (settled) return;
-      settled = true;
-      for (const u of unlisteners) u();
-      err ? reject(err) : resolve(res);
-    };
-    void listen<{ chatId: string; text: string }>("chat:delta", (e) => {
-      if (e.payload.chatId === chatId) {
-        res.text += e.payload.text;
-        useFxAssist.setState({ streaming: res.text });
-      }
-    }).then((u) => unlisteners.push(u));
-    void listen<{ chatId: string; id: string; name: string; input: Record<string, unknown> }>(
-      "chat:tool_use",
-      (e) => {
-        if (e.payload.chatId === chatId) {
-          res.tools.push({ id: e.payload.id, name: e.payload.name, input: e.payload.input });
-        }
-      },
-    ).then((u) => unlisteners.push(u));
-    void listen<{ chatId: string; stopReason?: string | null }>("chat:done", (e) => {
-      if (e.payload.chatId === chatId) {
-        res.stopReason = e.payload.stopReason ?? null;
-        finish();
-      }
-    }).then((u) => unlisteners.push(u));
-    void listen<{ chatId: string; message: string }>("chat:error", (e) => {
-      if (e.payload.chatId === chatId) finish(new Error(e.payload.message));
-    }).then((u) => unlisteners.push(u));
-    setTimeout(() => finish(new Error("FX assist timed out")), 180_000);
-
-    ipc.messagesChatRun(chatId, fxAssistSystem(), messages, FX_TOOLS).catch((e) =>
-      finish(e instanceof Error ? e : new Error(String(e))),
-    );
-  });
-}
-
-const MAX_ROUNDS = 8;
-
+let activeRequest: AbortController | null = null;
 type FxAssistState = {
   open: boolean;
   busy: boolean;
   items: AssistItem[];
-  /** Text of the currently streaming assistant turn. */
   streaming: string;
-  history: ApiMsg[];
+  history: RuntimeMsg[];
   setOpen: (open: boolean) => void;
   send: (prompt: string) => Promise<void>;
+  cancel: () => void;
   clear: () => void;
+  recordTool: (name: string, input: Record<string, unknown>, ok: boolean) => void;
 };
 
 export const useFxAssist = create<FxAssistState>((set, get) => ({
@@ -485,69 +439,48 @@ export const useFxAssist = create<FxAssistState>((set, get) => ({
   items: [],
   streaming: "",
   history: [],
-
   setOpen: (open) => set({ open }),
-  clear: () => set({ items: [], history: [], streaming: "" }),
-
+  cancel: () => {
+    activeRequest?.abort();
+    activeRequest = null;
+    set({ busy: false, streaming: "" });
+  },
+  clear: () => { get().cancel(); set({ items: [], history: [] }); },
+  recordTool: (name, input, ok) => set((s) => ({
+    items: [...s.items, { kind: "tool", label: toolLabel(name, input), ok }],
+  })),
   send: async (prompt) => {
     if (get().busy || !prompt.trim()) return;
-    const history: ApiMsg[] = [
-      ...get().history,
-      { role: "user", content: prompt },
-    ];
-    set((s) => ({
-      busy: true,
-      streaming: "",
-      items: [...s.items, { kind: "user", text: prompt }],
-      history,
-    }));
+    const controller = new AbortController();
+    activeRequest = controller;
+    const endActivity = beginXDesignActivity("fx-assist", "Stop FX Assist before disabling the plugin.");
+    const history: RuntimeMsg[] = [...get().history, { role: "user", content: prompt }];
+    set((s) => ({ busy: true, streaming: "", items: [...s.items, { kind: "user", text: prompt }], history }));
     try {
-      for (let round = 0; round < MAX_ROUNDS; round++) {
-        const chatId = `fxassist-${ulid()}`;
-        const res = await streamTurn(chatId, get().history);
-
-        const assistantBlocks: unknown[] = [];
-        if (res.text) assistantBlocks.push({ type: "text", text: res.text });
-        for (const t of res.tools) {
-          assistantBlocks.push({ type: "tool_use", id: t.id, name: t.name, input: t.input });
-        }
-        set((s) => ({
-          streaming: "",
-          items: res.text ? [...s.items, { kind: "assistant", text: res.text }] : s.items,
-          history: [...s.history, { role: "assistant", content: assistantBlocks }],
-        }));
-
-        if (res.stopReason !== "tool_use" || res.tools.length === 0) break;
-
-        const results: unknown[] = [];
-        for (const t of res.tools) {
-          const out = executeFxTool(t.name, t.input ?? {});
-          let okFlag = true;
-          try {
-            okFlag = (JSON.parse(out) as { ok?: boolean }).ok !== false;
-          } catch {
-            /* fx_get_scene returns raw scene JSON — treat as ok */
-          }
-          set((s) => ({
-            items: [...s.items, { kind: "tool", label: toolLabel(t.name, t.input ?? {}), ok: okFlag }],
-          }));
-          results.push({ type: "tool_result", tool_use_id: t.id, content: out });
-        }
-        set((s) => ({ history: [...s.history, { role: "user", content: results }] }));
-      }
-    } catch (e) {
-      log.error("fx assist", e);
+      const text = await runAgentTurn({
+        chatId: `fxassist-${ulid()}`,
+        value: useModelPrefs.getState().modelFor("fx"),
+        prompt, history,
+        extra: {
+          systemAppend: fxAssistSystem(),
+          allowedTools: FX_TOOLS.map((t) => `mcp__orion__orion_${t.name}`),
+        },
+      }, {
+        signal: controller.signal,
+        onText: (streaming) => { if (activeRequest === controller) set({ streaming }); },
+      });
+      if (activeRequest !== controller) return;
       set((s) => ({
-        items: [
-          ...s.items,
-          {
-            kind: "assistant",
-            text: `⚠ ${e instanceof Error ? e.message : String(e)}`,
-          },
-        ],
+        items: text ? [...s.items, { kind: "assistant", text }] : s.items,
+        history: text ? [...s.history, { role: "assistant", content: text }] : s.history,
       }));
+    } catch (e) {
+      if (activeRequest !== controller) return;
+      log.error("fx assist", e);
+      set((s) => ({ items: [...s.items, { kind: "assistant", text: `⚠ ${String(e)}` }] }));
     } finally {
-      set({ busy: false, streaming: "" });
+      if (activeRequest === controller) { activeRequest = null; set({ busy: false, streaming: "" }); }
+      endActivity();
     }
   },
 }));

@@ -11,22 +11,12 @@ import {
   previewCommand,
 } from "@/apps/xdesign/htmlPreviewBridge";
 
-function factory() {
-  const sources: string[] = [];
-  const revoked: string[] = [];
-  return {
-    sources,
-    revoked,
-    value: {
-      create(source: string) {
-        sources.push(source);
-        return `blob:preview-${sources.length}`;
-      },
-      revoke(url: string) {
-        revoked.push(url);
-      },
-    },
-  };
+const BOOTSTRAP_HASH = tauriConfig.app.security.csp["script-src"].split(/\s+/).find((source) => source.startsWith("'sha256-"))!;
+function documents(html: string) {
+  const prepared = prepareHtmlPreview(html);
+  const guard = new DOMParser().parseFromString(prepared.srcDoc, "text/html");
+  const data = JSON.parse(guard.getElementById("xd-preview-payload")!.textContent!);
+  return { guard, inner: new DOMParser().parseFromString(data.html, "text/html") };
 }
 
 describe("opaque HTML preview preparation", () => {
@@ -45,41 +35,47 @@ describe("opaque HTML preview preparation", () => {
     expect(HTML_PREVIEW_SANDBOX).not.toContain("allow-forms");
   });
 
-  it("moves generated scripts to blob URLs and installs the bridge first", () => {
-    const urls = factory();
-    const prepared = prepareHtmlPreview(
-      `<!doctype html><html><head>
-        <meta http-equiv="Content-Security-Policy" content="default-src *">
-        <script>window.generated = true</script>
-        <script src="https://evil.example/payload.js"></script>
-      </head><body onclick="window.clicked=true"><canvas id="scene"></canvas></body></html>`,
-      urls.value,
-    );
-    const doc = new DOMParser().parseFromString(prepared.srcDoc, "text/html");
-    const csp = doc.getElementById(HTML_PREVIEW_CSP_ID);
-    const scripts = Array.from(doc.querySelectorAll("script"));
-
-    expect(csp?.getAttribute("content")).toContain("script-src blob:");
-    expect(csp?.getAttribute("content")).toContain("connect-src 'none'");
-    expect(doc.querySelectorAll('meta[http-equiv="Content-Security-Policy"]')).toHaveLength(1);
-    expect(scripts[0]?.id).toBe(HTML_PREVIEW_BRIDGE_ID);
-    expect(scripts).toHaveLength(2);
-    expect(scripts.every((script) => script.textContent === "")).toBe(true);
-    expect(scripts.every((script) => script.getAttribute("src")?.startsWith("blob:"))).toBe(true);
-    expect(prepared.srcDoc).not.toContain("https://evil.example/payload.js");
-    expect(urls.sources).toHaveLength(2);
-    expect(urls.sources.some((source) => source.includes(HTML_PREVIEW_CHANNEL))).toBe(true);
-    expect(urls.sources.some((source) => source.includes("window.generated = true"))).toBe(true);
-
-    prepared.release();
-    expect(urls.revoked).toEqual(["blob:preview-1", "blob:preview-2"]);
+  it("loads one fixed bootstrap and keeps document code inert until inside the child", () => {
+    const { guard, inner } = documents(`<meta http-equiv="Content-Security-Policy" content="default-src *">
+      <script>window.generated = true</script><script src="https://evil.example/payload.js"></script>`);
+    expect(guard.querySelectorAll("script")).toHaveLength(2);
+    expect(guard.querySelector("script[src]")).toBeNull();
+    expect(guard.getElementById(HTML_PREVIEW_BRIDGE_ID)?.textContent).toContain("parent === window");
+    expect(inner.querySelector("script[data-xd-script-type]")?.textContent).toBe("window.generated = true");
+    expect(inner.querySelector("script[data-xd-script-type]")?.getAttribute("type")).toBe("application/x-orion-preview-script");
+    expect(inner.querySelectorAll("script[src]")).toHaveLength(0);
+    expect(inner.body.lastElementChild?.id).toBe(HTML_PREVIEW_BRIDGE_ID);
+    expect(inner.documentElement.outerHTML).not.toContain("evil.example");
+    const config = JSON.parse(inner.getElementById("xd-preview-payload")!.textContent!);
+    expect(config.bridge).toContain(HTML_PREVIEW_CHANNEL);
   });
 
-  it("releases every generated blob", () => {
-    const urls = factory();
-    const prepared = prepareHtmlPreview("<script>1</script>", urls.value);
-    prepared.release();
-    expect(urls.revoked).toHaveLength(2);
+  it("uses a trusted parent policy to block child self-navigation", () => {
+    const { guard, inner } = documents("<h1>Preview</h1>");
+    expect(guard.getElementById(HTML_PREVIEW_CSP_ID)?.getAttribute("content")).toContain("frame-src about:");
+    for (const doc of [guard, inner]) {
+      const csp = doc.getElementById(HTML_PREVIEW_CSP_ID)?.getAttribute("content");
+      expect(csp).toContain("connect-src 'none'");
+      expect(csp).toContain(`script-src ${BOOTSTRAP_HASH} 'unsafe-eval'`);
+      expect(csp).not.toContain("script-src blob:");
+      expect(doc.querySelectorAll('meta[http-equiv="Content-Security-Policy"]')).toHaveLength(1);
+    }
+    expect(inner.getElementById(HTML_PREVIEW_CSP_ID)?.getAttribute("content")).toContain("frame-src 'none'");
+  });
+
+  it("does not let document markup break out of the guard payload", () => {
+    const { guard, inner } = documents('<script>window.test = "</script><img id="escape" src=x>"</script><meta http-equiv="refresh" content="0;url=https://evil.example">');
+    expect(guard.querySelector("#escape")).toBeNull();
+    expect(guard.body.children).toHaveLength(1);
+    expect(guard.body.firstElementChild?.id).toBe(HTML_PREVIEW_BRIDGE_ID);
+    expect(inner.querySelector('meta[http-equiv="refresh"]')).toBeNull();
+  });
+
+  it("preserves non-executable metadata and validates startup errors", () => {
+    const { inner } = documents('<script type="application/ld+json">{"name":"demo"}</script>');
+    expect(inner.querySelector('script[type="application/ld+json"]')?.textContent).toBe('{"name":"demo"}');
+    expect(parsePreviewEvent({ channel: HTML_PREVIEW_CHANNEL, version: 1, type: "startup-error", error: "failed" })).toEqual({ type: "startup-error", error: "failed" });
+    expect(parsePreviewEvent({ channel: HTML_PREVIEW_CHANNEL, version: 1, type: "startup-error", error: "x".repeat(2001) })).toBeNull();
   });
 });
 

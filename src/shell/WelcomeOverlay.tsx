@@ -105,9 +105,8 @@ export function WelcomeOverlay() {
           <div className="ot-welcome-firstrun">
             <div className="ot-welcome-firstrun-title">Welcome to Orion Terminal.</div>
             <div className="ot-welcome-firstrun-body">
-              Three apps live here. Open one to start: Archives for thinking,
-              Orion for code, XDesign for visuals. Claude shows up inside
-              each, contextual to where you are.
+              Start with Archives for thinking, Orion for code, or XDesign
+              for visuals. Use each app's model picker to choose its AI.
             </div>
             <div className="ot-welcome-firstrun-actions">
               {enabledApps.has("archives") && (

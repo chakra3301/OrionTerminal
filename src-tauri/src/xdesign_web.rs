@@ -182,13 +182,44 @@ pub async fn xdesign_fetch_url(url: String) -> Result<String, String> {
 /// from the save dialog; we just persist the bytes.
 #[tauri::command]
 pub fn xdesign_save_bytes(path: String, bytes: Vec<u8>) -> Result<(), String> {
-    std::fs::write(&path, &bytes).map_err(|e| format!("write {path}: {e}"))
+    if bytes.len() > 256 * 1024 * 1024 { return Err("Export exceeds the 256MB save limit.".into()); }
+    crate::fs_ops::atomic_write_bytes(&path, &bytes)
 }
 
 #[cfg(test)]
 mod tests {
     use super::{is_public_ip, normalize_url, parse_target};
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+    #[test]
+    fn binary_export_failure_preserves_existing_directory_and_cleans_temporary_file() {
+        let dir = std::env::temp_dir().join(format!("orion-export-{}", ulid::Ulid::new()));
+        let target = dir.join("existing");
+        std::fs::create_dir_all(&target).unwrap();
+        std::fs::write(target.join("keep"), b"original").unwrap();
+        assert!(super::xdesign_save_bytes(target.to_string_lossy().into_owned(), vec![1, 2, 3]).is_err());
+        assert_eq!(std::fs::read(target.join("keep")).unwrap(), b"original");
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn binary_export_is_private_and_preserves_existing_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("orion-export-{}", ulid::Ulid::new()));
+        std::fs::create_dir(&dir).unwrap();
+        let target = dir.join("image.png");
+        let path = target.to_string_lossy().into_owned();
+        super::xdesign_save_bytes(path.clone(), vec![0, 255, 1]).unwrap();
+        assert_eq!(std::fs::metadata(&target).unwrap().permissions().mode() & 0o777, 0o600);
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o640)).unwrap();
+        super::xdesign_save_bytes(path, vec![255, 0, 2]).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), vec![255, 0, 2]);
+        assert_eq!(std::fs::metadata(&target).unwrap().permissions().mode() & 0o777, 0o640);
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn adds_https_to_bare_host() {

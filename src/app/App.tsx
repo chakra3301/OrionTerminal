@@ -2,6 +2,9 @@ import { useEffect, useState, lazy, Suspense } from "react";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { EventBridge } from "@/app/EventBridge";
+import { useQuitGuard } from "@/features/recovery/useQuitGuard";
+import { useStartupBackupWarning } from "@/features/recovery/useStartupBackupWarning";
+import { useDraftRecovery } from "@/features/recovery/useDraftRecovery";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { ControlPanel } from "@/features/controlpanel/ControlPanel";
 import { KeybindingsOverlay } from "@/features/keybindings/KeybindingsOverlay";
@@ -32,7 +35,6 @@ const SplashPreview = import.meta.env.DEV
       })),
     )
   : null;
-import { purgeEmptyNotes } from "@/lib/db";
 import { startFileDropOrchestrator } from "@/lib/fileDrop";
 import { useThemeStore } from "@/store/themeStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
@@ -103,8 +105,6 @@ async function hydrate() {
 
   if (usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.archives)) {
     try {
-      const purged = await purgeEmptyNotes();
-      if (purged > 0) log.info(`purged ${purged} empty notes`);
       await loadArchivesPluginData();
     } catch (err) {
       log.warn("archives load failed", err);
@@ -326,6 +326,9 @@ export default function App() {
   // True once we're actually displaying the shell (not splash / gate / blank).
   const inShell =
     hydrated && (warm || (probed && splashDone && authPhase === "unlocked"));
+  useQuitGuard(hydrated);
+  useStartupBackupWarning(hydrated);
+  useDraftRecovery(hydrated);
   useWindowSizePersistence();
   useShellWindowsPersistence();
   useArchivesLiveRefresh();

@@ -21,6 +21,7 @@ import { BlueprintCanvas } from "@/features/notes/visualizer/BlueprintCanvas";
 import { useVisualizer } from "@/features/notes/visualizer/visualizerStore";
 import { noteSchema } from "@/features/notes/noteSchema";
 import { log } from "@/lib/log";
+import { NoteSaveStatus } from "./NoteSaveStatus";
 
 /** A stored asset → the BlockNote block to insert for it. */
 function blockForAsset(asset: Asset): PartialBlock {
@@ -78,7 +79,8 @@ function EditorBody({
   initialBlocks: unknown[];
   onFirstBackspace: () => void;
 }) {
-  const saveBlocks = useNotesStore((s) => s.saveBlocks);
+  const stageBlocks = useNotesStore((s) => s.stageBlocks);
+  const flushNote = useNotesStore((s) => s.flushNote);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [dropping, setDropping] = useState(false);
   // Unique zone name per mount so two views of the same note route correctly.
@@ -97,18 +99,22 @@ function EditorBody({
 
   useEffect(() => {
     const off = editor.onChange(() => {
+      stageBlocks(noteId, editor.document as unknown[]);
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
-        void saveBlocks(noteId, editor.document as unknown[]);
+        saveTimer.current = null;
+        void flushNote(noteId).catch(() => {});
       }, AUTOSAVE_MS);
     });
     return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      // Flush pending edits on unmount so switching notes never drops keystrokes.
-      void saveBlocks(noteId, editor.document as unknown[]);
       off?.();
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current); saveTimer.current = null;
+        // Flush the shared draft, not this editor's possibly stale document.
+        void flushNote(noteId).catch(() => {});
+      }
     };
-  }, [editor, noteId, saveBlocks]);
+  }, [editor, noteId, stageBlocks, flushNote]);
 
   useEffect(() => {
     registerNoteEditor(noteId, {
@@ -234,25 +240,30 @@ function EditorBody({
 
 export function NoteEditor({ noteId }: { noteId: string }) {
   const note = useNotesStore((s) => s.notes.get(noteId));
-  const saveTitle = useNotesStore((s) => s.saveTitle);
+  const stageTitle = useNotesStore((s) => s.stageTitle);
+  const flushNote = useNotesStore((s) => s.flushNote);
+  const deleting = useNotesStore((s) => s.deleting.has(noteId));
   const vizEnabled = useVisualizer((s) => s.enabled);
   const toggleViz = useVisualizer((s) => s.toggle);
   useEffect(() => {
     void useVisualizer.getState().hydrate();
   }, []);
-  const [titleDraft, setTitleDraft] = useState<string>(note?.title ?? "");
   const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setTitleDraft(note?.title ?? "");
-  }, [noteId, note?.title]);
+  useEffect(() => () => {
+    if (titleSaveTimer.current) {
+      clearTimeout(titleSaveTimer.current); titleSaveTimer.current = null;
+      void flushNote(noteId).catch(() => {});
+    }
+  }, [noteId, flushNote]);
 
   const onTitleChange = (v: string) => {
-    setTitleDraft(v);
+    stageTitle(noteId, v);
     if (titleSaveTimer.current) clearTimeout(titleSaveTimer.current);
     titleSaveTimer.current = setTimeout(() => {
-      void saveTitle(noteId, v);
+      titleSaveTimer.current = null;
+      void flushNote(noteId).catch(() => {});
     }, AUTOSAVE_MS);
   };
 
@@ -278,8 +289,10 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     );
   }
 
+  if (note.readError) return <div className="note-editor-root" role="alert">{note.readError}</div>;
+
   return (
-    <div className="note-editor-root">
+    <div className="note-editor-root" inert={deleting} aria-busy={deleting}>
       {vizEnabled && (
         <BlueprintCanvas
           text={`${note.title}\n${note.plaintext}`}
@@ -294,13 +307,15 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       >
         <DraftingCompass size={13} />
       </button>
+      <NoteSaveStatus noteId={noteId} />
       <TitleInput
-        value={titleDraft}
+        value={note.title}
         onChange={onTitleChange}
         onEnter={focusEditor}
       />
       <div ref={editorContainerRef} className="note-editor-container">
         <EditorBody
+          key={note.id}
           noteId={note.id}
           initialBlocks={note.blocks}
           onFirstBackspace={focusTitle}

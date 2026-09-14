@@ -1,3 +1,5 @@
+import { parseModelValue } from "@/features/agents/modelSelection";
+
 // Canonical list of models any interactive Claude surface can run on. Ids must
 // match the CLI `--model` values; an empty stored value means "use default".
 export type ModelDef = { id: string; label: string; short: string };
@@ -12,9 +14,16 @@ export const MODELS: ModelDef[] = [
 
 export const DEFAULT_MODEL_ID = "claude-opus-4-8";
 
+function rawModel(id: string): string {
+  if (!id) return DEFAULT_MODEL_ID;
+  try { return parseModelValue(id).modelId; } catch { return id; }
+}
+
 export function modelLabel(id: string): string {
-  return MODELS.find((m) => m.id === id)?.label ?? "Opus 4.8";
+  const raw = rawModel(id);
+  return MODELS.find((m) => m.id === raw)?.label ?? raw;
 }
 export function modelShort(id: string): string {
-  return MODELS.find((m) => m.id === id)?.short ?? "opus-4.8";
+  const raw = rawModel(id);
+  return MODELS.find((m) => m.id === raw)?.short ?? raw;
 }

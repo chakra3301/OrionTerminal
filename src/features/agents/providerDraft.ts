@@ -8,9 +8,38 @@ export type ProviderPreset = {
   baseUrl: string;
   /** Example model id in this provider's namespace. */
   exampleModel: string;
+  modelIds?: string[];
 };
 
+export const OPENAI_GPT_MODELS = [
+  { id: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
+  { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
+  { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
+  { id: "gpt-5.6", label: "GPT-5.6" },
+  { id: "gpt-5.5", label: "GPT-5.5" },
+  { id: "gpt-5.4", label: "GPT-5.4" },
+  { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+  { id: "gpt-5.4-nano", label: "GPT-5.4 Nano" },
+  { id: "gpt-5.3-codex", label: "GPT-5.3 Codex" },
+  { id: "gpt-5.2", label: "GPT-5.2" },
+  { id: "gpt-5.1", label: "GPT-5.1" },
+  { id: "gpt-5", label: "GPT-5" },
+  { id: "gpt-5-mini", label: "GPT-5 Mini" },
+  { id: "gpt-5-nano", label: "GPT-5 Nano" },
+  { id: "gpt-4.1", label: "GPT-4.1" },
+  { id: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+  { id: "gpt-4o", label: "GPT-4o" },
+  { id: "gpt-4o-mini", label: "GPT-4o Mini" },
+] as const;
+
 export const PROVIDER_PRESETS: ProviderPreset[] = [
+  {
+    label: "OpenAI",
+    kind: "openai",
+    baseUrl: "",
+    exampleModel: OPENAI_GPT_MODELS[0].id,
+    modelIds: OPENAI_GPT_MODELS.map((m) => m.id),
+  },
   {
     label: "NVIDIA",
     kind: "openai_compat",

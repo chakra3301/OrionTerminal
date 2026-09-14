@@ -25,7 +25,8 @@ import {
 } from "@/store/assetsStore";
 import { useArchives } from "@/apps/archives/useArchives";
 import { openChatById } from "@/apps/archives/searchNav";
-import { ipc } from "@/lib/ipc";
+import { runTextModel } from "@/features/agents/textCall";
+import { useModelPrefs } from "@/store/modelPrefsStore";
 import { log } from "@/lib/log";
 import { relativeTime } from "@/lib/time";
 
@@ -179,7 +180,7 @@ export function ArchivesToday() {
             {recentChats.length === 0 ? (
               <div className="ar-empty">
                 <MessageSquare size={16} color="var(--t-faint)" />
-                <span>No conversations yet. Send Claude a message in the rail.</span>
+                <span>No conversations yet. Send your selected AI a message in the rail.</span>
               </div>
             ) : (
               <div className="ar-recent-chats">
@@ -271,9 +272,9 @@ export function ArchivesToday() {
 
           <article className="ar-card claude-read">
             <h3 style={{ color: "var(--neon-green)" }}>
-              <Sparkles size={12} /> Claude's read of your week
+              <Sparkles size={12} /> Your week, summarized
             </h3>
-            <ClaudeWeekRead recentNotes={recentNotes} recentChats={recentChats} />
+            <WeekRead recentNotes={recentNotes} recentChats={recentChats} />
           </article>
         </div>
       </div>
@@ -362,7 +363,7 @@ type CachedWeekRead = {
 
 const WEEK_READ_TTL_MS = 24 * 60 * 60 * 1000;
 
-function ClaudeWeekRead({
+export function WeekRead({
   recentNotes,
   recentChats,
 }: {
@@ -400,15 +401,17 @@ function ClaudeWeekRead({
     setError(null);
     try {
       const prompt = buildWeekReadPrompt(recentNotes, recentChats);
-      const reply = await ipc.claudeOneshot(prompt);
+      const reply = await runTextModel(prompt, useModelPrefs.getState().modelFor("archives"));
       const text = (reply || "").trim();
       if (!text) {
-        setError("Empty reply from Claude.");
+        setError("The selected AI returned an empty summary.");
         return;
       }
       const next: CachedWeekRead = { generatedAt: Date.now(), text };
       setCached(next);
-      void setAppState("today.weekRead", next);
+      await setAppState("today.weekRead", next).catch((error: unknown) => {
+        throw new Error(`Summary generated, but saving failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
     } catch (e) {
       log.error("week-read failed", e);
       setError(e instanceof Error ? e.message : String(e));
@@ -416,16 +419,6 @@ function ClaudeWeekRead({
       setLoading(false);
     }
   }, [recentNotes, recentChats]);
-
-  // First-load: if nothing cached and the user has any data, kick off a
-  // background generation. Cached results last 24h.
-  useEffect(() => {
-    if (!hydrated || cached || loading) return;
-    if (recentNotes.length === 0 && recentChats.length === 0) return;
-    void generate();
-    // We only want this to fire once after hydration, not on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated]);
 
   if (recentNotes.length === 0 && recentChats.length === 0) {
     return (
@@ -446,7 +439,7 @@ function ClaudeWeekRead({
         <p style={{ whiteSpace: "pre-wrap" }}>{cached.text}</p>
       ) : (
         <p style={{ color: "var(--t-tertiary)" }}>
-          {error ?? "No synthesis yet — generate one to see Claude's read."}
+          {error ?? "Generate a summary with your selected Archives AI."}
         </p>
       )}
       <div className="ar-week-read-footer">
@@ -466,7 +459,7 @@ function ClaudeWeekRead({
           type="button"
           className="ar-week-read-btn"
           onClick={() => void generate()}
-          disabled={loading}
+          disabled={loading || !hydrated}
         >
           {loading ? (
             <>
@@ -512,7 +505,7 @@ function buildWeekReadPrompt(notes: Note[], chats: ChatRow[]): string {
     "Recent notes / journal:",
     noteLines.length > 0 ? noteLines.join("\n") : "(none)",
     "",
-    "Recent threads with Claude:",
+    "Recent AI conversations:",
     chatLines.length > 0 ? chatLines.join("\n") : "(none)",
     "",
     "Your read:",

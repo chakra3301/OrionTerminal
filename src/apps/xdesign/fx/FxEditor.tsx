@@ -24,11 +24,13 @@ import {
   Sparkles,
   Mic,
   MicOff,
+  Upload,
 } from "lucide-react";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { ipc } from "@/lib/ipc";
 import { toast, useToasts } from "@/store/toastStore";
 import { log } from "@/lib/log";
+import { useFileDropZone } from "@/lib/fileDrop";
 import { recordCanvasToFile } from "@/apps/xdesign/recordCanvas";
 import {
   sceneToJson,
@@ -76,9 +78,41 @@ let fxCanvasEl: HTMLCanvasElement | null = null;
  * HUD polls). ms is CPU submit time; fps counts presented frames. */
 const fxPerf = { ms: 0, worst: 0, fps: 0, passes: 0, w: 0, h: 0 };
 import { fxEffect } from "./fxRegistry";
+import { FX_IMAGE_EXTENSIONS, fxImagePaths } from "./fxFiles";
 import { rasterizeSource, sourceRasterKey } from "./fxRaster";
 
 // ── Viewport ──────────────────────────────────────────────────────────────
+
+async function addDroppedImages(paths: string[]): Promise<void> {
+  const images = fxImagePaths(paths);
+  if (images.length === 0) {
+    toast.info("Drop an image file", {
+      body: `Supported: ${FX_IMAGE_EXTENSIONS.join(", ")}`,
+    });
+    return;
+  }
+
+  let added = 0;
+  const failures: string[] = [];
+  for (const path of images) {
+    try {
+      const stored = await ipc.assetStoreFile(path);
+      if (stored.kind !== "image") throw new Error("File is not a supported image");
+      useFxStore.getState().addImageLayer(stored.filePath, stored.originalName);
+      added++;
+    } catch (error) {
+      log.error("fx image drop", path, error);
+      failures.push(path.split("/").pop() ?? path);
+    }
+  }
+
+  if (added > 0) {
+    toast.success(added === 1 ? "Image added to FX" : `${added} images added to FX`);
+  }
+  if (failures.length > 0) {
+    toast.error("Some images couldn't be added", { body: failures.join(", ") });
+  }
+}
 
 function PerfHud() {
   const [, force] = useState(0);
@@ -103,9 +137,19 @@ function FxViewport() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState({ w: 0, h: 0 });
+  const [dropOver, setDropOver] = useState(false);
   const sceneW = useFxStore((s) => s.scene.width);
   const sceneH = useFxStore((s) => s.scene.height);
   const [glLost, setGlLost] = useState(false);
+
+  useFileDropZone(wrapRef, "xdesign-fx-artboard", (event) => {
+    if (event.type === "enter") setDropOver(true);
+    else if (event.type === "leave") setDropOver(false);
+    else {
+      setDropOver(false);
+      void addDroppedImages(event.paths);
+    }
+  });
 
   // Letterbox the scene into the available stage space.
   useEffect(() => {
@@ -152,9 +196,11 @@ function FxViewport() {
     let fpsCount = 0;
     let fpsWindowStart = performance.now();
 
-    // Source-layer rasterization bookkeeping. Keys are set eagerly (before
-    // the async raster lands) so a failed raster doesn't retry every frame.
+    // Source-layer rasterization bookkeeping. Failed decodes back off before
+    // retrying so a bad file can't churn the render loop.
     const rasterKeys = new Map<string, string>();
+    const rasterRetryAt = new Map<string, number>();
+    const warnedRasterKeys = new Set<string>();
     const syncSources = (pw: number, ph: number) => {
       const { scene } = useFxStore.getState();
       for (const layer of scene.layers) {
@@ -162,16 +208,32 @@ function FxViewport() {
         if (!fxEffect(layer.effectId)?.source || layer.effectId === "srcVideo") continue;
         const key = sourceRasterKey(layer, pw, ph);
         if (rasterKeys.get(layer.id) === key) continue;
+        if ((rasterRetryAt.get(layer.id) ?? 0) > performance.now()) continue;
         rasterKeys.set(layer.id, key);
-        void rasterizeSource(layer, pw, ph).then((cnv) => {
-          if (cnv && rasterKeys.get(layer.id) === key) {
-            compositor?.updateSource(layer.id, cnv);
-          }
-        });
+        void rasterizeSource(layer, pw, ph)
+          .then((cnv) => {
+            if (cnv && rasterKeys.get(layer.id) === key) {
+              compositor?.updateSource(layer.id, cnv);
+              rasterRetryAt.delete(layer.id);
+            }
+          })
+          .catch((error) => {
+            if (rasterKeys.get(layer.id) !== key) return;
+            rasterKeys.delete(layer.id);
+            rasterRetryAt.set(layer.id, performance.now() + 2_000);
+            log.error("fx source render", error);
+            if (!warnedRasterKeys.has(key)) {
+              warnedRasterKeys.add(key);
+              toast.error("Image couldn't be displayed", {
+                body: error instanceof Error ? error.message : String(error),
+              });
+            }
+          });
       }
       for (const id of [...rasterKeys.keys()]) {
         if (!scene.layers.some((l) => l.id === id)) {
           rasterKeys.delete(id);
+          rasterRetryAt.delete(id);
           compositor?.dropSource(id);
         }
       }
@@ -334,7 +396,7 @@ function FxViewport() {
   }, []);
 
   return (
-    <div className="xd-fx-viewport" ref={wrapRef}>
+    <div className={`xd-fx-viewport${dropOver ? " drop-over" : ""}`} ref={wrapRef}>
       {glLost ? (
         <div className="xd-fx-gl-lost">WebGL2 unavailable</div>
       ) : (
@@ -350,6 +412,13 @@ function FxViewport() {
             className="xd-fx-canvas"
           />
           <FxCanvasOverlay fitW={fit.w} fitH={fit.h} />
+        </div>
+      )}
+      {dropOver && (
+        <div className="xd-fx-drop-overlay">
+          <span className="xd-fx-drop-icon"><Upload size={20} /></span>
+          <strong>Drop image into FX</strong>
+          <span>A new image layer will be added to this artboard</span>
         </div>
       )}
     </div>
@@ -953,13 +1022,16 @@ function ParamControl({
               multiple: false,
               filters: isVideo
                 ? [{ name: "Video", extensions: ["mp4", "mov", "m4v", "webm"] }]
-                : [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"] }],
+                : [{ name: "Images", extensions: [...FX_IMAGE_EXTENSIONS] }],
             }).then(async (picked) => {
               if (typeof picked !== "string") return;
               // Copy into the app's scoped asset dir so the asset:// protocol
               // can actually load it (an arbitrary ~/Desktop path is blocked).
               try {
                 const stored = await ipc.assetStoreFile(picked);
+                if (isVideo ? stored.kind !== "video" : stored.kind !== "image") {
+                  throw new Error(`Unsupported ${isVideo ? "video" : "image"} file`);
+                }
                 set(stored.filePath);
               } catch (e) {
                 log.error("fx source ingest", e);

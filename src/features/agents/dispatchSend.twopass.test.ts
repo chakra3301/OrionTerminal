@@ -94,7 +94,7 @@ describe("dispatchAgentTurn two-pass sequencing", () => {
     expect(twoPassPhase("c1")).toBe("execute");
 
     // Action pass: Haiku, tools NOT disabled (null), plan in prompt.
-    expect(claudeSend).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(claudeSend).toHaveBeenCalledTimes(2));
     const action = claudeSend.mock.calls[1]!;
     expect(action[5]).toBe("claude-haiku-4-5-20251001"); // action model
     expect(action[1]).toContain("Execute this plan:");

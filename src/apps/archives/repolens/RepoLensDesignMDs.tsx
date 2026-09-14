@@ -3,6 +3,8 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { Globe, RefreshCw, Copy, Download } from "lucide-react";
 import { useRepoLensWebsites } from "./useRepoLensWebsites";
 import { useRepoLens } from "./useRepoLens";
+import { availableRepoLensModel } from "./models";
+import { useProvidersStore } from "@/store/providersStore";
 import { parseDesignSpec, designSpecToMarkdown, type DesignSpec } from "./designSpec";
 import type { WebsiteRipRow } from "./repolensWebsitesDb";
 import { toast } from "@/store/toastStore";
@@ -63,7 +65,9 @@ export function RepoLensDesignMDs() {
 function DesignSpecBoard({ row, onBack }: { row: WebsiteRipRow; onBack: () => void }) {
   const extractDesign = useRepoLensWebsites((s) => s.extractDesign);
   const extracting = useRepoLensWebsites((s) => s.extracting.has(row.id));
-  const model = useRepoLens((s) => s.model.default_model);
+  const selectedModel = useRepoLens((s) => s.model.default_model);
+  const providers = useProvidersStore((s) => s.providers);
+  const model = availableRepoLensModel(providers, selectedModel, "website-agent");
   const thumb = row.thumbnail_path ? convertFileSrc(row.thumbnail_path) : null;
 
   let spec: DesignSpec | null = null;

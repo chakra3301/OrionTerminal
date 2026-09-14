@@ -1,24 +1,37 @@
+import { useProvidersStore } from "@/store/providersStore";
 import { useRepoLens } from "./useRepoLens";
-import { REPOLENS_MODELS } from "./models";
+import { availableRepoLensModel, repoLensModelGroups } from "./models";
 import { TONES } from "./tone";
 
-export function RepoLensPickers() {
+export function RepoLensPickers({ websiteAgent = false }: { websiteAgent?: boolean }) {
   const model = useRepoLens((s) => s.model);
   const tone = useRepoLens((s) => s.tone);
   const setDefaultModel = useRepoLens((s) => s.setDefaultModel);
   const setTone = useRepoLens((s) => s.setTone);
+  const providers = useProvidersStore((s) => s.providers);
+  const capability = websiteAgent ? "website-agent" : "analysis";
+  const groups = repoLensModelGroups(providers, capability);
+  const selected = availableRepoLensModel(providers, model.default_model, capability);
+
   return (
     <>
       <select
         className="rl-select"
-        value={model.default_model}
+        value={selected}
         onChange={(e) => setDefaultModel(e.target.value)}
-        title="Model"
+        title={websiteAgent ? "Website clone agent model" : "Model"}
       >
-        {REPOLENS_MODELS.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.label}
-          </option>
+        {!groups.some((group) => group.models.some((item) => item.id === selected)) && (
+          <option value={selected}>Unavailable selection — choose a model</option>
+        )}
+        {groups.map((group) => (
+          <optgroup key={group.id} label={group.label}>
+            {group.models.map((item) => (
+              <option key={`${group.id}/${item.id}`} value={item.id}>
+                {item.label}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
       <select

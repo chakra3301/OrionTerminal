@@ -195,9 +195,9 @@ export function APIKeySection() {
       <h2 className="ot-settings-h2">Anthropic API key</h2>
       <p className="ot-settings-p">
         Stored in your OS keychain. Used by the inline-edit DiffEditor (⌘K with
-        a selection) and any direct Messages-API flows. Chat surfaces in
-        Orion's Code Companion and the Archive Assistant use your Claude Code
-        subscription via the CLI, not this key.
+        a selection), Tab completion, and direct Messages-API flows. Chats,
+        Learn, and FX use the AI selected in Control Panel → Providers or
+        their model picker; subscription connectors do not use this key.
       </p>
       <div className="ot-settings-status">
         <span

@@ -11,6 +11,7 @@ import { MonitorWidget } from "@/shell/MonitorWidget";
 import { PromptModalHost } from "@/components/PromptModal";
 import { ConfirmModalHost } from "@/components/ConfirmModal";
 import { ToastHost } from "@/components/ToastHost";
+import { RecoveryPanel } from "@/features/recovery/RecoveryPanel";
 import { PluginOverlays } from "@/plugins/PluginOverlays";
 import { CommunityPluginRuntimeHost } from "@/plugins/CommunityPluginRuntimeHost";
 import { SandboxPluginFrame } from "@/plugins/SandboxPluginFrame";
@@ -88,6 +89,7 @@ export function Shell() {
 
   return (
     <>
+      <RecoveryPanel />
       <Wallpaper />
       <MenuBar />
       <WelcomeOverlay />

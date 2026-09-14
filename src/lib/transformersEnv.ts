@@ -1,32 +1,28 @@
-/** Initialize `@xenova/transformers` for the Tauri webview environment.
- *
- * Background: the library defaults to `env.allowLocalModels = true`, which
- * makes it try to fetch model files from a path relative to the current
- * page URL FIRST before falling back to the Hugging Face CDN. In a Tauri
- * webview that "relative path" lands on the custom protocol's catch-all
- * route, which returns `index.html`. JSON.parse on `<!DOCTYPE html>...`
- * then throws `SyntaxError: Unrecognized token '<'`.
- *
- * Setting `allowLocalModels = false` forces the library to skip that
- * doomed local probe and hit the CDN directly. Models are still cached
- * in IndexedDB via `useBrowserCache = true` (the default), so subsequent
- * loads stay fast.
- *
- * Both the embeddings indexer (semantic search) and the voice transcriber
- * (Whisper) import + await this so we're guaranteed env is configured
- * before the first model fetch. */
+import wasmUrl from "onnx-assets/ort-wasm-simd-threaded.wasm?url";
+import moduleUrl from "onnx-assets/ort-wasm-simd-threaded.mjs?url";
+
 let configuredPromise: Promise<void> | null = null;
 
 export function configureTransformers(): Promise<void> {
   if (configuredPromise) return configuredPromise;
-  configuredPromise = (async () => {
-    const mod = await import("@xenova/transformers");
-    mod.env.allowLocalModels = false;
-    // Be explicit about the CDN — the default is already huggingface.co
-    // but writing it down makes the failure mode obvious if it ever
-    // changes upstream.
-    mod.env.remoteHost = "https://huggingface.co";
-    mod.env.useBrowserCache = true;
-  })();
+  configuredPromise = import("@huggingface/transformers").then(({ env }) => {
+    // Tauri's catch-all would return index.html for a missing local model.
+    env.allowLocalModels = false;
+    env.remoteHost = "https://huggingface.co";
+    env.useBrowserCache = true;
+    // Ship the Safari-compatible factory and matching binary together. No CDN
+    // executable downloads or cross-origin-isolation requirement for threads.
+    env.useWasmCache = false;
+    const wasm = env.backends.onnx.wasm!;
+    wasm.numThreads = 1;
+    wasm.proxy = false;
+    wasm.wasmPaths = {
+      wasm: new URL(wasmUrl, globalThis.location.href).href,
+      mjs: new URL(moduleUrl, globalThis.location.href).href,
+    };
+  }).catch((error) => {
+    configuredPromise = null;
+    throw error;
+  });
   return configuredPromise;
 }

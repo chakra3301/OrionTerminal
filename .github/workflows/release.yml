@@ -24,15 +24,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ github.event.inputs.tag || github.ref_name }}
+          persist-credentials: false
 
       - name: Resolve release tag
         id: tag
-        run: echo "value=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] || exit 1
+          printf 'value=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Setup Rust
@@ -48,18 +55,41 @@ jobs:
       - name: Install JS deps
         run: npm ci
 
+      - name: Verify frontend, bridges, and native code
+        run: npm run typecheck && npm test && npm run test:bridges && npm run test:native
+
+      - name: Block releases with high or critical production dependency advisories
+        run: npm run audit:production
+
+      - name: Install reviewed native audit tool
+        run: cargo install cargo-audit --version 0.22.2 --locked
+
+      - name: Block known vulnerable or unsound dependencies in the release target
+        run: npm run audit:native:target -- --target aarch64-apple-darwin
+
       - name: Build app (.app + .dmg)
-        # Ad-hoc signed (signingIdentity "-" in tauri.conf.json). No Apple
-        # cert / no name embedded. This downgrades the Gatekeeper "damaged"
-        # error to the bypassable "unverified developer" dialog.
-        run: npm run tauri build -- --target aarch64-apple-darwin
+        # Ad-hoc signing is neither notarization nor a Gatekeeper acceptance guarantee.
+        run: |
+          rm -rf src-tauri/target/aarch64-apple-darwin/release/bundle
+          npm run tauri build -- --target aarch64-apple-darwin
+
+      - name: Verify packaged MCP grants without a model or user profile
+        run: |
+          test "$(uname -m)" = arm64
+          npm run test:native-policy -- --binary "$PWD/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Terminal.app/Contents/MacOS/orion-terminal"
+
+      - name: Rehearse packaged cold recovery without a live profile
+        run: |
+          python3 scripts/rehearse-profile-recovery.py --binary "$PWD/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Terminal.app/Contents/MacOS/orion-terminal" --report "$RUNNER_TEMP/profile-recovery.json"
 
       - name: Stage release asset (stable name)
         id: asset
         run: |
           set -euo pipefail
-          src="$(find src-tauri/target -path '*/release/bundle/dmg/*.dmg' | head -n1)"
-          if [ -z "$src" ]; then echo "No .dmg found"; exit 1; fi
+          shopt -s nullglob
+          images=(src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg)
+          if [ "${#images[@]}" -ne 1 ]; then echo "Expected exactly one fresh target .dmg"; exit 1; fi
+          src="${images[0]}"
           stable="Orion-Terminal_aarch64.dmg"
           cp "$src" "$stable"
           echo "Built: $src -> $stable"

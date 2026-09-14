@@ -325,10 +325,11 @@ export function Rosie() {
           {visibleMessages.length === 0 && (
             <div className="ot-rosie-empty">
               <div className="ot-claude-orb" style={{ width: 56, height: 56 }} />
-              <div className="title">R.O.S.I.E is online.</div>
+              <div className="title">Ready when you are.</div>
               <div className="subtitle">
-                I have control over your workstation — apps, projects, notes,
-                files, search. Ask me to do something, or say “Rosie…”.
+                Choose a connected model, then ask for help with your apps,
+                notes or files. Available actions depend on the connector and
+                permissions.
               </div>
               <div className="examples">
                 <span>“open archives”</span>

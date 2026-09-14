@@ -8,7 +8,7 @@ use std::io::Write;
 use std::path::Path;
 use tauri::{AppHandle, Manager};
 
-fn write_private(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+pub(crate) fn write_private(path: &Path, contents: &[u8]) -> std::io::Result<()> {
     let file_name = path
         .file_name()
         .and_then(|name| name.to_str())
@@ -168,6 +168,53 @@ pub fn orion_server(app: &AppHandle) -> Option<crate::cli_engine::config::OrionS
     })
 }
 
+#[derive(Debug, Clone)]
+pub struct ScopedConfig(std::sync::Arc<ConfigFile>);
+
+#[derive(Debug)]
+struct ConfigFile(std::path::PathBuf);
+
+impl Drop for ConfigFile {
+    fn drop(&mut self) { let _ = std::fs::remove_file(&self.0); }
+}
+
+impl ScopedConfig {
+    pub fn write(dir: &Path, prefix: &str, contents: &[u8]) -> Result<Self, String> {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        let path = dir.join(format!("{prefix}-{}.json", ulid::Ulid::new()));
+        write_private(&path, contents).map_err(|e| e.to_string())?;
+        Ok(Self(std::sync::Arc::new(ConfigFile(path))))
+    }
+    pub fn path(&self) -> &Path { &self.0.0 }
+}
+
+pub fn scoped_server(app: &AppHandle, tools: Option<&[String]>, ui_run_id: Option<&str>) -> Result<crate::cli_engine::config::OrionServer, String> {
+    crate::ui_bridge::validate_run_id(ui_run_id)?;
+    let tools = crate::mcp_grants::normalized(tools)?;
+    let mut server = orion_server(app).ok_or("Orion MCP bridge is unavailable. Restart the app before sending.")?;
+    server.env.push((crate::mcp_grants::ENV_KEY.into(), serde_json::to_string(&tools).map_err(|e| e.to_string())?));
+    if let Some(id) = ui_run_id {
+        server.env.push(("ORION_UI_RUN_ID".into(), id.into()));
+    }
+    Ok(server)
+}
+
+pub fn write_scoped(app: &AppHandle, tools: Option<&[String]>, ui_run_id: Option<&str>) -> Result<ScopedConfig, String> {
+    let server = scoped_server(app, tools, ui_run_id)?;
+    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    let env: serde_json::Map<String, serde_json::Value> = server.env.into_iter()
+        .map(|(k, v)| (k, serde_json::Value::String(v))).collect();
+    let mut servers = serde_json::Map::new();
+    servers.insert("orion".into(), serde_json::json!({"command": server.command, "args": server.args, "env": env}));
+    for (name, config) in read_user_mcp_servers(&config_dir.join("orion.db")) {
+        let prefix = format!("mcp__{name}");
+        if name != "orion" && tools.is_none_or(|ts| ts.iter().any(|t| t == &prefix || t.starts_with(&format!("{prefix}__")))) {
+            servers.insert(name, config);
+        }
+    }
+    ScopedConfig::write(&config_dir, "orion-mcp", serde_json::json!({"mcpServers": servers}).to_string().as_bytes())
+}
+
 /// Frontend writes its current context snapshot here (debounced). The MCP
 /// server reads the file when `orion_get_context` is called so the agent
 /// sees what the user is actually looking at.
@@ -182,7 +229,23 @@ pub fn context_snapshot_write(app: AppHandle, json: String) -> Result<(), String
 
 #[cfg(test)]
 mod tests {
-    use super::write_private;
+    use super::{write_private, ScopedConfig};
+
+    #[test]
+    fn scoped_configs_are_unique_and_removed_only_after_the_last_owner() {
+        let dir = std::env::temp_dir().join(format!("orion-scoped-test-{}", ulid::Ulid::new()));
+        let first = ScopedConfig::write(&dir, "settings", b"one").unwrap();
+        let second = ScopedConfig::write(&dir, "settings", b"two").unwrap();
+        assert_ne!(first.path(), second.path());
+        let path = first.path().to_path_buf();
+        let copy = first.clone();
+        drop(first);
+        assert_eq!(std::fs::read(&path).unwrap(), b"one");
+        drop(copy);
+        assert!(!path.exists());
+        drop(second);
+        std::fs::remove_dir(dir).unwrap();
+    }
 
     #[test]
     fn private_write_replaces_contents() {

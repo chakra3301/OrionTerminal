@@ -11,7 +11,7 @@
 
 /* ── Overlay + surface ───────────────────────────────────────────────────── */
 .cp-overlay {
-  position: fixed; inset: 0; z-index: 2400; display: grid; place-items: center;
+  position: fixed; inset: 0; z-index: 6000; display: grid; place-items: center;
   background: rgba(2, 4, 8, 0.6); backdrop-filter: blur(3px);
 }
 .cp-surface {
@@ -258,10 +258,12 @@
 textarea.cp-input { resize: vertical; line-height: 1.55; font-family: var(--f-mono); font-size: 12px; }
 
 .cp-btn {
-  padding: 9px 16px; border-radius: var(--r-sm); border: 1px solid transparent;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 34px; padding: 8px 14px; border-radius: var(--r-sm); border: 1px solid transparent;
   background: linear-gradient(100deg, var(--neon-violet), var(--neon-cyan)); color: var(--bg-0);
-  font: 600 12px var(--f-display); cursor: pointer; box-shadow: 0 0 16px -8px rgba(var(--neon-violet-rgb), 0.7); transition: filter .14s;
+  font: 600 12px/1 var(--f-display); white-space: nowrap; cursor: pointer; box-shadow: 0 0 16px -8px rgba(var(--neon-violet-rgb), 0.7); transition: filter .14s;
 }
+.cp-btn svg { flex: 0 0 auto; }
 .cp-btn:hover { filter: brightness(1.08); }
 .cp-btn.ghost { background: transparent; color: var(--t-secondary); border-color: var(--glass-border); box-shadow: none; }
 .cp-btn.ghost:hover { color: var(--t-primary); border-color: var(--glass-border-bright); filter: none; }
@@ -270,9 +272,34 @@ textarea.cp-input { resize: vertical; line-height: 1.55; font-family: var(--f-mo
 .cp-link { background: none; border: none; color: var(--neon-cyan); cursor: pointer; font: 500 12px var(--f-display); padding: 4px 6px; }
 .cp-link:hover { text-decoration: underline; }
 .cp-link:disabled { color: var(--t-tertiary); cursor: default; text-decoration: none; }
-.cp-cli-status { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.cp-cli-status { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; min-width: 0; }
 .cp-cli-status .cp-badge { display: inline-flex; align-items: center; gap: 4px; }
+.cp-cli-status .cp-card-sub {
+  flex: 1 1 260px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cp-cli-status .cp-btn {
+  min-height: 30px; padding: 0 11px; font-size: 11px; box-shadow: 0 0 12px -8px rgba(var(--neon-violet-rgb), 0.75);
+}
+.cp-cli-status .cp-link { flex: 0 0 auto; }
+.cp-cli-status .cp-input {
+  flex: 1 1 240px; min-width: 180px; max-width: min(360px, 100%);
+}
+.cp-cli-status .cp-form-actions {
+  flex: 0 0 auto; align-items: center; margin-top: 0;
+}
+.cp-cli-status .cp-form-actions .cp-btn {
+  min-height: 30px;
+}
 .cp-label { font: 10px/1 var(--f-mono); color: var(--t-tertiary); text-transform: uppercase; letter-spacing: 0.16em; margin-top: 4px; }
+
+@media (max-width: 760px) {
+  .cp-card { align-items: flex-start; }
+  .cp-cli-status .cp-card-sub { flex-basis: 100%; }
+  .cp-cli-status .cp-btn,
+  .cp-cli-status .cp-link,
+  .cp-cli-status .cp-input,
+  .cp-cli-status .cp-form-actions { flex: 0 1 auto; }
+}
 
 /* tool grants as selectable rune chips */
 .cp-tool-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }

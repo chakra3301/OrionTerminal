@@ -16,12 +16,16 @@ export const BUILTIN_PROVIDER: Provider = {
 // logged-in run; ids match the engines' -m/--model flag values.
 export const CODEX_CLI_PROVIDER: Provider = {
   id: "builtin:codex-cli",
-  name: "OpenAI Codex (CLI)",
+  name: "OpenAI (ChatGPT subscription)",
   kind: "codex_cli",
   baseUrl: "",
   models: [
-    { id: "gpt-5.1-codex", label: "GPT-5.1 Codex" },
-    { id: "gpt-5.1-codex-mini", label: "GPT-5.1 Codex Mini" },
+    { id: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
+    { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
+    { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
+    { id: "gpt-5.5", label: "GPT-5.5" },
+    { id: "gpt-6-astra", label: "GPT-6 Astra" },
+    { id: "gpt-5.3-codex-spark", label: "GPT-5.3 Codex Spark" },
   ],
   keyRef: "",
   enabled: true,

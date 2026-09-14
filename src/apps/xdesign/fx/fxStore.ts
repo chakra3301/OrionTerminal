@@ -40,6 +40,7 @@ type FxState = {
   audioOn: boolean;
 
   addLayer: (effectId: string) => void;
+  addImageLayer: (filePath: string, name?: string) => void;
   removeLayer: (id: string) => void;
   duplicateLayer: (id: string) => void;
   /** Re-roll every number/color/select param within its legal range
@@ -151,6 +152,23 @@ export const useFxStore = create<FxState>((set, get) => ({
       name: uniqueLayerName(get().scene.layers, spec.label),
       opacity: 1,
       params: defaultParams(spec),
+    };
+    set((s) => ({
+      scene: { ...s.scene, layers: [...s.scene.layers, layer] },
+      selectedLayerId: layer.id,
+    }));
+  },
+
+  addImageLayer: (filePath, name) => {
+    const spec = fxEffect("srcImage");
+    if (!spec) return;
+    const baseName = name?.trim() || spec.label;
+    const layer: FxLayer = {
+      id: ulid(),
+      effectId: spec.id,
+      name: uniqueLayerName(get().scene.layers, baseName),
+      opacity: 1,
+      params: { ...defaultParams(spec), file: filePath },
     };
     set((s) => ({
       scene: { ...s.scene, layers: [...s.scene.layers, layer] },

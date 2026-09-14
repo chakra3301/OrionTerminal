@@ -40,13 +40,11 @@ struct ExitPayload {
 /// Is this server binary on PATH (augmented with the usual user dirs)?
 #[tauri::command]
 pub async fn lsp_probe(cmd: String) -> bool {
-    let mut probe = Command::new(&cmd);
-    probe.arg("--version");
-    probe.env("PATH", augmented_path());
-    probe.stdin(Stdio::null());
-    probe.stdout(Stdio::null());
-    probe.stderr(Stdio::null());
-    matches!(probe.status().await, Ok(s) if s.success())
+    // pyright-langserver has no --version; its companion CLI ships in the
+    // same package. Probing the server itself falsely reports it missing.
+    let binary = if cmd == "pyright-langserver" { "pyright" } else { &cmd };
+    crate::connector_status::probe(binary, &["--version"]).await
+        .is_some_and(|out| out.status.success())
 }
 
 #[tauri::command]

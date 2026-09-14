@@ -1,97 +1,59 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useModalRequest } from "./useModalRequest";
 
 type ConfirmOptions = {
   title: string;
   body?: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  /** Destructive action — confirm button renders magenta. */
   danger?: boolean;
 };
 
 let openConfirmImpl: ((opts: ConfirmOptions) => Promise<boolean>) | null = null;
 
-/**
- * Imperative confirm dialog — `if (await confirmAction({ ... })) { … }`.
- * In-canvas styling (use this instead of the native Tauri dialog). Mount
- * <ConfirmModalHost/> once at the app root. Prefer `toast.undo` over a
- * confirm when the action can be cheaply reversed.
- */
 export function confirmAction(opts: ConfirmOptions): Promise<boolean> {
-  if (!openConfirmImpl) return Promise.resolve(false);
-  return openConfirmImpl(opts);
+  return openConfirmImpl?.(opts) ?? Promise.resolve(false);
 }
 
 export function ConfirmModalHost() {
-  const [state, setState] = useState<{
-    opts: ConfirmOptions;
-    resolve: (v: boolean) => void;
-  } | null>(null);
-  const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const { request, open, close, dialogRef } = useModalRequest<ConfirmOptions, boolean>(false, cancelRef);
+  const titleId = useId();
+  const bodyId = useId();
 
   useEffect(() => {
-    openConfirmImpl = (opts) =>
-      new Promise<boolean>((resolve) => setState({ opts, resolve }));
-    return () => {
-      openConfirmImpl = null;
-    };
-  }, []);
+    openConfirmImpl = open;
+    return () => { if (openConfirmImpl === open) openConfirmImpl = null; };
+  }, [open]);
 
-  useEffect(() => {
-    if (state) {
-      const id = setTimeout(() => confirmRef.current?.focus(), 0);
-      return () => clearTimeout(id);
-    }
-  }, [state]);
-
-  if (!state) return null;
-
-  const close = (result: boolean) => {
-    state.resolve(result);
-    setState(null);
-  };
-
+  if (!request) return null;
+  const { opts } = request;
   return createPortal(
-    <div className="ot-prompt-overlay" onMouseDown={() => close(false)}>
-      <div
-        className="ot-prompt-card"
-        role="alertdialog"
-        aria-modal="true"
-        onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            close(true);
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            close(false);
-          }
-        }}
-      >
-        <div className="ot-prompt-title">{state.opts.title}</div>
-        {state.opts.body && (
-          <div className="ot-prompt-body">{state.opts.body}</div>
-        )}
+    <dialog
+      ref={dialogRef}
+      className="ot-prompt-overlay"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={opts.body ? bodyId : undefined}
+      onCancel={(event) => { event.preventDefault(); close(false); }}
+      onClose={(event) => { if (!event.currentTarget.open) close(false); }}
+      onMouseDown={(event) => { if (event.target === event.currentTarget) close(false); }}
+    >
+      <div className="ot-prompt-card">
+        <div id={titleId} className="ot-prompt-title">{opts.title}</div>
+        {opts.body && <div id={bodyId} className="ot-prompt-body">{opts.body}</div>}
         <div className="ot-prompt-actions">
-          <button
-            type="button"
-            className="ot-prompt-btn"
-            onClick={() => close(false)}
-          >
-            {state.opts.cancelLabel ?? "Cancel"}
+          <button ref={cancelRef} type="button" className="ot-prompt-btn" onClick={() => close(false)}>
+            {opts.cancelLabel ?? "Cancel"}
           </button>
-          <button
-            ref={confirmRef}
-            type="button"
-            className={`ot-prompt-btn ${state.opts.danger ? "danger" : "primary"}`}
-            onClick={() => close(true)}
-          >
-            {state.opts.confirmLabel ?? "Confirm"}
+          <button type="button" className={`ot-prompt-btn ${opts.danger ? "danger" : "primary"}`} onClick={() => close(true)}>
+            {opts.confirmLabel ?? "Confirm"}
           </button>
         </div>
       </div>
-    </div>,
+    </dialog>,
     document.body,
   );
 }

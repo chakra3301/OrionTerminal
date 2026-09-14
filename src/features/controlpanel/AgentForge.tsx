@@ -7,10 +7,13 @@ import { Brain, Zap, Hammer } from "lucide-react";
 import { useAgentsStore } from "@/store/agentsStore";
 import { useSkillsStore } from "@/store/skillsStore";
 import { useProvidersStore } from "@/store/providersStore";
+import { useModelPrefs } from "@/store/modelPrefsStore";
+import { owningProvider, providerModelValue, selectedModelValue } from "@/features/agents/modelSelection";
 import type { Agent, Skill } from "@/features/agents/agentTypes";
 import { SkillTile } from "./SkillTile";
 import { SkillEmblem } from "./SkillEmblem";
 import { hexToRgb } from "./sigil";
+import { toast } from "@/store/toastStore";
 
 const ACCENTS = ["#b14cff", "#00e0ff", "#39ff88", "#e6ff3a", "#ff3ea5"];
 const HEX = "60,4 112,34 112,98 60,128 8,98 8,34";
@@ -21,7 +24,9 @@ const CORNERS = [
 ];
 
 function blank(): Agent {
-  return { id: ulid(), name: "New Agent", role: "", accent: "#b14cff", avatarAssetId: null, avatarUrl: null, brainModel: "claude-opus-4-8", actionModel: "", skillIds: [] };
+  const selected = useModelPrefs.getState().modelFor("default");
+  const brainModel = selected.startsWith("agent:") ? useAgentsStore.getState().agents.get(selected.slice(6))?.brainModel ?? "" : selected;
+  return { id: ulid(), name: "New Agent", role: "", accent: "#b14cff", avatarAssetId: null, avatarUrl: null, brainModel, actionModel: "", skillIds: [] };
 }
 
 function ForgePortrait({ url, accent, equipped, onPick, onUnequip }: { url: string | null; accent: string; equipped: Skill[]; onPick: () => void; onUnequip: (id: string) => void }) {
@@ -64,8 +69,20 @@ export function AgentForge() {
   const save = useAgentsStore((s) => s.save);
   const remove = useAgentsStore((s) => s.remove);
   const providers = useProvidersStore((s) => s.providers);
-  const runnableModels = providers.filter((p) => p.enabled).flatMap((p) => p.models);
+  const runnableModels = providers.filter((p) => p.enabled).flatMap((p) => p.models.map((m) => ({ id: providerModelValue(p.id, m.id), label: `${m.label} · ${p.name}` })));
   const [draft, setDraft] = useState<Agent>(blank());
+  const [saving, setSaving] = useState(false);
+  const forge = async () => {
+    if (saving) return;
+    const submitted = draft;
+    setSaving(true);
+    try {
+      if (!draft.name.trim() || !owningProvider(providers, draft.brainModel) || (draft.actionModel && !owningProvider(providers, draft.actionModel))) throw new Error("Choose available models and give the agent a name.");
+      await save({ ...draft, name: draft.name.trim() });
+      setDraft((current) => current === submitted ? blank() : current);
+    } catch (e) { toast.error("Agent was not saved", { body: String(e) }); }
+    finally { setSaving(false); }
+  };
 
   const equipped = new Set(draft.skillIds);
   const equippedSkills = draft.skillIds.map((id) => skills.find((x) => x.id === id)).filter((s): s is Skill => !!s);
@@ -77,7 +94,7 @@ export function AgentForge() {
     if (typeof path === "string") setDraft({ ...draft, avatarUrl: convertFileSrc(path), avatarAssetId: null });
   };
 
-  const short = (m: string) => m.replace("claude-", "");
+  const short = (m: string) => runnableModels.find((item) => item.id === selectedModelValue(providers, m))?.label ?? m;
 
   return (
     <div className="forge">
@@ -86,13 +103,13 @@ export function AgentForge() {
           <div className="cp-eyebrow">Equipment</div>
           <div className="forge-slot brain">
             <div className="forge-slot-label"><Brain size={13} strokeWidth={2} /> Brain · thinks</div>
-            <select value={draft.brainModel} onChange={(e) => setDraft({ ...draft, brainModel: e.target.value })}>
+            <select aria-label="Agent planning model" value={selectedModelValue(providers, draft.brainModel)} onChange={(e) => setDraft({ ...draft, brainModel: e.target.value })}>
               {runnableModels.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
             </select>
           </div>
           <div className="forge-slot action">
             <div className="forge-slot-label"><Zap size={13} strokeWidth={2} /> Action · runs the plan</div>
-            <select value={draft.actionModel} onChange={(e) => setDraft({ ...draft, actionModel: e.target.value })}>
+            <select aria-label="Agent execution model" value={draft.actionModel ? selectedModelValue(providers, draft.actionModel) : ""} onChange={(e) => setDraft({ ...draft, actionModel: e.target.value })}>
               <option value="">same as brain</option>
               {runnableModels.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
             </select>
@@ -111,6 +128,7 @@ export function AgentForge() {
 
         <div className="forge-inv">
           <div className="cp-eyebrow">Skill Inventory <span className="cp-count">{skills.length}</span></div>
+          <p style={{ fontSize: 11, color: "var(--t-secondary)", margin: "8px 0" }}>Skills grant tool access. No grants means chat-only. Shell access can modify files and run programs.</p>
           <div className="cp-skill-grid">
             {skills.map((s) => (
               <SkillTile key={s.id} skill={s} equipped={equipped.has(s.id)} onClick={() => toggleSkill(s.id)} title={equipped.has(s.id) ? "Unequip" : "Equip"} />
@@ -126,7 +144,7 @@ export function AgentForge() {
             <span className="forge-twopass"> · two-pass</span>
           ) : null}
         </div>
-        <button className="forge-btn" onClick={() => { void save(draft); setDraft(blank()); }}><Hammer size={14} strokeWidth={2.2} /> Forge Agent</button>
+        <button className="forge-btn" disabled={saving} onClick={() => void forge()}><Hammer size={14} strokeWidth={2.2} /> {saving ? "Saving…" : "Forge Agent"}</button>
       </div>
 
       {agents.length > 0 && (
@@ -136,7 +154,7 @@ export function AgentForge() {
             <div key={a.id} className="cp-card" style={{ "--acc-rgb": hexToRgb(a.accent) } as CSSProperties}>
               <div className="cp-card-main"><div className="cp-card-title">{a.name}</div><div className="cp-card-sub">{a.role || "—"} · {short(a.brainModel)}</div></div>
               <button className="cp-link-danger" onClick={() => setDraft(a)}>Edit</button>
-              <button className="cp-link-danger" onClick={() => remove(a.id)}>Delete</button>
+              <button className="cp-link-danger" onClick={() => void remove(a.id).catch((e) => toast.error("Agent was not deleted", { body: String(e) }))}>Delete</button>
             </div>
           ))}
         </div>

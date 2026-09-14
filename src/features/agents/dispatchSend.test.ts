@@ -18,8 +18,8 @@ describe("routing", () => {
   it("routes claude models to the claude engine", () => {
     expect(routeFor([BUILTIN_PROVIDER, openai], "claude-opus-4-8")).toBe("claude");
   });
-  it("routes unknown models to claude (default)", () => {
-    expect(routeFor([BUILTIN_PROVIDER, openai], "mystery")).toBe("claude");
+  it("rejects unknown models instead of silently using Claude", () => {
+    expect(() => routeFor([BUILTIN_PROVIDER, openai], "mystery")).toThrow("unavailable");
   });
   it("routes a provider-owned model to that provider", () => {
     expect(routeFor([BUILTIN_PROVIDER, openai], "gpt-4o")).toEqual(openai);

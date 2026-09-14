@@ -6,11 +6,12 @@ import { useAppConfig, APP_DEFAULTS, resolveConfig, type AppId } from "@/store/a
 import { useSkillsStore } from "@/store/skillsStore";
 import { useMcpServers } from "@/store/mcpServersStore";
 import { BUILTIN_TOOLS } from "@/features/agents/toolCatalog";
-import type { ToolGrant } from "@/features/agents/agentTypes";
+import type { Provider, ToolGrant } from "@/features/agents/agentTypes";
 import { useTerminalStore } from "@/store/terminalStore";
 import { useRepoLens } from "@/apps/archives/repolens/useRepoLens";
 import { TONES } from "@/apps/archives/repolens/tone";
-import { defaultImageModel, isImageProvider } from "@/apps/xdesign/imageGen";
+import { defaultImageModelForProvider } from "@/apps/xdesign/imageGen";
+import { resolveImageProvider } from "@/apps/xdesign/imageProviderRuntime";
 import { useProvidersStore } from "@/store/providersStore";
 
 // Per-app settings — every piece of each app's embedded-Claude identity is
@@ -249,8 +250,8 @@ function AppEditor({ app, surface }: { app: AppId; surface: ModelSurface }) {
         </div>
         <div className="cp-card-sub">
           {cfg.toolsCustomized
-            ? "Only the checked tools are offered to this app's Claude."
-            : "Unrestricted — Claude may use any available tool. Turn on to limit."}
+            ? "Selected tool grants apply to Claude and HTTP runtimes. Cursor maps tool families; Codex/Gemini use native permission profiles."
+            : "Unrestricted — your selected AI can use the connector's available tools. Turn on to customize."}
         </div>
         {cfg.toolsCustomized && (
           <div className="cp-tool-grid">
@@ -358,7 +359,19 @@ export function ArchivesSettings() {
 
 export function XDesignSettings() {
   const providers = useProvidersStore((s) => s.providers);
-  const imageProvider = providers.find((p) => p.enabled && isImageProvider(p));
+  const [imageProvider, setImageProvider] = useState<Provider | null>(null);
+  const [imageChecked, setImageChecked] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void resolveImageProvider(providers).then((provider) => {
+      if (active) {
+        setImageProvider(provider);
+        setImageChecked(true);
+      }
+    });
+    return () => { active = false; };
+  }, [providers]);
 
   return (
     <div>
@@ -371,12 +384,14 @@ export function XDesignSettings() {
             <div className="cp-card-title">Raster image model</div>
             <div className="cp-card-sub">
               {imageProvider
-                ? `${imageProvider.name} · ${defaultImageModel(imageProvider.kind)}`
-                : "No image-capable provider — add one under Providers"}
+                ? `${imageProvider.name} · ${defaultImageModelForProvider(imageProvider)}`
+                : imageChecked
+                  ? "Connect ChatGPT or add an image-capable provider"
+                  : "Checking provider readiness…"}
             </div>
           </div>
           <span className={`cp-badge ${imageProvider ? "live" : "wait"}`}>
-            {imageProvider ? "ready" : "none"}
+            {imageProvider ? "ready" : imageChecked ? "none" : "checking"}
           </span>
         </div>
       </div>

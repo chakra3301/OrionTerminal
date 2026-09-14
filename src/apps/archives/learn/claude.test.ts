@@ -1,42 +1,44 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../../../lib/ipc", () => ({
-  learnClaudeCall: vi.fn(),
-}));
-import { learnClaudeCall } from "../../../lib/ipc";
-import { generateGraph, gradeAnswer } from "./claude";
+vi.mock("@/features/agents/textCall", () => ({ runTextModel: vi.fn() }));
+import { runTextModel } from "@/features/agents/textCall";
+import { generateGraph, gradeAnswer, generateFigure } from "./claude";
 
 beforeEach(() => vi.clearAllMocks());
 
 describe("generateGraph", () => {
-  it("parses the model reply into a GraphSpec", async () => {
-    (learnClaudeCall as any).mockResolvedValue({ result: JSON.stringify({ summary: "s", nodes: [{ key: "a", title: "A", level: "basics" }] }), cost: 0, model: "m" });
-    const g = await generateGraph("Photography", "model-x");
+  it("parses the selected provider's reply into a GraphSpec", async () => {
+    vi.mocked(runTextModel).mockResolvedValue(JSON.stringify({ summary: "s", nodes: [{ key: "a", title: "A", level: "basics" }] }));
+    const g = await generateGraph("Photography", "provider:custom/model-x");
     expect(g.nodes).toHaveLength(1);
-    expect(learnClaudeCall).toHaveBeenCalledTimes(1);
+    expect(runTextModel).toHaveBeenCalledWith(expect.any(String), "provider:custom/model-x");
   });
 });
 
+const answer = { question: "q", expected: "e", concept: "c", answer: "a" };
 describe("gradeAnswer", () => {
-  it("returns a structured grade and defaults to incorrect on garbage", async () => {
-    (learnClaudeCall as any).mockResolvedValue({ result: "not json", cost: 0, model: "m" });
-    const grade = await gradeAnswer({ question: "q", expected: "e", concept: "c", answer: "a" }, "model-x");
-    expect(grade.correct).toBe(false);
-    expect(Array.isArray(grade.missed_concepts)).toBe(true);
+  it("does not penalize the learner for an invalid model reply", async () => {
+    vi.mocked(runTextModel).mockResolvedValue("not json");
+    await expect(gradeAnswer(answer, "model-x")).rejects.toThrow("mastery was not changed");
+  });
+  it("rejects string booleans instead of marking false as correct", async () => {
+    vi.mocked(runTextModel).mockResolvedValue('{"correct":"false","partial":false,"missed_concepts":[]}');
+    await expect(gradeAnswer(answer, "model-x")).rejects.toThrow("invalid grade");
+  });
+  it("returns a valid structured grade", async () => {
+    const grade = { correct: false, partial: true, missed_concepts: ["depth"] };
+    vi.mocked(runTextModel).mockResolvedValue(JSON.stringify(grade));
+    expect(await gradeAnswer(answer, "model-x")).toEqual(grade);
   });
 });
-
-import { generateFigure } from "./claude";
 
 describe("generateFigure", () => {
   it("parses a figure reply", async () => {
-    (learnClaudeCall as any).mockResolvedValue({ result: JSON.stringify({ name: "penguin", outline: [{ x: 0.5, y: 0.1 }], anchors: [{ x: 0.5, y: 0.2 }] }), cost: 0, model: "m" });
-    const f = await generateFigure("Linux", 5, "model-x");
-    expect(f?.name).toBe("penguin");
+    vi.mocked(runTextModel).mockResolvedValue(JSON.stringify({ name: "penguin", outline: [{ x: 0.5, y: 0.1 }], anchors: [{ x: 0.5, y: 0.2 }] }));
+    expect((await generateFigure("Linux", 5, "model-x"))?.name).toBe("penguin");
   });
-
   it("returns null on garbage", async () => {
-    (learnClaudeCall as any).mockResolvedValue({ result: "no json", cost: 0, model: "m" });
+    vi.mocked(runTextModel).mockResolvedValue("no json");
     expect(await generateFigure("Linux", 5, "model-x")).toBeNull();
   });
 });

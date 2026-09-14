@@ -6,7 +6,7 @@ import {
 import { useChatStore, type ChatMessage } from "@/store/chatStore";
 import { useProjectStore } from "@/store/projectStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
-import { dispatchAgentTurn, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
+import { dispatchAgentTurn, dispatchCancel, forgetDispatch, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
 import { useAppConfig, resolveConfig, appFirstTurnPreamble, appAllowedTools } from "@/store/appConfigStore";
 import {
@@ -119,7 +119,9 @@ export function OrionClaudeRail() {
       );
     } catch (e) {
       log.error("claude_send failed", e);
+      forgetDispatch(chat.id);
       setRunning(false);
+      throw e;
     }
   };
 

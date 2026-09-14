@@ -34,6 +34,11 @@ export async function trackXDesignActivity<T>(
   }
 }
 
+export async function runXDesignUiAction<T>(assertActive: () => void, work: () => Promise<T>): Promise<T> {
+  assertActive();
+  return trackXDesignActivity("ui-tool", "Wait for the current AI action to finish before disabling the plugin", work);
+}
+
 export function setXDesignActivity(
   id: string,
   active: boolean,
@@ -45,6 +50,14 @@ export function setXDesignActivity(
 
 export function xdesignActivityReason(): string | null {
   return activities.values().next().value?.reason ?? null;
+}
+
+export function xdesignProjectChangeReason(): string | null {
+  for (const id of ["ui-tool", "model-assist", "fx-assist", "html-generation", "image-generation", "shader-generation", "brand-extraction", "canvas-recording", "canvas-image-import", "canvas-export"]) {
+    const active = activities.get(id);
+    if (active) return active.reason.replace("before disabling the plugin", "before switching projects");
+  }
+  return null;
 }
 
 export function clearXDesignActivities(): void {

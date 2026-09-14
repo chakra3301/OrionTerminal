@@ -1,6 +1,7 @@
 pub mod gemini;
 pub mod openai;
 pub mod pricing;
+mod policy;
 pub mod provider;
 pub mod tools;
 
@@ -9,7 +10,8 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Notify;
 
@@ -17,8 +19,46 @@ use provider::{make_provider, ChatRequest, Msg, StreamItem};
 
 const MAX_ROUNDS: usize = 24;
 
-static STREAMS: Lazy<Mutex<HashMap<String, Arc<Notify>>>> =
+#[derive(Default)]
+struct RunSignal { notify: Notify, cancelled: AtomicBool }
+
+static STREAMS: Lazy<Mutex<HashMap<String, Arc<RunSignal>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
+
+struct RunGuard { id: String, signal: Arc<RunSignal> }
+impl RunGuard {
+    fn start(id: &str) -> Result<Self, String> {
+        if id.is_empty() || id.len() > 512 || id.chars().any(char::is_control) { return Err("Invalid chat ID".into()); }
+        let mut streams = STREAMS.lock();
+        if streams.contains_key(id) { return Err("The previous turn is still running or stopping".into()); }
+        let signal = Arc::new(RunSignal::default());
+        streams.insert(id.into(), signal.clone());
+        Ok(Self { id: id.into(), signal })
+    }
+    fn active(&self) -> bool { !self.signal.cancelled.load(Ordering::Acquire) }
+}
+impl Drop for RunGuard {
+    fn drop(&mut self) { STREAMS.lock().remove(&self.id); }
+}
+
+fn http_client() -> Result<reqwest::Client, reqwest::Error> {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(Duration::from_secs(10))
+        .read_timeout(Duration::from_secs(120))
+        .build()
+}
+
+async fn brief_error(response: reqwest::Response) -> String {
+    let mut stream = response.bytes_stream();
+    let mut bytes = Vec::new();
+    while let Some(Ok(chunk)) = stream.next().await {
+        let take = chunk.len().min(4096 - bytes.len());
+        bytes.extend_from_slice(&chunk[..take]);
+        if bytes.len() == 4096 { break; }
+    }
+    String::from_utf8_lossy(&bytes).chars().take(500).collect()
+}
 
 #[derive(Serialize, Clone)]
 struct EventPayload {
@@ -91,6 +131,7 @@ fn emit_assistant_round(app: &AppHandle, chat_id: &str, msg_id: &str, content: s
             chat_id: chat_id.to_string(),
             event: serde_json::json!({
                 "type": "assistant",
+                "textMode": "snapshot",
                 "message": { "id": msg_id, "content": content }
             }),
         },
@@ -131,16 +172,20 @@ fn emit_error_exit(app: &AppHandle, chat_id: &str, msg: &str) {
 pub async fn runtime_send(
     app: AppHandle,
     chat_id: String,
-    provider_kind: String,
-    base_url: String,
-    key_ref: String,
+    provider_id: String,
     model: String,
     system: String,
     history: Vec<Msg>,
     allowed_tools: Vec<String>,
+    ui_run_id: Option<String>,
 ) -> Result<(), String> {
+    crate::ui_bridge::validate_run_id(ui_run_id.as_deref())?;
+    let config = policy::load(&app, &provider_id, &model)?;
+    let run = RunGuard::start(&chat_id)?;
+    let cancel = run.signal.clone();
+    let provider_kind = config.kind.as_str();
     let key = if provider_kind == "nous_oauth" {
-        match crate::nous_oauth::access_token(&key_ref).await {
+        match crate::nous_oauth::access_token(&config.key_ref).await {
             Ok(t) => t,
             Err(e) => {
                 emit_error_exit(&app, &chat_id, &e);
@@ -148,24 +193,26 @@ pub async fn runtime_send(
             }
         }
     } else {
-        crate::provider_keys::read(&key_ref).unwrap_or_default()
+        crate::provider_keys::read(&config.key_ref).unwrap_or_default()
     };
-    let prov = make_provider(&provider_kind);
-    let url = prov.endpoint(&base_url, &model);
+    if key.trim().is_empty() && matches!(provider_kind, "openai" | "google" | "nous_oauth") {
+        return Err("The selected provider has no saved credential. Reconnect it in Control Panel.".into());
+    }
+    let prov = make_provider(provider_kind);
+    let url = &config.endpoint;
     let tools = crate::runtime::tools::filter_tools(&allowed_tools);
-
-    let cancel = Arc::new(Notify::new());
-    STREAMS.lock().insert(chat_id.clone(), cancel.clone());
-
-    let client = reqwest::Client::new();
+    let client = http_client().map_err(|e| e.to_string())?;
     let mut working: Vec<Msg> = history;
     let mut total_in: u64 = 0;
     let mut total_out: u64 = 0;
     let mut had_usage = false;
 
     'rounds: for round in 0..MAX_ROUNDS {
-        if !STREAMS.lock().contains_key(&chat_id) {
-            break 'rounds;
+        if !run.active() { break 'rounds; }
+        if policy::load(&app, &provider_id, &model).as_ref() != Ok(&config) {
+            let error = "Provider configuration changed during this turn. Start a new turn.";
+            emit_error_exit(&app, &chat_id, error);
+            return Err(error.into());
         }
         let req = ChatRequest {
             model: model.clone(),
@@ -176,23 +223,31 @@ pub async fn runtime_send(
         let body = prov.body(&req);
         let msg_id = format!("rt-{}-{}", chat_id, round);
 
-        let mut rb = client.post(&url).json(&body);
+        let mut rb = client.post(url).json(&body);
         for (k, v) in prov.headers(&key) {
             rb = rb.header(k, v);
         }
-        let resp = match rb.send().await {
+        let response = tokio::select! {
+            biased;
+            _ = cancel.notify.notified() => { break 'rounds; }
+            response = rb.send() => response,
+        };
+        let resp = match response {
             Ok(r) => r,
             Err(e) => {
-                STREAMS.lock().remove(&chat_id);
-                emit_error_exit(&app, &chat_id, &e.to_string());
-                return Err(e.to_string());
+                let error = e.without_url().to_string();
+                emit_error_exit(&app, &chat_id, &error);
+                return Err(error);
             }
         };
         if !resp.status().is_success() {
             let status = resp.status();
-            let text = resp.text().await.unwrap_or_default();
-            STREAMS.lock().remove(&chat_id);
-            let brief: String = text.chars().take(500).collect();
+            let brief = tokio::select! {
+                biased;
+                _ = cancel.notify.notified() => { break 'rounds; }
+                text = brief_error(resp) => text,
+            };
+            let brief = if key.trim().is_empty() { brief } else { brief.replace(key.trim(), "[redacted]") };
             let msg = format!("HTTP {}: {}", status, brief);
             emit_error_exit(&app, &chat_id, &msg);
             return Err(msg);
@@ -204,13 +259,20 @@ pub async fn runtime_send(
         let mut acc_tools = crate::runtime::tools::ToolCallAccumulator::default();
         let mut cancelled = false;
         let mut errored: Option<String> = None;
+        let mut received = 0usize;
 
         loop {
             tokio::select! {
-                _ = cancel.notified() => { cancelled = true; break; }
+                biased;
+                _ = cancel.notify.notified() => { cancelled = true; break; }
                 chunk = stream.next() => {
                     match chunk {
                         Some(Ok(bytes)) => {
+                            received = received.saturating_add(bytes.len());
+                            if received > 8 * 1024 * 1024 || buf.len() + bytes.len() > 1024 * 1024 {
+                                errored = Some("Provider stream exceeded the response/frame size limit".into());
+                                break;
+                            }
                             buf.extend_from_slice(&bytes);
                             for line in take_lines(&mut buf) {
                                 for item in prov.parse_sse_line(&line) {
@@ -235,7 +297,7 @@ pub async fn runtime_send(
                                 }
                             }
                         }
-                        Some(Err(e)) => { errored = Some(e.to_string()); break; }
+                        Some(Err(e)) => { errored = Some(e.without_url().to_string()); break; }
                         None => break,
                     }
                 }
@@ -246,7 +308,6 @@ pub async fn runtime_send(
             break 'rounds;
         }
         if let Some(e) = errored {
-            STREAMS.lock().remove(&chat_id);
             emit_error_exit(&app, &chat_id, &e);
             return Err(e);
         }
@@ -269,14 +330,21 @@ pub async fn runtime_send(
         });
 
         for c in &calls {
-            if !STREAMS.lock().contains_key(&chat_id) {
-                break 'rounds;
-            }
-            let name = c.name.clone();
-            let args: serde_json::Value =
-                serde_json::from_str(&c.arguments).unwrap_or_else(|_| serde_json::json!({}));
+            if !run.active() { break 'rounds; }
+            let call = c.clone();
+            let granted = tools.clone();
+            let snapshot = config.clone();
+            let (tool_app, tool_provider, tool_model) = (app.clone(), provider_id.clone(), model.clone());
+            let signal = cancel.clone();
+            let tool_ui_run = ui_run_id.clone();
             let dispatched = tokio::task::spawn_blocking(move || {
-                crate::mcp_server::dispatch_tool(&name, &args)
+                if signal.cancelled.load(Ordering::Acquire) { return Err("Turn cancelled".into()); }
+                if policy::load(&tool_app, &tool_provider, &tool_model)? != snapshot {
+                    return Err("Provider configuration changed; tool execution denied".into());
+                }
+                crate::ui_bridge::with_sync_run(tool_ui_run, || {
+                    policy::dispatch_authorized(&call, &granted, crate::mcp_server::dispatch_tool)
+                })
             })
             .await
             .unwrap_or_else(|e| Err(format!("tool task panicked: {}", e)));
@@ -296,8 +364,6 @@ pub async fn runtime_send(
         }
         // loop to next round
     }
-
-    STREAMS.lock().remove(&chat_id);
 
     let cost = if had_usage {
         pricing::estimate_cost(&provider_kind, &model, total_in, total_out)
@@ -322,8 +388,9 @@ pub async fn runtime_send(
 
 #[tauri::command]
 pub fn runtime_cancel(chat_id: String) -> Result<(), String> {
-    if let Some(n) = STREAMS.lock().remove(&chat_id) {
-        n.notify_waiters();
+    if let Some(signal) = STREAMS.lock().get(&chat_id) {
+        signal.cancelled.store(true, Ordering::Release);
+        signal.notify.notify_one();
     }
     Ok(())
 }
@@ -331,6 +398,41 @@ pub fn runtime_cancel(chat_id: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{take_lines, tool_result_event, tool_use_blocks};
+
+    #[tokio::test]
+    async fn cancel_prevents_replacement_until_the_old_turn_retires() {
+        let id = format!("runtime-test-{}", ulid::Ulid::new());
+        let run = super::RunGuard::start(&id).unwrap();
+        assert!(run.active());
+        assert!(super::RunGuard::start(&id).is_err());
+        super::runtime_cancel(id.clone()).unwrap();
+        assert!(!run.active());
+        assert!(super::RunGuard::start(&id).is_err());
+        tokio::time::timeout(std::time::Duration::from_millis(100), run.signal.notify.notified()).await.unwrap();
+        drop(run);
+        assert!(super::RunGuard::start(&id).is_ok());
+    }
+
+    #[tokio::test]
+    async fn http_client_never_follows_a_credential_bearing_redirect() {
+        use tokio::{net::TcpListener, io::{AsyncReadExt, AsyncWriteExt}};
+        let origin = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let from = origin.local_addr().unwrap();
+        let to = target.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = origin.accept().await.unwrap();
+            let mut buffer = [0u8; 4096];
+            let n = socket.read(&mut buffer).await.unwrap();
+            assert!(String::from_utf8_lossy(&buffer[..n]).contains("x-goog-api-key: test-only-not-a-secret"));
+            socket.write_all(format!("HTTP/1.1 307 Temporary Redirect\r\nLocation: http://{to}/capture\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").as_bytes()).await.unwrap();
+        });
+        let response = tokio::time::timeout(std::time::Duration::from_secs(2), super::http_client().unwrap()
+            .post(format!("http://{from}/start")).header("x-goog-api-key", "test-only-not-a-secret").send()).await.unwrap().unwrap();
+        assert_eq!(response.status(), 307);
+        assert!(tokio::time::timeout(std::time::Duration::from_millis(50), target.accept()).await.is_err());
+        server.await.unwrap();
+    }
     use crate::runtime::provider::ToolCall;
 
     #[test]

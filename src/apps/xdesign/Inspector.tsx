@@ -23,6 +23,7 @@ import {
 } from "@/apps/xdesign/store";
 import { XDesignImagePicker } from "@/apps/xdesign/ImagePicker";
 import { toast } from "@/store/toastStore";
+import { trackXDesignActivity } from "./runtimeActivity";
 import type { BoolOp } from "@/apps/xdesign/booleanOps";
 import type { ConstraintH, ConstraintV } from "@/apps/xdesign/constraints";
 import { findInstanceRoot } from "@/apps/xdesign/overrides";
@@ -873,15 +874,23 @@ function FillField({
 function ExportRow() {
   const shapes = useXDesign((s) => s.shapes);
   const selection = useXDesign((s) => s.selection);
+  const [exporting, setExporting] = useState(false);
+  const exportLock = useRef(false);
   const doExport = async (kind: "png" | "svg") => {
-    const { computeExportBounds, exportPNG, exportSVG } = await import(
-      "@/apps/xdesign/exportXD"
-    );
-    const bounds = computeExportBounds(shapes, selection);
-    if (!bounds) return;
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    if (kind === "svg") exportSVG(bounds, `xdesign-${stamp}.svg`);
-    else void exportPNG(bounds, `xdesign-${stamp}.png`, 2);
+    if (exportLock.current) return;
+    exportLock.current = true; setExporting(true);
+    try {
+      await trackXDesignActivity("canvas-export", "Wait for canvas export before switching projects.", async () => {
+        const { computeExportBounds, exportPNG, exportSVG } = await import("@/apps/xdesign/exportXD");
+        const bounds = computeExportBounds(shapes, selection);
+        if (!bounds) return;
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        if (kind === "svg") await exportSVG(bounds, `xdesign-${stamp}.svg`);
+        else await exportPNG(bounds, `xdesign-${stamp}.png`, 2);
+      });
+    } catch (error) {
+      toast.error("Canvas export failed", { body: error instanceof Error ? error.message : String(error) });
+    } finally { exportLock.current = false; setExporting(false); }
   };
   return (
     <div className="xd-export-row">
@@ -889,6 +898,7 @@ function ExportRow() {
         type="button"
         className="xd-effects-add"
         onClick={() => void doExport("png")}
+        disabled={exporting}
         title="Export as PNG"
       >
         PNG
@@ -897,6 +907,7 @@ function ExportRow() {
         type="button"
         className="xd-effects-add"
         onClick={() => void doExport("svg")}
+        disabled={exporting}
         title="Export as SVG"
       >
         SVG

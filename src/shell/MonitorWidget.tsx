@@ -7,8 +7,7 @@ import { log } from "@/lib/log";
 
 const SYS_POLL_MS = 2000;
 const USAGE_POLL_MS = 30_000;
-// The real `/usage` scrape spawns a `claude` subprocess (~2–4s) and the
-// numbers move slowly, so poll it far less often than the local file read.
+// Live quota is unavailable until a verified non-generative provider API is integrated.
 const LIMITS_POLL_MS = 90_000;
 
 type Pos = { x: number; y: number };
@@ -209,7 +208,7 @@ export function MonitorWidget() {
         <div className="ot-mon-row">
           <span
             className="ot-mon-label"
-            title="Real subscription usage, from Claude's /usage"
+            title="Live quota unavailable. Local transcript usage below is not a subscription limit."
           >
             CLAUDE · session
           </span>
@@ -227,7 +226,7 @@ export function MonitorWidget() {
             {sessionReset
               ? `resets ${sessionReset}`
               : limits && !limits.ok
-                ? "/usage unavailable"
+                ? "live quota unavailable"
                 : ""}
           </span>
           <span>

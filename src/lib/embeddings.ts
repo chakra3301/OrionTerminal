@@ -1,67 +1,15 @@
 import { log } from "@/lib/log";
-import type {
-  WorkerRequest,
-  WorkerResponse,
-} from "@/lib/embeddingsWorker";
+import { InferenceClient } from "./inferenceClient";
 
-// Model load AND inference live in a dedicated Web Worker
-// (embeddingsWorker.ts) so neither the ~800KB script parse nor the ~30ms
-// per-text inference ever blocks the UI thread. Nothing spawns until the
-// first embed/warm call.
-let worker: Worker | null = null;
-let nextId = 1;
-let modelReady = false;
-const pending = new Map<
-  number,
-  { resolve: (v: ArrayBuffer[]) => void; reject: (e: Error) => void }
->();
-
-function getWorker(): Worker {
-  if (worker) return worker;
-  const w = new Worker(new URL("./embeddingsWorker.ts", import.meta.url), {
-    type: "module",
-  });
-  w.onmessage = (e: MessageEvent<WorkerResponse>) => {
-    const msg = e.data;
-    const p = pending.get(msg.id);
-    if (!p) return;
-    pending.delete(msg.id);
-    if (msg.ok) {
-      modelReady = true;
-      p.resolve(msg.vectors);
-    } else {
-      p.reject(new Error(msg.error));
-    }
-  };
-  w.onerror = (e) => {
-    // The worker script itself died (load/parse) — fail everything in
-    // flight and let the next call spawn a fresh worker.
-    const err = new Error(e.message || "embeddings worker crashed");
-    for (const p of pending.values()) p.reject(err);
-    pending.clear();
-    w.terminate();
-    if (worker === w) worker = null;
-  };
-  worker = w;
-  return w;
-}
-
-type WorkerCall =
-  | { op: "warm" }
-  | { op: "embed"; texts: string[] };
-
-function call(req: WorkerCall): Promise<ArrayBuffer[]> {
-  const id = nextId++;
-  return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject });
-    const msg: WorkerRequest = { ...req, id };
-    getWorker().postMessage(msg);
-  });
-}
+type WorkerCall = { op: "warm" } | { op: "embed"; texts: string[] };
+const client = new InferenceClient<WorkerCall, ArrayBuffer[]>(
+  () => new Worker(new URL("./embeddingsWorker.ts", import.meta.url), { type: "module" }),
+);
+const call = (request: WorkerCall) => client.request(request);
 
 /** True once the model has produced at least one successful response. */
 export function isEmbeddingReady(): boolean {
-  return modelReady;
+  return client.ready;
 }
 
 /** Pre-warm the model (spawns the worker + downloads/loads weights).

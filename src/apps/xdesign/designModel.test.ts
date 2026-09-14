@@ -3,9 +3,9 @@ import { designTurnModel, STRONGEST_DESIGN_MODEL } from "./designModel";
 import { MODELS } from "@/lib/models";
 
 describe("designTurnModel", () => {
-  it("upgrades a weaker built-in Claude to the strongest", () => {
+  it("honors a smaller model instead of silently upgrading its cost tier", () => {
     const weaker = MODELS.find((m) => m.id !== STRONGEST_DESIGN_MODEL)!;
-    expect(designTurnModel(weaker.id)).toBe(STRONGEST_DESIGN_MODEL);
+    expect(designTurnModel(weaker.id)).toBe(weaker.id);
   });
 
   it("leaves the strongest model unchanged (no-op)", () => {

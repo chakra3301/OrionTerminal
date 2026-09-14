@@ -49,13 +49,15 @@ pub fn codex_line_to_events(line: &str, st: &mut CodexState) -> Vec<Value> {
             match item.get("type").and_then(|t| t.as_str()) {
                 Some("agent_message") => {
                     let text = item.get("text").and_then(|s| s.as_str()).unwrap_or("");
-                    vec![json!({ "type": "assistant", "message": {
+                    vec![json!({ "type": "assistant", "textMode": "snapshot", "message": {
                         "id": id, "content": [{ "type": "text", "text": text }] } })]
                 }
                 Some("mcp_tool_call") => {
                     let tool = item.get("tool").and_then(|s| s.as_str()).unwrap_or("tool");
                     let input = item.get("arguments").cloned().unwrap_or_else(|| json!({}));
-                    let is_error = item.get("error").is_some()
+                    let is_error = item.get("error").is_some_and(|error| !error.is_null())
+                        || item.pointer("/result/isError").and_then(Value::as_bool) == Some(true)
+                        || item.pointer("/result/is_error").and_then(Value::as_bool) == Some(true)
                         || item
                             .get("status")
                             .and_then(|s| s.as_str())
@@ -120,6 +122,9 @@ pub fn codex_line_to_events(line: &str, st: &mut CodexState) -> Vec<Value> {
 #[derive(Default)]
 pub struct GeminiState {
     pub session_id: Option<String>,
+    text: String,
+    message_index: usize,
+    after_tool: bool,
 }
 
 /// Best-effort extraction of assistant text from a gemini `message` event,
@@ -180,11 +185,22 @@ pub fn gemini_line_to_events(line: &str, st: &mut GeminiState) -> Vec<Value> {
             if text.is_empty() {
                 return vec![];
             }
-            let id = v.get("id").and_then(|s| s.as_str()).unwrap_or("g_msg").to_string();
-            vec![json!({ "type": "assistant", "message": { "id": id, "content": [
-                { "type": "text", "text": text } ] } })]
+            if st.after_tool {
+                st.message_index += 1;
+                st.text.clear();
+                st.after_tool = false;
+            }
+            if v.get("delta").and_then(Value::as_bool) == Some(true) {
+                st.text.push_str(&text);
+            } else {
+                st.text = text;
+            }
+            let id = format!("g_msg_{}", st.message_index);
+            vec![json!({ "type": "assistant", "textMode": "snapshot", "message": { "id": id, "content": [
+                { "type": "text", "text": st.text } ] } })]
         }
         Some("tool_use") => {
+            st.after_tool = true;
             let id = v.get("id").and_then(|s| s.as_str()).unwrap_or("g_tool").to_string();
             let name = v.get("name").and_then(|s| s.as_str()).unwrap_or("tool");
             let input = v
@@ -265,6 +281,20 @@ mod codex_transcode_tests {
         assert_eq!(ev[1]["message"]["content"][0]["is_error"], false);
     }
     #[test]
+    fn real_codex_null_error_is_success_but_explicit_result_errors_are_not() {
+        let mut item = json!({"type":"item.completed", "item": {
+            "id":"it-real", "type":"mcp_tool_call", "tool":"orion_read_file", "arguments":{"path":"fixture.ts"},
+            "status":"completed", "error":null, "result":{"content":[{"type":"text", "text":"42"}], "structured_content":null}
+        }});
+        let mut st = CodexState::default();
+        let events = codex_line_to_events(&item.to_string(), &mut st);
+        assert_eq!(events[1]["message"]["content"][0]["is_error"], false);
+        item["item"]["result"]["isError"] = json!(true);
+        let events = codex_line_to_events(&item.to_string(), &mut st);
+        assert_eq!(events[1]["message"]["content"][0]["is_error"], true);
+    }
+
+    #[test]
     fn failed_tool_call_marks_error() {
         let mut st = CodexState::default();
         let line = "{\"type\":\"item.completed\",\"item\":{\"id\":\"it2\",\"type\":\"mcp_tool_call\",\"tool\":\"x\",\"status\":\"failed\",\"error\":{\"message\":\"boom\"}}}";
@@ -291,6 +321,28 @@ mod codex_transcode_tests {
 #[cfg(test)]
 mod gemini_transcode_tests {
     use super::*;
+
+    #[test]
+    fn real_delta_messages_accumulate_including_repeated_chunks() {
+        let mut st = GeminiState::default();
+        let line = r#"{"type":"message","role":"assistant","content":"ha","delta":true}"#;
+        let first = gemini_line_to_events(line, &mut st);
+        let second = gemini_line_to_events(line, &mut st);
+        assert_eq!(first[0]["message"]["content"][0]["text"], "ha");
+        assert_eq!(second[0]["message"]["content"][0]["text"], "haha");
+        assert_eq!(first[0]["message"]["id"], second[0]["message"]["id"]);
+        assert_eq!(second[0]["textMode"], "snapshot");
+    }
+
+    #[test]
+    fn post_tool_text_has_a_distinct_message_identity() {
+        let mut st = GeminiState::default();
+        let first = gemini_line_to_events(r#"{"type":"message","role":"assistant","content":"Checking.","delta":true}"#, &mut st);
+        gemini_line_to_events(r#"{"type":"tool_use","id":"t","name":"read"}"#, &mut st);
+        let last = gemini_line_to_events(r#"{"type":"message","role":"assistant","content":"Done.","delta":true}"#, &mut st);
+        assert_ne!(first[0]["message"]["id"], last[0]["message"]["id"]);
+        assert_eq!(last[0]["message"]["content"][0]["text"], "Done.");
+    }
     #[test]
     fn init_sets_session_and_emits_init() {
         let mut st = GeminiState::default();
@@ -328,7 +380,7 @@ mod gemini_transcode_tests {
     }
     #[test]
     fn result_emits_session_zero_cost() {
-        let mut st = GeminiState { session_id: Some("s1".into()) };
+        let mut st = GeminiState { session_id: Some("s1".into()), ..Default::default() };
         let ev = gemini_line_to_events("{\"type\":\"result\",\"stats\":{\"total_tokens\":9}}", &mut st);
         assert_eq!(ev[0]["type"], "result");
         assert_eq!(ev[0]["session_id"], "s1");

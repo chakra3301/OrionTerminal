@@ -549,8 +549,9 @@ export function CommandCenterApp() {
             <div className="cc-empty">
               <div className="big">No transmissions yet</div>
               <div className="small">
-                Delegation, directives and reports will stream here once the pi
-                engine lands (CC-1). For now this is the org you'll command.
+                Select an agent and send a directive to begin. Delegation,
+                reports, and live activity appear here. Configure pi credentials
+                for the provider selected in the agent's brain model.
               </div>
             </div>
           ) : (
@@ -685,7 +686,7 @@ export function CommandCenterApp() {
               <div className="cc-field">
                 <div className="lbl">Brain</div>
                 <div className="val">
-                  {selectedProfile.brainModel || "pi · model TBD (CC-1)"}
+                  {selectedProfile.brainModel || "pi · default model"}
                 </div>
               </div>
               <div className="cc-field">

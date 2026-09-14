@@ -1,4 +1,5 @@
-// Ashima / Stefan Gustavson 3D simplex noise (webgl-noise, MIT). Inlined as a
+// Modified webgl-noise (Ashima Arts / Stefan Gustavson), MIT; copyright and
+// full permission notice: THIRD_PARTY_LICENSES/webgl-noise-MIT.txt. Inlined as a
 // GLSL string so the energy-core shaders can churn vertices on the GPU without
 // pulling in a CPU noise dependency (no new deps — project rule).
 export const SNOISE_GLSL = /* glsl */ `

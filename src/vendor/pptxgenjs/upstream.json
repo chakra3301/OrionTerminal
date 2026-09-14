@@ -1,0 +1,11 @@
+{
+  "package": "pptxgenjs",
+  "version": "4.0.1",
+  "tarball": "https://registry.npmjs.org/pptxgenjs/-/pptxgenjs-4.0.1.tgz",
+  "integrity": "sha512-TeJISr8wouAuXw4C1F/mC33xbZs/FuEG6nH9FG1Zj+nuPcGMP5YRHl6X+j3HSUnS1f3at6k75ZZXPMZlA5Lj9A==",
+  "runtimeDependency": "jszip@3.10.1",
+  "sourceSha256": "097f0b92e15035a72bba72b59ef1ece62ab45ec6075ac85fe0e2d80d3f59b8e3",
+  "typesSha256": "0726d015dbcb55ccfa75546cb2fd43fe13a0dfeb783d08572f1c62f59193bbe5",
+  "licenseSha256": "7a2bfe96150786ed1908b8e63f98ebab88875c1e79e28faff6649e0f11f77e52",
+  "adaptedSha256": "b7bc722b95353a90bbcde04c644bbd60d600fe8e7be9ef427e1a13c31eb1e154"
+}

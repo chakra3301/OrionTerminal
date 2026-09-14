@@ -1,0 +1,15 @@
+.recovery-panel { width: min(780px, 90vw); max-height: 82vh; overflow: auto; margin: auto; padding: 28px; border: 1px solid var(--t-faint); border-radius: var(--r-lg); background: var(--bg-1); color: var(--t-primary); box-shadow: var(--shadow-window); }
+.recovery-panel::backdrop { background: #03060acc; }
+.recovery-panel header { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.recovery-panel h2 { font-size: 22px; }
+.recovery-panel h3 { margin: 18px 0 8px; font-size: 14px; overflow-wrap: anywhere; }
+.recovery-panel p { margin: 12px 0; color: var(--t-secondary); line-height: 1.6; }
+.recovery-panel button { padding: 8px 12px; margin: 4px 8px 4px 0; border: 1px solid var(--t-faint); border-radius: var(--r-sm); background: var(--bg-2); color: var(--t-primary); text-align: left; overflow-wrap: anywhere; }
+.recovery-panel button:hover { background: var(--bg-3); }
+.recovery-panel button:focus-visible { outline: 2px solid var(--neon-green); outline-offset: 2px; }
+.recovery-panel button:disabled { opacity: .5; cursor: not-allowed; }
+.recovery-list section { padding: 8px 0 14px; border-bottom: 1px solid var(--t-faint); }
+.recovery-list section > button { display: block; max-width: 100%; }
+.recovery-panel .recovery-feedback { position: sticky; bottom: -28px; padding: 14px; margin: 14px 0 0; background: var(--bg-2); border: 1px solid var(--neon-green); border-radius: var(--r-sm); color: var(--t-primary); }
+.recovery-panel .recovery-feedback[role="alert"] { border-color: var(--neon-yellow); }
+.recovery-panel pre { max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg-0); padding: 14px; border-radius: var(--r-sm); }

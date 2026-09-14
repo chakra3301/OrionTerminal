@@ -1,101 +1,428 @@
-//! Boot-time safety net for orion.db. Before the frontend opens the database
-//! (and before tauri-plugin-sql runs any pending migration), snapshot it into
-//! `<app-config>/backups/orion-<utc-stamp>.db` and keep the newest few — so a
-//! bad migration or corruption never costs more than one session of data.
-//!
-//! Uses SQLite's online backup API instead of a file copy: the iOS sync
-//! helper writes to orion.db out-of-band, so a raw copy could tear a
-//! mid-write WAL state. The backup API takes the proper locks.
+//! Verified boot-time snapshots, before frontend SQL migrations. These protect
+//! persisted SQLite state, not unsaved drafts or files outside SQLite.
 
-use std::fs;
-use std::path::Path;
+use rusqlite::{
+    backup::{Backup, StepResult},
+    Connection, OpenFlags,
+};
+use sha2::{Digest, Sha384};
+use std::{
+    fs::{self, File, OpenOptions},
+    path::{Path, PathBuf},
+    time::{Duration, Instant},
+};
 use tauri::{AppHandle, Manager};
 
 const KEEP: usize = 5;
+const BUDGET: Duration = Duration::from_secs(30);
+const MAX_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const MAX_CANDIDATES: usize = 128;
+
+pub struct StartupBackupWarning(Option<String>);
 
 pub fn run(app: &AppHandle) {
-    if let Err(e) = backup_and_rotate(app) {
-        // Non-fatal by design — never block launch on the safety net.
-        eprintln!("[db_backup] skipped: {e}");
-    }
+    let result = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| e.to_string())
+        .and_then(|dir| backup_and_rotate(&dir, Instant::now() + BUDGET));
+    let warning = match result {
+        Ok(warning) => warning,
+        Err(error) => {
+            eprintln!("[db_backup] {error}");
+            Some("The startup database backup did not complete. Older backups were not rotated. Preserve your database and backups before attempting recovery.".into())
+        }
+    };
+    app.manage(StartupBackupWarning(warning));
 }
 
-fn backup_and_rotate(app: &AppHandle) -> Result<(), String> {
-    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    let db = dir.join("orion.db");
-    if !db.exists() {
-        return Ok(()); // first launch — nothing to protect yet
+#[tauri::command]
+pub fn database_backup_warning(
+    window: tauri::WebviewWindow,
+    state: tauri::State<'_, StartupBackupWarning>,
+) -> Result<Option<String>, String> {
+    if window.label() != "main" {
+        return Err("Backup status is available only to the main window".into());
     }
-    let backups = dir.join("backups");
-    fs::create_dir_all(&backups).map_err(|e| e.to_string())?;
+    Ok(state.inner().0.clone())
+}
 
-    let secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
-        .as_secs();
-    let target = backups.join(format!("orion-{}.db", stamp_utc(secs)));
-    snapshot(&db, &target)?;
+fn private_dir(path: &Path) -> Result<(), String> {
+    let mut builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(path).map_err(|e| e.to_string())
+}
 
-    for name in prune_list(list_backups(&backups)?, KEEP) {
-        let _ = fs::remove_file(backups.join(name));
+fn private_file(path: &Path) -> Result<File, String> {
+    let mut options = OpenOptions::new();
+    options.read(true).write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(path).map_err(|e| e.to_string())
+}
+
+fn regular_file(path: &Path) -> Result<(), String> {
+    let meta = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
+    if !meta.file_type().is_file() || meta.len() == 0 || meta.len() > MAX_BYTES {
+        return Err(
+            "Database must be a nonempty regular file of at most 2 GiB; symlinks are refused"
+                .into(),
+        );
     }
     Ok(())
 }
 
-fn snapshot(src_path: &Path, dst_path: &Path) -> Result<(), String> {
-    let src = rusqlite::Connection::open_with_flags(
-        src_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )
-    .map_err(|e| e.to_string())?;
-    let mut dst = rusqlite::Connection::open(dst_path).map_err(|e| e.to_string())?;
-    let bk = rusqlite::backup::Backup::new(&src, &mut dst).map_err(|e| e.to_string())?;
-    bk.run_to_completion(256, std::time::Duration::from_millis(5), None)
-        .map_err(|e| e.to_string())
+fn check_deadline(deadline: Instant) -> Result<(), String> {
+    if Instant::now() >= deadline {
+        Err("Database recovery operation timed out".into())
+    } else {
+        Ok(())
+    }
 }
 
-fn list_backups(dir: &Path) -> Result<Vec<String>, String> {
-    let mut names = vec![];
-    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with("orion-") && name.ends_with(".db") {
-            names.push(name);
+fn configure(conn: &Connection, deadline: Instant) -> Result<(), String> {
+    conn.busy_timeout(Duration::from_millis(100))
+        .map_err(|e| e.to_string())?;
+    conn.pragma_update(None, "trusted_schema", false)
+        .map_err(|e| e.to_string())?;
+    conn.progress_handler(10_000, Some(move || Instant::now() >= deadline));
+    Ok(())
+}
+
+fn validate(conn: &Connection, deadline: Instant) -> Result<(), String> {
+    check_deadline(deadline)?;
+    let integrity: String = conn
+        .query_row("PRAGMA integrity_check(1)", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+    if integrity != "ok" {
+        return Err("Database integrity check failed".into());
+    }
+    let migrations = crate::database_migrations();
+    let mut stmt = conn
+        .prepare("SELECT version,success,checksum FROM _sqlx_migrations ORDER BY version")
+        .map_err(|_| "Missing or invalid Orion migration history")?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, bool>(1)?,
+                r.get::<_, Vec<u8>>(2)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+    let mut count = 0;
+    for row in rows {
+        let (version, success, checksum) = row.map_err(|e| e.to_string())?;
+        let expected = migrations
+            .get(count)
+            .ok_or("Database belongs to a newer Orion version")?;
+        if version != expected.version
+            || !success
+            || checksum != Sha384::digest(expected.sql.as_bytes()).to_vec()
+        {
+            return Err("Database migration history is incomplete, modified or unsupported".into());
+        }
+        count += 1;
+    }
+    if count == 0 {
+        return Err("Database has no completed Orion migrations".into());
+    }
+    for table in ["notes", "app_state", "projects"] {
+        let kind: String = conn
+            .query_row(
+                "SELECT type FROM sqlite_schema WHERE name=?1",
+                [table],
+                |r| r.get(0),
+            )
+            .map_err(|_| "Required Orion table is missing")?;
+        if kind != "table" {
+            return Err("Required Orion object is not a table".into());
         }
     }
-    Ok(names)
+    conn.prepare("SELECT id,title,blocks_json,created_at,updated_at FROM notes LIMIT 0")
+        .map_err(|_| "Invalid Orion notes schema")?;
+    conn.prepare("SELECT key,value FROM app_state LIMIT 0")
+        .map_err(|_| "Invalid Orion state schema")?;
+    check_deadline(deadline)
 }
 
-/// Which backup filenames to delete, keeping the `keep` newest. Stamped names
-/// sort lexicographically by age, so plain sort order is age order.
-fn prune_list(mut names: Vec<String>, keep: usize) -> Vec<String> {
-    if names.len() <= keep {
-        return vec![];
+struct Scratch(PathBuf);
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
     }
-    names.sort();
-    let cut = names.len() - keep;
-    names.truncate(cut);
-    names
 }
 
-/// `YYYYMMDD-HHMMSS` in UTC — sortable and readable in Finder.
+// Keep this inode permanently: unlinking an advisory lock permits two lock owners.
+fn rotation_lock(dir: &Path) -> Result<File, String> {
+    let path = dir.join(".rotation.lock");
+    let file = match private_file(&path) {
+        Ok(file) => file,
+        Err(_) => {
+            if !fs::symlink_metadata(&path)
+                .map_err(|e| e.to_string())?
+                .file_type()
+                .is_file()
+            {
+                return Err("Backup coordination file is not a regular file".into());
+            }
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(path)
+                .map_err(|e| e.to_string())?
+        }
+    };
+    file.try_lock()
+        .map_err(|_| "Another backup operation is running or the backup lock is unavailable")?;
+    Ok(file)
+}
+
+fn sync_dir(path: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        File::open(path)
+            .and_then(|f| f.sync_all())
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
+    Ok(())
+}
+
+fn snapshot(src_path: &Path, target: &Path, deadline: Instant) -> Result<(), String> {
+    regular_file(src_path)?;
+    check_deadline(deadline)?;
+    let parent = target.parent().ok_or("Missing snapshot parent")?;
+    let scratch = parent.join(format!(".pending-{}", ulid::Ulid::new()));
+    private_dir(&scratch)?;
+    let scratch = Scratch(scratch);
+    let temp = scratch.0.join("snapshot.db");
+    let reserved = private_file(&temp)?;
+    {
+        let src = Connection::open_with_flags(src_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(|e| e.to_string())?;
+        configure(&src, deadline)?;
+        let mut dst = Connection::open_with_flags(&temp, OpenFlags::SQLITE_OPEN_READ_WRITE)
+            .map_err(|e| e.to_string())?;
+        configure(&dst, deadline)?;
+        {
+            let backup = Backup::new(&src, &mut dst).map_err(|e| e.to_string())?;
+            loop {
+                check_deadline(deadline)?;
+                match backup.step(256).map_err(|e| e.to_string())? {
+                    StepResult::Done => break,
+                    StepResult::Busy | StepResult::Locked | StepResult::More => {
+                        std::thread::sleep(Duration::from_millis(2))
+                    }
+                    _ => return Err("Unsupported SQLite backup response".into()),
+                }
+                if fs::metadata(&temp).map_err(|e| e.to_string())?.len() > MAX_BYTES {
+                    return Err("Snapshot exceeds 2 GiB".into());
+                }
+            }
+        }
+        // Produce a self-contained file even when the source uses WAL.
+        dst.pragma_update(None, "journal_mode", "DELETE")
+            .map_err(|e| e.to_string())?;
+        validate(&dst, deadline)?;
+        dst.close().map_err(|(_, e)| e.to_string())?;
+    }
+    regular_file(&temp)?;
+    reserved.sync_all().map_err(|e| e.to_string())?;
+    drop(reserved);
+    check_deadline(deadline)?;
+    // Same-filesystem hard-link publication is atomic and refuses existing names.
+    fs::hard_link(&temp, target).map_err(|e| e.to_string())?;
+    sync_dir(parent)
+}
+
+fn managed_name(name: &str) -> bool {
+    let Some(stem) = name
+        .strip_prefix("orion-")
+        .and_then(|s| s.strip_suffix(".db"))
+    else {
+        return false;
+    };
+    if !stem.is_ascii() || (stem.len() != 15 && stem.len() != 42) {
+        return false;
+    }
+    let stamp = &stem[..15];
+    if stamp.as_bytes()[8] != b'-'
+        || !stamp
+            .bytes()
+            .enumerate()
+            .all(|(i, b)| i == 8 || b.is_ascii_digit())
+    {
+        return false;
+    }
+    let number = |start, end| stamp[start..end].parse::<u32>().unwrap_or(0);
+    let (y, m, d) = (number(0, 4), number(4, 6), number(6, 8));
+    let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+    let days = match m {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            if leap {
+                29
+            } else {
+                28
+            }
+        }
+        _ => 0,
+    };
+    if y < 1970
+        || d == 0
+        || d > days
+        || number(9, 11) > 23
+        || number(11, 13) > 59
+        || number(13, 15) > 59
+    {
+        return false;
+    }
+    stem.len() == 15
+        || (stem.as_bytes()[15] == b'-'
+            && ulid::Ulid::from_string(&stem[16..]).is_ok_and(|id| id.to_string() == stem[16..]))
+}
+
+fn prune(dir: &Path, current: &Path, deadline: Instant) -> Result<(), String> {
+    let mut valid = Vec::new();
+    let mut candidates = 0;
+    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+        check_deadline(deadline)?;
+        let entry = entry.map_err(|e| e.to_string())?;
+        if !managed_name(&entry.file_name().to_string_lossy())
+            || !entry.file_type().map_err(|e| e.to_string())?.is_file()
+        {
+            continue;
+        }
+        candidates += 1;
+        if candidates > MAX_CANDIDATES {
+            return Err("Too many backup candidates; retention needs manual review".into());
+        }
+        let path = entry.path();
+        // Invalid or future-version candidates are preserved, never counted as good backups.
+        if regular_file(&path).is_err()
+            || ["-wal", "-shm", "-journal"].iter().any(|suffix| {
+                let mut sidecar = path.as_os_str().to_os_string();
+                sidecar.push(suffix);
+                Path::new(&sidecar).symlink_metadata().is_ok()
+            })
+        {
+            continue;
+        }
+        // Published snapshots have no live writers/sidecars; immutable avoids
+        // creating WAL/SHM files while examining older WAL-header snapshots.
+        let mut uri = tauri::Url::from_file_path(&path).map_err(|_| "Invalid backup path")?;
+        uri.query_pairs_mut()
+            .append_pair("mode", "ro")
+            .append_pair("immutable", "1");
+        let conn = Connection::open_with_flags(
+            uri.as_str(),
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
+        )
+        .map_err(|e| e.to_string())?;
+        configure(&conn, deadline)?;
+        if validate(&conn, deadline).is_ok() {
+            valid.push(path);
+        }
+    }
+    check_deadline(deadline)?;
+    valid.sort();
+    let remove = valid.len().saturating_sub(KEEP);
+    for path in valid
+        .into_iter()
+        .filter(|path| path != current)
+        .take(remove)
+    {
+        fs::remove_file(path).map_err(|e| e.to_string())?;
+    }
+    sync_dir(dir)
+}
+
+fn backup_and_rotate(dir: &Path, deadline: Instant) -> Result<Option<String>, String> {
+    let source = dir.join("orion.db");
+    match fs::symlink_metadata(&source) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.to_string()),
+        Ok(_) => regular_file(&source)?,
+    }
+    let backups = dir.join("backups");
+    if !backups.try_exists().map_err(|e| e.to_string())? {
+        private_dir(&backups)?;
+    }
+    if !fs::symlink_metadata(&backups)
+        .map_err(|e| e.to_string())?
+        .file_type()
+        .is_dir()
+    {
+        return Err("Backup directory must not be a symlink".into());
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&backups, fs::Permissions::from_mode(0o700))
+            .map_err(|e| e.to_string())?;
+    }
+    let _lock = rotation_lock(&backups)?;
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_secs();
+    let target = backups.join(format!(
+        "orion-{}-{}.db",
+        stamp_utc(secs),
+        ulid::Ulid::new()
+    ));
+    snapshot(&source, &target, deadline)?;
+    if let Err(error) = prune(&backups, &target, deadline) {
+        eprintln!("[db_backup] retention incomplete: {error}");
+        return Ok(Some("A verified startup database snapshot was created, but backup retention cleanup did not complete. Preserve existing backups and review the backup directory.".into()));
+    }
+    Ok(None)
+}
+
+/// Offline recovery rehearsal: creates a new directory, never replaces a profile.
+/// A caller must separately preserve the entire profile and stop every writer
+/// before any manual promotion; external media, CLI auth and keychain files
+/// are not included. Sensitive data stored inside SQLite is included.
+pub fn restore_copy(source: &Path, destination: &Path) -> Result<(), String> {
+    regular_file(source)?;
+    private_dir(destination)?;
+    let target = destination.join("orion.db");
+    match snapshot(source, &target, Instant::now() + BUDGET) {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            // A directory-sync failure may leave a complete published copy: keep it.
+            if !target.exists() {
+                let _ = fs::remove_dir(destination);
+            }
+            Err(error)
+        }
+    }
+}
+
 fn stamp_utc(unix_secs: u64) -> String {
-    let days = (unix_secs / 86_400) as i64;
+    let (y, m, d) = civil_from_days((unix_secs / 86_400) as i64);
     let rem = unix_secs % 86_400;
-    let (y, m, d) = civil_from_days(days);
     format!(
-        "{:04}{:02}{:02}-{:02}{:02}{:02}",
-        y,
-        m,
-        d,
+        "{y:04}{m:02}{d:02}-{:02}{:02}{:02}",
         rem / 3600,
         (rem % 3600) / 60,
         rem % 60
     )
 }
 
-/// Howard Hinnant's `civil_from_days` — inverse of the `days_from_civil` used
-/// in sysstats. Days since 1970-01-01 → (year, month, day).
+// Howard Hinnant's civil_from_days (same calendar calculation as sysstats).
 fn civil_from_days(z: i64) -> (i64, u32, u32) {
     let z = z + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
@@ -110,57 +437,4 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn stamp_known_moments() {
-        // cross-checked with `date -u -r <secs>`
-        assert_eq!(stamp_utc(0), "19700101-000000");
-        assert_eq!(stamp_utc(1_770_000_000), "20260202-024000");
-        // leap day
-        assert_eq!(stamp_utc(1_709_164_800), "20240229-000000");
-    }
-
-    #[test]
-    fn prune_keeps_the_newest() {
-        let names = vec![
-            "orion-20260601-120000.db".to_string(),
-            "orion-20260603-120000.db".to_string(),
-            "orion-20260602-120000.db".to_string(),
-            "orion-20260605-120000.db".to_string(),
-            "orion-20260604-120000.db".to_string(),
-            "orion-20260606-120000.db".to_string(),
-        ];
-        let doomed = prune_list(names, 5);
-        assert_eq!(doomed, vec!["orion-20260601-120000.db".to_string()]);
-    }
-
-    #[test]
-    fn prune_noop_under_cap() {
-        let names = vec!["orion-20260601-120000.db".to_string()];
-        assert!(prune_list(names, 5).is_empty());
-    }
-
-    #[test]
-    fn snapshot_round_trips_data() {
-        let dir = std::env::temp_dir().join(format!("otdbk-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let src = dir.join("src.db");
-        let dst = dir.join("dst.db");
-        {
-            let conn = rusqlite::Connection::open(&src).unwrap();
-            conn.execute_batch(
-                "CREATE TABLE t(x TEXT); INSERT INTO t VALUES('hello'),('world');",
-            )
-            .unwrap();
-        }
-        snapshot(&src, &dst).unwrap();
-        let conn = rusqlite::Connection::open(&dst).unwrap();
-        let n: i64 = conn
-            .query_row("SELECT COUNT(*) FROM t", [], |r| r.get(0))
-            .unwrap();
-        assert_eq!(n, 2);
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-}
+mod tests;

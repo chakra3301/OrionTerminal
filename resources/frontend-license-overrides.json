@@ -1,0 +1,113 @@
+{
+  "onnxruntime-common@1.24.3": {
+    "license": "MIT",
+    "reason": "Published package omits license text; Microsoft upstream MIT license and supplementary notices retained at inspected revision b7804b056c. Not a claim that all JS packages have the same source revision.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/onnxruntime-MIT.txt",
+        "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+      },
+      {
+        "file": "THIRD_PARTY_LICENSES/onnxruntime-ThirdPartyNotices.txt",
+        "sha256": "0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2"
+      }
+    ]
+  },
+  "onnxruntime-common@1.24.0-dev.20251116-b39e144322": {
+    "license": "MIT",
+    "reason": "Published package omits license text; Microsoft upstream MIT license and supplementary notices retained at inspected revision b7804b056c. Not a claim that all JS packages have the same source revision.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/onnxruntime-MIT.txt",
+        "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+      },
+      {
+        "file": "THIRD_PARTY_LICENSES/onnxruntime-ThirdPartyNotices.txt",
+        "sha256": "0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2"
+      }
+    ]
+  },
+  "onnxruntime-web@1.26.0-dev.20260416-b7804b056c": {
+    "license": "MIT",
+    "reason": "Published package omits license text; Microsoft upstream MIT license and supplementary notices retained at inspected revision b7804b056c. Not a claim that all JS packages have the same source revision.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/onnxruntime-MIT.txt",
+        "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+      },
+      {
+        "file": "THIRD_PARTY_LICENSES/onnxruntime-ThirdPartyNotices.txt",
+        "sha256": "0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2"
+      }
+    ]
+  },
+  "onnxruntime-node@1.24.3": {
+    "license": "MIT",
+    "reason": "Published package omits license text; Microsoft upstream MIT license and supplementary notices retained at inspected revision b7804b056c. Not a claim that all JS packages have the same source revision.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/onnxruntime-MIT.txt",
+        "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+      },
+      {
+        "file": "THIRD_PARTY_LICENSES/onnxruntime-ThirdPartyNotices.txt",
+        "sha256": "0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2"
+      }
+    ]
+  },
+  "@mantine/core@7.17.8": {
+    "license": "MIT",
+    "reason": "Published package omits standalone text; retained from its npm gitHead in upstream repository.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/mantine-core-7.17.8-LICENSE",
+        "sha256": "61c765e625bc25d55143f14de7554685c52f21d9e671d3d204304691a163d06a",
+        "origin": "https://raw.githubusercontent.com/mantinedev/mantine/1545157911e0954873e6aced4736a7250bfa88b3/LICENSE"
+      }
+    ]
+  },
+  "@mantine/hooks@7.17.8": {
+    "license": "MIT",
+    "reason": "Published package omits standalone text; retained from its npm gitHead in upstream repository.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/mantine-hooks-7.17.8-LICENSE",
+        "sha256": "61c765e625bc25d55143f14de7554685c52f21d9e671d3d204304691a163d06a",
+        "origin": "https://raw.githubusercontent.com/mantinedev/mantine/fea303d3fc4fcc5708de5bcc0054ec4a640ee6fd/LICENSE"
+      }
+    ]
+  },
+  "@react-three/fiber@9.7.0": {
+    "license": "MIT",
+    "reason": "Published package omits standalone text; retained from its npm gitHead in upstream repository.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/react-three-fiber-9.7.0-LICENSE",
+        "sha256": "9c35b5de7b7493a707fffe4eb23bd2f7f449153c1911f7c6eefb4e591fd5349a",
+        "origin": "https://raw.githubusercontent.com/pmndrs/react-three-fiber/0a107412ac64667b1908422e859447952f57feef/LICENSE"
+      }
+    ]
+  },
+  "react-remove-scroll-bar@2.3.8": {
+    "license": "MIT",
+    "reason": "npm declares MIT but omits text; npm gitHead is unavailable from upstream. Text inspected at the recorded public upstream commit, not represented as the exact package commit.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/react-remove-scroll-bar-2.3.8-MIT.txt",
+        "sha256": "a79aae0c0f21990d9d963bb3c5a79cdcea9a46f8523ba55c58d7fe776b6ebc84",
+        "origin": "https://raw.githubusercontent.com/theKashey/react-remove-scroll-bar/8ca9ba5ea52de03308fe8ced94f7b159a44d28ff/LICENSE"
+      }
+    ]
+  },
+  "splaytree@3.2.3": {
+    "license": "MIT",
+    "reason": "Full license section retained from the published README and verified against npm gitHead.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/splaytree-3.2.3-MIT.txt",
+        "sha256": "18b65eb99645589005889cdc3cd1307a79e3e29569ab0be8d406d7ccdc79b341",
+        "origin": "https://raw.githubusercontent.com/w8r/splay-tree/0f3602340f9d7eec6c4af846126ed72249d2b0d4/Readme.md"
+      }
+    ]
+  }
+}

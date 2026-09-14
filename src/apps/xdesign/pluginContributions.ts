@@ -9,6 +9,8 @@ import { useAssetsStore } from "@/store/assetsStore";
 import { useDesignSystems } from "@/store/designSystemStore";
 import { logActivity } from "@/lib/db";
 import { log } from "@/lib/log";
+import { markProjectDirty, unsavedXDesignReason } from "./saveState";
+import { useModelStore } from "./model3d/modelStore";
 import { useXDesign } from "@/apps/xdesign/store";
 import {
   flushActive,
@@ -37,6 +39,7 @@ export const XDESIGN_CONTRIBUTION_IDS = {
   applyAction: "xdesign_apply",
 } as const;
 
+let modelSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let designSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let fxSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let lastLoggedProjectId: string | null = null;
@@ -112,12 +115,15 @@ function optionalColor(
   return value;
 }
 
-async function ensureDesignProject(): Promise<void> {
+async function ensureDesignProject(assertActive: () => void): Promise<void> {
+  assertActive();
   useShell.getState().openApp("xdesign");
   await useXDProjects.getState().ensureActive();
+  assertActive();
+  if (useXDProjects.getState().transitioning) throw new Error("Project is switching; retry the canvas tool.");
 }
 
-async function addRectAction(value: unknown): Promise<void> {
+async function addRectAction(value: unknown, assertActive: () => void = () => {}): Promise<void> {
   const payload = record(value);
   if (!payload) throw new Error("xdesign_add_rect: invalid payload");
   const x = finite(payload, "x");
@@ -126,7 +132,7 @@ async function addRectAction(value: unknown): Promise<void> {
   const h = dimension(payload, "h");
   const radius = optionalNumber(payload, "radius", 0);
   const fill = optionalColor(payload, "fill", "#00e0ff");
-  await ensureDesignProject();
+  await ensureDesignProject(assertActive);
   useXDesign.getState().addShape({
     kind: "rect",
     x,
@@ -140,7 +146,7 @@ async function addRectAction(value: unknown): Promise<void> {
   });
 }
 
-async function addEllipseAction(value: unknown): Promise<void> {
+async function addEllipseAction(value: unknown, assertActive: () => void = () => {}): Promise<void> {
   const payload = record(value);
   if (!payload) throw new Error("xdesign_add_ellipse: invalid payload");
   const x = finite(payload, "x");
@@ -148,7 +154,7 @@ async function addEllipseAction(value: unknown): Promise<void> {
   const w = dimension(payload, "w");
   const h = dimension(payload, "h");
   const fill = optionalColor(payload, "fill", "#00e0ff");
-  await ensureDesignProject();
+  await ensureDesignProject(assertActive);
   useXDesign.getState().addShape({
     kind: "ellipse",
     x,
@@ -161,7 +167,7 @@ async function addEllipseAction(value: unknown): Promise<void> {
   });
 }
 
-async function addFrameAction(value: unknown): Promise<void> {
+async function addFrameAction(value: unknown, assertActive: () => void = () => {}): Promise<void> {
   const payload = record(value);
   if (!payload) throw new Error("xdesign_add_frame: invalid payload");
   const x = finite(payload, "x");
@@ -169,7 +175,7 @@ async function addFrameAction(value: unknown): Promise<void> {
   const w = dimension(payload, "w");
   const h = dimension(payload, "h");
   const fill = optionalColor(payload, "fill", "rgba(255,255,255,0.03)");
-  await ensureDesignProject();
+  await ensureDesignProject(assertActive);
   useXDesign.getState().addShape({
     kind: "frame",
     x,
@@ -183,7 +189,7 @@ async function addFrameAction(value: unknown): Promise<void> {
   });
 }
 
-async function addTextAction(value: unknown): Promise<void> {
+async function addTextAction(value: unknown, assertActive: () => void = () => {}): Promise<void> {
   const payload = record(value);
   if (!payload) throw new Error("xdesign_add_text: invalid payload");
   const text = payload.text;
@@ -197,7 +203,7 @@ async function addTextAction(value: unknown): Promise<void> {
   const x = finite(payload, "x");
   const y = finite(payload, "y");
   const fill = optionalColor(payload, "fill", "#e6f4ec");
-  await ensureDesignProject();
+  await ensureDesignProject(assertActive);
   useXDesign.getState().addShape({
     kind: "text",
     x,
@@ -234,14 +240,19 @@ function selectionSnapshot(): Record<string, unknown> {
   };
 }
 
-async function applyAction(value: unknown): Promise<Record<string, unknown>> {
+async function applyAction(value: unknown, assertActive: () => void = () => {}): Promise<Record<string, unknown>> {
   const payload = record(value);
   const ops = payload?.ops;
   if (!Array.isArray(ops) || ops.length > 100) {
     throw new Error("xdesign_apply: ops must be an array of at most 100 entries");
   }
-  await ensureDesignProject();
+  await ensureDesignProject(assertActive);
+  const projectId = useXDProjects.getState().activeId;
   const { runCanvasCommands } = await import("@/apps/xdesign/claudeCommands");
+  assertActive();
+  if (useXDProjects.getState().transitioning || useXDProjects.getState().activeId !== projectId) {
+    throw new Error("Project changed before canvas tool execution; retry the tool.");
+  }
   const outcome = runCanvasCommands(
     ops as Parameters<typeof runCanvasCommands>[0],
   );
@@ -251,13 +262,24 @@ async function applyAction(value: unknown): Promise<Record<string, unknown>> {
 function clearPersistenceTimers(): void {
   if (designSaveTimer) clearTimeout(designSaveTimer);
   if (fxSaveTimer) clearTimeout(fxSaveTimer);
+  if (modelSaveTimer) clearTimeout(modelSaveTimer);
+  modelSaveTimer = null;
+  setXDesignActivity("model-save-pending", false, "");
   designSaveTimer = null;
   fxSaveTimer = null;
   setXDesignActivity("design-save-pending", false, "");
   setXDesignActivity("fx-save-pending", false, "");
 }
 
+function canSave(kind: "design" | "fx" | "model"): boolean {
+  const { activeId, registry, transitioning } = useXDProjects.getState();
+  return !transitioning && !!activeId && projectKind(registry.find((project) => project.id === activeId)) === kind;
+}
+
 function scheduleDesignSave(): void {
+  if (!canSave("design")) return;
+  const activeId = useXDProjects.getState().activeId!;
+  markProjectDirty(activeId);
   if (designSaveTimer) clearTimeout(designSaveTimer);
   setXDesignActivity(
     "design-save-pending",
@@ -267,8 +289,7 @@ function scheduleDesignSave(): void {
   designSaveTimer = setTimeout(() => {
     designSaveTimer = null;
     setXDesignActivity("design-save-pending", false, "");
-    const activeId = useXDProjects.getState().activeId;
-    if (!activeId) return;
+    if (useXDProjects.getState().activeId !== activeId || !canSave("design")) return;
     const state = useXDesign.getState();
     void flushActive()
       .then(() => {
@@ -280,15 +301,18 @@ function scheduleDesignSave(): void {
             title: page?.name || "Canvas",
             summary: `${state.shapes.length} layer${state.shapes.length === 1 ? "" : "s"}`,
             refId: state.activePageId,
-          });
+          }).catch((error) => log.warn("XDesign activity log failed", error));
         }
         lastLoggedProjectId = activeId;
       })
-      .catch((error) => log.warn("xdesign document save failed", error));
+      .catch(() => {});
   }, 400);
 }
 
 function scheduleFxSave(): void {
+  if (!canSave("fx")) return;
+  const activeId = useXDProjects.getState().activeId!;
+  markProjectDirty(activeId);
   if (fxSaveTimer) clearTimeout(fxSaveTimer);
   setXDesignActivity(
     "fx-save-pending",
@@ -298,10 +322,22 @@ function scheduleFxSave(): void {
   fxSaveTimer = setTimeout(() => {
     fxSaveTimer = null;
     setXDesignActivity("fx-save-pending", false, "");
-    const { activeId, registry: projects } = useXDProjects.getState();
-    if (!activeId) return;
-    if (projectKind(projects.find((project) => project.id === activeId)) !== "fx") return;
-    void flushActive().catch((error) => log.warn("xdesign FX save failed", error));
+    if (useXDProjects.getState().activeId !== activeId || !canSave("fx")) return;
+    void flushActive().catch(() => {});
+  }, 400);
+}
+
+function scheduleModelSave(): void {
+  if (!canSave("model")) return;
+  const activeId = useXDProjects.getState().activeId!;
+  markProjectDirty(activeId);
+  if (modelSaveTimer) clearTimeout(modelSaveTimer);
+  setXDesignActivity("model-save-pending", true, "Wait for the 3D model to finish saving before disabling the plugin.");
+  modelSaveTimer = setTimeout(() => {
+    modelSaveTimer = null;
+    setXDesignActivity("model-save-pending", false, "");
+    if (useXDProjects.getState().activeId !== activeId || !canSave("model")) return;
+    void flushActive().catch(() => {});
   }, 400);
 }
 
@@ -310,7 +346,6 @@ function disposeXDesignRuntime(): void {
   clearXDesignActivities();
   useXDesign.getState().endHistoryCoalesce();
   usePresentMode.getState().exit();
-  useHtmlArtifact.getState().close();
   useHtmlArtifact.setState({
     builder: null,
     refiner: null,
@@ -325,13 +360,14 @@ function disposeXDesignRuntime(): void {
 }
 
 export function xdesignDisableReason(): string | null {
+  if (useXDProjects.getState().transitioning) return "Wait for the XDesign project change to finish before disabling the plugin.";
   if (useAppChat.getState().threads.xdesign.running) {
-    return "Wait for the XDesign Claude response to finish before disabling the plugin.";
+    return "Wait for the XDesign AI response to finish before disabling the plugin.";
   }
   if (useFxAssist.getState().busy) {
     return "Wait for XDesign FX Assist to finish before disabling the plugin.";
   }
-  return xdesignActivityReason();
+  return xdesignActivityReason() ?? unsavedXDesignReason();
 }
 
 export async function loadXDesignPluginData(): Promise<void> {
@@ -347,7 +383,16 @@ export function registerXDesignContributions(
   subscriptions: DisposableScope,
 ): void {
   subscriptions.add(disposeXDesignRuntime);
-  subscriptions.add(useXDesign.subscribe(scheduleDesignSave));
+  subscriptions.add(useXDesign.subscribe((state, previous) => {
+    if (state.shapes !== previous.shapes || state.pages !== previous.pages || state.activePageId !== previous.activePageId || state.variables !== previous.variables || state.modes !== previous.modes || state.activeModeId !== previous.activeModeId) scheduleDesignSave();
+  }));
+  subscriptions.add(useHtmlArtifact.subscribe((state, previous) => {
+    if (state.projectId === previous.projectId &&
+      (state.html !== previous.html || state.title !== previous.title || state.open !== previous.open)) scheduleDesignSave();
+  }));
+  subscriptions.add(useModelStore.subscribe((state, previous) => {
+    if (state.spec !== previous.spec || state.reference !== previous.reference) scheduleModelSave();
+  }));
   subscriptions.add(
     useFxStore.subscribe((state, previous) => {
       if (state.scene !== previous.scene) scheduleFxSave();

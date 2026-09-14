@@ -335,12 +335,33 @@ pub fn reveal_in_os(path: String) -> Result<(), String> {
     Err("unsupported platform".into())
 }
 
+fn create_private_analysis_dir(path: &Path) -> Result<(), String> {
+    let mut builder = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(path).map_err(|e| format!("Could not create a private analysis directory: {e}"))
+}
+
+#[tauri::command]
+pub fn analysis_work_dir() -> Result<String, String> {
+    let path = std::env::temp_dir().join(format!("orion-analysis-{}", ulid::Ulid::new()));
+    create_private_analysis_dir(&path)?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
 #[tauri::command]
 pub fn save_file_atomic(path: String, contents: String) -> Result<(), String> {
-    use std::fs::{rename, File};
+    atomic_write_bytes(&path, contents.as_bytes())
+}
+
+pub(crate) fn atomic_write_bytes(path: &str, contents: &[u8]) -> Result<(), String> {
+    use std::fs::{rename, OpenOptions};
     use std::io::Write;
 
-    let target = PathBuf::from(&path);
+    let target = PathBuf::from(path);
     let parent = target
         .parent()
         .ok_or_else(|| format!("no parent directory: {}", path))?;
@@ -353,16 +374,115 @@ pub fn save_file_atomic(path: String, contents: String) -> Result<(), String> {
         .ok_or_else(|| format!("no file name: {}", path))?
         .to_string_lossy()
         .into_owned();
-    let tmp = parent.join(format!(".{}.orion.tmp", fname));
+    let tmp = parent.join(format!(".{}.{}.orion.tmp", fname, ulid::Ulid::new()));
+    let result = (|| -> std::io::Result<()> {
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut f = options.open(&tmp)?;
+        if let Ok(meta) = std::fs::metadata(&target) {
+            f.set_permissions(meta.permissions())?;
+        }
+        f.write_all(contents)?;
+        f.sync_all()?;
+        drop(f);
+        rename(&tmp, &target)
+    })();
+    if result.is_err() { let _ = std::fs::remove_file(&tmp); }
+    result.map_err(|e| e.to_string())
+}
 
-    {
-        let mut f = File::create(&tmp).map_err(|e| e.to_string())?;
-        f.write_all(contents.as_bytes()).map_err(|e| e.to_string())?;
-        f.sync_all().map_err(|e| e.to_string())?;
+pub(crate) fn copy_regular_file(source: &Path, target: &Path, max_bytes: u64) -> Result<u64, String> {
+    use std::io::Read;
+    let meta = std::fs::symlink_metadata(source).map_err(|e| e.to_string())?;
+    if !meta.is_file() || meta.len() > max_bytes {
+        return Err(format!("Import requires a regular file no larger than {} MB", max_bytes / 1024 / 1024));
     }
-    rename(&tmp, &target).map_err(|e| {
-        let _ = std::fs::remove_file(&tmp);
-        e.to_string()
-    })?;
-    Ok(())
+    let input = std::fs::File::open(source).map_err(|e| e.to_string())?;
+    if !input.metadata().map_err(|e| e.to_string())?.is_file() {
+        return Err("Import requires a regular file".into());
+    }
+    let mut output = std::fs::OpenOptions::new().write(true).create_new(true).open(target).map_err(|e| e.to_string())?;
+    let result = std::io::copy(&mut input.take(max_bytes + 1), &mut output)
+        .map_err(|e| e.to_string())
+        .and_then(|n| if n > max_bytes { Err("File grew beyond the import limit".into()) } else { Ok(n) });
+    drop(output);
+    if result.is_err() { let _ = std::fs::remove_file(target); }
+    result
+}
+
+#[cfg(test)]
+mod save_tests {
+    use super::*;
+    #[test]
+    fn analysis_directories_are_unique_and_never_reuse_existing_contents() {
+        let a = PathBuf::from(analysis_work_dir().unwrap());
+        let b = PathBuf::from(analysis_work_dir().unwrap());
+        assert_ne!(a, b);
+        std::fs::write(a.join("AGENTS.md"), "stale instructions").unwrap();
+        assert!(create_private_analysis_dir(&a).is_err());
+        assert_eq!(std::fs::read_dir(&b).unwrap().count(), 0);
+        std::fs::remove_file(a.join("AGENTS.md")).unwrap();
+        std::fs::remove_dir(a).unwrap(); std::fs::remove_dir(b).unwrap();
+    }
+    #[cfg(unix)]
+    #[test]
+    fn analysis_directory_is_private_and_rejects_symlinks() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+        let dir = PathBuf::from(analysis_work_dir().unwrap());
+        assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
+        let target = dir.join("real"); std::fs::create_dir(&target).unwrap();
+        let link = dir.join("alias"); symlink(&target, &link).unwrap();
+        assert!(create_private_analysis_dir(&link).is_err());
+        assert_eq!(std::fs::read_dir(&target).unwrap().count(), 0);
+        std::fs::remove_file(link).unwrap(); std::fs::remove_dir(target).unwrap(); std::fs::remove_dir(dir).unwrap();
+    }
+    #[test]
+    fn concurrent_atomic_saves_never_mix_contents_or_leave_temps() {
+        let dir = std::env::temp_dir().join(format!("orion-save-{}", ulid::Ulid::new()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("file.txt");
+        std::thread::scope(|scope| {
+            for n in 0..8 {
+                let path = path.clone();
+                scope.spawn(move || save_file_atomic(path.to_string_lossy().into_owned(), n.to_string().repeat(8192)).unwrap());
+            }
+        });
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(contents.len(), 8192);
+        assert!(contents.bytes().all(|b| b == contents.as_bytes()[0]));
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn imports_are_bounded_and_never_overwrite_an_existing_target() {
+        let dir = std::env::temp_dir().join(format!("orion-copy-{}", ulid::Ulid::new()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let source = dir.join("source");
+        let target = dir.join("target");
+        std::fs::write(&source, b"12345").unwrap();
+        assert!(copy_regular_file(&source, &target, 4).is_err());
+        assert!(!target.exists());
+        assert_eq!(copy_regular_file(&source, &target, 5).unwrap(), 5);
+        assert!(copy_regular_file(&source, &target, 5).is_err());
+        assert!(copy_regular_file(&dir, &dir.join("bad"), 100).is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[cfg(unix)]
+    #[test]
+    fn atomic_save_preserves_executable_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("orion-mode-{}", ulid::Ulid::new()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("script.sh");
+        std::fs::write(&path, "old").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o750)).unwrap();
+        save_file_atomic(path.to_string_lossy().into_owned(), "new".into()).unwrap();
+        assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o750);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }

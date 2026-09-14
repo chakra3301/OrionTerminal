@@ -1,71 +1,20 @@
 import { create } from "zustand";
-import { log } from "@/lib/log";
-
-/** Legacy global key (pre per-project scoping). Kept only so the migrated
- * "Untitled" project can adopt whatever page was last generated. */
-const LEGACY_LS_KEY = "xd-html-artifact";
+import { toast } from "@/store/toastStore";
+import { markProjectDirty } from "./saveState";
+import { validateHtmlArtifact, type HtmlArtifactData } from "./htmlArtifactData";
 
 export type ArtifactViewport = "desktop" | "tablet" | "mobile";
 
-type Persisted = { html: string; title: string; open?: boolean };
-
-/** The project the artifact store is currently bound to. Null = Home / no
- * project, in which case there is no page to show or persist. */
-let activeProjectId: string | null = null;
-
-function keyFor(id: string): string {
-  return `xd-html-artifact.${id}`;
-}
-
-function loadPersistedFrom(key: string): Persisted | null {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const o = JSON.parse(raw) as Persisted;
-    if (o && typeof o.html === "string") return o;
-  } catch (e) {
-    log.warn("html artifact load failed", e);
-  }
-  return null;
-}
-
-function persist(html: string, title: string, open: boolean): void {
-  if (!activeProjectId) return;
-  try {
-    localStorage.setItem(
-      keyFor(activeProjectId),
-      JSON.stringify({ html, title, open }),
-    );
-  } catch (e) {
-    log.warn("html artifact persist failed", e);
-  }
-}
-
-/** One-time migration: copy the old global page into a project's slot the
- * first time we adopt it, then drop the legacy key. */
-export function migrateLegacyArtifactTo(projectId: string): void {
-  try {
-    const raw = localStorage.getItem(LEGACY_LS_KEY);
-    if (!raw) return;
-    if (!localStorage.getItem(keyFor(projectId)))
-      localStorage.setItem(keyFor(projectId), raw);
-    localStorage.removeItem(LEGACY_LS_KEY);
-  } catch (e) {
-    log.warn("html artifact legacy migration failed", e);
-  }
-}
-
 type HtmlArtifactState = {
+  projectId: string | null;
   html: string | null;
   title: string;
   open: boolean;
   viewport: ArtifactViewport;
-  /** Set by the rail so the preview can request build/refine without coupling. */
   builder: (() => void) | null;
   refiner: ((instruction: string) => void) | null;
-  /** Element-scoped AI refine: rewrite only the given element's markup. */
   elementRefiner: ((elementHtml: string, instruction: string) => void) | null;
-  setArtifact: (html: string, title?: string) => void;
+  setArtifact: (html: string, title?: string, expectedProjectId?: string | null) => boolean;
   openPreview: () => void;
   close: () => void;
   setViewport: (v: ArtifactViewport) => void;
@@ -74,12 +23,17 @@ type HtmlArtifactState = {
     refiner: (instruction: string) => void;
     elementRefiner: (elementHtml: string, instruction: string) => void;
   }) => void;
-  /** Bind the store to a project (or null for Home). Loads that project's
-   * saved page, or clears when the project has none. Closes the preview. */
-  setProject: (projectId: string | null) => void;
+  setProject: (projectId: string | null, artifact?: HtmlArtifactData | null) => void;
 };
 
-export const useHtmlArtifact = create<HtmlArtifactState>((set) => ({
+export function snapshotHtmlArtifact(projectId: string): HtmlArtifactData | null {
+  const s = useHtmlArtifact.getState();
+  if (s.projectId !== projectId) throw new Error("Webpage belongs to another project; save refused.");
+  return s.html === null ? null : { version: 1, html: s.html, title: s.title, open: s.open };
+}
+
+export const useHtmlArtifact = create<HtmlArtifactState>((set, get) => ({
+  projectId: null,
   html: null,
   title: "Untitled page",
   open: false,
@@ -87,33 +41,37 @@ export const useHtmlArtifact = create<HtmlArtifactState>((set) => ({
   builder: null,
   refiner: null,
   elementRefiner: null,
-  setArtifact: (html, title) =>
-    set((s) => {
-      const t = title ?? s.title;
-      persist(html, t, true);
-      return { html, title: t, open: true };
-    }),
-  openPreview: () =>
-    set((s) => {
-      if (s.html) persist(s.html, s.title, true);
-      return { open: true };
-    }),
-  close: () =>
-    set((s) => {
-      if (s.html) persist(s.html, s.title, false);
-      return { open: false };
-    }),
+  setArtifact: (html, title, expectedProjectId = get().projectId) => {
+    const s = get();
+    if (!s.projectId || s.projectId !== expectedProjectId) {
+      toast.error("Webpage was not applied", { body: "The owning project changed. The original response remains in chat." });
+      return false;
+    }
+    try {
+      const data = validateHtmlArtifact({ version: 1, html, title: title ?? s.title, open: true });
+      if (s.html === data.html && s.title === data.title && s.open) return true;
+      markProjectDirty(s.projectId);
+      set({ html: data.html, title: data.title, open: data.open });
+      return true;
+    } catch (error) {
+      toast.error("Webpage was not applied", { body: String(error) });
+      return false;
+    }
+  },
+  openPreview: () => {
+    const s = get();
+    if (!s.projectId || s.html === null || s.open) return;
+    markProjectDirty(s.projectId); set({ open: true });
+  },
+  close: () => {
+    const s = get();
+    if (!s.projectId || s.html === null || !s.open) return;
+    markProjectDirty(s.projectId); set({ open: false });
+  },
   setViewport: (viewport) => set({ viewport }),
-  setActions: ({ builder, refiner, elementRefiner }) =>
-    set({ builder, refiner, elementRefiner }),
-  setProject: (projectId) => {
-    activeProjectId = projectId;
-    const p = projectId ? loadPersistedFrom(keyFor(projectId)) : null;
-    set({
-      html: p?.html ?? null,
-      title: p?.title ?? "Untitled page",
-      // Reopen the preview if it was showing when this project was last left.
-      open: !!(p?.html && p.open),
-    });
+  setActions: ({ builder, refiner, elementRefiner }) => set({ builder, refiner, elementRefiner }),
+  setProject: (projectId, artifact) => {
+    const data = artifact == null ? null : validateHtmlArtifact(artifact);
+    set({ projectId, html: data?.html ?? null, title: data?.title ?? "Untitled page", open: data?.open ?? false });
   },
 }));

@@ -7,26 +7,34 @@
 import type { Provider, ProviderKind } from "@/features/agents/agentTypes";
 import type { DesignSystem } from "./designSystem";
 
-/** Kinds that expose an image-generation endpoint we support. The CLI engines
- * (codex/gemini), nous_oauth, and anthropic (no image API) are excluded. */
+export const CODEX_SUBSCRIPTION_IMAGE_MODEL = "gpt-image-2";
+
+/** Kinds that expose an image-generation path Orion supports. Codex is
+ * dynamically ready only after its ChatGPT subscription login is verified. */
 export function imageCapableKind(kind: ProviderKind): boolean {
   return (
     kind === "openai" ||
     kind === "openai_compat" ||
     kind === "custom" ||
-    kind === "google"
+    kind === "google" ||
+    kind === "codex_cli"
   );
 }
 
-/** A configured provider is usable for image gen when its kind supports it,
- * it's enabled, and it has a key reference (the actual key lives in the OS
- * keychain — presence is verified at call time, but no keyRef = no key). */
-export function isImageProvider(p: Provider): boolean {
-  return p.enabled && imageCapableKind(p.kind) && p.keyRef.trim().length > 0;
+export function isImageProvider(p: Provider, codexReady = false): boolean {
+  if (!p.enabled || !imageCapableKind(p.kind)) return false;
+  if (p.kind === "codex_cli") return codexReady;
+  return p.keyRef.trim().length > 0;
 }
 
-export function imageCapableProviders(providers: Provider[]): Provider[] {
-  return providers.filter(isImageProvider);
+export function imageCapableProviders(providers: Provider[], codexReady = false): Provider[] {
+  return providers.filter((provider) => isImageProvider(provider, codexReady));
+}
+
+export function hasPotentialImageProvider(providers: Provider[]): boolean {
+  return providers.some((provider) =>
+    provider.enabled && (provider.kind === "codex_cli" || isImageProvider(provider)),
+  );
 }
 
 /** Default image model per kind. OpenAI-compatible → gpt-image-1 (dall-e-3 is
@@ -36,10 +44,23 @@ export function defaultImageModel(kind: ProviderKind): string {
   return kind === "google" ? "imagen-4.0-generate-001" : "gpt-image-1";
 }
 
+export function defaultImageModelForProvider(provider: Pick<Provider, "kind" | "baseUrl">): string {
+  return provider.kind === "codex_cli"
+    ? CODEX_SUBSCRIPTION_IMAGE_MODEL
+    : defaultImageModel(provider.kind);
+}
+
 /** Resolve the image model: a user override (Control Panel) wins, else the
  * per-kind default. */
 export function resolveImageModel(kind: ProviderKind, override: string): string {
   return override.trim() || defaultImageModel(kind);
+}
+
+export function resolveImageModelForProvider(
+  provider: Pick<Provider, "kind" | "baseUrl">,
+  override: string,
+): string {
+  return override.trim() || defaultImageModelForProvider(provider);
 }
 
 // Per-provider image-model override (no migration — a tiny localStorage pref,
@@ -66,10 +87,11 @@ export function setImageModelOverride(providerId: string, model: string): void {
 
 /** Choose the provider to generate with. Prefers the first OpenAI-ish provider
  * (broadest model support), else the first capable one. Null when none. */
-export function pickImageProvider(providers: Provider[]): Provider | null {
-  const capable = imageCapableProviders(providers);
+export function pickImageProvider(providers: Provider[], codexReady = false): Provider | null {
+  const capable = imageCapableProviders(providers, codexReady);
   if (capable.length === 0) return null;
   return (
+    capable.find((p) => p.kind === "codex_cli") ??
     capable.find((p) => p.kind === "openai") ??
     capable.find((p) => p.kind === "openai_compat" || p.kind === "custom") ??
     capable[0]!

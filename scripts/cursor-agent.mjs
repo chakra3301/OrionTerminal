@@ -7,15 +7,22 @@
  * Events: { type:"sdk", message } | { type:"agent", agentId } | { type:"fatal", message }
  */
 
-import { Agent, Cursor, CursorAgentError } from "@cursor/sdk";
+import { loadCursorSdk } from "./cursor-sdk.mjs";
+import { cursorOptions } from "./cursor-options.mjs";
+let Agent, Cursor, CursorAgentError;
 
 // When stdout is piped to Tauri, force line delivery so events stream live.
 if (process.stdout.isTTY === false && process.stdout._handle?.setBlocking) {
   process.stdout._handle.setBlocking(true);
 }
 
+let secrets = [];
+function redact(text) {
+  for (const secret of secrets) text = text.replaceAll(secret, "[REDACTED]");
+  return text;
+}
 function emit(obj) {
-  process.stdout.write(`${JSON.stringify(obj)}\n`);
+  process.stdout.write(`${JSON.stringify(obj, (_key, value) => typeof value === "string" ? redact(value) : value)}\n`);
 }
 
 function assistantHasText(message) {
@@ -46,15 +53,11 @@ async function probe(apiKey) {
 }
 
 async function run(config) {
-  const { apiKey, model, prompt, cwd, systemAppend, agentId } = config;
+  const { apiKey, prompt, systemAppend, agentId } = config;
   if (!apiKey?.trim()) throw new Error("apiKey is required");
   if (!prompt?.trim()) throw new Error("prompt is required");
 
-  const opts = {
-    apiKey: apiKey.trim(),
-    model: { id: model || "composer-2.5" },
-    local: { cwd: cwd || process.cwd(), settingSources: [] },
-  };
+  const opts = cursorOptions(config);
 
   const agent = agentId?.trim()
     ? await Agent.resume(agentId.trim(), opts)
@@ -99,32 +102,46 @@ async function run(config) {
 
 async function main() {
   const args = process.argv.slice(2);
+  if (args[0] === "--check-sdk") {
+    const { version } = await loadCursorSdk();
+    emit({ type: "sdk-status", version, ready: true });
+    return;
+  }
   if (args[0] === "--probe") {
-    const key = args[1] || process.env.CURSOR_API_KEY;
+    const key = process.env.CURSOR_API_KEY;
     if (!key) {
       emit({ type: "probe", ok: false, message: "no api key" });
       process.exit(1);
     }
+    secrets = [key];
+    ({ sdk: { Agent, Cursor, CursorAgentError } } = await loadCursorSdk());
     await probe(key);
     return;
   }
 
   let raw = "";
-  for await (const chunk of process.stdin) raw += chunk;
+  for await (const chunk of process.stdin) {
+    raw += chunk;
+    if (raw.length > 2_000_000) throw Error("Cursor request exceeds the size limit");
+  }
   const config = JSON.parse(raw || "{}");
+  secrets = [config.apiKey, ...Object.values(config.mcpServers ?? {}).flatMap((server) =>
+    Object.entries(server.env ?? {}).filter(([name]) => /TOKEN|KEY|SECRET|PASSWORD/i.test(name)).map(([, value]) => value)
+  )].filter((value) => typeof value === "string" && value.length > 0);
   // Mirror Node/SDK stderr into the bridge stream so Tauri can surface it.
   const origErr = console.error;
   console.error = (...args) => {
     const text = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
     emit({ type: "stderr", text });
-    origErr.apply(console, args);
+    origErr.call(console, redact(text));
   };
 
   try {
+    ({ sdk: { Agent, Cursor, CursorAgentError } } = await loadCursorSdk());
     await run(config);
   } catch (err) {
     const message =
-      err instanceof CursorAgentError
+      CursorAgentError && err instanceof CursorAgentError
         ? `${err.message} (retryable=${err.isRetryable})`
         : err instanceof Error
           ? err.message
@@ -134,4 +151,7 @@ async function main() {
   }
 }
 
-await main();
+await main().catch(err => {
+  emit({ type: "fatal", message: err instanceof Error ? err.message : String(err) });
+  process.exitCode = 1;
+});

@@ -1,11 +1,13 @@
 import { useNotesStore } from "@/store/notesStore";
-import { ipc } from "@/lib/ipc";
+import { runSurfaceAnalysis } from "@/features/agents/textCall";
+import { withBackgroundConsent } from "@/store/backgroundAiStore";
+import { toast } from "@/store/toastStore";
 import { log } from "@/lib/log";
 
 /** Conservative note auto-tagging (the assets path has had this since launch;
  * notes never did). Fires only when a note has SETTLED (debounced), has
  * real content, and has NO tags yet — so it never fights manual tags and
- * never re-runs once tags exist. Subscription CLI, fire-and-forget. */
+ * never re-runs once tags exist. Background uploads require explicit consent. */
 
 const MIN_CHARS = 280;
 const SETTLE_MS = 8000;
@@ -57,17 +59,26 @@ async function run(id: string): Promise<void> {
   inFlight.add(id);
   attempted.add(id);
   try {
-    const reply = await ipc.claudeOneshot(buildPrompt(note.title, note.plaintext));
+    const reply = await withBackgroundConsent("notes", (signal) => {
+      const current = useNotesStore.getState().notes.get(id);
+      if (!enabled || !current || current.plaintext !== note.plaintext || current.title !== note.title) return Promise.resolve(null);
+      return runSurfaceAnalysis(buildPrompt(note.title, note.plaintext), "archives", { signal });
+    });
+    if (reply === null) { attempted.delete(id); return; }
     if (!enabled) return;
     const tags = parseTags(reply);
     // Re-check: the user may have added tags while we waited.
     const fresh = useNotesStore.getState().notes.get(id);
     if (!fresh || fresh.tags.length > 0) return;
+    if (fresh.plaintext !== note.plaintext || fresh.title !== note.title) { attempted.delete(id); return; }
     for (const tag of tags) {
       await useNotesStore.getState().addTag(id, tag);
     }
   } catch (e) {
-    log.warn("note auto-tag failed", id, e);
+    if (!(e instanceof Error && e.message === "Analysis cancelled.")) {
+      log.warn("note auto-tag failed", id, e);
+      toast.warning("Automatic note tagging failed", { body: String(e), dedupeKey: "note-auto-tag" });
+    }
     attempted.delete(id); // let a later settle retry
   } finally {
     inFlight.delete(id);

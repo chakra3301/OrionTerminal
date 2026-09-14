@@ -1,0 +1,16 @@
+Orion Terminal
+Copyright 2026 Orion Terminal contributors
+
+Original Orion Terminal source code and creator-owned built-in assets in
+public/characters/, public/companion/, app-icon.png and its generated
+src-tauri/icons/ variants are licensed under the Apache License, Version 2.0.
+The project owner confirmed authorship and inclusion of the bundled models on
+2026-09-11 and authorship of the app icon on 2026-09-13.
+
+Third-party software and adapted source retain their respective copyrights,
+licenses, and notices. See THIRD_PARTY_NOTICES.md and THIRD_PARTY_LICENSES/.
+This notice does not relicense third-party dependencies, user-imported assets,
+or third-party content generated or retrieved while using the application.
+
+Provider names and product trademarks belong to their respective owners.
+No provider endorsement or affiliation is implied.

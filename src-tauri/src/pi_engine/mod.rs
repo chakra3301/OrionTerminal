@@ -567,7 +567,7 @@ pub fn cc_recent_artifacts(
 #[tauri::command]
 pub fn pi_cancel(run_id: String) -> Result<(), String> {
     if let Some(n) = PI_CHILDREN.lock().remove(&run_id) {
-        n.notify_waiters();
+        n.notify_one();
     }
     Ok(())
 }

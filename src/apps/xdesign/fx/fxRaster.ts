@@ -9,7 +9,8 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { FxLayer } from "./fxModel";
 import { setSourceAspect } from "./fxSourceInfo";
-import { log } from "@/lib/log";
+import { imageMimeForPath } from "./fxFiles";
+import { ipc } from "@/lib/ipc";
 
 /** Cache key — re-rasterize only when something visual changed. */
 export function sourceRasterKey(layer: FxLayer, pw: number, ph: number): string {
@@ -27,20 +28,32 @@ function str(v: unknown, fallback: string): string {
 
 const imgCache = new Map<string, Promise<HTMLImageElement>>();
 
+async function imageSource(filePath: string): Promise<string> {
+  if (filePath.startsWith("http") || filePath.startsWith("data:") || filePath.startsWith("blob:")) {
+    return filePath;
+  }
+  try {
+    const base64 = await ipc.readFileBase64(filePath);
+    return `data:${imageMimeForPath(filePath)};base64,${base64}`;
+  } catch (error) {
+    if (String(error).includes("TOO_LARGE:")) return convertFileSrc(filePath);
+    throw error;
+  }
+}
+
 function loadImage(filePath: string): Promise<HTMLImageElement> {
   let p = imgCache.get(filePath);
   if (!p) {
-    p = new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => {
-        imgCache.delete(filePath);
-        reject(new Error(`fx: image failed to load: ${filePath}`));
-      };
-      img.src = filePath.startsWith("http") || filePath.startsWith("data:")
-        ? filePath
-        : convertFileSrc(filePath);
-    });
+    p = imageSource(filePath).then(
+      (src) =>
+        new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error(`fx: image failed to decode: ${filePath}`));
+          img.src = src;
+        }),
+    );
+    p.catch(() => imgCache.delete(filePath));
     imgCache.set(filePath, p);
   }
   return p;
@@ -142,13 +155,7 @@ export async function rasterizeSource(
   if (layer.effectId === "srcImage") {
     const file = str(p.file, "");
     if (!file) return canvas;
-    let img: HTMLImageElement;
-    try {
-      img = await loadImage(file);
-    } catch (e) {
-      log.warn("fx raster", e);
-      return canvas;
-    }
+    const img = await loadImage(file);
     if (img.naturalHeight > 0) {
       setSourceAspect(layer.id, img.naturalWidth / img.naturalHeight);
     }

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { ipc } from "@/lib/ipc";
+import { runSurfaceAnalysis } from "@/features/agents/textCall";
+import { withBackgroundConsent } from "@/store/backgroundAiStore";
 import { useRosie, extractSpeakableText } from "@/features/rosie/rosieStore";
 import { useVoice } from "@/store/voiceStore";
 import { useProjectStore } from "@/store/projectStore";
@@ -118,8 +119,10 @@ function pickFallback(): string {
   return options[Math.floor(Math.random() * options.length)]!;
 }
 
-async function generateQuestion(): Promise<string> {
+async function generateQuestion(signal: AbortSignal): Promise<string> {
   try {
+    const reply = await withBackgroundConsent("companion", async (signal) => {
+    if (!canAskNow()) return null;
     const ctx = gatherContext();
     const angles = usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.archives)
       ? ANGLES
@@ -132,7 +135,9 @@ async function generateQuestion(): Promise<string> {
       "\n\nProactively check in with ONE short line (max ~14 words) — a friendly, specific question " +
       `or offer about ${angle}. Make it feel personal and natural, never generic or repetitive. ` +
       "Do not greet by name. Output ONLY the line, no quotes, no preamble.";
-    const reply = await ipc.claudeOneshot(prompt);
+    return runSurfaceAnalysis(prompt, "rosie", { signal });
+    }, signal);
+    if (reply === null) return pickFallback();
     const line =
       reply
         .split("\n")
@@ -168,15 +173,19 @@ export function useProactiveCompanion() {
   // (1) Proactive check-ins.
   useEffect(() => {
     let nextAt = Date.now() + FIRST_DELAY;
+    const lifetime = new AbortController();
+    let pending = false;
     const tick = () => {
-      if (Date.now() < nextAt || !canAskNow()) {
+      if (pending || Date.now() < nextAt || !canAskNow()) {
         if (Date.now() >= nextAt) nextAt = Date.now() + RETRY;
         return;
       }
       nextAt = Date.now() + MIN_GAP + Math.random() * (MAX_GAP - MIN_GAP);
+      pending = true;
       void (async () => {
-        const q = await generateQuestion();
-        if (!canAskNow()) return; // conditions may have changed while generating
+        const q = await generateQuestion(lifetime.signal);
+        pending = false;
+        if (lifetime.signal.aborted || !canAskNow()) return; // conditions may have changed while generating
         useCompanionProactive.getState().ask(q);
         if (useRosie.getState().ttsEnabled) {
           void import("@/lib/voiceSpeak").then((m) => m.speak(q));
@@ -184,7 +193,7 @@ export function useProactiveCompanion() {
       })();
     };
     const id = setInterval(tick, TICK);
-    return () => clearInterval(id);
+    return () => { clearInterval(id); lifetime.abort(); };
   }, []);
 
   // (2) Her chat replies → bubble (only when the panel is closed).

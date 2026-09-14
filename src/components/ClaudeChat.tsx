@@ -188,6 +188,11 @@ export function ClaudeChat(props: ClaudeChatProps) {
   } = props;
 
   const [input, setInput] = useState("");
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const submitInFlight = useRef(false);
+  const lifetime = useRef(0);
+  useEffect(() => () => { lifetime.current++; }, []);
   const [dragOver, setDragOver] = useState(false);
   const [chips, setChips] = useState<ContextChip[]>([]);
   const [picker, setPicker] = useState<{
@@ -196,11 +201,12 @@ export function ClaudeChat(props: ClaudeChatProps) {
     hi: number;
   } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const followOutput = useRef(true);
   const inputWrapRef = useRef<HTMLDivElement>(null);
   const inputElRef = useRef<HTMLTextAreaElement>(null);
   const searchSeq = useRef(0);
 
-  const closePicker = () => setPicker(null);
+  const closePicker = () => { searchSeq.current++; setPicker(null); };
 
   const refreshPicker = (value: string, caret: number) => {
     if (!props.contextSearch) return;
@@ -216,6 +222,8 @@ export function ClaudeChat(props: ClaudeChatProps) {
       setPicker((cur) =>
         cur ? { query: tok.query, results, hi: Math.min(cur.hi, Math.max(0, results.length - 1)) } : cur,
       );
+    }).catch(() => {
+      if (searchSeq.current === seq) setPicker(null);
     });
   };
 
@@ -258,17 +266,34 @@ export function ClaudeChat(props: ClaudeChatProps) {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [messages.length, running]);
+    if (!messages.length) followOutput.current = true;
+    if (followOutput.current) el.scrollTop = el.scrollHeight;
+  }, [messages, running]);
 
   const send = async (text?: string) => {
     const value = (text ?? input).trim();
-    if (!value || running || disabledReason) return;
+    if (!value || running || disabledReason || submitInFlight.current) return;
     const attached = chips;
+    const generation = lifetime.current;
+    submitInFlight.current = true;
+    setSubmitting(true);
+    setSendError(null);
+    followOutput.current = true;
     setInput("");
     setChips([]);
     closePicker();
-    await onSend(value, attached.length > 0 ? attached : undefined);
+    try {
+      await onSend(value, attached.length > 0 ? attached : undefined);
+    } catch (error) {
+      if (generation === lifetime.current) {
+        setSendError(error instanceof Error ? error.message : String(error));
+        setInput((current) => current || value);
+        setChips((current) => current.length ? current : attached);
+      }
+    } finally {
+      submitInFlight.current = false;
+      if (generation === lifetime.current) setSubmitting(false);
+    }
   };
 
   const orbStyle = {
@@ -285,16 +310,19 @@ export function ClaudeChat(props: ClaudeChatProps) {
     <aside className="ot-claude-rail">
       <div className="ot-claude-header">
         <div className="ot-claude-orb" style={orbStyle} />
-        <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="ot-claude-identity">
           <div className="ot-claude-name">{name}</div>
           <div className="ot-claude-sub">{subtitle}</div>
         </div>
-        <ModelSelect surface={props.appId} />
+        <ModelSelect surface={props.appId} disabled={running || submitting} />
         {onNewChat ? (
           <button
             type="button"
-            onClick={onNewChat}
+            onClick={() => { setSendError(null); onNewChat?.(); }}
+            disabled={running || submitting}
             title="New chat"
+            aria-label="New chat"
+            className="ot-claude-action"
             style={{
               background: "none",
               border: 0,
@@ -306,11 +334,14 @@ export function ClaudeChat(props: ClaudeChatProps) {
             <Plus size={14} />
           </button>
         ) : (
-          <MoreHorizontal size={14} color="var(--t-tertiary)" />
+          <MoreHorizontal className="ot-claude-action" size={14} color="var(--t-tertiary)" />
         )}
       </div>
 
-      <div ref={scrollRef} className="ot-claude-messages scroll">
+      <div ref={scrollRef} className="ot-claude-messages scroll" onScroll={(e) => {
+        const el = e.currentTarget;
+        followOutput.current = el.scrollHeight - el.scrollTop - el.clientHeight < 64;
+      }}>
         {messages.length === 0 && !openingLine && (
           <div className="ot-claude-empty">
             <div className="sparkle">
@@ -368,6 +399,12 @@ export function ClaudeChat(props: ClaudeChatProps) {
         </div>
       )}
 
+      {sendError && (
+        <div role="alert" style={{ padding: "8px 14px", fontSize: 12, color: "var(--neon-magenta)", overflowWrap: "anywhere" }}>
+          Couldn’t send: {sendError}
+        </div>
+      )}
+      {submitting && !running && <div role="status" style={{ padding: "4px 14px", fontSize: 12, color: "var(--t-secondary)" }}>Preparing message…</div>}
       <div
         ref={inputWrapRef}
         className={`ot-claude-input${dragOver ? " drag-over" : ""}`}
@@ -444,6 +481,7 @@ export function ClaudeChat(props: ClaudeChatProps) {
         )}
         <textarea
           ref={inputElRef}
+          aria-label="Message"
           rows={1}
           value={input}
           onChange={(e) => {
@@ -453,10 +491,11 @@ export function ClaudeChat(props: ClaudeChatProps) {
           placeholder={
             disabledReason ??
             placeholder ??
-            (props.contextSearch ? "Ask Claude… (@ to attach context)" : "Ask Claude…")
+            (props.contextSearch ? "Ask your AI… (@ to attach context)" : "Ask your AI…")
           }
-          disabled={!!disabledReason || running}
+          disabled={!!disabledReason || running || submitting}
           onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
             if (picker) {
               if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                 e.preventDefault();
@@ -495,6 +534,7 @@ export function ClaudeChat(props: ClaudeChatProps) {
             }}
             onClick={onCancel}
             title="Cancel (⌘.)"
+            aria-label="Stop response"
           >
             <StopCircle size={16} />
           </button>
@@ -506,8 +546,9 @@ export function ClaudeChat(props: ClaudeChatProps) {
               background: `linear-gradient(135deg, ${accentColor}, var(--neon-cyan))`,
             }}
             onClick={() => void send()}
-            disabled={!input.trim() || !!disabledReason}
+            disabled={!input.trim() || !!disabledReason || submitting}
             title="Send (↵)"
+            aria-label="Send message"
           >
             <Send size={14} />
           </button>

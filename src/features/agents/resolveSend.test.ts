@@ -17,8 +17,12 @@ describe("resolveSend", () => {
     expect(r.allowedTools).toEqual(["WebSearch"]);
   });
 
-  it("falls back to the value as a model if the agent is missing", () => {
-    expect(resolveSend("agent:ghost", agents, skills)).toEqual({ model: "agent:ghost", actionModel: null, systemAppend: null, allowedTools: null });
+  it("an agent with no tool grants is tool-less, not unrestricted", () => {
+    expect(resolveSend("agent:a1", [{ ...agents[0]!, skillIds: [] }], []).allowedTools).toEqual([]);
+  });
+
+  it("reports a deleted agent instead of sending its ID as a model", () => {
+    expect(() => resolveSend("agent:ghost", agents, skills)).toThrow("no longer exists");
   });
 
   it("a plain model selection resolves actionModel to null", () => {

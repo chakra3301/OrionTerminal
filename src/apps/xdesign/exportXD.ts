@@ -9,6 +9,10 @@
 // coordinates.
 
 import type { Shape } from "@/apps/xdesign/store";
+import { embedRasterResources } from "./rasterResources";
+import { isTauri } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
+import { ipc } from "@/lib/ipc";
 
 let svgRef: SVGSVGElement | null = null;
 
@@ -50,7 +54,8 @@ export function buildExportSVG(bounds: ExportBounds): string | null {
   if (!svgRef) return null;
   const clone = svgRef.cloneNode(true) as SVGSVGElement;
   clone.removeAttribute("style");
-  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  // XMLSerializer supplies the element namespace; a plain xmlns attribute can duplicate it.
+  clone.removeAttribute("xmlns");
   clone.setAttribute("viewBox", `${bounds.x} ${bounds.y} ${bounds.w} ${bounds.h}`);
   clone.setAttribute("width", String(Math.max(1, Math.round(bounds.w))));
   clone.setAttribute("height", String(Math.max(1, Math.round(bounds.h))));
@@ -89,11 +94,18 @@ export function downloadFile(filename: string, blob: Blob): void {
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-export function exportSVG(bounds: ExportBounds, filename = "xdesign.svg"): void {
+async function saveExport(filename: string, blob: Blob): Promise<void> {
+  if (!isTauri()) { downloadFile(filename, blob); return; }
+  const extension = filename.split(".").at(-1) || "png";
+  const path = await save({ defaultPath: filename, filters: [{ name: extension.toUpperCase(), extensions: [extension] }] });
+  if (path) await ipc.xdesignSaveBytes(path, Array.from(new Uint8Array(await blob.arrayBuffer())));
+}
+
+export async function exportSVG(bounds: ExportBounds, filename = "xdesign.svg"): Promise<void> {
   const svg = buildExportSVG(bounds);
-  if (!svg) return;
-  const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-  downloadFile(filename, blob);
+  if (!svg) throw new Error("No canvas is available for export.");
+  const blob = new Blob([await embedRasterResources(svg)], { type: "image/svg+xml;charset=utf-8" });
+  await saveExport(filename, blob);
 }
 
 /** Rasterize the export SVG to a PNG Blob. `backdrop` paints behind the
@@ -106,17 +118,19 @@ async function rasterizePNG(
 ): Promise<Blob | null> {
   const svg = buildExportSVG(bounds);
   if (!svg) return null;
-  const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  const svgBlob = new Blob([await embedRasterResources(svg)], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(svgBlob);
   try {
     const img = new Image();
     await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = (e) => reject(e);
+      const timer = setTimeout(() => { img.onload = null; img.onerror = null; img.src = ""; reject(new Error("Export rendering timed out.")); }, 15_000);
+      img.onload = () => { clearTimeout(timer); resolve(); };
+      img.onerror = () => { clearTimeout(timer); reject(new Error("Could not render the export image.")); };
       img.src = url;
     });
     const w = Math.max(1, Math.round(bounds.w * scale));
     const h = Math.max(1, Math.round(bounds.h * scale));
+    if (!Number.isFinite(w * h) || w * h > 16_777_216) throw new Error("Export exceeds 16 megapixels. Export a smaller selection.");
     const canvas = document.createElement("canvas");
     canvas.width = w;
     canvas.height = h;
@@ -141,7 +155,8 @@ export async function exportPNG(
   scale = 2,
 ): Promise<void> {
   const blob = await rasterizePNG(bounds, scale, null);
-  if (blob) downloadFile(filename, blob);
+  if (!blob) throw new Error("Could not encode the canvas as PNG.");
+  await saveExport(filename, blob);
 }
 
 /** Render the current canvas to PNG bytes for the Claude vision loop. Painted

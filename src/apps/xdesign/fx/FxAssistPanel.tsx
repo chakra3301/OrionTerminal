@@ -4,8 +4,9 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, X, Trash2, LoaderCircle, Check, TriangleAlert } from "lucide-react";
+import { Sparkles, X, Trash2, LoaderCircle, Check, TriangleAlert, StopCircle } from "lucide-react";
 import { useFxAssist } from "./fxAssist";
+import { ModelSelect } from "@/components/ModelSelect";
 
 const SUGGESTIONS = [
   "cursor-reactive liquid chrome hero",
@@ -43,6 +44,7 @@ export function FxAssistPanel() {
           <Sparkles size={13} /> FX Assist
         </span>
         <span className="xd-fx-assist-actions">
+          {busy && <button type="button" onClick={() => useFxAssist.getState().cancel()} title="Stop" aria-label="Stop response"><StopCircle size={13} /></button>}
           <button
             type="button"
             onClick={() => useFxAssist.getState().clear()}
@@ -60,6 +62,7 @@ export function FxAssistPanel() {
           </button>
         </span>
       </div>
+      <div style={{ padding: "8px 12px" }}><ModelSelect surface="fx" disabled={busy} /></div>
       <div className="xd-fx-assist-list" ref={listRef}>
         {items.length === 0 && !streaming && (
           <div className="xd-fx-assist-empty">

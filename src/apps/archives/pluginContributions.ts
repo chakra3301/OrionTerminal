@@ -365,8 +365,11 @@ export function archivesDisableReason(): string | null {
   if (useAskArchive.getState().loading) {
     return "Wait for Ask your Archive to finish before disabling the plugin.";
   }
-  if (useNotesStore.getState().pendingWrites.size > 0 || noteAutoTagBusy()) {
-    return "Wait for Archives note saves and automatic tagging to finish before disabling the plugin.";
+  if (useNotesStore.getState().pendingWrites.size > 0) {
+    return "Archives has unsaved notes. Open the note and use Save now or Retry save before disabling the plugin.";
+  }
+  if (noteAutoTagBusy()) {
+    return "Wait for Archives automatic tagging to finish before disabling the plugin.";
   }
   if (useAssetsStore.getState().taggingIds.size > 0) {
     return "Wait for Archives asset tagging to finish before disabling the plugin.";

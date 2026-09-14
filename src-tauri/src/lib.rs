@@ -1,15 +1,22 @@
 #![recursion_limit = "256"]
-mod app_handle;
 mod api_key;
-mod provider_keys;
+mod app_handle;
 mod asset;
 mod autocomplete;
+mod characters;
 mod claude_cli;
+mod connector_status;
+mod provider_selection;
+mod process_group;
 mod cli_engine;
+mod cli_auth;
+mod codex_subscription;
 mod cursor_engine;
-mod pi_engine;
-mod plugin_runtime;
-mod db_backup;
+pub mod db_backup;
+mod draft_recovery;
+mod quit_guard;
+#[cfg(target_os = "macos")]
+mod quit_guard_macos;
 mod fs_ops;
 mod fs_watch;
 mod git_ops;
@@ -18,9 +25,13 @@ mod inline_edit;
 mod learn;
 mod lsp;
 mod mcp_config;
+mod mcp_grants;
 pub mod mcp_server;
-mod nous_oauth;
 mod messages_chat;
+mod nous_oauth;
+mod pi_engine;
+mod plugin_runtime;
+mod provider_keys;
 mod repolens;
 mod repolens_website;
 mod runtime;
@@ -28,17 +39,24 @@ mod spotify;
 mod sysstats;
 mod terminal;
 mod ui_bridge;
-mod characters;
 mod wallpaper;
 mod xdesign_image;
+mod xdesign_state;
 mod xdesign_web;
 
 use tauri::Manager;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    let migrations = vec![
+#[tauri::command]
+fn open_devtools(window: tauri::WebviewWindow) -> Result<(), String> {
+    #[cfg(debug_assertions)]
+    { window.open_devtools(); Ok(()) }
+    #[cfg(not(debug_assertions))]
+    { let _ = window; Err("Devtools are disabled in release builds".into()) }
+}
+
+fn database_migrations() -> Vec<Migration> {
+    vec![
         Migration {
             version: 1,
             description: "init schema",
@@ -213,9 +231,15 @@ pub fn run() {
             sql: include_str!("../migrations/0029_xdesign_design_systems.sql"),
             kind: MigrationKind::Up,
         },
-    ];
+    ]
+}
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    let migrations = database_migrations();
     tauri::Builder::default()
+        .manage(quit_guard::QuitGuard::default())
+        .manage(draft_recovery::Recovery::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(spotify::global_shortcut_plugin())
@@ -225,6 +249,7 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
+            cli_auth::init(app.handle())?;
             // Synchronous on purpose: the snapshot must land before the
             // frontend opens the DB and migrations run.
             db_backup::run(app.handle());
@@ -234,6 +259,8 @@ pub fn run() {
             // export the same paths the MCP subprocess gets via its config so
             // in-process tool handlers can open the DB / read context.
             crate::app_handle::set(app.handle().clone());
+            #[cfg(target_os = "macos")]
+            quit_guard_macos::install()?;
             if let Ok(dir) = app.path().app_config_dir() {
                 let _ = std::fs::create_dir_all(&dir);
                 std::env::set_var("ORION_DB_PATH", dir.join("orion.db"));
@@ -255,11 +282,21 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            db_backup::database_backup_warning,
+            draft_recovery::drafts_begin,
+            draft_recovery::drafts_write,
+            draft_recovery::drafts_list,
+            draft_recovery::drafts_read,
+            draft_recovery::drafts_discard,
+            draft_recovery::drafts_export,
+            quit_guard::app_quit_pending,
+            quit_guard::app_quit_decide,
             fs_ops::read_dir_tree,
             fs_ops::read_file,
             fs_ops::read_file_base64,
             fs_ops::count_files,
             fs_ops::save_file_atomic,
+            fs_ops::analysis_work_dir,
             fs_ops::path_exists,
             fs_ops::search_in_files,
             fs_ops::create_path,
@@ -328,14 +365,20 @@ pub fn run() {
             inline_edit::inline_edit_cancel,
             messages_chat::messages_chat_run,
             messages_chat::messages_chat_cancel,
+            open_devtools,
+            connector_status::claude_status,
             claude_cli::claude_send,
             claude_cli::claude_cancel,
             runtime::runtime_send,
             runtime::runtime_cancel,
             cli_engine::cli_status,
+            cli_engine::cli_login,
+            cli_auth::cli_auth_scope,
+            cli_auth::cli_logout,
             cli_engine::cli_send,
             cli_engine::cli_cancel,
             cursor_engine::cursor_status,
+            cursor_engine::install::cursor_install_sdk,
             cursor_engine::cursor_send,
             cursor_engine::cursor_cancel,
             pi_engine::pi_status,
@@ -348,8 +391,6 @@ pub fn run() {
             pi_engine::cc_read_image,
             pi_engine::cc_vault_pages,
             pi_engine::cc_vault_graph,
-            claude_cli::claude_oneshot,
-            claude_cli::claude_oneshot_with_image,
             hermes::hermes_dispatch_task,
             hermes::hermes_continue_agent,
             hermes::hermes_stop_agent,
@@ -367,6 +408,7 @@ pub fn run() {
             xdesign_image::xdesign_image_gen,
             xdesign_web::xdesign_fetch_url,
             xdesign_web::xdesign_save_bytes,
+            xdesign_state::xdesign_state_commit,
             fs_watch::fs_watch_set_root,
             wallpaper::wallpaper_store_file,
             wallpaper::wallpaper_clear_file,
@@ -385,10 +427,23 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            if let tauri::RunEvent::Exit = event {
-                crate::plugin_runtime::runtime_shutdown(app_handle);
-                crate::terminal::kill_all();
-                crate::lsp::kill_all();
+            match event {
+                tauri::RunEvent::ExitRequested { api, .. } => {
+                    if !quit_guard::take_approval(app_handle) {
+                        api.prevent_exit();
+                        quit_guard::request(app_handle);
+                    }
+                }
+                tauri::RunEvent::WindowEvent { label, event: tauri::WindowEvent::CloseRequested { api, .. }, .. } if label == "main" => {
+                    api.prevent_close();
+                    quit_guard::request(app_handle);
+                }
+                tauri::RunEvent::Exit => {
+                    crate::plugin_runtime::runtime_shutdown(app_handle);
+                    crate::terminal::kill_all();
+                    crate::lsp::kill_all();
+                }
+                _ => {}
             }
         });
 }

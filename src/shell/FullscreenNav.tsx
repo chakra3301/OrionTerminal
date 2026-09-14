@@ -16,6 +16,8 @@ export function FullscreenNav() {
   useEffect(() => {
     if (!fs) return;
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || useShell.getState().spotlightOpen ||
+          document.querySelector('dialog[open], [aria-modal="true"], [role="menu"]')) return;
       if (e.key === "Escape") {
         e.preventDefault();
         exitFullscreen();

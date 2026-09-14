@@ -8,6 +8,8 @@ import { RepoLensCombinator } from "./RepoLensCombinator";
 import { RepoLensScanTray } from "./RepoLensScanTray";
 import { RepoLensWebsitesLibrary } from "./RepoLensWebsitesLibrary";
 import { useRepoLensWebsites } from "./useRepoLensWebsites";
+import { availableRepoLensModel } from "./models";
+import { useProvidersStore } from "@/store/providersStore";
 import { resolveInput } from "./fetch";
 
 export function RepoLensView() {
@@ -18,6 +20,12 @@ export function RepoLensView() {
   const [tab, setTab] = useState<"repos" | "websites">("repos");
   const [webInput, setWebInput] = useState("");
   const rip = useRepoLensWebsites((s) => s.rip);
+  const providers = useProvidersStore((s) => s.providers);
+  const websiteModel = availableRepoLensModel(
+    providers,
+    model.default_model,
+    "website-agent",
+  );
 
   useEffect(() => {
     void useRepoLens.getState().hydratePrefs();
@@ -41,12 +49,12 @@ export function RepoLensView() {
                 value={webInput}
                 onChange={(e) => setWebInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") void rip(webInput, model.default_model);
+                  if (e.key === "Enter") void rip(webInput, websiteModel);
                 }}
               />
             </div>
-            <RepoLensPickers />
-            <button className="rl-btn rl-btn--primary" onClick={() => void rip(webInput, model.default_model)}>
+            <RepoLensPickers websiteAgent />
+            <button className="rl-btn rl-btn--primary" onClick={() => void rip(webInput, websiteModel)}>
               Rip
             </button>
           </>

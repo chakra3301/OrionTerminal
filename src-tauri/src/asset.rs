@@ -36,23 +36,7 @@ fn asset_dir(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn ulid_string() -> String {
-    // We don't have the ulid crate on the Rust side; mint a passable id from
-    // time + a few random bytes. This is opaque to humans and good enough as
-    // a filesystem-safe asset id.
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let ms = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    // 6 random bytes via the address of a stack var (good-enough entropy
-    // mixed with the timestamp — collisions across writes within the same
-    // ms on the same machine are not a concern at human typing speed).
-    let entropy: u64 = {
-        let x: u8 = 0;
-        let addr = &x as *const u8 as usize as u64;
-        addr ^ ms as u64
-    };
-    format!("{:013x}{:012x}", ms, entropy & 0xFFF_FFFF_FFFF_FFFF)
+    ulid::Ulid::new().to_string()
 }
 
 fn ext_of(path: &Path) -> String {
@@ -136,9 +120,7 @@ pub async fn asset_store_file(
     };
     let target = dir.join(&target_name);
 
-    let bytes = fs::read(&src).map_err(|e| format!("read source: {e}"))?;
-    let size_bytes = bytes.len() as u64;
-    fs::write(&target, &bytes).map_err(|e| format!("write target: {e}"))?;
+    let size_bytes = crate::fs_ops::copy_regular_file(&src, &target, 512 * 1024 * 1024)?;
 
     let file_path = target
         .to_str()
@@ -166,6 +148,7 @@ pub async fn asset_store_bytes(
     suggested_name: String,
     mime_type_hint: String,
 ) -> Result<StoredAsset, String> {
+    if bytes.len() > 64 * 1024 * 1024 { return Err("Pasted assets must be smaller than 64 MB".into()); }
     let original_name = if suggested_name.trim().is_empty() {
         format!("pasted-{}", chrono_like_now())
     } else {
@@ -193,7 +176,7 @@ pub async fn asset_store_bytes(
     let target = dir.join(&target_name);
 
     let size_bytes = bytes.len() as u64;
-    fs::write(&target, &bytes).map_err(|e| format!("write target: {e}"))?;
+    crate::fs_ops::atomic_write_bytes(&target.to_string_lossy(), &bytes)?;
 
     let file_path = target
         .to_str()
@@ -254,18 +237,40 @@ pub async fn asset_delete_file(app: AppHandle, file_path: String) -> Result<(), 
     crate::fs_ops::remove_file_within(&dir, &file_path)
 }
 
-/// Write a transient XDesign canvas snapshot PNG for the Claude vision loop.
-/// Overwrites a single file in the app config dir each turn — these are
-/// throwaway renders, deliberately kept out of the asset library — and
-/// returns its absolute path so the caller can hand it to the CLI as an
-/// `@<path>` attachment.
+/// References and comparison sheets must not overwrite one another while
+/// another connector is still reading them.
 #[tauri::command]
 pub fn xdesign_snapshot_write(app: AppHandle, bytes: Vec<u8>) -> Result<String, String> {
-    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    fs::create_dir_all(&dir).map_err(|e| format!("create_dir_all: {e}"))?;
-    let path = dir.join("xdesign-snapshot.png");
-    fs::write(&path, &bytes).map_err(|e| format!("write snapshot: {e}"))?;
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?.join("snapshots");
+    write_snapshot(&dir, &bytes)
+}
+
+fn write_snapshot(dir: &Path, bytes: &[u8]) -> Result<String, String> {
+    if bytes.len() > 20 * 1024 * 1024 || !bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return Err("Snapshot must be a PNG smaller than 20 MB".into());
+    }
+    fs::create_dir_all(dir).map_err(|e| format!("create_dir_all: {e}"))?;
+    let path = dir.join(format!("{}.png", ulid_string()));
+    crate::fs_ops::atomic_write_bytes(&path.to_string_lossy(), &bytes)?;
     path.to_str()
         .map(|s| s.to_string())
         .ok_or_else(|| "snapshot path was not valid UTF-8".to_string())
+}
+
+#[cfg(test)]
+mod snapshot_tests {
+    use super::*;
+    #[test]
+    fn reference_and_comparison_snapshots_never_overwrite_each_other() {
+        let dir = std::env::temp_dir().join(format!("orion-snapshot-{}", ulid::Ulid::new()));
+        let reference = b"\x89PNG\r\n\x1a\nreference";
+        let comparison = b"\x89PNG\r\n\x1a\ncomparison";
+        let first = write_snapshot(&dir, reference).unwrap();
+        let second = write_snapshot(&dir, comparison).unwrap();
+        assert_ne!(first, second);
+        assert_eq!(fs::read(first).unwrap(), reference);
+        assert_eq!(fs::read(second).unwrap(), comparison);
+        assert!(write_snapshot(&dir, b"not PNG").is_err());
+        fs::remove_dir_all(dir).unwrap();
+    }
 }

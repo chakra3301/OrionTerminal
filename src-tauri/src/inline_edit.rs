@@ -298,7 +298,7 @@ pub async fn inline_edit_run(
 #[tauri::command]
 pub fn inline_edit_cancel(stream_id: String) -> Result<(), String> {
     if let Some(n) = STREAMS.lock().remove(&stream_id) {
-        n.notify_waiters();
+        n.notify_one();
     }
     Ok(())
 }

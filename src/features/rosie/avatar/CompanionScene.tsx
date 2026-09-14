@@ -1,11 +1,10 @@
 import {
-  Component,
   Suspense,
   useEffect,
   useMemo,
   useRef,
-  type ReactNode,
 } from "react";
+import { CharacterModelBoundary } from "@/features/characters/CharacterModelBoundary";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -609,20 +608,6 @@ function CharacterCompanion({ url }: { url: string }) {
   );
 }
 
-/** Falls back to the placeholder if the model fails to load. */
-class ModelBoundary extends Component<
-  { fallback: ReactNode; children: ReactNode },
-  { failed: boolean }
-> {
-  override state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  override render() {
-    return this.state.failed ? this.props.fallback : this.props.children;
-  }
-}
-
 /** A mode-colored aura light so her state reads at a glance (cyan idle, green
  * listening, violet thinking, yellow working) without swapping mocap clips. */
 function ModeLight({ mode }: { mode: CompanionMode }) {
@@ -671,9 +656,9 @@ function Avatar() {
   );
 
   const body = (
-    <ModelBoundary fallback={placeholder}>
+    <CharacterModelBoundary key={selectedId} fallback={placeholder}>
       <Suspense fallback={placeholder}>{inner}</Suspense>
-    </ModelBoundary>
+    </CharacterModelBoundary>
   );
   return (
     <>

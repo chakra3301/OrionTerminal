@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { runSurfaceAnalysis } from "@/features/agents/textCall";
 import {
   Check,
   X,
@@ -254,8 +255,9 @@ function GitSection() {
     );
     try {
       const diff = await ipc.gitWorkingDiff(root);
-      const msg = await ipc.claudeOneshot(
+      const msg = await runSurfaceAnalysis(
         `Write a conventional-commit message for this diff. First line: type(scope): summary under 65 chars. If the change warrants it, add a short body (2-4 bullet lines) after a blank line. Output ONLY the commit message.\n\n${diff.slice(0, 24_000)}`,
+        "orion",
       );
       if (msg.trim()) setMessage(msg.trim());
     } catch (e) {

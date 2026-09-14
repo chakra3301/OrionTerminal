@@ -1,0 +1,272 @@
+[
+  {
+    "name": "orion_fx_get_scene",
+    "description": "Read the current scene: size, background, duration, and every layer with its id, effect, params, blend, opacity, bindings, keyframes, mask.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "orion_fx_add_layer",
+    "description": "Add a registry effect as a new top layer. Returns the new layer id. Layers render bottom→top; effects transform everything below them.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "effectId": {
+          "type": "string",
+          "description": "Registry effect id"
+        },
+        "name": {
+          "type": "string"
+        },
+        "params": {
+          "type": "object",
+          "description": "Param overrides (key → value)"
+        },
+        "blend": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "add",
+            "screen",
+            "multiply",
+            "overlay",
+            "softlight",
+            "difference",
+            "lighten",
+            "darken"
+          ]
+        },
+        "opacity": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "effectId"
+      ]
+    }
+  },
+  {
+    "name": "orion_fx_add_custom_shader",
+    "description": "Add a layer with YOUR OWN GLSL ES 3.00 body defining `vec4 fxMain(vec2 uv)`. Use for anything the registry can't do. Available: uTex (stack below), uTime, uMouse (0..1), uMouseSpeed (0..1), uAudio (0..1 mic loudness), uResolution, sliders u_a..u_d (0..1), colors u_colorA/u_colorB, helpers fxHash21/fxNoise2/fxFbm/fxSimplex/fxFbmS/fxRidge/fxRotate2. NO #version/precision/main/uniform declarations. The shader is compiled immediately — fix and retry on error.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "glsl": {
+          "type": "string"
+        },
+        "params": {
+          "type": "object",
+          "description": "Initial a/b/c/d/colorA/colorB values"
+        }
+      },
+      "required": [
+        "name",
+        "glsl"
+      ]
+    }
+  },
+  {
+    "name": "orion_fx_set_params",
+    "description": "Set one or more params on a layer (values clamped to range).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "layerId": {
+          "type": "string"
+        },
+        "params": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "layerId",
+        "params"
+      ]
+    }
+  },
+  {
+    "name": "orion_fx_patch_layer",
+    "description": "Patch layer meta: name, opacity, blend, hidden, maskLayerId (a SOURCE layer id, or null to clear).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "layerId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "opacity": {
+          "type": "number"
+        },
+        "blend": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "add",
+            "screen",
+            "multiply",
+            "overlay",
+            "softlight",
+            "difference",
+            "lighten",
+            "darken"
+          ]
+        },
+        "hidden": {
+          "type": "boolean"
+        },
+        "maskLayerId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "layerId"
+      ]
+    }
+  },
+  {
+    "name": "orion_fx_set_binding",
+    "description": "Bind a numeric param to an input (mouseX/mouseY/mouseSpeed/hover/appear). amount −1..1 = fraction of the param range the source sweeps. source null removes the binding.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "layerId": {
+          "type": "string"
+        },
+        "param": {
+          "type": "string"
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "mouseX",
+            "mouseY",
+            "mouseSpeed",
+            "hover",
+            "appear",
+            "audio",
+            null
+          ]
+        },
+        "amount": {
+          "type": "number"
+        },
+        "smooth": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "layerId",
+        "param"
+      ]
+    }
+  },
+  {
+    "name": "orion_fx_add_keyframe",
+    "description": "Add a timeline key for a numeric param. t is 0..1 across the scene loop.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "layerId": {
+          "type": "string"
+        },
+        "param": {
+          "type": "string"
+        },
+        "t": {
+          "type": "number"
+        },
+        "v": {
+          "type": "number"
+        },
+        "ease": {
+          "type": "string",
+          "enum": [
+            "linear",
+            "inOut",
+            "hold"
+          ]
+        }
+      },
+      "required": [
+        "layerId",
+        "param",
+        "t",
+        "v"
+      ]
+    }
+  },
+  {
+    "name": "orion_fx_remove_layer",
+    "description": "Delete a layer.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "layerId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "layerId"
+      ]
+    }
+  },
+  {
+    "name": "orion_fx_move_layer",
+    "description": "Move a layer up (toward top of stack) or down.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "layerId": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "up",
+            "down"
+          ]
+        }
+      },
+      "required": [
+        "layerId",
+        "direction"
+      ]
+    }
+  },
+  {
+    "name": "orion_fx_set_scene",
+    "description": "Patch scene: background (#hex), duration (s), width, height.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "background": {
+          "type": "string"
+        },
+        "duration": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        }
+      },
+      "required": []
+    }
+  }
+]

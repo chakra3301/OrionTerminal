@@ -1,33 +1,11 @@
 import { log } from "@/lib/log";
 import { useVoice } from "@/store/voiceStore";
-import { configureTransformers } from "@/lib/transformersEnv";
+import { InferenceClient } from "./inferenceClient";
+import type { SpeechRequest } from "./speechWorker";
 
-const MODEL_ID = "Xenova/whisper-tiny.en";
-
-type AsrPipeline = (
-  input: Float32Array,
-  opts?: { language?: string; task?: "transcribe" | "translate" },
-) => Promise<{ text: string }>;
-
-let pipelinePromise: Promise<AsrPipeline> | null = null;
-
-function getPipeline(): Promise<AsrPipeline> {
-  if (pipelinePromise) return pipelinePromise;
-  useVoice.getState().setStatus("loading_model");
-  pipelinePromise = (async () => {
-    await configureTransformers();
-    const mod = await import("@xenova/transformers");
-    return (await mod.pipeline(
-      "automatic-speech-recognition",
-      MODEL_ID,
-      { quantized: true },
-    )) as unknown as AsrPipeline;
-  })().catch((err) => {
-    pipelinePromise = null;
-    throw err;
-  });
-  return pipelinePromise;
-}
+const speech = new InferenceClient<SpeechRequest, string>(
+  () => new Worker(new URL("./speechWorker.ts", import.meta.url), { type: "module" }),
+);
 
 /** Decode a recorded audio blob (Opus/WebM, MP4, etc.) into mono float32
  * samples Whisper expects. We let the system pick the sample rate (Safari/
@@ -108,13 +86,12 @@ export async function transcribeSamples(
   quiet = false,
 ): Promise<string> {
   if (samples16k.length < 1600) return "";
-  const pipe = await getPipeline();
+  if (!speech.ready) useVoice.getState().setStatus("loading_model");
+  const samples = new Float32Array(samples16k).buffer;
   try {
-    const result = await pipe(samples16k, { task: "transcribe" });
-    if (!quiet) {
-      log.info("[voice] inference raw text:", JSON.stringify(result.text));
-    }
-    return (result.text || "").trim();
+    const text = await speech.request({ op: "transcribe", samples }, [samples]);
+    if (!quiet) log.info("[voice] inference completed");
+    return text;
   } catch (err) {
     log.warn("[voice] whisper inference failed", err);
     throw err;
@@ -127,31 +104,14 @@ export async function transcribeBlob(blob: Blob): Promise<string> {
     log.warn(`[voice] only ${samples.length} samples — too short, skipping`);
     return "";
   }
-  log.info("[voice] loading whisper pipeline (first call may download ~40MB)…");
-  const pipeStart = performance.now();
-  const pipe = await getPipeline();
-  log.info(
-    `[voice] pipeline ready in ${Math.round(performance.now() - pipeStart)}ms`,
-  );
-  log.info("[voice] running inference…");
-  const infStart = performance.now();
-  try {
-    const result = await pipe(samples, { task: "transcribe" });
-    log.info(
-      `[voice] inference done in ${Math.round(performance.now() - infStart)}ms, raw text:`,
-      JSON.stringify(result.text),
-    );
-    return (result.text || "").trim();
-  } catch (err) {
-    log.warn(
-      `[voice] whisper inference failed after ${Math.round(performance.now() - infStart)}ms`,
-      err,
-    );
-    throw err;
-  }
+  return transcribeSamples(samples);
+}
+
+export async function warmSpeech(): Promise<void> {
+  await speech.request({ op: "warm" });
 }
 
 /** True once the model has loaded successfully. Cheap UI hook. */
 export function isWhisperReady(): boolean {
-  return pipelinePromise !== null;
+  return speech.ready;
 }

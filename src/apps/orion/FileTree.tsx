@@ -27,6 +27,7 @@ import { promptText } from "@/components/PromptModal";
 import { registry } from "@/commands/registry";
 import { log } from "@/lib/log";
 import { trackOrionActivity } from "@/apps/orion/runtimeActivity";
+import { renameBlockedReason } from "./renameSafety";
 import { useFileDropZone } from "@/lib/fileDrop";
 
 type RowContext = (e: React.MouseEvent, node: TreeNode) => void;
@@ -284,6 +285,9 @@ export function OrionFileTree() {
         "path-rename",
         "Wait for Orion to finish renaming the path before disabling the plugin.",
         async () => {
+          const openPaths = allTabs(useWorkspace.getState().root).flatMap(tab => tab.descriptor.kind === "file" ? [tab.descriptor.path] : []);
+          const blocked = renameBlockedReason(node.path, useTabsStore.getState().fileBuffers, openPaths);
+          if (blocked) throw new Error(blocked);
           await ipc.renamePath(node.path, target);
           if (wasOpen) {
             closeTabsFor(node.path);
@@ -367,7 +371,10 @@ export function OrionFileTree() {
     return items;
   };
 
-  const onRowContext: RowContext = (e, node) => openAt(e, buildMenu(node));
+  const onRowContext: RowContext = (e, node) => {
+    e.stopPropagation();
+    openAt(e, buildMenu(node));
+  };
 
   const onRootContext = (e: React.MouseEvent) => {
     if (!project) return;

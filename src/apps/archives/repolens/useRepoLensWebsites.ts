@@ -8,6 +8,8 @@ import { useShell } from "@/shell/store/useShell";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
 import { usePreviewStore } from "@/store/previewStore";
 import { appRegistry } from "@/plugins/appRegistry";
+import { useProvidersStore } from "@/store/providersStore";
+import { websiteModelSelection } from "./models";
 
 // Stable per-rip dev-server port in an uncommon range (avoids the default 3000),
 // so reopening the same clone reuses its port and different clones don't collide.
@@ -61,7 +63,8 @@ export const useRepoLensWebsites = create<State>((set, get) => ({
       return;
     }
     try {
-      await ipc.repolensWebsiteRip(parsed.url, model);
+      const selected = websiteModelSelection(useProvidersStore.getState().providers, model);
+      await ipc.repolensWebsiteRip(parsed.url, selected);
       await get().load();
     } catch (e) {
       toast.error(`Rip failed to start: ${String(e)}`);
@@ -69,18 +72,24 @@ export const useRepoLensWebsites = create<State>((set, get) => ({
   },
 
   cancel: async (id) => {
-    await ipc.repolensWebsiteCancel(id);
-    await get().load();
+    try {
+      await ipc.repolensWebsiteCancel(id);
+      await get().load();
+    } catch (error) { toast.error("Website agent was not stopped", { body: String(error) }); }
   },
 
   continueRip: async (id) => {
-    await ipc.repolensWebsiteContinue(id);
-    await get().load();
+    try {
+      await ipc.repolensWebsiteContinue(id);
+      await get().load();
+    } catch (error) { toast.error("Website agent could not continue", { body: String(error) }); }
   },
 
   remove: async (id) => {
-    await ipc.repolensWebsiteDelete(id);
-    set((s) => ({ rips: s.rips.filter((r) => r.id !== id) }));
+    try {
+      await ipc.repolensWebsiteDelete(id);
+      set((s) => ({ rips: s.rips.filter((r) => r.id !== id) }));
+    } catch (error) { toast.error("Website project was not deleted", { body: String(error) }); }
   },
 
   openInOrion: async (id) => {
@@ -188,7 +197,8 @@ export const useRepoLensWebsites = create<State>((set, get) => ({
     if (get().extracting.has(id)) return;
     set((s) => ({ extracting: new Set(s.extracting).add(id) }));
     try {
-      const json = await ipc.repolensWebsiteExtractDesign(id, model);
+      const selected = websiteModelSelection(useProvidersStore.getState().providers, model);
+      const json = await ipc.repolensWebsiteExtractDesign(id, selected);
       set((s) => {
         const rips = s.rips.map((r) =>
           r.id === id ? { ...r, design_json: json, design_at: Date.now() } : r,

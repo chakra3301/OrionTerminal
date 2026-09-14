@@ -1,13 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ulid } from "ulid";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { RefreshCw, CheckCircle2, LogIn, Download, ImageIcon } from "lucide-react";
+import { RefreshCw, CheckCircle2, LogIn, ImageIcon } from "lucide-react";
+import { CliEngineStatus } from "./CliEngineStatus";
+import { BackgroundAiSettings } from "./BackgroundAiSettings";
+import { ProviderConnectionToggle } from "./ProviderConnectionToggle";
 import { useProvidersStore } from "@/store/providersStore";
 import { ipc } from "@/lib/ipc";
+import { toast } from "@/store/toastStore";
+import { confirmAction } from "@/components/ConfirmModal";
+import { ModelSelect } from "@/components/ModelSelect";
 import type { Provider, ProviderKind } from "@/features/agents/agentTypes";
 import {
   isImageProvider,
-  defaultImageModel,
+  defaultImageModelForProvider,
   getImageModelOverride,
   setImageModelOverride,
 } from "@/apps/xdesign/imageGen";
@@ -20,59 +26,32 @@ import {
 
 const KINDS: ProviderKind[] = ["openai", "google", "openai_compat", "custom"];
 
-type CliStat = { installed: boolean; loggedIn: boolean; version: string | null; detail: string };
-
-function CliEngineStatus({ engine }: { engine: "codex_cli" | "gemini_cli" }) {
-  const [stat, setStat] = useState<CliStat | null>(null);
-  const [busy, setBusy] = useState(false);
-  const check = async () => {
-    setBusy(true);
-    try {
-      setStat(await ipc.cliStatus(engine));
-    } finally {
-      setBusy(false);
-    }
-  };
-  useEffect(() => {
-    void check();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine]);
-  const Icon = !stat
-    ? RefreshCw
-    : !stat.installed
-      ? Download
-      : !stat.loggedIn
-        ? LogIn
-        : CheckCircle2;
-  const cls = stat?.loggedIn ? "live" : "wait";
-  const label = !stat
-    ? "checking"
-    : stat.loggedIn
-      ? "ready"
-      : stat.installed
-        ? "login needed"
-        : "not found";
-  return (
-    <div className="cp-cli-status">
-      <span className={`cp-badge ${cls}`}>
-        <Icon size={12} /> {label}
-      </span>
-      <span className="cp-card-sub">{stat?.detail ?? ""}</span>
-      <button className="cp-link" disabled={busy} onClick={() => void check()}>
-        Re-check
-      </button>
-    </div>
-  );
-}
-
 export function ProvidersPanel() {
   const providers = useProvidersStore((s) => s.providers);
   const save = useProvidersStore((s) => s.save);
   const remove = useProvidersStore((s) => s.remove);
   const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const removeProvider = async (p: Provider) => {
+    if (!await confirmAction({ title: `Remove ${p.name}?`, body: "Chats are kept. Selections using this provider will need a new model. Its unshared saved credential will be removed.", confirmLabel: "Remove", danger: true })) return;
+    setRemoving(p.id);
+    try {
+      await remove(p.id);
+      if (p.keyRef && !useProvidersStore.getState().providers.some((other) => other.keyRef === p.keyRef)) {
+        if (p.kind === "nous_oauth") await ipc.nousOauthClear(p.keyRef);
+        else await ipc.providerKeyClear(p.keyRef);
+      }
+    } catch (e) { toast.error("Provider removal failed", { body: String(e) }); }
+    finally { setRemoving(null); }
+  };
 
   return (
     <div>
+      <div className="cp-card">
+        <div className="cp-card-main"><div className="cp-card-title">Default AI</div><div className="cp-card-sub">Used by assistants without their own model choice. Connection status is not a live model-access test.</div></div>
+        <ModelSelect surface="default" />
+      </div>
+      <p className="cp-card-sub" style={{ margin: "8px 0 14px" }}>Claude, ChatGPT/Codex and Gemini CLI use their subscription/login accounts. Cursor SDK and API providers use separate credentials/billing; a chat subscription does not automatically cover them.</p>
       <div className="cp-list">
         {providers.map((p) => {
           const isCli = p.kind === "codex_cli" || p.kind === "gemini_cli";
@@ -82,27 +61,32 @@ export function ProvidersPanel() {
               <div className="cp-card-main">
                 <div className="cp-card-title">{p.name}</div>
                 <div className="cp-card-sub">{p.kind}{p.models.length ? ` · ${p.models.length} models` : ""}</div>
+                {p.enabled ? <>
+                {p.kind === "anthropic" && <CliEngineStatus engine="claude" />}
                 {isCli && <CliEngineStatus engine={p.kind as "codex_cli" | "gemini_cli"} />}
                 {isCursor && <CursorProviderStatus />}
                 {p.kind === "nous_oauth" && <NousProviderStatus keyRef={p.keyRef} />}
+                {!p.builtin && !isCli && !isCursor && p.kind !== "nous_oauth" && (
+                  <ApiProviderStatus provider={p} onSave={save} />
+                )}
                 {isImageProvider(p) && <ImageModelField provider={p} />}
+                </> : <div className="cp-card-sub" style={{ marginTop: 8 }}><span className="cp-badge wait">Disconnected from Orion</span> Credentials retained. Enable to manage or reuse the account.</div>}
+                <ProviderConnectionToggle provider={p} />
               </div>
-              {isImageProvider(p) && (
+              {p.enabled && isImageProvider(p) && (
                 <span className="cp-badge live" title="Usable by XDesign 🖼️ Generate image">
                   <ImageIcon size={12} /> image
                 </span>
               )}
-              {p.builtin
-                ? <span className="cp-badge live">built-in</span>
-                : <span className="cp-badge wait">chat ready</span>}
-              {!p.builtin && <button className="cp-link-danger" onClick={() => {
-                if (p.kind === "nous_oauth" && p.keyRef) void ipc.nousOauthClear(p.keyRef);
-                void remove(p.id);
-              }}>Remove</button>}
+              {isCli || isCursor || p.kind === "nous_oauth" || !p.builtin
+                ? null
+                : <span className="cp-badge live">built-in</span>}
+              {!p.builtin && <button className="cp-link-danger" disabled={removing !== null} onClick={() => void removeProvider(p)}>Remove</button>}
             </div>
           );
         })}
       </div>
+      <BackgroundAiSettings />
       {adding
         ? <AddProvider onDone={() => setAdding(false)} onSave={save} />
         : <button className="cp-btn" onClick={() => setAdding(true)}>+ Add provider</button>}
@@ -117,14 +101,18 @@ function AddProvider({ onDone, onSave }: { onDone: () => void; onSave: (p: Provi
   const [models, setModels] = useState("");
   const [key, setKey] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const saving = useRef(false);
+  const [id] = useState(ulid);
 
   const applyPreset = (label: string) => {
     const p = PROVIDER_PRESETS.find((x) => x.label === label);
     if (!p) return;
     setKind(p.kind);
     setBaseUrl(p.baseUrl);
-    if (!name.trim()) setName(p.label);
-    if (!models.trim()) setModels(p.exampleModel);
+    setName(p.label);
+    setModels((p.modelIds ?? [p.exampleModel]).join(", "));
+    setKey("");
     setError(null);
   };
 
@@ -133,28 +121,44 @@ function AddProvider({ onDone, onSave }: { onDone: () => void; onSave: (p: Provi
   const [oauthRef, setOauthRef] = useState("");
 
   const submit = async () => {
+    if (saving.current) return;
     const err = validateProviderDraft({ name, kind, baseUrl });
     if (err) { setError(err); return; }
+    const modelIds = models.split(",").map((m) => m.trim()).filter(Boolean);
+    if (modelIds.length === 0) {
+      setError("Add at least one model id.");
+      return;
+    }
     if (usesOAuth(kind) && !oauthRef) {
       setError("Connect with Nous Portal first.");
       return;
     }
-    const id = ulid();
-    let keyRef = oauthRef;
-    if (!usesOAuth(kind)) {
-      keyRef = key.trim() ? id : "";
-      if (keyRef) await ipc.providerKeySet(keyRef, key.trim());
+    if (!usesOAuth(kind) && !key.trim() && !((kind === "openai_compat" || kind === "custom") && isLocalBaseUrl(baseUrl))) {
+      setError("API key is required for this provider.");
+      return;
     }
-    await onSave({
-      id, name: name.trim(), kind, baseUrl: baseUrl.trim(),
-      models: models.split(",").map((m) => m.trim()).filter(Boolean).map((m) => ({ id: m, label: m })),
-      keyRef, enabled: true, builtin: false,
-    });
-    onDone();
+    saving.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      let keyRef = oauthRef;
+      if (!usesOAuth(kind)) {
+        keyRef = key.trim() ? id : "";
+        if (keyRef) await ipc.providerKeySet(keyRef, key.trim());
+      }
+      await onSave({
+        id, name: name.trim(), kind, baseUrl: baseUrl.trim(),
+        models: [...new Set(modelIds)].map((m) => ({ id: m, label: m })),
+        keyRef, enabled: true, builtin: false,
+      });
+      setKey("");
+      onDone();
+    } catch (e) { setError(String(e)); }
+    finally { saving.current = false; setBusy(false); }
   };
 
   return (
-    <div className="cp-form">
+    <fieldset className="cp-form" disabled={busy} style={{ border: 0, minWidth: 0 }}>
       <div className="cp-presets">
         {PROVIDER_PRESETS.map((p) => (
           <button key={p.label} type="button" className="cp-chip" onClick={() => applyPreset(p.label)}>
@@ -176,15 +180,134 @@ function AddProvider({ onDone, onSave }: { onDone: () => void; onSave: (p: Provi
       {error && <div className="cp-form-error">{error}</div>}
       <div className="cp-form-actions">
         <button className="cp-btn ghost" onClick={onDone}>Cancel</button>
-        <button className="cp-btn" onClick={submit}>Add</button>
+        <button className="cp-btn" onClick={() => void submit()}>{busy ? "Saving…" : "Add"}</button>
       </div>
+    </fieldset>
+  );
+}
+
+function isLocalBaseUrl(baseUrl: string): boolean {
+  try {
+    const url = new URL(baseUrl.trim());
+    return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  } catch { return false; }
+}
+
+function isLocalProvider(provider: Provider): boolean {
+  return (provider.kind === "openai_compat" || provider.kind === "custom") && isLocalBaseUrl(provider.baseUrl);
+}
+
+function ApiProviderStatus({ provider, onSave }: { provider: Provider; onSave: (p: Provider) => Promise<void> }) {
+  const [keySaved, setKeySaved] = useState<boolean | null>(null);
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+  const [err, setErr] = useState("");
+  const local = isLocalProvider(provider);
+  const hasModels = provider.models.length > 0;
+
+  const refresh = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      setKeySaved(provider.keyRef ? await ipc.providerKeyStatus(provider.keyRef) : false);
+    } catch (e) {
+      setKeySaved(false);
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveKey = async () => {
+    setBusy(true);
+    setErr("");
+    setJustSaved(false);
+    try {
+      if (!key.trim() && keySaved) {
+        if (provider.keyRef) await ipc.providerKeyClear(provider.keyRef);
+        await onSave({ ...provider, keyRef: "" });
+        setKeySaved(false);
+      } else if (key.trim()) {
+        const keyRef = provider.keyRef.trim() || provider.id;
+        await ipc.providerKeySet(keyRef, key.trim());
+        await onSave({ ...provider, keyRef });
+        setKey("");
+        setKeySaved(true);
+        setJustSaved(true);
+      } else {
+        setErr("Paste an API key first.");
+        return;
+      }
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (local) {
+      setKeySaved(true);
+      return;
+    }
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider.id, provider.keyRef, provider.baseUrl]);
+
+  const ready = hasModels && (local || keySaved === true);
+  const label = !hasModels
+    ? "models needed"
+    : local
+      ? "local"
+      : keySaved === null
+        ? "checking"
+        : keySaved
+          ? "key saved"
+          : "key needed";
+
+  return (
+    <div className="cp-cli-status">
+      <span className={`cp-badge ${ready ? "live" : "wait"}`}>
+        {keySaved === null && !local ? <RefreshCw size={12} /> : ready ? <CheckCircle2 size={12} /> : <LogIn size={12} />}
+        {label}
+      </span>
+      <span className="cp-card-sub">
+        {ready
+          ? `${provider.models.length} model${provider.models.length === 1 ? "" : "s"} configured`
+          : !hasModels
+            ? "Add at least one model id."
+            : "Paste and save an API key for this provider."}
+      </span>
+      {!local && (
+        <>
+          <input
+            className="cp-input"
+            type="password"
+            placeholder={keySaved ? "API key saved - paste to replace" : "API key"}
+            value={key}
+            onChange={(e) => { setKey(e.target.value); setJustSaved(false); }}
+            onKeyDown={(e) => { if (e.key === "Enter") void saveKey(); }}
+          />
+          <div className="cp-form-actions" style={{ marginTop: 8 }}>
+            <button className="cp-link" disabled={busy} onClick={() => void refresh()}>
+              Re-check
+            </button>
+            <button className="cp-btn" disabled={busy || (!key.trim() && !keySaved)} onClick={() => void saveKey()}>
+              {keySaved && !key.trim() ? "Clear key" : "Save key"}
+            </button>
+          </div>
+        </>
+      )}
+      {justSaved && !err && <span className="cp-card-sub" style={{ color: "var(--neon-green)" }}>Key saved to keychain.</span>}
+      {err && <span className="cp-form-error">{err}</span>}
     </div>
   );
 }
 
 function ImageModelField({ provider }: { provider: Provider }) {
   const [val, setVal] = useState(() => getImageModelOverride(provider.id));
-  const fallback = defaultImageModel(provider.kind);
+  const fallback = defaultImageModelForProvider(provider);
   return (
     <div className="cp-cli-status">
       <span className="cp-card-sub">Image model</span>
@@ -201,7 +324,7 @@ function ImageModelField({ provider }: { provider: Provider }) {
 }
 
 function CursorProviderStatus() {
-  const [stat, setStat] = useState<{ installed: boolean; keySaved: boolean; ready: boolean; version: string | null; detail: string } | null>(null);
+  const [stat, setStat] = useState<{ installed: boolean; keySaved: boolean; sdkReady: boolean; ready: boolean; version: string | null; detail: string } | null>(null);
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<boolean | null>(null);
@@ -253,6 +376,14 @@ function CursorProviderStatus() {
     }
   };
 
+  const installSdk = async () => {
+    if (busy || !await confirmAction({ title: "Install optional Cursor SDK?", body: "Downloads the pinned SDK and dependencies from npm into Orion's application-data directory. The SDK is proprietary and governed by Cursor's terms (cursor.com/terms-of-service), not Orion's Apache license. No API key or paid model request is needed for installation. This may take several minutes.", confirmLabel: "Install SDK" })) return;
+    setBusy(true); setErr("");
+    try { await ipc.cursorInstallSdk(); await refresh(); }
+    catch (error) { setErr(String(error)); }
+    finally { setBusy(false); }
+  };
+
   const keySaved = stat?.keySaved ?? saved === true;
   const Icon = !stat ? RefreshCw : stat.ready ? CheckCircle2 : keySaved ? CheckCircle2 : LogIn;
   const cls = stat?.ready ? "live" : keySaved ? "live" : "wait";
@@ -282,6 +413,7 @@ function CursorProviderStatus() {
         onKeyDown={(e) => { if (e.key === "Enter") void saveKey(); }}
       />
       <div className="cp-form-actions" style={{ marginTop: 8 }}>
+        {!stat?.sdkReady && <button type="button" className="cp-btn" disabled={busy} onClick={() => void installSdk()}>Install SDK</button>}
         <button type="button" className="cp-link" disabled={busy} onClick={() => void refresh()}>Re-check</button>
         <button type="button" className="cp-btn" disabled={busy || (!key.trim() && !saved)} onClick={() => void saveKey()}>
           {saved && !key.trim() ? "Clear key" : "Save key"}

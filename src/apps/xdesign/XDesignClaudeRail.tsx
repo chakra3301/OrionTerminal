@@ -14,14 +14,15 @@ import { useProvidersStore } from "@/store/providersStore";
 import { useAssetsStore } from "@/store/assetsStore";
 import { useToasts } from "@/store/toastStore";
 import {
-  pickImageProvider,
-  resolveImageModel,
+  hasPotentialImageProvider,
+  resolveImageModelForProvider,
   getImageModelOverride,
   defaultSize,
   base64ToBytes,
   sizeAspect,
   styleImagePrompt,
 } from "@/apps/xdesign/imageGen";
+import { resolveImageProvider } from "@/apps/xdesign/imageProviderRuntime";
 import {
   hasImageSlots,
   extractImageRequests,
@@ -34,7 +35,7 @@ import {
   summarizeIssues,
   buildRepairPrompt,
 } from "@/apps/xdesign/artifactGuard";
-import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
+import { dispatchSend, dispatchCancel, toRuntimeHistory, selectionSupportsImages } from "@/features/agents/dispatchSend";
 import { log } from "@/lib/log";
 import { COMPOSER_PROMPT, composerVariationsPrompt } from "@/apps/xdesign/claude";
 import { useAppConfig, resolveConfig, appFirstTurnPreamble, appAllowedTools } from "@/store/appConfigStore";
@@ -110,7 +111,7 @@ const TOOL_MODES: Record<ToolModeId, { label: string; placeholder: string }> = {
   },
   variations: {
     label: "3 directions",
-    placeholder: "Describe a design — Claude pitches 3 distinct directions",
+    placeholder: "Describe a design — explore 3 distinct directions",
   },
   webpage: {
     label: "Build a webpage",
@@ -448,10 +449,11 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     try {
       const isFirstTurn = !thread.sessionId;
       const note = buildCanvasNote();
-      const snapshotPath = await captureCanvasSnapshot();
+      const selection = modelOverride ?? useModelPrefs.getState().modelFor("xdesign");
+      const snapshotPath = selectionSupportsImages(selection) ? await captureCanvasSnapshot() : null;
       const visionNote = snapshotPath
         ? "\n\nThe attached image is a render of the CURRENT canvas. Read it to judge layout, spacing, alignment, color, contrast, and overlap before deciding what to change."
-        : "";
+        : "\n\nNo image is attached. Use the structured canvas context below; do not claim to have visually inspected it.";
       const preamble = isFirstTurn ? appFirstTurnPreamble("xdesign") : "";
       const prompt = isFirstTurn
         ? `${preamble}${brandBlock()}\n\n${note}${visionNote}\n\n---\n\n${sentText}`
@@ -461,7 +463,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
       // dropped on --resume turns). Null path → plain text-only send.
       await dispatchSend({
         chatId,
-        value: modelOverride ?? useModelPrefs.getState().modelFor("xdesign"),
+        value: selection,
         prompt,
         history: toRuntimeHistory(useAppChat.getState().threads.xdesign.messages),
         projectRoot: null,
@@ -582,7 +584,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     pendingArtifactRef.current = true;
     refiningRef.current = false;
     repairAttemptRef.current = 0;
-    const imagesAvailable = !!pickImageProvider(useProvidersStore.getState().providers);
+    const imagesAvailable = hasPotentialImageProvider(useProvidersStore.getState().providers);
     // Lever 2: pick the expert blueprint for the brief; the model fills its
     // named slots instead of free-architecting the page. Core craft only — the
     // blueprint already carries the artifact structure the lens used to hint.
@@ -607,7 +609,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     pendingArtifactRef.current = true;
     refiningRef.current = false;
     repairAttemptRef.current = 0;
-    const imagesAvailable = !!pickImageProvider(useProvidersStore.getState().providers);
+    const imagesAvailable = hasPotentialImageProvider(useProvidersStore.getState().providers);
     await sendTurn(
       `🖥️ Build deck — ${b}`,
       buildDeckPrompt(
@@ -647,7 +649,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     pendingArtifactRef.current = true;
     refiningRef.current = true;
     repairAttemptRef.current = 0;
-    const imagesAvailable = !!pickImageProvider(useProvidersStore.getState().providers);
+    const imagesAvailable = hasPotentialImageProvider(useProvidersStore.getState().providers);
     void sendTurn(
       `Refine webpage — ${instruction}`,
       buildRefinePrompt(cur, instruction, useDesignSystems.getState().active(), imagesAvailable),
@@ -665,7 +667,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     pendingArtifactRef.current = true;
     refiningRef.current = true;
     repairAttemptRef.current = 0;
-    const imagesAvailable = !!pickImageProvider(useProvidersStore.getState().providers);
+    const imagesAvailable = hasPotentialImageProvider(useProvidersStore.getState().providers);
     void sendTurn(
       `Refine element — ${instruction}`,
       buildElementRefinePrompt(
@@ -701,18 +703,14 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     );
   };
 
-  // 🖼️ Generate image — real raster image from a text prompt via a
-  // user-configured image provider (OpenAI/Google). Ingested into the Archives
-  // asset library, then placed as an editable image layer (real filePath, not
-  // an embedded data URL — keeps the document light). Direct API call, not a
-  // chat turn.
-  // Arming the image tool needs a configured provider; check up front so the
-  // user isn't told "no provider" only after typing a prompt.
-  const handleImageButton = () => {
-    const provider = pickImageProvider(useProvidersStore.getState().providers);
+  // 🖼️ Generate image — real raster image from a text prompt via the connected
+  // ChatGPT subscription, with API-key providers retained as fallback. The
+  // result is ingested into Archives and placed as an editable image layer.
+  const handleImageButton = async () => {
+    const provider = await resolveImageProvider(useProvidersStore.getState().providers);
     if (!provider) {
       toast.info("No image provider", {
-        body: "Add an image-capable key (OpenAI or Google) in Control Panel → Providers.",
+        body: "Connect ChatGPT or add an image-capable OpenAI/Google key in Control Panel → Providers.",
       });
       return;
     }
@@ -720,16 +718,16 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
   };
 
   const runImage = async (desc: string) => {
-    const provider = pickImageProvider(useProvidersStore.getState().providers);
+    const provider = await resolveImageProvider(useProvidersStore.getState().providers);
     if (!provider) {
       toast.info("No image provider", {
-        body: "Add an image-capable key (OpenAI or Google) in Control Panel → Providers.",
+        body: "Connect ChatGPT or add an image-capable OpenAI/Google key in Control Panel → Providers.",
       });
       return;
     }
     const d = desc.trim();
     if (!d) return;
-    const model = resolveImageModel(provider.kind, getImageModelOverride(provider.id));
+    const model = resolveImageModelForProvider(provider, getImageModelOverride(provider.id));
     const size = defaultSize();
     const styled = styleImagePrompt(d, useDesignSystems.getState().active());
     const loadingId = toast.info("Generating image…", {
@@ -788,16 +786,18 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
   // per slot and inline it as a data: URL (sandboxed srcdoc can't load
   // asset://; data URLs also make the exported file self-contained). Failed /
   // uncovered slots fall back to a gradient so the layout never breaks.
-  const renderArtifact = async (doc: string) => {
+  const renderArtifact = (doc: string) => trackXDesignActivity(
+    "html-generation", "Wait for webpage preparation before switching projects or disabling XDesign.", async () => {
+    const projectId = useHtmlArtifact.getState().projectId;
     const title = (doc.match(/<title>([^<]*)<\/title>/i)?.[1] ?? "").trim();
-    const provider = pickImageProvider(useProvidersStore.getState().providers);
+    const provider = await resolveImageProvider(useProvidersStore.getState().providers);
     const requests = provider ? extractImageRequests(doc) : [];
     if (provider && requests.length > 0) {
       const loadingId = toast.info(
         `Generating ${requests.length} image${requests.length > 1 ? "s" : ""}…`,
         { durationMs: 0, body: provider.name },
       );
-      const model = resolveImageModel(provider.kind, getImageModelOverride(provider.id));
+      const model = resolveImageModelForProvider(provider, getImageModelOverride(provider.id));
       const brand = useDesignSystems.getState().active();
       const map = new Map<string, string>();
       await Promise.all(
@@ -823,17 +823,18 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
       );
       useToasts.getState().dismiss(loadingId);
       log.info(`xdesign claude: ${map.size}/${requests.length} slot image(s) generated`);
-      finishArtifact(inlineGeneratedImages(doc, map), title);
+      finishArtifact(inlineGeneratedImages(doc, map), title, projectId);
       return;
     }
     // No provider / no slots — swap any stray tokens for the gradient fallback.
     const safe = hasImageSlots(doc) ? inlineGeneratedImages(doc, new Map()) : doc;
-    finishArtifact(safe, title);
-  };
+    finishArtifact(safe, title, projectId);
+  }).catch((error) => toast.error("Webpage preparation failed", { body: String(error) }));
 
   // Lever 3 — quality guard. Inspect the final document; on issues run ONE
   // silent auto-repair turn, else publish (warning if still imperfect).
-  const finishArtifact = (finalHtml: string, title: string) => {
+  const finishArtifact = (finalHtml: string, title: string, projectId: string | null) => {
+    if (!projectId || useHtmlArtifact.getState().projectId !== projectId) throw new Error("The owning project changed. The original response remains in chat.");
     const prior = useHtmlArtifact.getState().html;
     const issues = inspectArtifact(finalHtml, { prior, isRefine: refiningRef.current });
     if (issues.length > 0 && repairAttemptRef.current < 1) {
@@ -848,8 +849,9 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
       toast.warning("Page may need a tweak", { body: summarizeIssues(issues) });
       log.warn(`xdesign artifact guard: shipped with issues — ${summarizeIssues(issues)}`);
     }
-    useHtmlArtifact.getState().setArtifact(finalHtml, title || undefined);
-    log.info("xdesign claude: rendered HTML artifact");
+    if (useHtmlArtifact.getState().setArtifact(finalHtml, title || undefined, projectId)) {
+      log.info("xdesign claude: rendered HTML artifact");
+    }
   };
 
   const handleCancel = () => {
@@ -891,7 +893,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     { icon: Presentation, tip: "Build deck — a presentable HTML slide deck (export to PDF/HTML)", onClick: () => enterMode("deck"), disabled: thread.running },
     { icon: Film, tip: "Motion — a looping canvas motion graphic you can record to video", onClick: () => enterMode("motion"), disabled: thread.running },
     { icon: ImagePlus, tip: "Illustrate — generate a vector SVG illustration", onClick: () => enterMode("illustrate"), disabled: thread.running },
-    { icon: ImageIcon, tip: "Generate image — real raster from a prompt (needs an image key)", onClick: handleImageButton },
+    { icon: ImageIcon, tip: "Generate image — ChatGPT subscription or an image API provider", onClick: handleImageButton },
     { icon: Eye, tip: "Critique & refine — self-critique the canvas, then fix it", onClick: handleCritique, disabled: thread.running },
     { icon: Paintbrush, tip: "Apply brand — restyle the canvas to the active design system", onClick: handleApplyBrand, disabled: thread.running },
     { icon: Palette, tip: "Extract brand — distill the canvas into a reusable design system", onClick: handleExtractBrand, disabled: thread.running },

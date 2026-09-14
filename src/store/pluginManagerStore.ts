@@ -59,7 +59,7 @@ function persisted(disabledIds: string[]): PluginEnablementV1 {
   return { version: 1, disabled: [...disabledIds].sort() };
 }
 
-function blockReason(pluginId: string): string | null {
+export function pluginDisableReason(pluginId: string): string | null {
   const plugin = catalogById.get(pluginId);
   if (!plugin) return "Unknown plugin.";
   if (!plugin.disableable) return "This built-in remains required while its private contributions migrate.";
@@ -140,7 +140,7 @@ export const usePluginManager = create<PluginManagerState>((set, get) => ({
       return false;
     }
     if (!enabled) {
-      const reason = blockReason(pluginId);
+      const reason = pluginDisableReason(pluginId);
       if (reason) {
         set({ error: reason });
         return false;

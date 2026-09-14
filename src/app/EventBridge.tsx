@@ -13,6 +13,8 @@ import {
   isOrionHermesWriteTool,
 } from "@/lib/orionToolMatch";
 import { beginOrionActivity } from "@/apps/orion/runtimeActivity";
+import { runXDesignUiAction } from "@/apps/xdesign/runtimeActivity";
+import { uiActionGuard, type UiActionLifetime } from "@/features/agents/uiActionRuns";
 import { useHermes, type HermesStatus, type HermesColumn } from "@/store/hermesStore";
 import { usePluginManager } from "@/store/pluginManagerStore";
 import { BUILTIN_APP_PLUGIN_IDS } from "@/plugins/builtinApps";
@@ -21,6 +23,7 @@ import { internalActionRegistry } from "@/plugins/internalActionRegistry";
 import { appRegistry } from "@/plugins/appRegistry";
 import { useSpotify } from "@/store/spotifyStore";
 import { log } from "@/lib/log";
+import { forgetDispatch, recordDispatchedSession } from "@/features/agents/dispatchSend";
 
 /** UI actions the MCP server can request via the local TCP bridge. Each
  * kind maps to a store mutation in the frontend. */
@@ -56,18 +59,29 @@ type UiAction =
 
 /** The bridge wraps every action with a request id so the frontend can reply
  * via `ui_bridge_respond`. */
-type UiActionEnvelope = UiAction & { requestId: string };
+type UiActionEnvelope = UiAction & { requestId: string } & UiActionLifetime;
 
 /** Returns data for read-back (query) kinds; void for fire-and-forget
  * actions. Throwing here surfaces an error back to the calling MCP tool. */
-async function handleUiAction(action: UiAction): Promise<unknown> {
-  const contributed = await internalActionRegistry.dispatch(action.kind, action.payload);
+async function handleUiAction(action: UiAction & UiActionLifetime): Promise<unknown> {
+  const assertLifetime = uiActionGuard(action);
+  const assertActive = () => {
+    assertLifetime();
+    if (["xdesign_", "model_", "fx_"].some((prefix) => action.kind.startsWith(prefix)) &&
+      !usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign)) {
+      throw new Error("XDesign plugin is disabled");
+    }
+  };
+  assertActive();
+  const contributed = await internalActionRegistry.dispatch(action.kind, action.payload, assertActive);
   if (contributed.handled) return contributed.value;
+  assertActive();
   if (action.kind === "open_note") throw new Error("Archives plugin is disabled");
   if (["switch_project", "open_file", "run_in_terminal", "staged_edit"].includes(action.kind)) {
     throw new Error("Orion editor plugin is disabled");
   }
   if (action.kind.startsWith("xdesign_")) throw new Error("XDesign plugin is disabled");
+
   if (action.kind === "open_app") {
     const app = (action.payload as { app?: unknown } | undefined)?.app;
     if (typeof app !== "string" || !["archives", "orion", "xdesign", "command", "hermes"].includes(app)) {
@@ -76,6 +90,47 @@ async function handleUiAction(action: UiAction): Promise<unknown> {
     if (!appRegistry.has(app)) throw new Error(`${app} plugin is disabled`);
     useShell.getState().openApp(app as AppId);
     return;
+  }
+  if (action.kind.startsWith("fx_")) {
+    const { useXDProjects, projectKind } = await import("@/apps/xdesign/projectsStore");
+    assertActive();
+    const proj = useXDProjects.getState();
+    useShell.getState().openApp("xdesign");
+    if (!proj.activeId || projectKind(proj.registry.find((p) => p.id === proj.activeId)) !== "fx") {
+      await proj.newProject(undefined, "fx");
+    }
+    return runXDesignUiAction(assertActive, async () => {
+      const { executeFxTool, useFxAssist } = await import("@/apps/xdesign/fx/fxAssist");
+      assertActive();
+      const args = (action.payload ?? {}) as Record<string, unknown>;
+      const result = JSON.parse(executeFxTool(action.kind, args));
+      useFxAssist.getState().recordTool(action.kind, args, result.ok !== false);
+      return result;
+    });
+  }
+  // img2model (`orion_model_*` MCP tools — see mcp_server.rs::tool_model_bridge).
+  // One generic bridge for all ~19 tools: the real implementation lives in
+  // `executeModelTool`, which never throws (its own `ok:false` JSON is the
+  // error channel), so we just parse and hand its result straight back.
+  if (action.kind.startsWith("model_")) {
+    const { useXDProjects, projectKind } = await import("@/apps/xdesign/projectsStore");
+    assertActive();
+    useShell.getState().openApp("xdesign");
+    const proj = useXDProjects.getState();
+    const activeKind = projectKind(proj.registry.find((m) => m.id === proj.activeId));
+    if (activeKind !== "model") {
+      await useXDProjects.getState().newProject(undefined, "model");
+    }
+    return runXDesignUiAction(assertActive, async () => {
+      const { executeModelTool } = await import("@/apps/xdesign/model3d/modelAssistTools");
+      assertActive();
+      const result = await executeModelTool(action.kind, (action.payload ?? {}) as Record<string, unknown>);
+      try {
+        return JSON.parse(result.text);
+      } catch {
+        return { ok: false, error: "model tool returned non-JSON text" };
+      }
+    });
   }
   log.warn("ui:action unknown kind:", action.kind);
 }
@@ -234,6 +289,9 @@ function trackOrionToolSideEffects(env: ClaudeEnvelope) {
 }
 
 function handleClaude(env: ClaudeEnvelope) {
+  if (env.event.type === "system" && env.event.subtype === "init" && typeof env.event.session_id === "string") {
+    recordDispatchedSession(env.chatId, env.event.session_id);
+  }
   trackOrionToolSideEffects(env);
   if (handleAppChatClaudeEvent(env)) return;
   internalEventRegistry.dispatch("orion.claude.event", env);
@@ -351,6 +409,7 @@ export function EventBridge() {
     listen<{ chatId: string; code: number | null; error: string | null }>(
       "claude:exit",
       (e) => {
+        forgetDispatch(e.payload.chatId);
         clearToolActivitiesForChat(e.payload.chatId);
         // App-chat (Archives/XDesign over CLI)?
         const app = appForStream(e.payload.chatId);

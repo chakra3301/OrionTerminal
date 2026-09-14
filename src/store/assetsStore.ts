@@ -12,6 +12,9 @@ import {
 } from "@/lib/db";
 import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
+import { runSurfaceAnalysis } from "@/features/agents/textCall";
+import { withBackgroundConsent } from "@/store/backgroundAiStore";
+import { toast } from "@/store/toastStore";
 import {
   scheduleReindex,
   removeEntityEmbedding,
@@ -104,9 +107,7 @@ export const useAssetsStore = create<AssetsState>((set, get) => ({
       if (!existing) return s;
       const next = new Map(s.assets);
       next.set(id, { ...existing, tags });
-      const taggingIds = new Set(s.taggingIds);
-      taggingIds.delete(id);
-      return { assets: next, taggingIds };
+      return { assets: next };
     }),
 
   ingestBlobs: async (blobs) => {
@@ -225,9 +226,7 @@ export const useAssetsStore = create<AssetsState>((set, get) => ({
       set((s) => {
         const next = new Map(s.assets);
         next.delete(id);
-        const taggingIds = new Set(s.taggingIds);
-        taggingIds.delete(id);
-        return { assets: next, taggingIds };
+        return { assets: next };
       });
       void removeEntityEmbedding("asset", id);
     } catch (e) {
@@ -236,27 +235,20 @@ export const useAssetsStore = create<AssetsState>((set, get) => ({
   },
 }));
 
-/**
- * Ask the Claude CLI for 1–3 short tags for a freshly-ingested asset and
- * persist them. Best-effort — failures get logged and the asset just goes
- * untagged. Tags are lowercase single words/hyphenated phrases.
- *
- * Images use the vision-capable variant (`claude --print` with an `@<path>`
- * attachment) so tags reflect actual visual content, not just the filename.
- * Non-images stay on the cheaper metadata-only path.
- */
+// Image tags need actual pixels; unsupported vision must not silently fall back to a filename guess.
 async function runAutoTag(asset: Asset): Promise<void> {
   const isImage = asset.kind === "image" && !!asset.filePath;
   const prompt = isImage ? buildImageTagPrompt(asset) : buildTagPrompt(asset);
   try {
-    const reply = isImage
-      ? await ipc.claudeOneshotWithImage(prompt, asset.filePath)
-      : await ipc.claudeOneshot(prompt);
+    const reply = await withBackgroundConsent("assets", (signal) => {
+      if (!useAssetsStore.getState().assets.has(asset.id)) return Promise.resolve(null);
+      return runSurfaceAnalysis(prompt, "archives", { signal, imagePath: isImage ? asset.filePath : undefined });
+    });
+    if (reply === null) return;
+    const fresh = useAssetsStore.getState().assets.get(asset.id);
+    if (!fresh || fresh.tags.length > 0) return;
     const tags = parseTags(reply);
-    if (tags.length === 0) {
-      useAssetsStore.getState().setTags(asset.id, []);
-      return;
-    }
+    if (tags.length === 0) return;
     const records = await upsertTagsByName(tags);
     await attachAssetTags(
       asset.id,
@@ -264,13 +256,21 @@ async function runAutoTag(asset: Asset): Promise<void> {
     );
     useAssetsStore.getState().setTags(
       asset.id,
-      records.map((r) => r.name),
+      [...new Set([...(useAssetsStore.getState().assets.get(asset.id)?.tags ?? []), ...records.map((r) => r.name)])],
     );
     // Tags substantially change the indexable text — re-embed once they land.
     scheduleReindex("asset", asset.id, () => assetIndexableText(asset.id));
   } catch (e) {
-    log.warn("auto-tag failed", asset.id, e);
-    useAssetsStore.getState().setTags(asset.id, []);
+    if (!(e instanceof Error && e.message === "Analysis cancelled.")) {
+      log.warn("auto-tag failed", asset.id, e);
+      toast.warning("Automatic media tagging failed", { body: String(e), dedupeKey: "asset-auto-tag" });
+    }
+  } finally {
+    useAssetsStore.setState((s) => {
+      const taggingIds = new Set(s.taggingIds);
+      taggingIds.delete(asset.id);
+      return { taggingIds };
+    });
   }
 }
 
@@ -300,9 +300,6 @@ function buildTagPrompt(a: Asset): string {
 }
 
 function buildImageTagPrompt(a: Asset): string {
-  // Same shape as the metadata prompt, but tells Claude to look at the
-  // attached image and tag what it actually sees. Filename is still useful
-  // context but visual content dominates.
   return [
     "Tag the attached image with 1 to 3 short tags, comma-separated,",
     "lowercase, single words or hyphenated phrases. Pick tags that capture",

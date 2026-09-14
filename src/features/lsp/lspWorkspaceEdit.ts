@@ -1,6 +1,7 @@
 import type { OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { ipc } from "@/lib/ipc";
+import { saveFileSnapshot } from "@/apps/orion/saveFileBuffer";
 import { useTabsStore } from "@/store/tabsStore";
 import { useFileTreeRefresh } from "@/store/fileTreeRefreshStore";
 import { useGit } from "@/store/gitStore";
@@ -95,13 +96,15 @@ export async function applyWorkspaceEdit(
         );
         // Persist immediately so on-disk matches (rename is a commit-grade
         // action) and mark the tab clean.
-        await ipc.saveFileAtomic(path, model.getValue());
-        useTabsStore.getState().markSaved?.(path);
+        if (!await saveFileSnapshot(path, model.getValue())) continue;
       } else {
+        const initialBuffer = useTabsStore.getState().fileBuffers[path];
         const original = await ipc.readFile(path);
         const updated = applyEditsToText(original, edits);
-        await ipc.saveFileAtomic(path, updated);
-        useTabsStore.getState().markLoaded(path, updated);
+        if (!await saveFileSnapshot(path, updated)) continue;
+        if (useTabsStore.getState().fileBuffers[path] === initialBuffer) {
+          useTabsStore.getState().markLoaded(path, updated);
+        }
       }
       changed++;
     } catch (e) {

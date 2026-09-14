@@ -3,19 +3,12 @@ import { useDiagnosticsStore } from "@/store/diagnosticsStore";
 import { registerTabAutocomplete } from "@/features/autocomplete/tabAutocomplete";
 import { registerLsp } from "@/features/lsp/lspManager";
 
-loader.config({
-  paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs" },
-});
-
 let registerPromise: Promise<void> | null = null;
 
 export function ensureOrionTheme(): Promise<void> {
   if (registerPromise) return registerPromise;
   registerPromise = loader.init().then((monaco) => {
-    configureTypescript(monaco);
-    trackMarkers(monaco);
-    registerTabAutocomplete(monaco);
-    registerLsp(monaco);
+    // Service initialization failures must not leave the light fallback theme.
     monaco.editor.defineTheme("orion-neon", {
       base: "vs-dark",
       inherit: true,
@@ -65,6 +58,10 @@ export function ensureOrionTheme(): Promise<void> {
         "editorStickyScroll.background": "#060a0f",
       },
     });
+    configureTypescript(monaco);
+    trackMarkers(monaco);
+    registerTabAutocomplete(monaco);
+    registerLsp(monaco);
   });
   return registerPromise;
 }

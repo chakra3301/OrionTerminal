@@ -149,6 +149,22 @@ export function CompanionAvatar() {
       }}
       title="R.O.S.I.E — drag to move · fling off-screen to dismiss · click to talk"
     >
+      {visible && (
+        <button
+          type="button"
+          className="ot-companion-hide"
+          aria-label="Hide companion"
+          title="Hide companion · summon again with ⌥R"
+          data-no-drag
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            dismissCompanion();
+          }}
+        >
+          <X size={14} />
+        </button>
+      )}
       {visible && proactivePrompt && (
         <div
           className="ot-companion-bubble"

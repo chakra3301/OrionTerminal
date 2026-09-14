@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useModalRequest } from "./useModalRequest";
 
 type PromptOptions = {
   title: string;
@@ -9,109 +10,67 @@ type PromptOptions = {
   confirmLabel?: string;
 };
 
-let openPromptImpl: ((opts: PromptOptions) => Promise<string | null>) | null =
-  null;
+let openPromptImpl: ((opts: PromptOptions) => Promise<string | null>) | null = null;
 
-/**
- * Imperative text-input dialog — `const name = await promptText({ ... })`.
- * Returns the trimmed string on confirm, or null on cancel. Mount
- * <PromptModalHost/> once at the app root for this to work.
- */
 export function promptText(opts: PromptOptions): Promise<string | null> {
-  if (!openPromptImpl) return Promise.resolve(null);
-  return openPromptImpl(opts);
+  return openPromptImpl?.(opts) ?? Promise.resolve(null);
 }
 
 export function PromptModalHost() {
-  const [state, setState] = useState<{
-    opts: PromptOptions;
-    resolve: (v: string | null) => void;
-  } | null>(null);
-  const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const { request, open, close, dialogRef } = useModalRequest<PromptOptions, string | null>(null, inputRef);
+  const titleId = useId();
+  const inputId = useId();
 
   useEffect(() => {
-    openPromptImpl = (opts) =>
-      new Promise<string | null>((resolve) => {
-        setValue(opts.initialValue ?? "");
-        setState({ opts, resolve });
-      });
-    return () => {
-      openPromptImpl = null;
-    };
-  }, []);
+    openPromptImpl = open;
+    return () => { if (openPromptImpl === open) openPromptImpl = null; };
+  }, [open]);
 
-  useEffect(() => {
-    if (state) {
-      // Focus + select the field once it mounts.
-      const id = setTimeout(() => {
-        inputRef.current?.focus();
-        inputRef.current?.select();
-      }, 0);
-      return () => clearTimeout(id);
-    }
-  }, [state]);
+  useLayoutEffect(() => {
+    if (!request || !inputRef.current) return;
+    inputRef.current.value = request.opts.initialValue ?? "";
+    inputRef.current.select();
+  }, [request]);
 
-  if (!state) return null;
-
-  const close = (result: string | null) => {
-    state.resolve(result);
-    setState(null);
-  };
-
-  const confirm = () => {
-    const v = value.trim();
-    close(v.length > 0 ? v : null);
-  };
-
+  if (!request) return null;
+  const { opts } = request;
+  const confirm = () => close(inputRef.current?.value.trim() || null);
   return createPortal(
-    <div className="ot-prompt-overlay" onMouseDown={() => close(null)}>
-      <div
-        className="ot-prompt-card"
-        role="dialog"
-        aria-modal="true"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="ot-prompt-title">{state.opts.title}</div>
-        {state.opts.label && (
-          <div className="ot-prompt-label">{state.opts.label}</div>
-        )}
+    <dialog
+      ref={dialogRef}
+      className="ot-prompt-overlay"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      onCancel={(event) => { event.preventDefault(); close(null); }}
+      onClose={(event) => { if (!event.currentTarget.open) close(null); }}
+      onMouseDown={(event) => { if (event.target === event.currentTarget) close(null); }}
+    >
+      <div className="ot-prompt-card">
+        <div id={titleId} className="ot-prompt-title">{opts.title}</div>
+        {opts.label && <label className="ot-prompt-label" htmlFor={inputId}>{opts.label}</label>}
         <input
+          id={inputId}
           ref={inputRef}
           className="ot-prompt-input"
           type="text"
-          value={value}
-          placeholder={state.opts.placeholder}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
+          aria-labelledby={opts.label ? undefined : titleId}
+          defaultValue={opts.initialValue ?? ""}
+          placeholder={opts.placeholder}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
+              event.preventDefault();
               confirm();
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              close(null);
             }
           }}
           spellCheck={false}
         />
         <div className="ot-prompt-actions">
-          <button
-            type="button"
-            className="ot-prompt-btn"
-            onClick={() => close(null)}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="ot-prompt-btn primary"
-            onClick={confirm}
-          >
-            {state.opts.confirmLabel ?? "OK"}
-          </button>
+          <button type="button" className="ot-prompt-btn" onClick={() => close(null)}>Cancel</button>
+          <button type="button" className="ot-prompt-btn primary" onClick={confirm}>{opts.confirmLabel ?? "OK"}</button>
         </div>
       </div>
-    </div>,
+    </dialog>,
     document.body,
   );
 }

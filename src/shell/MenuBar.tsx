@@ -1,4 +1,5 @@
-import { Wifi, BatteryMedium, Mic, MicOff, Loader2 } from "lucide-react";
+import { SlidersHorizontal, Mic, MicOff, Loader2 } from "lucide-react";
+import { useControlPanel } from "@/store/controlPanelStore";
 import { useShell, focusedApp } from "@/shell/store/useShell";
 import { useAppDescriptors } from "@/plugins/appRegistry";
 import { useClock } from "@/shell/useClock";
@@ -170,23 +171,15 @@ export function MenuBar() {
         <SpotifyWidget />
         <VoiceIndicator />
         <NotificationCenter />
-        <span className="pill">
-          <span className="pill-dot" />
-          CLAUDE • ONLINE
-        </span>
-        <span style={{ color: "var(--t-secondary)" }}>
-          <Wifi size={13} />
-        </span>
-        <span
-          style={{
-            color: "var(--t-secondary)",
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-          }}
+        <button
+          type="button"
+          className="pill"
+          title="Configure models and accounts. Connection status is shown per provider."
+          onClick={() => useControlPanel.getState().show("providers")}
         >
-          <BatteryMedium size={14} /> 84%
-        </span>
+          <SlidersHorizontal size={12} aria-hidden />
+          AI · SETTINGS
+        </button>
         <span style={{ color: "var(--t-tertiary)" }}>{dateText}</span>
         <span style={{ color: "var(--t-primary)" }}>{clockText}</span>
       </div>

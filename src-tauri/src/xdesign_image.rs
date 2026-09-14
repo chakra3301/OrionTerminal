@@ -1,7 +1,8 @@
 // Raster image generation for XDesign's AI.
 //
 // Unlike the streaming chat runtime (`runtime/`), image generation is a single
-// non-streaming request/response. Two backends keyed off the provider kind:
+// non-streaming request/response. Three backends keyed off the provider kind:
+//   - codex_cli:         native ChatGPT-subscription transport (gpt-image-2)
 //   - OpenAI-compatible: POST {base}/images/generations  (gpt-image-1 / dall-e-3)
 //   - Google:            POST {base}/models/{model}:predict  (Imagen)
 // Both return base64 PNG bytes that the frontend ingests into the Archives
@@ -36,13 +37,25 @@ fn trim_base<'a>(base_url: &'a str, default: &'a str) -> &'a str {
 // ---- OpenAI-compatible (gpt-image-1 / dall-e-3) ----------------------------
 
 pub fn openai_image_endpoint(base_url: &str) -> String {
-    format!("{}/images/generations", trim_base(base_url, OPENAI_DEFAULT_BASE))
+    format!(
+        "{}/images/generations",
+        trim_base(base_url, OPENAI_DEFAULT_BASE)
+    )
 }
 
 /// dall-e-* needs `response_format: b64_json`; gpt-image-1 always returns
 /// base64 and REJECTS the param, so we only send it for dall-e models.
 fn is_dalle(model: &str) -> bool {
     model.to_lowercase().starts_with("dall-e")
+}
+
+fn openai_image_headers(key: &str) -> Vec<(String, String)> {
+    let mut headers = vec![("content-type".into(), "application/json".into())];
+    let key = key.trim();
+    if !key.is_empty() {
+        headers.push(("authorization".into(), format!("Bearer {}", key)));
+    }
+    headers
 }
 
 pub fn openai_image_body(model: &str, prompt: &str, size: &str) -> Value {
@@ -66,7 +79,10 @@ pub fn parse_openai_image(v: &Value) -> Result<GeneratedImage, String> {
         return Err(msg.to_string());
     }
     if let Some(b64) = v.pointer("/data/0/b64_json").and_then(|x| x.as_str()) {
-        return Ok(GeneratedImage { b64: b64.to_string(), mime: "image/png".to_string() });
+        return Ok(GeneratedImage {
+            b64: b64.to_string(),
+            mime: "image/png".to_string(),
+        });
     }
     // Some models/params return a hosted URL instead of base64. We requested
     // b64; tell the user plainly rather than failing opaquely.
@@ -158,9 +174,9 @@ pub fn parse_imagen(v: &Value) -> Result<GeneratedImage, String> {
 
 // ---- Command (thin side-effect) --------------------------------------------
 
-/// Generate one raster image. `provider_kind` "google" → Imagen; every other
-/// kind speaks the OpenAI-compatible /images/generations endpoint. Returns
-/// base64 image bytes + mime; the frontend ingests them into the asset library.
+/// Generate one raster image. `codex_cli` uses the native subscription bridge,
+/// `google` uses Imagen, and every other kind uses its OpenAI-compatible image
+/// endpoint. Returns base64 bytes + mime for frontend asset ingestion.
 #[tauri::command]
 pub async fn xdesign_image_gen(
     provider_kind: String,
@@ -170,13 +186,18 @@ pub async fn xdesign_image_gen(
     prompt: String,
     size: String,
 ) -> Result<GeneratedImage, String> {
+    if provider_kind == "codex_cli" {
+        return crate::codex_subscription::generate_image(&prompt, &size).await;
+    }
+
     let key = crate::provider_keys::read(&key_ref).unwrap_or_default();
     if key.trim().is_empty() {
         return Err("no API key configured for this provider".into());
     }
     let client = reqwest::Client::new();
 
-    let (url, body, headers): (String, Value, Vec<(String, String)>) = if provider_kind == "google" {
+    let (url, body, headers): (String, Value, Vec<(String, String)>) = if provider_kind == "google"
+    {
         (
             imagen_endpoint(&base_url, &model),
             imagen_body(&prompt, size_to_aspect(&size)),
@@ -189,10 +210,7 @@ pub async fn xdesign_image_gen(
         (
             openai_image_endpoint(&base_url),
             openai_image_body(&model, &prompt, &size),
-            vec![
-                ("content-type".into(), "application/json".into()),
-                ("authorization".into(), format!("Bearer {}", key.trim())),
-            ],
+            openai_image_headers(&key),
         )
     };
 
@@ -214,9 +232,7 @@ pub async fn xdesign_image_gen(
         } else {
             parse_openai_image(&v)
         };
-        return Err(parsed
-            .err()
-            .unwrap_or_else(|| format!("HTTP {}", status)));
+        return Err(parsed.err().unwrap_or_else(|| format!("HTTP {}", status)));
     }
     if provider_kind == "google" {
         parse_imagen(&v)
@@ -255,6 +271,16 @@ mod tests {
     fn openai_body_sets_response_format_for_dalle() {
         let b = openai_image_body("dall-e-3", "a dog", "1024x1024");
         assert_eq!(b["response_format"], "b64_json");
+    }
+
+    #[test]
+    fn openai_headers_omit_empty_authorization() {
+        let no_key = openai_image_headers("  ");
+        assert!(no_key.iter().all(|(k, _)| k != "authorization"));
+        let with_key = openai_image_headers("sk-test");
+        assert!(with_key
+            .iter()
+            .any(|(k, v)| k == "authorization" && v == "Bearer sk-test"));
     }
 
     #[test]
@@ -298,7 +324,8 @@ mod tests {
 
     #[test]
     fn parses_imagen() {
-        let v = json!({ "predictions": [{ "bytesBase64Encoded": "BBBB", "mimeType": "image/png" }] });
+        let v =
+            json!({ "predictions": [{ "bytesBase64Encoded": "BBBB", "mimeType": "image/png" }] });
         let g = parse_imagen(&v).unwrap();
         assert_eq!(g.b64, "BBBB");
         assert_eq!(g.mime, "image/png");

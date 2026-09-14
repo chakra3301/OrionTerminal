@@ -4,6 +4,8 @@ import { Globe, FileText } from "lucide-react";
 import { useContextMenu } from "@/components/ContextMenu";
 import { useRepoLensWebsites } from "./useRepoLensWebsites";
 import { useRepoLens } from "./useRepoLens";
+import { availableRepoLensModel } from "./models";
+import { useProvidersStore } from "@/store/providersStore";
 import { RepoLensWebsiteProgress } from "./RepoLensWebsiteProgress";
 import { RepoLensDesignMDs } from "./RepoLensDesignMDs";
 import { phaseLabel } from "./websiteRip";
@@ -13,7 +15,9 @@ export function RepoLensWebsitesLibrary() {
   const { rips, loaded, load, remove, continueRip, openInOrion, extractDesign } =
     useRepoLensWebsites();
   const extractingSet = useRepoLensWebsites((s) => s.extracting);
-  const model = useRepoLens((s) => s.model.default_model);
+  const selectedModel = useRepoLens((s) => s.model.default_model);
+  const providers = useProvidersStore((s) => s.providers);
+  const model = availableRepoLensModel(providers, selectedModel, "website-agent");
   const { openAt, menu } = useContextMenu();
   const [webSub, setWebSub] = useState<"rips" | "designs">("rips");
 

@@ -1,5 +1,10 @@
 // src/apps/archives/learn/claude.ts
 import { learnClaudeCall } from "../../../lib/ipc";
+import { runTextModel } from "@/features/agents/textCall";
+import { resolveSendFromStores } from "@/features/agents/resolveSend";
+import { routeFor } from "@/features/agents/dispatchSend";
+import { parseModelValue } from "@/features/agents/modelSelection";
+import { useProvidersStore } from "@/store/providersStore";
 import { parseGraphSpec, parseLesson, type GraphSpec, type Lesson } from "./learnTypes";
 import { graphPrompt, lessonPrompt, gradePrompt, findLinksPrompt, figurePrompt } from "./pedagogy";
 import { parseFigure, type Figure } from "./figure";
@@ -34,7 +39,14 @@ function trackedCall(prompt: string, model: string, allowWeb: boolean) {
   return withArchivesActivity(
     "learn-ai",
     "Wait for Archives Learn AI work to finish before disabling the plugin.",
-    () => learnClaudeCall(prompt, model, allowWeb),
+    async () => {
+      if (!allowWeb) return { result: await runTextModel(prompt, model) };
+      const resolved = resolveSendFromStores(model);
+      if (routeFor(useProvidersStore.getState().providers, resolved.model) !== "claude") {
+        throw new Error("Verified web-link lookup currently requires the Claude connector. Lesson generation, grading, and tutoring use any configured provider.");
+      }
+      return learnClaudeCall(prompt, parseModelValue(resolved.model).modelId, true);
+    },
   );
 }
 
@@ -62,10 +74,13 @@ export async function gradeAnswer(args: { question: string; expected: string; co
   const reply = await enqueue(() => trackedCall(gradePrompt(args), model, false));
   try {
     const s = reply.result; const a = s.indexOf("{"); const b = s.lastIndexOf("}");
-    const o = a >= 0 && b > a ? JSON.parse(s.slice(a, b + 1)) : {};
-    return { correct: !!o.correct, partial: !!o.partial, missed_concepts: Array.isArray(o.missed_concepts) ? o.missed_concepts.map(String) : [] };
+    const o = a >= 0 && b > a ? JSON.parse(s.slice(a, b + 1)) : null;
+    if (!o || typeof o.correct !== "boolean" || typeof o.partial !== "boolean" || !Array.isArray(o.missed_concepts) || !o.missed_concepts.every((c: unknown) => typeof c === "string")) {
+      throw new Error("Invalid grade");
+    }
+    return { correct: o.correct, partial: o.partial, missed_concepts: o.missed_concepts };
   } catch {
-    return { correct: false, partial: false, missed_concepts: [] };
+    throw new Error("The model returned an invalid grade. Your mastery was not changed — please retry.");
   }
 }
 

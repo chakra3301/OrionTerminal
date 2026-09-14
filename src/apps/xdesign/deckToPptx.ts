@@ -86,7 +86,7 @@ export async function deckToPptxBase64(
 ): Promise<string> {
   const slides = parseDeckSlides(html);
   if (slides.length === 0) throw new Error("no slides found in this document");
-  const { default: PptxGen } = await import("pptxgenjs");
+  const { default: PptxGen } = await import("@/vendor/pptxgenjs/pptxgen.js");
   const { bg, ink, accent } = deckColors(brand);
 
   const pptx = new PptxGen();

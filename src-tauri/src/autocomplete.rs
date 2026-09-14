@@ -67,7 +67,7 @@ pub async fn autocomplete_run(ctx: AutocompleteCtx) -> Result<String, String> {
     {
         let mut cur = CURRENT.lock();
         if let Some(prev) = cur.take() {
-            prev.notify_waiters();
+            prev.notify_one();
         }
         *cur = Some(cancel.clone());
     }

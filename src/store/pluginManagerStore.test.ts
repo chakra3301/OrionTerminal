@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setAppState } from "@/lib/db";
+import { setAppState, updateNote } from "@/lib/db";
 import { registry } from "@/commands/registry";
 import { appRegistry } from "@/plugins/appRegistry";
 import { BUILTIN_APP_PLUGIN_IDS } from "@/plugins/builtinApps";
@@ -29,8 +29,13 @@ import {
 import { ORION_CONTRIBUTION_IDS } from "@/apps/orion/pluginContributions";
 import { beginLiveTerminal } from "@/apps/orion/terminalActivity";
 import { usePluginManager } from "./pluginManagerStore";
+import { useNotesStore, type Note } from "./notesStore";
+import { emptyDoc, flushActive, useXDProjects } from "@/apps/xdesign/projectsStore";
+import { useXDesign } from "@/apps/xdesign/store";
+import { useXDesignSaveState } from "@/apps/xdesign/saveState";
+import { useHtmlArtifact } from "@/apps/xdesign/htmlArtifactStore";
 
-vi.mock("@/lib/db", () => ({ setAppState: vi.fn(async () => {}) }));
+vi.mock("@/lib/db", () => ({ setAppState: vi.fn(async () => {}), updateNote: vi.fn(async () => {}), logActivity: vi.fn(async () => {}) }));
 vi.mock("@/lib/log", () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
@@ -79,6 +84,8 @@ function reset() {
       },
     },
   });
+  useXDesignSaveState.setState({ documents: {}, names: {} });
+  useNotesStore.setState({ notes: new Map(), pendingWrites: new Set(), saving: new Set(), deleting: new Set(), drafts: new Map(), saveErrors: new Map(), loadError: null });
   vi.clearAllMocks();
 }
 
@@ -86,6 +93,46 @@ beforeEach(reset);
 afterEach(reset);
 
 describe("plugin enablement persistence", () => {
+  it("blocks Archives disable for staged/failed notes and permits it after retry", async () => {
+    vi.useFakeTimers();
+    try {
+      usePluginManager.getState().hydrate(null);
+      const note: Note = { id: "note-fixture", title: "Old", blocks: [], plaintext: "", parentId: null,
+        kind: "note", location: "", collectionId: null, tags: [], favorite: false, createdAt: 1, updatedAt: 1 };
+      useNotesStore.setState({ notes: new Map([[note.id, note]]) });
+      useNotesStore.getState().stageTitle(note.id, "Retain me");
+      expect(await usePluginManager.getState().setEnabled(BUILTIN_APP_PLUGIN_IDS.archives, false)).toBe(false);
+      vi.mocked(updateNote).mockRejectedValueOnce(new Error("note disk full"));
+      await expect(useNotesStore.getState().flushNote(note.id)).rejects.toThrow(/disk full/);
+      expect(useNotesStore.getState().saving.size).toBe(0);
+      expect(await usePluginManager.getState().setEnabled(BUILTIN_APP_PLUGIN_IDS.archives, false)).toBe(false);
+      expect(usePluginManager.getState().error).toMatch(/unsaved notes/);
+      expect(useNotesStore.getState().get(note.id)?.title).toBe("Retain me");
+      await useNotesStore.getState().flushNote(note.id);
+      expect(await usePluginManager.getState().setEnabled(BUILTIN_APP_PLUGIN_IDS.archives, false)).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+  it("keeps XDesign enabled after an actual subscribed autosave failure until retry succeeds", async () => {
+    vi.useFakeTimers();
+    try {
+      usePluginManager.getState().hydrate(null);
+      useXDProjects.setState({ ready: true, transitioning: true });
+      useXDesign.getState().hydrate(emptyDoc());
+      useHtmlArtifact.getState().setProject("save-fixture");
+      useXDProjects.setState({ activeId: "save-fixture", registry: [{ id: "save-fixture", name: "Fixture", createdAt: 1, updatedAt: 1 }], transitioning: false });
+      vi.mocked(setAppState).mockRejectedValueOnce(new Error("disk full"));
+      useXDesign.getState().addShape({ kind: "rect", x: 0, y: 0, w: 20, h: 20, fill: "#ffffff", stroke: "transparent", strokeWidth: 0, radius: 0 });
+      await vi.advanceTimersByTimeAsync(450);
+      expect(useXDesignSaveState.getState().documents["save-fixture"]?.error).toMatch(/disk full/);
+      expect(await usePluginManager.getState().setEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign, false)).toBe(false);
+      expect(usePluginManager.getState().error).toMatch(/unsaved work/);
+      expect(useXDProjects.getState().activeId).toBe("save-fixture");
+      expect(useXDesign.getState().shapes).toHaveLength(1);
+      await flushActive();
+      expect(useXDesignSaveState.getState().documents["save-fixture"]).toBeUndefined();
+      expect(await usePluginManager.getState().setEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign, false)).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
   it("fails closed until persisted state is hydrated", () => {
     expect(usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.hermes)).toBe(false);
     expect(appRegistry.list()).toEqual([]);
@@ -285,7 +332,7 @@ describe("plugin enablement persistence", () => {
       .getState()
       .setEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign, false);
     expect(ok).toBe(false);
-    expect(usePluginManager.getState().error).toMatch(/XDesign Claude response/);
+    expect(usePluginManager.getState().error).toMatch(/XDesign AI response/);
 
     useAppChat.setState({
       threads: {

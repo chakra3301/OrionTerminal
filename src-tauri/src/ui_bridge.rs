@@ -21,9 +21,9 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{AppHandle, Emitter};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, Semaphore};
 use tokio::time::{timeout, Duration};
 
 /// Token + port published once the listener is bound. `mcp_config::write`
@@ -46,6 +46,44 @@ static PENDING_SYNC: Lazy<Mutex<HashMap<String, std::sync::mpsc::Sender<BridgeRe
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 static REQ_COUNTER: AtomicU64 = AtomicU64::new(1);
+const MAX_REQUEST_BYTES: usize = 1024 * 1024;
+const REQUEST_READ_TIMEOUT: Duration = Duration::from_secs(2);
+
+thread_local! {
+    static SYNC_RUN: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+pub fn validate_run_id(id: Option<&str>) -> Result<(), String> {
+    if id.is_some_and(|id| id.is_empty() || id.len() > 128 || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')) {
+        return Err("Invalid UI run identity".into());
+    }
+    Ok(())
+}
+
+pub fn with_sync_run<T>(id: Option<String>, work: impl FnOnce() -> T) -> T {
+    struct Restore(Option<String>);
+    impl Drop for Restore {
+        fn drop(&mut self) { SYNC_RUN.with(|slot| *slot.borrow_mut() = self.0.take()); }
+    }
+    let _restore = Restore(SYNC_RUN.with(|slot| slot.replace(id)));
+    work()
+}
+
+fn expires_at() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default().as_millis() as u64 + 5000
+}
+
+async fn read_request<R: AsyncBufRead + Unpin>(reader: R) -> Result<String, String> {
+    let mut bytes = Vec::new();
+    let mut limited = reader.take((MAX_REQUEST_BYTES + 1) as u64);
+    timeout(REQUEST_READ_TIMEOUT, limited.read_until(b'\n', &mut bytes)).await
+        .map_err(|_| "UI bridge request read timed out")?
+        .map_err(|_| "Could not read UI bridge request")?;
+    if bytes.len() > MAX_REQUEST_BYTES { return Err("UI bridge request exceeds 1MB".into()); }
+    if bytes.last() != Some(&b'\n') { return Err("Incomplete UI bridge request".into()); }
+    String::from_utf8(bytes).map_err(|_| "UI bridge request must be UTF-8".into())
+}
 
 #[derive(Clone)]
 struct BridgeResult {
@@ -68,6 +106,8 @@ pub fn current() -> Option<&'static BridgeInfo> {
 struct Request {
     token: String,
     kind: String,
+    #[serde(default, rename = "runId")]
+    run_id: Option<String>,
     #[serde(default)]
     payload: serde_json::Value,
 }
@@ -93,6 +133,10 @@ impl Response {
 
 #[derive(Serialize, Clone)]
 struct UiActionEvent {
+    #[serde(rename = "runId")]
+    run_id: Option<String>,
+    #[serde(rename = "expiresAt")]
+    expires_at: u64,
     kind: String,
     payload: serde_json::Value,
     #[serde(rename = "requestId")]
@@ -114,25 +158,30 @@ pub async fn start(app: AppHandle) -> Result<BridgeInfo, String> {
     let _ = BRIDGE.set(info.clone());
 
     let app_clone = app.clone();
+    let connections = std::sync::Arc::new(Semaphore::new(64));
     tokio::spawn(async move {
         loop {
             let (mut socket, _) = match listener.accept().await {
                 Ok(v) => v,
                 Err(_) => continue,
             };
+            let Ok(permit) = connections.clone().try_acquire_owned() else { continue; };
             let app_for_conn = app_clone.clone();
             let token_for_conn = token.clone();
             tokio::spawn(async move {
+                let _permit = permit;
                 let (read_half, mut write_half) = socket.split();
-                let mut reader = BufReader::new(read_half);
-                let mut line = String::new();
-                let _ = reader.read_line(&mut line).await;
-                let response = handle_request(&app_for_conn, &token_for_conn, &line).await;
+                let response = match read_request(BufReader::new(read_half)).await {
+                    Ok(line) => handle_request(&app_for_conn, &token_for_conn, &line).await,
+                    Err(error) => Response::err(error),
+                };
                 let body = serde_json::to_string(&response)
                     .unwrap_or_else(|_| "{\"ok\":false}".to_string());
-                let _ = write_half.write_all(body.as_bytes()).await;
-                let _ = write_half.write_all(b"\n").await;
-                let _ = write_half.shutdown().await;
+                let _ = timeout(Duration::from_secs(2), async {
+                    write_half.write_all(body.as_bytes()).await?;
+                    write_half.write_all(b"\n").await?;
+                    write_half.shutdown().await
+                }).await;
             });
         }
     });
@@ -156,6 +205,7 @@ async fn handle_request(app: &AppHandle, expected_token: &str, line: &str) -> Re
     if req.token != expected_token {
         return Response::err("bad token");
     }
+    if let Err(error) = validate_run_id(req.run_id.as_deref()) { return Response::err(error); }
 
     let request_id = format!("req-{}", REQ_COUNTER.fetch_add(1, Ordering::Relaxed));
     let (tx, rx) = oneshot::channel::<BridgeResult>();
@@ -165,6 +215,8 @@ async fn handle_request(app: &AppHandle, expected_token: &str, line: &str) -> Re
     let emitted = app.emit(
         "ui:action",
         UiActionEvent {
+            run_id: req.run_id,
+            expires_at: expires_at(),
             kind: req.kind,
             payload: req.payload,
             request_id: request_id.clone(),
@@ -208,6 +260,8 @@ pub fn dispatch_sync(app: &AppHandle, kind: &str, payload: Value) -> Result<Valu
     let emitted = app.emit(
         "ui:action",
         UiActionEvent {
+            run_id: SYNC_RUN.with(|slot| slot.borrow().clone()),
+            expires_at: expires_at(),
             kind: kind.to_string(),
             payload,
             request_id: request_id.clone(),
@@ -259,6 +313,54 @@ fn random_token() -> Result<String, String> {
 mod tests {
     use super::*;
     use std::sync::mpsc;
+
+    #[tokio::test]
+    async fn request_reader_bounds_size_and_requires_complete_utf8_line() {
+        assert_eq!(read_request(&b"{}\nignored"[..]).await.unwrap(), "{}\n");
+        assert!(read_request(&b"{}"[..]).await.unwrap_err().contains("Incomplete"));
+        assert!(read_request(&[255, b'\n'][..]).await.unwrap_err().contains("UTF-8"));
+        let mut exact = vec![b'x'; MAX_REQUEST_BYTES - 1];
+        exact.push(b'\n');
+        assert_eq!(read_request(exact.as_slice()).await.unwrap().len(), MAX_REQUEST_BYTES);
+        let oversized = vec![b'x'; MAX_REQUEST_BYTES + 1];
+        assert!(read_request(oversized.as_slice()).await.unwrap_err().contains("exceeds 1MB"));
+    }
+
+    #[tokio::test]
+    async fn silent_connections_have_a_read_deadline() {
+        let (_writer, reader) = tokio::io::duplex(64);
+        assert!(read_request(BufReader::new(reader)).await.unwrap_err().contains("timed out"));
+    }
+
+    #[test]
+    fn identities_and_expiry_are_envelope_metadata_not_model_payload() {
+        assert!(validate_run_id(None).is_ok());
+        assert!(validate_run_id(Some("run-ABC123")).is_ok());
+        for id in ["", "bad\nvalue", "../other", &"a".repeat(129)] {
+            assert!(validate_run_id(Some(id)).is_err());
+        }
+        let event = UiActionEvent {
+            run_id: Some("trusted-run".into()), expires_at: expires_at(), kind: "fx_get_scene".into(),
+            request_id: "fixture".into(), payload: serde_json::json!({"runId":"spoofed", "expiresAt": u64::MAX}),
+        };
+        let json = serde_json::to_value(event).unwrap();
+        assert_eq!(json["runId"], "trusted-run");
+        assert!(json["expiresAt"].as_u64().unwrap() < u64::MAX);
+        assert_eq!(json["payload"]["runId"], "spoofed");
+    }
+
+    #[test]
+    fn sync_run_context_is_restored_after_nested_calls_and_panics() {
+        with_sync_run(Some("outer".into()), || {
+            let _ = std::panic::catch_unwind(|| with_sync_run(Some("inner".into()), || {
+                assert_eq!(SYNC_RUN.with(|s| s.borrow().clone()).as_deref(), Some("inner"));
+                panic!("fixture");
+            }));
+            assert_eq!(SYNC_RUN.with(|s| s.borrow().clone()).as_deref(), Some("outer"));
+            assert!(std::thread::spawn(|| SYNC_RUN.with(|s| s.borrow().is_none())).join().unwrap());
+        });
+        assert!(SYNC_RUN.with(|s| s.borrow().is_none()));
+    }
 
     #[test]
     fn respond_resolves_sync_pending_map() {

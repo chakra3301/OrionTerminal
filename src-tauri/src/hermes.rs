@@ -491,7 +491,8 @@ async fn run_agent(
                 s.push_str(&line);
                 s.push('\n');
                 if s.len() > 4000 {
-                    let cut = s.len() - 4000;
+                    let mut cut = s.len() - 4000;
+                    while !s.is_char_boundary(cut) { cut += 1; }
                     s.replace_range(0..cut, "");
                 }
             }
@@ -824,7 +825,7 @@ pub async fn hermes_continue_agent(
 #[tauri::command]
 pub fn hermes_stop_agent(agent_id: String) -> Result<(), String> {
     if let Some(n) = AGENTS.lock().remove(&agent_id) {
-        n.notify_waiters();
+        n.notify_one();
     }
     Ok(())
 }
@@ -835,7 +836,7 @@ pub fn hermes_stop_task(app: AppHandle, task_id: String) -> Result<(), String> {
     let mut map = AGENTS.lock();
     for id in ids {
         if let Some(n) = map.remove(&id) {
-            n.notify_waiters();
+            n.notify_one();
         }
     }
     Ok(())

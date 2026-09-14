@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { currentUiRun } from "@/features/agents/uiActionRuns";
 
 export type TreeNode = {
   name: string;
@@ -51,6 +52,7 @@ export const ipc = {
     invoke<string>("read_file_base64", { path }),
   countFiles: (path: string): Promise<number> =>
     invoke<number>("count_files", { path }),
+  analysisWorkDir: (): Promise<string> => invoke("analysis_work_dir"),
   pathExists: (path: string): Promise<boolean> =>
     invoke<boolean>("path_exists", { path }),
   saveFileAtomic: (path: string, contents: string): Promise<void> =>
@@ -197,6 +199,7 @@ export const ipc = {
   ): Promise<void> =>
     invoke("claude_send", {
       chatId,
+      uiRunId: currentUiRun(chatId),
       prompt,
       projectRoot,
       sessionId,
@@ -209,9 +212,7 @@ export const ipc = {
     invoke("claude_cancel", { chatId }),
   runtimeSend: (
     chatId: string,
-    providerKind: string,
-    baseUrl: string,
-    keyRef: string,
+    providerId: string,
     model: string,
     system: string,
     history: Array<{ role: "user" | "assistant"; content: string }>,
@@ -219,9 +220,8 @@ export const ipc = {
   ): Promise<void> =>
     invoke("runtime_send", {
       chatId,
-      providerKind,
-      baseUrl,
-      keyRef,
+      uiRunId: currentUiRun(chatId),
+      providerId,
       model,
       system,
       history,
@@ -237,8 +237,11 @@ export const ipc = {
     sessionId: string | null,
     model: string,
     systemAppend: string,
+    imagePath: string | null = null,
+    allowedTools: string[] | null = null,
   ): Promise<void> =>
     invoke("cli_send", {
+      uiRunId: currentUiRun(chatId),
       engine,
       chatId,
       prompt,
@@ -246,12 +249,29 @@ export const ipc = {
       sessionId,
       model,
       systemAppend,
+      imagePath,
+      allowedTools,
     }),
   cliCancel: (chatId: string): Promise<void> => invoke("cli_cancel", { chatId }),
   cliStatus: (
     engine: "codex_cli" | "gemini_cli",
-  ): Promise<{ installed: boolean; loggedIn: boolean; version: string | null; detail: string }> =>
-    invoke("cli_status", { engine }),
+  ): Promise<{
+    installed: boolean;
+    loggedIn: boolean;
+    version: string | null;
+    detail: string;
+    authMode: string | null;
+    subscriptionReady: boolean;
+    imageReady: boolean;
+  }> => invoke("cli_status", { engine }),
+  openDevtools: (): Promise<void> => invoke("open_devtools"),
+  claudeStatus: (): Promise<{ installed: boolean; loggedIn: boolean; version: string | null; detail: string }> =>
+    invoke("claude_status"),
+  cliLogin: (engine: "claude" | "codex_cli" | "gemini_cli"): Promise<void> =>
+    invoke("cli_login", { engine }),
+  cliLogout: (engine: "claude" | "codex_cli"): Promise<void> => invoke("cli_logout", { engine }),
+  cliAuthScope: (engine: "claude" | "codex_cli" | "gemini_cli"): Promise<{ directory: string; shared: boolean }> =>
+    invoke("cli_auth_scope", { engine }),
 
   cursorSend: (
     chatId: string,
@@ -261,18 +281,22 @@ export const ipc = {
     model: string,
     systemAppend: string,
     keyRef: string,
+    allowedTools: string[] | null = null,
   ): Promise<void> =>
     invoke("cursor_send", {
       chatId,
+      uiRunId: currentUiRun(chatId),
       prompt,
       projectRoot,
       sessionId,
       model,
       systemAppend,
       keyRef,
+      allowedTools,
     }),
   cursorCancel: (chatId: string): Promise<void> => invoke("cursor_cancel", { chatId }),
-  cursorStatus: (): Promise<{ installed: boolean; keySaved: boolean; ready: boolean; version: string | null; detail: string }> =>
+  cursorInstallSdk: (): Promise<void> => invoke("cursor_install_sdk"),
+  cursorStatus: (): Promise<{ installed: boolean; keySaved: boolean; sdkReady: boolean; ready: boolean; version: string | null; detail: string }> =>
     invoke("cursor_status"),
 
   // Command Center — drive a profile as a headless `pi` run.
@@ -329,14 +353,6 @@ export const ipc = {
     version: string | null;
     detail: string;
   }> => invoke("pi_status", {}),
-  claudeOneshot: (prompt: string): Promise<string> =>
-    invoke("claude_oneshot", { prompt }),
-  claudeOneshotWithImage: (
-    prompt: string,
-    imagePath: string,
-  ): Promise<string> =>
-    invoke("claude_oneshot_with_image", { prompt, imagePath }),
-
   // Learn section — one-shot subscription-CLI call. `allowWeb=true` enables
   // WebSearch so the model can find real links; `allowWeb=false` (default) is
   // tool-less and faster (graph/lesson/grade generation).

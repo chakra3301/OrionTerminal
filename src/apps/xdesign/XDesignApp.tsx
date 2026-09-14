@@ -16,9 +16,12 @@ import { useAssetsStore } from "@/store/assetsStore";
 import { useXDesign } from "@/apps/xdesign/store";
 import { useXDProjects, projectKind } from "@/apps/xdesign/projectsStore";
 import { FxEditor } from "@/apps/xdesign/fx/FxEditor";
+import { ModelStudio } from "@/apps/xdesign/model3d/ModelStudio";
 import { XDesignHome } from "@/apps/xdesign/XDesignHome";
 import { XDesignTabs } from "@/apps/xdesign/XDesignTabs";
 import { log } from "@/lib/log";
+import { toast } from "@/store/toastStore";
+import { trackXDesignActivity } from "./runtimeActivity";
 
 /** Enter present mode on the selected top-level frame, else the first screen. */
 export function startPresent(): void {
@@ -62,6 +65,7 @@ async function handleImageDrop(paths: string[]): Promise<void> {
     assets = await useAssetsStore.getState().ingestPaths(imgs);
   } catch (e) {
     log.warn("xdesign drop: ingest failed", e);
+    toast.error("Images could not be imported", { body: String(e) });
     return;
   }
   let stagger = 0;
@@ -112,6 +116,8 @@ export function XDesignApp() {
   const [dropOver, setDropOver] = useState(false);
   const hasFrames = useXDesign((s) => topLevelFrames(s.shapes).length > 0);
   const activeId = useXDProjects((s) => s.activeId);
+  const transitioning = useXDProjects((s) => s.transitioning);
+  const transitionProps = { inert: transitioning, "aria-busy": transitioning, style: { opacity: transitioning ? 0.65 : undefined } };
   const activeKind = useXDProjects((s) =>
     projectKind(s.registry.find((m) => m.id === s.activeId)),
   );
@@ -121,13 +127,15 @@ export function XDesignApp() {
     else if (e.type === "leave") setDropOver(false);
     else {
       setDropOver(false);
-      void handleImageDrop(e.paths);
+      if (useXDProjects.getState().transitioning) return;
+      void trackXDesignActivity("canvas-image-import", "Wait for image import to finish before changing projects.", () => handleImageDrop(e.paths))
+        .catch((error) => toast.error("Image import failed", { body: String(error) }));
     }
   });
 
   if (activeId === null) {
     return (
-      <div className="xd-root xd-root-home">
+      <div className="xd-root xd-root-home" {...transitionProps}>
         <XDesignHome />
       </div>
     );
@@ -135,15 +143,24 @@ export function XDesignApp() {
 
   if (activeKind === "fx") {
     return (
-      <div className="xd-root">
+      <div className="xd-root" {...transitionProps}>
         <XDesignTabs />
         <FxEditor />
       </div>
     );
   }
 
+  if (activeKind === "model") {
+    return (
+      <div className="xd-root" {...transitionProps}>
+        <XDesignTabs />
+        <ModelStudio />
+      </div>
+    );
+  }
+
   return (
-    <div className="xd-root">
+    <div className="xd-root" {...transitionProps}>
       <XDesignTabs />
       <div className="xd-shell" ref={setShellEl}>
       <XDesignToolRail />

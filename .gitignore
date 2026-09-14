@@ -21,6 +21,10 @@ dist-ssr
 backups/
 orion-data-backup*/
 
+# Python verification caches
+__pycache__/
+*.py[cod]
+
 # Local tool state
 .claude/
 .cursor/

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { searchHybrid } from "@/lib/searchHybrid";
 import { useNotesStore } from "@/store/notesStore";
-import { ipc } from "@/lib/ipc";
+import { runSurfaceAnalysis } from "@/features/agents/textCall";
 import { log } from "@/lib/log";
 
 /** "Ask your Archive" — retrieval-augmented Q&A over your own notes, with
@@ -31,7 +31,7 @@ export function buildPrompt(question: string, sources: Array<{ n: number; title:
 
 export type AskResult = { answer: string; sources: Source[] };
 
-export async function askArchive(question: string): Promise<AskResult> {
+export async function askArchive(question: string, signal?: AbortSignal): Promise<AskResult> {
   const hits = await searchHybrid(question, 14);
   const notes = useNotesStore.getState().notes;
 
@@ -58,7 +58,7 @@ export async function askArchive(question: string): Promise<AskResult> {
     };
   }
 
-  const answer = await ipc.claudeOneshot(buildPrompt(question, picked));
+  const answer = await runSurfaceAnalysis(buildPrompt(question, picked), "archives", { signal });
   return {
     answer: answer.trim(),
     sources: picked.map((p) => ({ n: p.n, id: p.id, title: p.title, kind: p.kind })),
@@ -77,6 +77,8 @@ type AskState = {
   run: () => Promise<void>;
 };
 
+let activeRequest: AbortController | null = null;
+
 export const useAskArchive = create<AskState>((set, get) => ({
   open: false,
   question: "",
@@ -84,16 +86,20 @@ export const useAskArchive = create<AskState>((set, get) => ({
   result: null,
   error: null,
   show: () => set({ open: true }),
-  hide: () => set({ open: false }),
+  hide: () => { activeRequest?.abort(); activeRequest = null; set({ open: false, loading: false }); },
   setQuestion: (question) => set({ question }),
   run: async () => {
     const q = get().question.trim();
     if (!q || get().loading) return;
+    const request = new AbortController();
+    activeRequest = request;
     set({ loading: true, error: null, result: null });
     try {
-      const result = await askArchive(q);
-      set({ result, loading: false });
+      const result = await askArchive(q, request.signal);
+      if (activeRequest === request) { activeRequest = null; set({ result, loading: false }); }
     } catch (e) {
+      if (activeRequest !== request) return;
+      activeRequest = null;
       log.error("ask archive failed", e);
       set({
         error: e instanceof Error ? e.message : String(e),

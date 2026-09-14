@@ -1,20 +1,25 @@
 import { useState } from "react";
 import { X, Home, Plus } from "lucide-react";
-import { useXDProjects } from "./projectsStore";
+import { flushActive, useXDProjects } from "./projectsStore";
+import { ProjectNameInput } from "./ProjectNameInput";
+import { useXDesignSaveState } from "./saveState";
 
 export function XDesignTabs() {
   const registry = useXDProjects((s) => s.registry);
   const openTabs = useXDProjects((s) => s.openTabs);
   const activeId = useXDProjects((s) => s.activeId);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
+  const names = useXDesignSaveState((s) => s.names);
+  const unsaved = useXDesignSaveState((s) => activeId ? s.documents[activeId] : undefined);
+  const [saving, setSaving] = useState(false);
 
   const nameOf = (id: string) =>
     registry.find((m) => m.id === id)?.name ?? "Untitled";
 
-  const commit = (id: string) => {
-    setEditingId(null);
-    if (draft.trim()) void useXDProjects.getState().renameProject(id, draft);
+  const retrySave = async () => {
+    setSaving(true);
+    try { await flushActive(); } catch { /* flushActive reports the failure and retains dirty state. */ }
+    finally { setSaving(false); }
   };
 
   return (
@@ -22,7 +27,7 @@ export function XDesignTabs() {
       <button
         type="button"
         className="xd-tab-home"
-        onClick={() => void useXDProjects.getState().goHome()}
+        onClick={() => void useXDProjects.getState().goHome().catch(() => {})}
         title="Home"
         aria-label="Home"
       >
@@ -33,26 +38,15 @@ export function XDesignTabs() {
           <div
             key={id}
             className={`xd-tab${id === activeId ? " active" : ""}`}
-            onClick={() => void useXDProjects.getState().switchTo(id)}
+            onClick={() => void useXDProjects.getState().switchTo(id).catch(() => {})}
             onDoubleClick={() => {
-              setDraft(nameOf(id));
               setEditingId(id);
             }}
             title={nameOf(id)}
           >
-            {editingId === id ? (
-              <input
-                className="xd-tab-rename"
-                value={draft}
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={() => commit(id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commit(id);
-                  if (e.key === "Escape") setEditingId(null);
-                }}
-              />
+            {editingId === id || names[id] ? (
+              <ProjectNameInput id={id} name={nameOf(id)} className="xd-tab-rename"
+                onFinish={() => setEditingId((current) => current === id ? null : current)} />
             ) : (
               <span className="xd-tab-label">{nameOf(id)}</span>
             )}
@@ -61,7 +55,7 @@ export function XDesignTabs() {
               className="xd-tab-close"
               onClick={(e) => {
                 e.stopPropagation();
-                void useXDProjects.getState().closeTab(id);
+                void useXDProjects.getState().closeTab(id).catch(() => {});
               }}
               aria-label={`Close ${nameOf(id)}`}
             >
@@ -70,10 +64,14 @@ export function XDesignTabs() {
           </div>
         ))}
       </div>
+      {unsaved && <button type="button" className="xd-tab-save" disabled={saving}
+        onClick={() => void retrySave()} title={unsaved.error ?? "Save the current project"}>
+        {saving ? "Saving…" : unsaved.error ? "Retry save" : "Unsaved · Save"}
+      </button>}
       <button
         type="button"
         className="xd-tab-new"
-        onClick={() => void useXDProjects.getState().newProject()}
+        onClick={() => void useXDProjects.getState().newProject().catch(() => {})}
         title="New project"
         aria-label="New project"
       >

@@ -94,7 +94,7 @@ export const useVoice = create<VoiceState>((set, get) => ({
       const wake = await import("@/lib/wakeWord");
       wake.stopListening();
     }
-    // Lazy-import the capture module so the @xenova/transformers chunk
+    // Lazy-import the capture module so the @huggingface/transformers chunk
     // doesn't load until the user actually uses voice.
     const { startVoiceCapture, stopAndTranscribe } = await import(
       "@/lib/voiceCapture"

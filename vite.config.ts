@@ -2,13 +2,26 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
+import { createRequire } from "node:module";
+import { frontendLicenses, excludeFinderMetadata } from "./scripts/frontend-licenses.mjs";
+
+const require = createRequire(import.meta.url);
+const fromTransformers = createRequire(require.resolve("@huggingface/transformers"));
+const onnxDist = path.dirname(fromTransformers.resolve("onnxruntime-web"));
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig(async () => ({
-  plugins: [react()],
+  plugins: [react(), frontendLicenses("main"), excludeFinderMetadata()],
+  worker: { format: "es", plugins: () => [frontendLicenses("worker")] },
+  optimizeDeps: {
+    entries: ["index.html"],
+    include: ["@huggingface/transformers"],
+    exclude: ["onnx-assets"],
+  },
   build: {
+    license: { fileName: "THIRD_PARTY_FRONTEND_LICENSES.md" },
     // Tauri loads these from disk, so total size matters less than keeping the
     // initial parse small and vendors in their own cacheable chunks. Split the
     // heavy, rarely-changing libs out of the main entry so a cold boot parses
@@ -31,6 +44,7 @@ export default defineConfig(async () => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "onnx-assets": onnxDist,
     },
   },
   clearScreen: false,

@@ -17,6 +17,12 @@ import { XDESIGN_CONTRIBUTION_IDS } from "@/apps/xdesign/pluginContributions";
 import { ORION_CONTRIBUTION_IDS } from "@/apps/orion/pluginContributions";
 import { newRun } from "@/apps/command/ccRun";
 import { useCommand } from "@/store/commandStore";
+import { beginUiRun, currentUiRun, revokeUiRun, uiActionGuard } from "@/features/agents/uiActionRuns";
+import { useXDProjects } from "@/apps/xdesign/projectsStore";
+import { useXDesign } from "@/apps/xdesign/store";
+import { useHtmlArtifact } from "@/apps/xdesign/htmlArtifactStore";
+import { useXDesignSaveState } from "@/apps/xdesign/saveState";
+import { setAppState } from "@/lib/db";
 import { allTabs, useWorkspace } from "@/components/workspace/workspaceStore";
 
 vi.mock("@/lib/log", () => ({
@@ -24,7 +30,7 @@ vi.mock("@/lib/log", () => ({
 }));
 vi.mock("@/lib/db", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/db")>();
-  return { ...actual, setAppState: vi.fn(async () => {}) };
+  return { ...actual, setAppState: vi.fn(async () => {}), logActivity: vi.fn(async () => {}) };
 });
 
 function reset() {
@@ -42,6 +48,47 @@ beforeEach(reset);
 afterEach(reset);
 
 describe("built-in app plugins", () => {
+  it("autosaves webpage-only edits through the project queue without a canvas mutation", async () => {
+    vi.useFakeTimers();
+    const id = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
+    try {
+      useXDProjects.setState({ ready: true, activeId: id, transitioning: false, registry: [{ id, name: "Page", createdAt: 1, updatedAt: 1 }] });
+      useHtmlArtifact.getState().setProject(id);
+      ensureBuiltinAppPlugins();
+      vi.mocked(setAppState).mockClear();
+      useHtmlArtifact.getState().setArtifact("<h1>Autosaved page</h1>", "Page");
+      expect(useXDesignSaveState.getState().documents[id]).toBeDefined();
+      await vi.advanceTimersByTimeAsync(401);
+      expect(setAppState).toHaveBeenCalledWith(`xdesign.project.${id}`, expect.objectContaining({ htmlArtifact: { version: 1, html: "<h1>Autosaved page</h1>", title: "Page", open: true } }));
+      expect(useXDesignSaveState.getState().documents[id]).toBeUndefined();
+    } finally {
+      internalPluginHost.reset();
+      useXDProjects.setState({ ready: false, activeId: null, registry: [], openTabs: [] });
+      useHtmlArtifact.getState().setProject(null);
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not add a canvas shape when Stop arrives during project preparation", async () => {
+    ensureBuiltinAppPlugins();
+    let ready!: (id: string) => void;
+    const prepare = vi.spyOn(useXDProjects.getState(), "ensureActive").mockImplementation(() => new Promise((resolve) => { ready = resolve; }));
+    const add = vi.spyOn(useXDesign.getState(), "addShape").mockReturnValue("should-not-exist");
+    const end = beginUiRun("canvas-callback");
+    try {
+      const guard = uiActionGuard({ runId: currentUiRun("canvas-callback") });
+      const action = internalActionRegistry.dispatch(XDESIGN_CONTRIBUTION_IDS.addRectAction, { x: 0, y: 0, w: 20, h: 20 }, guard);
+      expect(prepare).toHaveBeenCalledOnce();
+      revokeUiRun("canvas-callback");
+      ready("fixture-project");
+      await expect(action).rejects.toThrow(/late UI action/);
+      expect(add).not.toHaveBeenCalled();
+    } finally {
+      end();
+      prepare.mockRestore();
+      add.mockRestore();
+    }
+  });
   it("bootstrap through the same owned app and command contracts", () => {
     ensureBuiltinAppPlugins();
     expect(appRegistry.list().map((app) => app.id)).toEqual([

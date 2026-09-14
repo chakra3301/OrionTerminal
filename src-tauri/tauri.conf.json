@@ -22,11 +22,11 @@
     "security": {
       "csp": {
         "default-src": "'self' customprotocol: asset:",
-        "connect-src": "ipc: http://ipc.localhost https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co",
+        "connect-src": "'self' blob: asset: http://asset.localhost ipc: http://ipc.localhost https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co",
         "font-src": "'self' data: https://fonts.gstatic.com",
         "img-src": "'self' asset: http://asset.localhost blob: data: https:",
         "media-src": "'self' asset: http://asset.localhost blob: data: https:",
-        "script-src": "'self' blob: 'unsafe-eval'",
+        "script-src": "'self' blob: 'unsafe-eval' 'sha256-lKSxVhDTFVCTxEUx7m3wIUnnq0gRyu9dmhMCMmEIJIM='",
         "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
         "worker-src": "'self' blob:",
         "frame-src": "http: https: about: blob:",
@@ -36,11 +36,11 @@
       },
       "devCsp": {
         "default-src": "'self' customprotocol: asset:",
-        "connect-src": "ipc: http://ipc.localhost http: https: ws: wss:",
+        "connect-src": "'self' blob: asset: ipc: http://ipc.localhost http: https: ws: wss:",
         "font-src": "'self' data: https://fonts.gstatic.com",
         "img-src": "'self' asset: http://asset.localhost blob: data: https:",
         "media-src": "'self' asset: http://asset.localhost blob: data: https:",
-        "script-src": "'self' blob: 'unsafe-eval'",
+        "script-src": "'self' blob: 'unsafe-eval' 'sha256-lKSxVhDTFVCTxEUx7m3wIUnnq0gRyu9dmhMCMmEIJIM='",
         "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
         "worker-src": "'self' blob:",
         "frame-src": "http: https: about: blob:",
@@ -75,7 +75,19 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["../resources/website-cloner-scaffold", "../scripts/cursor-agent.mjs"],
+    "resources": [
+      "../resources/website-cloner-scaffold",
+      "../scripts/cursor-agent.mjs",
+      "../scripts/cursor-options.mjs",
+      "../scripts/cursor-sdk.mjs",
+      "../LICENSE",
+      "../NOTICE",
+      "../THIRD_PARTY_NOTICES.md",
+      "../THIRD_PARTY_LICENSES",
+      "../THIRD_PARTY_SOURCES",
+      "../resources/distribution-license-manifest.json",
+      "../dist/licenses"
+    ],
     "macOS": {
       "signingIdentity": "-"
     }
