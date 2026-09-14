@@ -1,7 +1,7 @@
 {
   "target": "aarch64-apple-darwin",
   "scope": "Selected native normal/build graph; build-only crates conservatively included",
-  "cargoLockSha256": "9568481c0f845cc9a9b4dea7f5ed70cf959cb556c48a5f9b5cc9234f1c066b21",
+  "cargoLockSha256": "be25072d50eba96b429ae278f6a2961101b2d5752833ccbb4af668feff0ce1a8",
   "cargoManifestSha256": "2917a83f9e49a87638d9e2f12410ef6d1da039facb34005b9b64e91d93acd875",
   "npmLockSha256": "9b646b04bcab23a4d94f0c0656a387f8ca8ad1a1277711eeb6032fe52ec6b807",
   "native": [
@@ -1703,11 +1703,11 @@
     },
     {
       "name": "rustls",
-      "version": "0.23.44",
+      "version": "0.23.45",
       "license": "Apache-2.0 OR ISC OR MIT",
-      "crateSha256": "6725596c3f2c3a0aef021139e145d4eafe314a6623e4680ca83852b2c67ab2ba",
-      "notice": "THIRD_PARTY_LICENSES/native/rustls-0.23.44.md",
-      "noticeSha256": "755994ff970530a675d88b97f9cc2dd6ab515d46d924edd833624105efb7fcb9"
+      "crateSha256": "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634",
+      "notice": "THIRD_PARTY_LICENSES/native/rustls-0.23.45.md",
+      "noticeSha256": "7221cc24c938be73764ebe15dc7b8a9feee84315611219980db573255f002550"
     },
     {
       "name": "rustls-pki-types",
