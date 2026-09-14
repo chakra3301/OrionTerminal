@@ -23,6 +23,12 @@ Local application evidence remains **198 frontend files/1254 tests,30 Node,240 R
 
 Private review evidence: `/tmp/orion-release-next/public-candidate-review/` (inventory/hashes, unpublished-history paths, bounded credential-pattern scan, staged manifest and push/CI results). Remote CI must be evaluated against its exact commit and run URL; a branch existing on GitHub is not a passing result.
 
+## First remote run and clean-build correction
+
+[Run34890638947](https://github.com/chakra3301/OrionTerminal/actions/runs/34890638947), commit `7a815e5c3b82fcdd1e8bb40f995890942f5e124a`: fresh dependency install, TypeScript,198 frontend files/1254 tests and30 Node tests passed. Native compilation then failed with **`resource path ../dist/licenses doesn't exist`**. The runner is confirmed `aarch64-apple-darwin` (Rust1.98.1).
+
+Cause: `verify` compiled Rust before running Vite; Tauri now requires emitted license resources at compile time. Existing local `dist` output concealed this ordering dependency. Corrected `verify` to build the frontend before native tests and made release preflight use the same command. A regression fails on the original order, then passes with the correction; no empty placeholder resource, license bypass or skipped test was added. Standalone Cargo/native-test commands on fresh checkouts require a prior frontend build. The failed run remains evidence, not CI acceptance.
+
 ## Remaining release decisions
 
 Clean-Mac installation/upgrade/core recovery, disclosed accessibility coverage, final provenance/risk acceptance and user approval of the actual release candidate remain open. The selected-target UNIC maintenance risks and experimental provider/specialist boundaries are not waived. No release is signed off by this review.

@@ -71,7 +71,7 @@ Agents with no grants are chat-only; plain model selections retain unrestricted 
 
 ## Repeatable gates
 
-- `npm run verify`: TypeScript, frontend tests, Node bridge/dependency contracts, Rust library tests, Vite production build.
+- `npm run verify`: TypeScript, frontend tests, Node bridge/dependency contracts, Vite production build, then Rust library tests. Vite must emit `dist/licenses` before Tauri compiles its resource manifest—even for native tests. On a fresh checkout, run `npm run build` before invoking `npm run test:native` or Cargo directly.
 - `npm run audit:production`: production npm advisories.
 - `npm run audit:native`: unfiltered Cargo lockfile advisories; requires `cargo-audit` installed separately.
 - `npm run audit:native:target -- --target aarch64-apple-darwin`: classify the actual selected normal/build dependency tree; block selected vulnerable/unsound crates while retaining excluded and maintenance findings. Requires reviewed `cargo-audit` 0.22.2.

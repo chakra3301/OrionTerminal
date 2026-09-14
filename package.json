@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test:bridges": "node --test scripts/*.test.mjs",
     "test:native": "cd src-tauri && cargo test --locked --lib",
-    "verify": "npm run typecheck && npm test && npm run test:bridges && npm run test:native && npm run build",
+    "verify": "npm run typecheck && npm test && npm run test:bridges && npm run build && npm run test:native",
     "doctor": "node scripts/doctor.mjs",
     "sync:fx-tools": "node scripts/sync-fx-tools.mjs",
     "sync:preview-csp": "node scripts/sync-preview-csp.mjs",

@@ -26,6 +26,17 @@ test("startup does not purge notes using an empty plaintext heuristic", () => {
   assert.deepEqual(noteDeletes, ["DELETE FROM notes WHERE id = $1"], "Note deletion must remain explicitly ID-scoped; empty plaintext does not imply an empty note");
 });
 
+test("clean verification builds emitted resources before compiling native tests", () => {
+  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  const steps = pkg.scripts.verify.split(/\s*&&\s*/);
+  for (const gate of ["npm run typecheck", "npm test", "npm run test:bridges", "npm run build", "npm run test:native"]) {
+    assert.ok(steps.includes(gate), `Missing verification gate: ${gate}`);
+  }
+  assert.ok(steps.indexOf("npm run build") < steps.indexOf("npm run test:native"), "Tauri requires the emitted dist/licenses resources even when compiling tests");
+  const release = readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
+  assert.match(release, /run: npm run verify\s*\n/, "Release preflight must use the same clean-build ordering");
+});
+
 test("bundle retains checked third-party notices and license texts", () => {
   for (const resource of ["../LICENSE", "../NOTICE", "../THIRD_PARTY_NOTICES.md", "../THIRD_PARTY_LICENSES"]) {
     assert.ok(config.bundle.resources.includes(resource));

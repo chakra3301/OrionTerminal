@@ -56,7 +56,7 @@ jobs:
         run: npm ci
 
       - name: Verify frontend, bridges, and native code
-        run: npm run typecheck && npm test && npm run test:bridges && npm run test:native
+        run: npm run verify
 
       - name: Block releases with high or critical production dependency advisories
         run: npm run audit:production
