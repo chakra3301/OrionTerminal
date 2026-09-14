@@ -15,6 +15,9 @@ concurrency:
 jobs:
   verify:
     runs-on: macos-14
+    env:
+      # Vite's full editor/ML graph exceeds Node 22's default ~2 GiB heap.
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@v4
         with:

@@ -29,6 +29,8 @@ Private review evidence: `/tmp/orion-release-next/public-candidate-review/` (inv
 
 Cause: `verify` compiled Rust before running Vite; Tauri now requires emitted license resources at compile time. Existing local `dist` output concealed this ordering dependency. Corrected `verify` to build the frontend before native tests and made release preflight use the same command. A regression fails on the original order, then passes with the correction; no empty placeholder resource, license bypass or skipped test was added. Standalone Cargo/native-test commands on fresh checkouts require a prior frontend build. The failed run remains evidence, not CI acceptance.
 
+[Run34891224808](https://github.com/chakra3301/OrionTerminal/actions/runs/34891224808), commit `bbee4d14c53fb62da2d287d23a5b3fe974b6cc0f`:198 frontend/1254 tests and31 Node contracts passed; Vite then exhausted Node22's approximately2 GiB heap during transformation (`Reached heap limit`, exit134). Both verification and release jobs now set `NODE_OPTIONS=--max-old-space-size=4096`, a bounded4 GiB old-space budget, leaving headroom on the runner. This affects build-time Node only, not desktop runtime memory or test coverage; Node's [documented setting](https://nodejs.org/api/cli.html#--max-old-space-sizesize-in-mib) is not a total-process-memory cap. This second failed run is also retained.
+
 ## Remaining release decisions
 
 Clean-Mac installation/upgrade/core recovery, disclosed accessibility coverage, final provenance/risk acceptance and user approval of the actual release candidate remain open. The selected-target UNIC maintenance risks and experimental provider/specialist boundaries are not waived. No release is signed off by this review.

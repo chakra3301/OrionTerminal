@@ -35,6 +35,8 @@ test("clean verification builds emitted resources before compiling native tests"
   assert.ok(steps.indexOf("npm run build") < steps.indexOf("npm run test:native"), "Tauri requires the emitted dist/licenses resources even when compiling tests");
   const release = readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
   assert.match(release, /run: npm run verify\s*\n/, "Release preflight must use the same clean-build ordering");
+  const ci = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  for (const workflow of [ci, release]) assert.match(workflow, /NODE_OPTIONS: --max-old-space-size=4096\s*\n/, "Both build jobs need the reviewed 4 GiB Node heap budget");
 });
 
 test("bundle retains checked third-party notices and license texts", () => {
