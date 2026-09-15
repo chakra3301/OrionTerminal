@@ -15,7 +15,11 @@ targets:
   ArchivesiOS:
     type: application
     platform: iOS
-    sources: [ArchivesiOS]
+    sources:
+      - path: ArchivesiOS
+        excludes: [Legal]
+      - path: ArchivesiOS/Legal
+        type: folder
     dependencies:
       - package: ArchivesCore
         product: ArchivesCore
@@ -25,8 +29,8 @@ targets:
       path: ArchivesiOS/Info.plist
       properties:
         CFBundleDisplayName: Archives
-        CFBundleShortVersionString: "0.1"
-        CFBundleVersion: "2"
+        CFBundleShortVersionString: "0.2"
+        CFBundleVersion: "3"
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations:
@@ -53,10 +57,11 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        MARKETING_VERSION: "0.1"
-        CURRENT_PROJECT_VERSION: "2"
+        MARKETING_VERSION: "0.2"
+        CURRENT_PROJECT_VERSION: "3"
         SWIFT_VERSION: "6.0"
-        # Set your Apple Developer team here (or in Xcode > Signing & Capabilities).
+        CODE_SIGN_STYLE: Automatic
+        # Keep signing configuration in this spec, not the generated project.
         DEVELOPMENT_TEAM: X429L5AGXB
 
   # macOS menu-bar helper — speaks Multipeer to the phone, reads/writes orion.db.
@@ -73,6 +78,8 @@ targets:
       path: ArchivesSyncHelper/Info.plist
       properties:
         LSUIElement: true   # menu-bar agent, no Dock icon
+        CFBundleShortVersionString: "0.2"
+        CFBundleVersion: "3"
         NSLocalNetworkUsageDescription: "Archives Sync connects to your iPhone over the local network to exchange notes and media."
         NSBonjourServices:
           - _archives-sync._tcp
@@ -81,7 +88,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.lucaorion.archives.synchelper
         GENERATE_INFOPLIST_FILE: NO
-        MARKETING_VERSION: "0.1"
-        CURRENT_PROJECT_VERSION: "2"
+        MARKETING_VERSION: "0.2"
+        CURRENT_PROJECT_VERSION: "3"
         SWIFT_VERSION: "6.0"
+        CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: X429L5AGXB

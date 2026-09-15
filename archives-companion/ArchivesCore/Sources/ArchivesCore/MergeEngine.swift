@@ -57,21 +57,27 @@ public enum MergeEngine {
 
         // 4. Assets: union by id (create-once), drop tombstoned-after-create.
         var assetByID: [String: Asset] = [:]
-        for asset in a.assets + b.assets where assetByID[asset.id] == nil {
+        for asset in a.assets + b.assets {
+            if let existing = assetByID[asset.id], canonical(existing) >= canonical(asset) { continue }
             assetByID[asset.id] = asset
         }
         let assets = assetByID.values
             .filter { !deleted(.asset, $0.id, after: $0.createdAt) }
             .sorted { $0.id < $1.id }
 
-        // 5. Join rows: remap tag ids, then set-union, then drop tombstoned.
+        let noteIDs = Set(notes.map(\.id))
+        let assetIDs = Set(assets.map(\.id))
+        let tagIDs = Set(mergedTags.map(\.id))
+        let boardIDs = Set(moodBoards.map(\.id))
+
+        // A join must not resurrect a deleted owner.
         var assetTagByKey: [String: AssetTag] = [:]
         for raw in a.assetTags + b.assetTags {
             let r = AssetTag(assetID: raw.assetID, tagID: tagRemap[raw.tagID] ?? raw.tagID)
             assetTagByKey[CompositeKey.assetTag(r)] = r
         }
         let assetTags = assetTagByKey
-            .filter { !deleted(.assetTag, $0.key, after: 0) }
+            .filter { !deleted(.assetTag, $0.key, after: 0) && assetIDs.contains($0.value.assetID) && tagIDs.contains($0.value.tagID) }
             .values.sorted { CompositeKey.assetTag($0) < CompositeKey.assetTag($1) }
 
         var noteTagByKey: [String: NoteTag] = [:]
@@ -80,24 +86,33 @@ public enum MergeEngine {
             noteTagByKey[CompositeKey.noteTag(r)] = r
         }
         let noteTags = noteTagByKey
-            .filter { !deleted(.noteTag, $0.key, after: 0) }
+            .filter { !deleted(.noteTag, $0.key, after: 0) && noteIDs.contains($0.value.noteID) && tagIDs.contains($0.value.tagID) }
             .values.sorted { CompositeKey.noteTag($0) < CompositeKey.noteTag($1) }
 
         var boardAssetByKey: [String: MoodBoardAsset] = [:]
         for r in a.moodBoardAssets + b.moodBoardAssets {
             let k = CompositeKey.moodBoardAsset(r)
-            if let e = boardAssetByKey[k], e.addedAt >= r.addedAt { continue }
+            if let e = boardAssetByKey[k], e.addedAt > r.addedAt || (e.addedAt == r.addedAt && canonical(e) >= canonical(r)) { continue }
             boardAssetByKey[k] = r
         }
         let moodBoardAssets = boardAssetByKey.values
-            .filter { !deleted(.moodBoardAsset, CompositeKey.moodBoardAsset($0), after: $0.addedAt) }
-            .sorted { $0.position < $1.position }
+            .filter { !deleted(.moodBoardAsset, CompositeKey.moodBoardAsset($0), after: $0.addedAt) && boardIDs.contains($0.boardID) && assetIDs.contains($0.assetID) }
+            .sorted { $0.position == $1.position ? CompositeKey.moodBoardAsset($0) < CompositeKey.moodBoardAsset($1) : $0.position < $1.position }
 
         return SyncPayload(
             deviceID: a.deviceID,
             generatedAt: max(a.generatedAt, b.generatedAt),
-            notes: notes, assets: assets, tags: mergedTags,
-            collections: collections, moodBoards: moodBoards,
+            notes: notes.map { note in
+                var note = note
+                if let parent = note.parentID, !noteIDs.contains(parent) { note.parentID = nil }
+                if let collection = note.collectionID, !collections.contains(where: { $0.id == collection }) { note.collectionID = nil }
+                return note
+            }, assets: assets, tags: mergedTags,
+            collections: collections, moodBoards: moodBoards.map { board in
+                var board = board
+                if let cover = board.coverAssetID, !assetIDs.contains(cover) { board.coverAssetID = nil }
+                return board
+            },
             assetTags: assetTags, noteTags: noteTags, moodBoardAssets: moodBoardAssets,
             tombstones: tomb.values.sorted { $0.entityID < $1.entityID }
         )
@@ -109,7 +124,12 @@ public enum MergeEngine {
         "\(type.rawValue)\u{1}\(id)"
     }
 
-    private static func mergeVersioned<T>(
+    static func canonical<T: Encodable>(_ value: T) -> String {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        return (try? String(decoding: encoder.encode(value), as: UTF8.self)) ?? ""
+    }
+
+    private static func mergeVersioned<T: Encodable>(
         _ aRows: [T], _ bRows: [T], type: EntityType,
         id: KeyPath<T, String>, updatedAt: KeyPath<T, Millis>,
         deleted: (EntityType, String, Millis) -> Bool
@@ -117,7 +137,8 @@ public enum MergeEngine {
         var best: [String: T] = [:]
         for r in aRows + bRows {
             let i = r[keyPath: id]
-            if let e = best[i], e[keyPath: updatedAt] >= r[keyPath: updatedAt] { continue }
+            if let e = best[i], e[keyPath: updatedAt] > r[keyPath: updatedAt]
+                || (e[keyPath: updatedAt] == r[keyPath: updatedAt] && canonical(e) >= canonical(r)) { continue }
             best[i] = r
         }
         return best.values

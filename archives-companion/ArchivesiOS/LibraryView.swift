@@ -82,7 +82,7 @@ struct ProjectsContent: View {
         .navigationTitle("Projects")
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar { ToolbarItem(placement: .topBarTrailing) {
-            Button { path.append(model.createNote(.project, parentID: nil)) } label: { Image(systemName: "plus") }
+            Button { if let note = model.createNote(.project) { path.append(note) } } label: { Image(systemName: "plus") }
         } }
     }
 
@@ -103,7 +103,7 @@ private struct ProjectNodeRows: View {
             node: node, depth: depth, hasChildren: !children.isEmpty, isExpanded: expanded.contains(node.id),
             onToggle: { toggle(node.id) },
             onOpen: { path.append(node) },
-            onAddChild: { let c = model.createNote(.project, parentID: node.id); expanded.insert(node.id); path.append(c) },
+            onAddChild: { if let child = model.createNote(.project, parentID: node.id) { expanded.insert(node.id); path.append(child) } },
             onDelete: { model.deleteNote(node.id) }
         )
         if expanded.contains(node.id) {

@@ -7,11 +7,12 @@ struct NoteEditorScreen: View {
     let note: Note
     @ObservedObject var model: AppModel
     @State private var title: String
+    @State private var editorToken = UUID()
 
     init(note: Note, model: AppModel) {
-        self.note = note
+        self.note = model.pendingDrafts[note.id] ?? note
         self.model = model
-        _title = State(initialValue: note.title)
+        _title = State(initialValue: (model.pendingDrafts[note.id] ?? note).title)
     }
 
     var body: some View {
@@ -36,15 +37,18 @@ struct NoteEditorScreen: View {
                     .padding(.top, note.kind == .journal ? 0 : 8)
                     .onChange(of: title) { _, newValue in model.saveTitle(note.id, newValue) }
 
-                BlockNoteEditorView(initialBlocksJSON: note.blocksJSON, editable: true) { blocks, plaintext in
+                Text(model.saveStatus).font(.caption).foregroundStyle(Theme.tSecondary).padding(.horizontal, 18)
+                BlockNoteEditorView(initialBlocksJSON: note.blocksJSON, editable: true, onChange: { blocks, plaintext in
                     model.saveBody(note.id, blocksJSON: blocks, plaintext: plaintext)
-                }
+                }, onError: { message in model.errorMessage = message }, onClose: { model.openEditors.remove(editorToken) })
+                .id(note.id)
                 .padding(.horizontal, 10)
             }
             .padding(.bottom, 8)
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .onDisappear { model.reload() }   // refresh the list once editing ends
+        .onAppear { model.openEditors.insert(editorToken) }
+        .onDisappear { model.reload() }
     }
 }

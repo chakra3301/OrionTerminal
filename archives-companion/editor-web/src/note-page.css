@@ -28,7 +28,7 @@ html, body, #root {
 .ProseMirror h2 { font-size: 22px; font-weight: 700; margin: 1.1em 0 0.3em; }
 .ProseMirror h3 { font-size: 18px; font-weight: 600; margin: 1em 0 0.3em; }
 .ProseMirror blockquote {
-  border-left: 3px solid #007AFF;
+  border-left: 3px solid #00e0ff;
   background: rgba(255, 255, 255, 0.06);
   border-radius: 0 8px 8px 0;
   padding: 12px 16px;
@@ -51,5 +51,14 @@ html, body, #root {
   font-size: 13px;
   color: #ff6b9d;
 }
-.ProseMirror a { color: #007AFF; text-decoration: none; border-bottom: 1px solid rgba(0, 122, 255, 0.35); }
+.ProseMirror a { color: #00e0ff; text-decoration: underline; text-underline-offset: 3px; }
 .ProseMirror p { margin: 0.25em 0; }
+.bn-callout { --callout: #39ff88; display: flex; align-items: flex-start; gap: 8px; padding: 10px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--callout) 30%, transparent); background: color-mix(in srgb, var(--callout) 8%, transparent); }
+.bn-callout.c-cyan { --callout: #00e0ff; }
+.bn-callout.c-yellow { --callout: #e6ff3a; }
+.bn-callout.c-magenta { --callout: #ff3ea5; }
+.bn-callout.c-violet { --callout: #b14cff; }
+.bn-callout-emoji { border: 0; background: transparent; min-width: 44px; min-height: 44px; font-size: 20px; cursor: pointer; }
+.bn-callout-content { flex: 1; min-width: 0; padding-block: 8px; }
+button:focus-visible, a:focus-visible { outline: 2px solid #39ff88; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }

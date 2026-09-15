@@ -16,6 +16,10 @@ struct RosieView: View {
                         LazyVStack(alignment: .leading, spacing: 10) {
                             if model.chat.isEmpty { emptyState }
                             ForEach(model.chat) { m in RosieBubble(message: m).id(m.id) }
+                            if model.chat.last?.failed == true, let lastUser = model.chat.last(where: { $0.role == .user }) {
+                                Button("Restore message to edit and retry") { input = lastUser.text }
+                                    .font(.caption).tint(Theme.green)
+                            }
                         }
                         .padding(16)
                     }
@@ -39,8 +43,8 @@ struct RosieView: View {
                 .fill(RadialGradient(colors: [Theme.green, Theme.green.opacity(0.2)], center: .center, startRadius: 2, endRadius: 30))
                 .frame(width: 54, height: 54)
                 .shadow(color: Theme.green.opacity(0.5), radius: 16)
-            Text("Ask R.O.S.I.E about your Archives").font(Theme.display(15, .medium)).foregroundStyle(Theme.tPrimary)
-            Text(sync.connectedPeers.isEmpty ? "Connect to your Mac (Sync) — she runs there." : "Connected — ask away.")
+            Text("Ready when you are.").font(Theme.display(15, .medium)).foregroundStyle(Theme.tPrimary)
+            Text(sync.connectedPeers.isEmpty ? "Pair your Mac in Sync to start a conversation." : "Private text chat via your Mac. Notes aren't uploaded automatically.")
                 .font(Theme.mono(10)).foregroundStyle(Theme.tTertiary)
         }
         .frame(maxWidth: .infinity).padding(.top, 80)
@@ -55,13 +59,20 @@ struct RosieView: View {
                 .padding(.horizontal, 12).padding(.vertical, 9)
                 .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: Theme.rMd))
                 .overlay(RoundedRectangle(cornerRadius: Theme.rMd).strokeBorder(Theme.glassBorder))
+            if model.rosieRunning {
+                Button { model.stopRosie() } label: {
+                    Image(systemName: "stop.circle.fill").font(.system(size: 28)).foregroundStyle(Theme.magenta)
+                }.accessibilityLabel("Stop response")
+            }
             Button {
-                model.askRosie(input); input = ""
+                model.askRosie(input)
+                if model.rosieRunning { input = "" }
             } label: {
                 Image(systemName: "arrow.up.circle.fill").font(.system(size: 28))
                     .foregroundStyle(canSend ? Theme.green : Theme.tFaint)
             }
             .disabled(!canSend)
+            .accessibilityLabel("Send message")
         }
         .padding(12)
         .background(Theme.bg1)
@@ -69,7 +80,7 @@ struct RosieView: View {
     }
 
     private var canSend: Bool {
-        !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !model.rosieRunning
+        !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !model.rosieRunning && !sync.connectedPeers.isEmpty && input.utf8.count <= 32_000
     }
 }
 
