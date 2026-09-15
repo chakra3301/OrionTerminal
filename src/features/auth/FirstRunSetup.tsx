@@ -1,161 +1,86 @@
 import { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, Sparkles, ArrowRight } from "lucide-react";
-import { SplashScreen } from "@/shell/Splash/SplashScreen";
-import { useCoreReactions } from "@/shell/Splash/coreReactions";
+import { Eye, EyeOff, ArrowRight, ArrowLeft, SkipForward, LoaderCircle } from "lucide-react";
+import { STOCK_WALLPAPER_URL } from "@/store/wallpaperStore";
 import { useAuth } from "./authStore";
 import { LiquidGlassCard } from "./LiquidGlass";
 import "./auth.css";
 
-const spark = () => useCoreReactions.getState().spark();
-
-const MIN_PW = 4;
-
-/** First-run account creation, shown only for a truly empty vault. Collects the
- * required minimum (display name + username + password); accent, wallpaper and
- * provider keys stay in Settings. */
 export function FirstRunSetup() {
   const busy = useAuth((s) => s.busy);
   const error = useAuth((s) => s.error);
   const createAccount = useAuth((s) => s.createAccount);
+  const skipSetup = useAuth((s) => s.skipSetup);
   const clearError = useAuth((s) => s.clearError);
-
-  const [displayName, setDisplayName] = useState("");
+  const [step, setStep] = useState<"username" | "password">("username");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
   const [reveal, setReveal] = useState(false);
-  const [localErr, setLocalErr] = useState<string | null>(null);
-  const nameRef = useRef<HTMLInputElement>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const submitting = useRef(false);
 
-  useEffect(() => {
-    const t = setTimeout(() => nameRef.current?.focus(), 350);
-    return () => clearTimeout(t);
-  }, []);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLocalErr(null);
-    if (!username.trim()) return setLocalErr("Pick a username.");
-    if (password.length < MIN_PW)
-      return setLocalErr(`Password needs at least ${MIN_PW} characters.`);
-    if (password !== confirm) return setLocalErr("Passwords don't match.");
-    await createAccount(username, password, displayName);
+  useEffect(() => { inputRef.current?.focus(); }, [step]);
+  const clear = () => { setLocalError(null); clearError(); };
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (busy || submitting.current) return;
+    clear();
+    if (!username.trim()) return setLocalError("Pick a username.");
+    if (step === "username") { setStep("password"); return; }
+    if (password.length < 4) return setLocalError("Password needs at least 4 characters.");
+    submitting.current = true;
+    try { await createAccount(username, password, username); }
+    catch { /* The store preserves the form and exposes the save error. */ }
+    finally { submitting.current = false; }
   };
-
-  const shownErr = localErr ?? error;
+  const shownError = localError ?? error;
+  const fieldName = step === "username" ? "Username" : "Password";
+  const submitLabel = step === "username" ? "Next" : "Enter Orion Terminal";
 
   return (
     <>
-      <SplashScreen mode="idle" ready={false} />
-      <div className="ot-auth-overlay">
-        <LiquidGlassCard wide onSubmit={submit}>
-          <div className="ot-auth-badge">
-            <Sparkles size={18} />
-          </div>
-          <div className="ot-auth-title">Welcome to Orion Terminal.</div>
-          <div className="ot-auth-sub">
-            Set up your sign-in. You can change everything later in Settings.
-          </div>
-
-          <label className="ot-auth-field">
-            <span>Display name</span>
-            <input
-              ref={nameRef}
-              type="text"
-              value={displayName}
-              placeholder="What should I call you?"
-              spellCheck={false}
-              onChange={(e) => {
-                setDisplayName(e.target.value);
-                spark();
-                if (shownErr) {
-                  setLocalErr(null);
-                  clearError();
-                }
-              }}
-            />
-          </label>
-
-          <label className="ot-auth-field">
-            <span>Username</span>
-            <input
-              type="text"
-              value={username}
-              autoCapitalize="off"
-              autoComplete="username"
-              spellCheck={false}
-              onChange={(e) => {
-                setUsername(e.target.value);
-                spark();
-                if (shownErr) {
-                  setLocalErr(null);
-                  clearError();
-                }
-              }}
-            />
-          </label>
-
-          <div className="ot-auth-row">
-            <label className="ot-auth-field">
-              <span>Password</span>
-              <div className="ot-auth-input">
-                <input
-                  type={reveal ? "text" : "password"}
-                  value={password}
-                  autoComplete="new-password"
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    spark();
-                    if (shownErr) {
-                      setLocalErr(null);
-                      clearError();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="ot-auth-reveal"
-                  onClick={() => setReveal((r) => !r)}
-                  tabIndex={-1}
-                  aria-label={reveal ? "Hide password" : "Show password"}
-                >
-                  {reveal ? <EyeOff size={13} /> : <Eye size={13} />}
-                </button>
-              </div>
-            </label>
-            <label className="ot-auth-field">
-              <span>Confirm</span>
+      <div className="ot-setup-backdrop" aria-hidden="true" style={{ backgroundImage: `linear-gradient(#03060a55, #03060a88), url("${STOCK_WALLPAPER_URL}")` }} />
+      <div className="ot-auth-overlay ot-setup-overlay">
+        <div className="ot-setup">
+          <LiquidGlassCard onSubmit={submit}>
+            <div className="ot-setup-input-row">
               <input
-                type={reveal ? "text" : "password"}
-                value={confirm}
-                autoComplete="new-password"
-                onChange={(e) => {
-                  setConfirm(e.target.value);
-                  spark();
-                  if (shownErr) {
-                    setLocalErr(null);
-                    clearError();
-                  }
+                key={step}
+                ref={inputRef}
+                type={step === "username" || reveal ? "text" : "password"}
+                value={step === "username" ? username : password}
+                placeholder={fieldName}
+                aria-label={fieldName}
+                autoComplete={step === "username" ? "username" : "new-password"}
+                autoCapitalize="off"
+                maxLength={step === "username" ? 64 : undefined}
+                spellCheck={false}
+                disabled={busy}
+                aria-invalid={!!shownError}
+                aria-describedby={shownError ? "setup-error" : undefined}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.preventDefault();
+                }}
+                onChange={(event) => {
+                  if (step === "username") setUsername(event.target.value);
+                  else setPassword(event.target.value);
+                  clear();
                 }}
               />
-            </label>
+              {step === "password" && <button type="button" disabled={busy} onClick={() => setReveal(!reveal)} aria-label={reveal ? "Hide password" : "Show password"} title={reveal ? "Hide password" : "Show password"}>
+                {reveal ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>}
+              <button type="submit" aria-label={busy ? "Setting up" : submitLabel} title={submitLabel} disabled={busy || (step === "username" ? !username.trim() : !password)}>
+                {busy ? <LoaderCircle size={17} className="animate-spin" /> : <ArrowRight size={17} />}
+              </button>
+            </div>
+            {shownError && <div id="setup-error" role="alert" className="ot-auth-error">{shownError}</div>}
+          </LiquidGlassCard>
+          <div className="ot-setup-actions">
+            {step === "password" && <button type="button" disabled={busy} aria-label="Back" title="Back" onClick={() => { clear(); setPassword(""); setReveal(false); setStep("username"); }}><ArrowLeft size={14} /></button>}
+            <button type="button" disabled={busy} aria-label="Skip sign-in" title="Skip sign-in" onClick={() => { clear(); void skipSetup(); }}><SkipForward size={14} /></button>
           </div>
-
-          {shownErr && <div className="ot-auth-error">{shownErr}</div>}
-
-          <button
-            type="submit"
-            className="ot-auth-submit"
-            disabled={busy || !username.trim() || !password}
-          >
-            {busy ? "Setting up…" : "Enter Orion Terminal"}
-            <ArrowRight size={14} />
-          </button>
-          <div className="ot-auth-fineprint">
-            Local only. The password protects this workstation — it isn't disk
-            encryption, and it never leaves this machine.
-          </div>
-        </LiquidGlassCard>
+        </div>
       </div>
     </>
   );

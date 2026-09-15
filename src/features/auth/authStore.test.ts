@@ -17,7 +17,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { useAuth } from "./authStore";
-import { deleteAppState } from "@/lib/db";
+import { deleteAppState, setAppState } from "@/lib/db";
 
 const reset = () => {
   mem.clear();
@@ -62,6 +62,53 @@ describe("authStore gate resolution", () => {
     mem.set("auth.session", { token: "x", expiresAt: Date.now() - 1000 });
     await useAuth.getState().probe();
     expect(useAuth.getState().phase).toBe("locked");
+  });
+});
+
+describe("optional first-run sign-in", () => {
+  beforeEach(reset);
+
+  it("persists skip on an empty install without creating credentials", async () => {
+    await useAuth.getState().probe();
+    await useAuth.getState().skipSetup();
+    expect(useAuth.getState().phase).toBe("unlocked");
+    expect(mem.get("auth.setupSkipped")).toBe(true);
+    expect(mem.has("auth.user")).toBe(false);
+    expect(mem.has("auth.session")).toBe(false);
+    await useAuth.getState().probe();
+    expect(useAuth.getState().phase).toBe("unlocked");
+  });
+
+  it("cannot skip an existing locked account, even with an old skip marker", async () => {
+    mem.set("auth.setupSkipped", true);
+    await useAuth.getState().createAccount("owner", "test-password", "Owner");
+    await useAuth.getState().lock();
+    await useAuth.getState().skipSetup();
+    await useAuth.getState().probe();
+    expect(useAuth.getState().phase).toBe("locked");
+    expect(useAuth.getState().hasAccount).toBe(true);
+  });
+
+  it("refuses stale first-run state when an account already exists on disk", async () => {
+    await useAuth.getState().createAccount("owner", "test-password", "Owner");
+    const user = mem.get("auth.user");
+    useAuth.setState({ phase: "first-run", hasAccount: false });
+    await useAuth.getState().skipSetup();
+    expect(mem.get("auth.user")).toEqual(user);
+    expect(mem.has("auth.setupSkipped")).toBe(false);
+    expect(useAuth.getState().phase).toBe("first-run");
+    expect(useAuth.getState().error).toBeTruthy();
+  });
+
+  it("keeps setup open after a failed skip write and allows retry", async () => {
+    await useAuth.getState().probe();
+    vi.mocked(setAppState).mockRejectedValueOnce(new Error("disk full"));
+    await useAuth.getState().skipSetup();
+    expect(useAuth.getState().phase).toBe("first-run");
+    expect(useAuth.getState().busy).toBe(false);
+    expect(mem.has("auth.setupSkipped")).toBe(false);
+    await useAuth.getState().skipSetup();
+    expect(useAuth.getState().phase).toBe("unlocked");
   });
 });
 

@@ -118,6 +118,7 @@ export function Shell() {
               occluded={occluded}
               title={descriptor.window.title}
               subtitle={descriptor.window.subtitle}
+              statusInTitle={w.app === "archives"}
             >
               <ErrorBoundary label={descriptor.window.title} compact>
                 <AppBody descriptor={descriptor} />

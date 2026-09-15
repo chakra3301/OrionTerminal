@@ -34,7 +34,7 @@ const CharacterPicker = lazy(() =>
 import { useSettingsStore } from "@/store/settingsStore";
 import { PluginManagerPanel } from "@/features/controlpanel/PluginManagerPanel";
 import { useThemeStore, THEMES } from "@/store/themeStore";
-import { useWallpaperStore } from "@/store/wallpaperStore";
+import { STOCK_WALLPAPER_URL, useWallpaperStore } from "@/store/wallpaperStore";
 import { useMcpServers } from "@/store/mcpServersStore";
 import { registry, type Command } from "@/commands/registry";
 import { ipc } from "@/lib/ipc";
@@ -464,10 +464,11 @@ export function ThemeSection() {
 
 // Add new overlays here (key must be in OVERLAY_KINDS).
 const OVERLAY_OPTIONS: Array<{
-  key: "matrix" | "core";
+  key: "none" | "matrix" | "core";
   label: string;
   hint: string;
 }> = [
+  { key: "none", label: "Off", hint: "Wallpaper only" },
   { key: "matrix", label: "Matrix", hint: "Katakana rain" },
   { key: "core", label: "Core", hint: "Reactor core" },
 ];
@@ -493,7 +494,7 @@ export function WallpaperSection() {
 
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const previewUrl = customPath ? convertFileSrc(customPath) : null;
+  const previewUrl = mode === "custom" && customPath ? convertFileSrc(customPath) : STOCK_WALLPAPER_URL;
 
   const pick = async () => {
     setMsg(null);
@@ -535,21 +536,12 @@ export function WallpaperSection() {
     <>
       <h2 className="ot-settings-h2">Wallpaper</h2>
       <p className="ot-settings-p">
-        Use your own photo as the desktop background. The Matrix rain stays on
-        top — drag the slider to dim it if you want the photo to read cleanly.
+        Keep the stock wallpaper or choose your own image. Animated overlays
+        are optional — choose Off for a still desktop.
       </p>
 
       <div className="ot-wp-preview">
-        {previewUrl ? (
-          <img src={previewUrl} alt={originalName ?? "wallpaper"} />
-        ) : (
-          <div className="ot-wp-preview-default">
-            <div className="ot-wp-preview-blob a" />
-            <div className="ot-wp-preview-blob b" />
-            <div className="ot-wp-preview-blob c" />
-            <span>Default — Matrix rain</span>
-          </div>
-        )}
+        <img src={previewUrl} alt={mode === "custom" ? originalName ?? "Custom wallpaper" : "Stock wallpaper"} />
       </div>
 
       <div className="ot-settings-input-row">
@@ -585,6 +577,7 @@ export function WallpaperSection() {
               key={opt.key}
               type="button"
               className={`ot-wp-overlay-tile${overlay === opt.key ? " active" : ""}`}
+              aria-pressed={overlay === opt.key}
               onClick={() => setOverlay(opt.key)}
             >
               <div className={`ot-wp-overlay-thumb ${opt.key}`} aria-hidden />
@@ -683,7 +676,7 @@ export function WallpaperSection() {
       </div>
       )}
 
-      <div className="ot-wp-slider-row">
+      {overlay !== "none" && <div className="ot-wp-slider-row">
         <label className="ot-wp-slider-label">
           Overlay intensity
           <span className="mono">{Math.round(overlayIntensity * 100)}%</span>
@@ -694,12 +687,13 @@ export function WallpaperSection() {
           max={1}
           step={0.05}
           value={overlayIntensity}
+          aria-label="Overlay intensity"
           onChange={(e) => setOverlayIntensity(parseFloat(e.target.value))}
         />
         <div className="ot-wp-slider-hint">
-          Only affects the look when a custom image is set.
+          Adjusts the animation over your wallpaper.
         </div>
-      </div>
+      </div>}
 
       {msg && <div className="ot-settings-msg">{msg}</div>}
     </>

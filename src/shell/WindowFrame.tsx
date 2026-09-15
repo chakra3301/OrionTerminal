@@ -1,12 +1,14 @@
-import { useCallback, useRef, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { useShell, type WindowState } from "@/shell/store/useShell";
 import { useDraggable } from "@/shell/useDraggable";
+import { WindowTitleStatusContext } from "@/shell/WindowTitleStatusContext";
 
 type WindowFrameProps = {
   window: WindowState;
   focused: boolean;
   title: string;
   subtitle?: string;
+  statusInTitle?: boolean;
   occluded?: boolean;
   children: ReactNode;
 };
@@ -23,9 +25,11 @@ export function WindowFrame({
   focused,
   title,
   subtitle,
+  statusInTitle = false,
   occluded,
   children,
 }: WindowFrameProps) {
+  const [statusTarget, setStatusTarget] = useState<HTMLSpanElement | null>(null);
   const moveWindow = useShell((s) => s.moveWindow);
   const resizeWindow = useShell((s) => s.resizeWindow);
   const focusWindow = useShell((s) => s.focusWindow);
@@ -167,6 +171,7 @@ export function WindowFrame({
         <div className="ot-window-title">
           <span className="accent">{title}</span>
           {subtitle ? <span> · {subtitle}</span> : null}
+          <span ref={setStatusTarget} className="ot-window-title-status" data-no-drag />
         </div>
         <div className="ot-window-tools" data-no-drag>
           <button
@@ -187,7 +192,9 @@ export function WindowFrame({
         className="ot-window-body"
         style={occluded ? { contentVisibility: "hidden" } : undefined}
       >
-        {children}
+        <WindowTitleStatusContext.Provider value={statusInTitle ? statusTarget : null}>
+          {children}
+        </WindowTitleStatusContext.Provider>
       </div>
 
       {!w.maximized && !w.fullscreen && (

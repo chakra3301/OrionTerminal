@@ -4803,6 +4803,9 @@ summary:focus-visible,
   overflow: hidden;
   background: #03060a;
 }
+.ot-wp-overlay-thumb.none {
+  background: linear-gradient(135deg, #15242a, #03060a);
+}
 .ot-wp-overlay-thumb.matrix {
   background:
     repeating-linear-gradient(
@@ -6740,22 +6743,34 @@ summary:focus-visible,
   position: relative;
 }
 
+.ot-window-title-status:not(:empty) { display: inline-flex; margin-left: 16px; vertical-align: middle; }
 .note-save-status {
-  position: relative;
-  z-index: 1;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 44px 8px 18px;
-  color: var(--neon-yellow);
-  font-size: 12px;
+  gap: 8px;
+  color: var(--t-tertiary);
+  font: 10px var(--f-mono);
+  min-width: calc(21ch + 8px);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  white-space: nowrap;
+  cursor: default;
 }
+.note-save-status > span { min-width: 16ch; }
+.note-save-status[data-error="true"] { color: var(--t-secondary); }
 .note-save-status button {
-  padding: 4px 8px;
-  border: 1px solid currentColor;
-  border-radius: var(--r-sm);
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0;
 }
-.note-save-status button:disabled { opacity: .5; }
+.note-save-status:hover button, .note-save-status:focus-within button, .note-save-status[data-error="true"] button { opacity: 1; }
+.note-save-status button:hover:not(:disabled) { color: var(--t-primary); }
+.note-save-status button:focus-visible { outline: 1px solid var(--t-secondary); outline-offset: 3px; }
+.note-save-status:hover button:disabled, .note-save-status:focus-within button:disabled { opacity: .5; }
 
 /* ── Blueprint visualizer — live wireframe drafting layer behind the page ─ */
 .note-blueprint-layer {

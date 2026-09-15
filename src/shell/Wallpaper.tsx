@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { useWallpaperStore } from "@/store/wallpaperStore";
+import { STOCK_WALLPAPER_URL, useWallpaperStore } from "@/store/wallpaperStore";
 import { useShell } from "@/shell/store/useShell";
 import { CoreOverlay } from "@/shell/CoreOverlay";
 
@@ -20,20 +20,18 @@ export function Wallpaper() {
       data-custom={hasCustom ? "1" : "0"}
       data-overlay={overlay}
     >
-      {customUrl && (
-        <div
-          className="ot-wp-custom"
-          style={{ backgroundImage: `url("${customUrl}")` }}
-        />
-      )}
       <div
+        className="ot-wp-custom"
+        style={{ backgroundImage: `url("${customUrl ?? STOCK_WALLPAPER_URL}")` }}
+      />
+      {overlay !== "none" && <div
         className="ot-wp-overlay"
-        style={{ opacity: hasCustom ? overlayIntensity : 1 }}
+        style={{ opacity: overlayIntensity }}
       >
         {/* Add new overlays here as `overlay === "..."` branches. */}
         {overlay === "matrix" && <MatrixCanvas hue={matrixHue} />}
         {overlay === "core" && <CoreOverlay />}
-      </div>
+      </div>}
     </div>
   );
 }

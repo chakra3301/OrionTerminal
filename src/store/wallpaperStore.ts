@@ -2,10 +2,13 @@ import { create } from "zustand";
 import { setAppState } from "@/lib/db";
 import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
+import { serialQueue } from "@/lib/serialQueue";
+import { toast } from "@/store/toastStore";
 
 export type WallpaperMode = "default" | "custom";
 // Extend this union (and OVERLAY_KINDS below) to add new overlays.
-export type OverlayKind = "matrix" | "core";
+export type OverlayKind = "none" | "matrix" | "core";
+export const STOCK_WALLPAPER_URL = "/wallpapers/stock.png";
 
 export type WallpaperState = {
   mode: WallpaperMode;
@@ -30,17 +33,24 @@ type WallpaperStore = WallpaperState & {
 const DEFAULT_OVERLAY = 0.6;
 const DEFAULT_HUE = 145;
 const DEFAULT_CORE_HUE = 354;
-export const OVERLAY_KINDS: OverlayKind[] = ["matrix", "core"];
+export const OVERLAY_KINDS: OverlayKind[] = ["none", "matrix", "core"];
 
+const writeInOrder = serialQueue();
 function persist(state: WallpaperState) {
-  void setAppState("wallpaper", state);
+  return writeInOrder(() => setAppState("wallpaper", state));
+}
+function persistPreference(state: WallpaperState) {
+  void persist(state).catch((error) => {
+    log.warn("wallpaper preference save failed", error);
+    toast.error("Wallpaper setting wasn't saved", { body: "Your choice is visible now, but may not survive a restart. Please retry.", dedupeKey: "wallpaper-save" });
+  });
 }
 
 export const useWallpaperStore = create<WallpaperStore>((set, get) => ({
   mode: "default",
   customPath: null,
   originalName: null,
-  overlay: "matrix",
+  overlay: "none",
   overlayIntensity: DEFAULT_OVERLAY,
   matrixHue: DEFAULT_HUE,
   coreHue: DEFAULT_CORE_HUE,
@@ -73,7 +83,7 @@ export const useWallpaperStore = create<WallpaperStore>((set, get) => ({
       originalName: stored.originalName,
     };
     set(next);
-    persist(next);
+    await persist(next);
     if (previous && previous !== stored.filePath) {
       ipc.wallpaperClearFile(previous).catch((err) =>
         log.warn("wallpaper_clear_file (previous) failed", err),
@@ -90,7 +100,7 @@ export const useWallpaperStore = create<WallpaperStore>((set, get) => ({
       originalName: null,
     };
     set(next);
-    persist(next);
+    await persist(next);
     if (previous) {
       ipc.wallpaperClearFile(previous).catch((err) =>
         log.warn("wallpaper_clear_file failed", err),
@@ -101,25 +111,25 @@ export const useWallpaperStore = create<WallpaperStore>((set, get) => ({
   setOverlay: (overlay) => {
     if (!OVERLAY_KINDS.includes(overlay)) return;
     set({ overlay });
-    persist({ ...get(), overlay });
+    persistPreference({ ...get(), overlay });
   },
 
   setOverlayIntensity: (value) => {
     const v = clamp01(value);
     set({ overlayIntensity: v });
-    persist({ ...get(), overlayIntensity: v });
+    persistPreference({ ...get(), overlayIntensity: v });
   },
 
   setMatrixHue: (value) => {
     const v = clampHue(value);
     set({ matrixHue: v });
-    persist({ ...get(), matrixHue: v });
+    persistPreference({ ...get(), matrixHue: v });
   },
 
   setCoreHue: (value) => {
     const v = clampHue(value);
     set({ coreHue: v });
-    persist({ ...get(), coreHue: v });
+    persistPreference({ ...get(), coreHue: v });
   },
 }));
 

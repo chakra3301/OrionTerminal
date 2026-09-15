@@ -57,6 +57,7 @@ export type AppStateKey =
   | "note_visualizer"
   | "auth.user"
   | "auth.session"
+  | "auth.setupSkipped"
   | "onboarding.completed";
 
 export async function getAppState<T = unknown>(

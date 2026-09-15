@@ -85,6 +85,11 @@ jobs:
         run: |
           python3 scripts/rehearse-profile-recovery.py --binary "$PWD/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Terminal.app/Contents/MacOS/orion-terminal" --report "$RUNNER_TEMP/profile-recovery.json"
 
+      - name: Verify release bundle and disk image
+        run: |
+          codesign --verify --deep --strict "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Terminal.app"
+          for image in src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg; do hdiutil verify "$image"; done
+
       - name: Stage release asset (stable name)
         id: asset
         run: |
@@ -95,6 +100,8 @@ jobs:
           src="${images[0]}"
           stable="Orion-Terminal_aarch64.dmg"
           cp "$src" "$stable"
+          shasum -a 256 "$stable" > SHA256SUMS.txt
+          (cd "$(dirname "$src")" && shasum -a 256 "$(basename "$src")") >> "$GITHUB_WORKSPACE/SHA256SUMS.txt"
           echo "Built: $src -> $stable"
           echo "stable=$stable" >> "$GITHUB_OUTPUT"
           echo "versioned=$src" >> "$GITHUB_OUTPUT"
@@ -103,12 +110,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.value }}
-          name: ${{ steps.tag.outputs.value }}
-          # Must be false so /releases/latest/download/... resolves.
-          # GitHub's "latest" endpoint ignores prereleases. The -beta tag
-          # name + the site copy still communicate that this is a beta.
-          prerelease: false
+          name: Orion Terminal — ${{ steps.tag.outputs.value }}
+          body_path: docs/releases/v0.1.0-alpha.1.md
+          # Alpha builds must not replace the stable /releases/latest target.
+          prerelease: true
           fail_on_unmatched_files: true
           files: |
             ${{ steps.asset.outputs.stable }}
             ${{ steps.asset.outputs.versioned }}
+            SHA256SUMS.txt

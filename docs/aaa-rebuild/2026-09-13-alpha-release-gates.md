@@ -1,6 +1,6 @@
-# Bounded alpha — remaining gates and ownership
+# Public alpha — evidence and remaining release actions
 
-No unrelated feature expansion. Production data/bundles remain untouched; uncommitted work is not automatically publishable.
+No unrelated feature expansion. Uncommitted work is not automatically publishable. **2026-09-14:** public alpha is the agreed direction, not a mandatory private-testing phase. CI and recipient fresh-Mac smoke checks passed at `86ec7cf`; the requested first-launch/default changes need their own focused acceptance and a new candidate. Historical evidence below retains its original build attribution.
 
 ## Frozen scope
 
@@ -16,7 +16,7 @@ No unrelated feature expansion. Production data/bundles remain untouched; uncomm
 - A controlled writer leaves committed WAL state; its lease blocks cold recovery until the owned process exits. The rehearsal copies DB/WAL/SHM together into a disposable input before native recovery. It verifies associated content, same-path references, manifests, bad-candidate/symlink/existing-destination refusals, original preservation, interrupted-promotion rollback and preservation of both versions on rollback.
 - A real failed first run discovered that a SQLite read-only connection can update `orion.db-shm` read marks. The corrected procedure never recovers directly against the sole preserved tuple. Failed and corrected evidence are retained.
 - Browser data is an explicit **logical synthetic export**, not a WebKit store transplant. Credential-directory contents are omitted (the only auth-directory test data is a non-credential sentinel). File bytes in wallpaper/character/snapshot fixtures establish preservation, not renderer acceptance.
-- CI and release workflows now run this fixture rehearsal before proceeding. **Neither remote workflow has run for this worktree.**
+- CI and release workflows now run this fixture rehearsal before proceeding. **Verification CI subsequently passed at `86ec7cf`; no release workflow was dispatched.**
 
 ## Why “database copy” is not “full profile restored”
 
@@ -31,14 +31,14 @@ Do not copy auth homes/keychains or a whole WebKit directory as a supposedly cre
 | Gate | State / owner action |
 | --- | --- |
 | Local verify, packaged MCP, recovery rehearsal, signature/DMG and scoped audits | **Passed within scope:**198 frontend files/1254 tests,30 Node,240 Rust+1 ignored; latest core-dialog/minimum-window package/signature/MCP proof below. Native workflow, DMG, audit and recovery evidence retains its original binary attribution |
-| Current worktree in remote CI | **Public validation push approved; focused source review completed:** [candidate scope](2026-09-14-validation-candidate.md). Branch `validation/alpha-2026-09-14`; CI acceptance requires its exact commit/run result. Release publication and merging `main` remain unauthorized |
-| Real clean-machine installation/upgrade | **Blocked:** no separate clean Mac/VM supplied. Rebuilding or changing HOME on this development Mac is not equivalent |
+| Remote CI | **Passed at `86ec7cf`:** [run34893323117](https://github.com/chakra3301/OrionTerminal/actions/runs/34893323117),198 frontend files/1254 tests,31 Node,240 Rust+1 ignored, recovery rehearsal and scoped dependency audits. New first-launch work still needs its own commit/run; release publication and merging `main` remain separate approvals |
+| Fresh Apple Silicon installation | **User-reported passed at `86ec7cf`:** another Mac with no previous Orion install, reported Tahoe26.6; install/desktop, Archives note, Orion file, XDesign canvas/PNG, full quit/reopen persistence, ChatGPT onboarding/basic chat. Not independent inspection, an upgrade test, or evidence for the new setup flow |
 | Native core-data recovery and rollback | **Passed for a generated profile:** actual packaged promotion/open/edit/restart/rollback; Tauri SQL plugin upgraded generated schema28→29; originals and used-restored version preserved |
 | Broader full-profile/real historical-user recovery | **Open:** other profile content, real historical-user datasets, raw WebKit/auth, rebasing and clean-machine paths were not accepted by the core-profile test |
 | Other provider/model/account/billing workflows | **Open/experimental:** requires separately authorized accounts/keys/live tests; no API fallback or account reset to manufacture a pass |
-| Licensing/provenance | **Notice/source packaging passed:**213 frontend/342 native packages,8 matching MPL archives, identified adapted-code notices, owner-confirmed icon/models. **Final provenance approval remains:** documented historical input/notice-baseline limitations; no blanket rights clearance |
+| Licensing/provenance | **Notice/source packaging passed:**213 frontend/342 native packages,8 matching MPL archives, identified adapted-code notices, owner-confirmed icon/models. Historical input/baseline limits are disclosed, not automatically release blockers. Creator confirmed stock wallpaper authorship and redistribution on2026-09-15; no blanket legal clearance is claimed |
 | Accessibility/narrow layout and specialist media workflows | **Scoped core checks passed:** native safe Cancel+Enter, Tab wrapping, modal/menu priority and800×500 chat/header; browser long-dialog and192–360px rail checks. **Still open:** VoiceOver, broader keyboard/theme/surface matrix and specialist media |
-| Publish/sign-off | **Not authorized/performed:** no release tag, asset upload, notarization or production replacement |
+| Publish/sign-off | **Public alpha publication authorized2026-09-15:** commit/push and tagged prerelease with new DMG/checksums. The release workflow must pass before assets publish. No notarization or local production replacement |
 
 ## Latest continuation — core dialog safety and minimum-window checks
 

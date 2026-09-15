@@ -1,6 +1,6 @@
-# Orion Terminal — Beta v1
+# Orion Terminal — Public alpha guide
 
-Thanks for testing Orion Terminal. This is an early personal-use build — expect rough edges, and please report anything that feels off. **The current source is still under pre-release validation, not signed off for important work.** Published assets may predate these changes. See the [current evidence and remaining gates](docs/aaa-rebuild/2026-09-11-release-closure.md).
+An open-source alpha for macOS Apple Silicon. Expect rough edges, back up important work, and report reproducible problems. Choose **`v0.1.0-alpha.1`** for this source; older beta downloads predate these changes. Check the release's commit, checksum and [tested scope](docs/aaa-rebuild/2026-09-13-alpha-release-gates.md).
 
 ---
 
@@ -12,10 +12,11 @@ Personal builds are **ad-hoc signed but not notarized**, so macOS Gatekeeper may
 2. First launch is blocked with an “unverified developer” warning. To get past it once:
    - **macOS 14 Sonoma & earlier:** right-click the app → **Open** → confirm **Open**.
    - **macOS 15 Sequoia & later:** double-click once (it’s blocked), then **System Settings → Privacy & Security** → scroll down → **Open Anyway**.
-3. Only if you have verified and trust this particular build, you can remove its quarantine flag in **Terminal**:
-   ```bash
-   xattr -dr com.apple.quarantine "/Applications/Orion Terminal.app"
-   ```
+3. If macOS refuses approval, stop and report the exact warning. Do not disable Gatekeeper or remove quarantine to bypass it.
+
+Compare the downloaded alpha DMG's SHA-256 with its release's `SHA256SUMS.txt` (`shasum -a 256 <downloaded-file>`). A checksum detects a mismatch; it does not establish trust in the publisher.
+
+First launch is a glass **Username → Password** input, with arrow/Enter to continue or the **Skip sign-in** icon to skip. Sign-in can be enabled later in Control Panel; it is not encryption. Fresh profiles use the supplied stock wallpaper with animations **Off**, and enable only **Archives, Orion and XDesign**. Change animations in **Control Panel → Wallpaper** and enable additional apps in **Plugins**. The tour is optional from **Help**. Saved preferences/accounts are not reset.
 
 > **Apple Silicon only.** This DMG is `aarch64` — it will not run on Intel Macs.
 
@@ -49,7 +50,9 @@ These are test suggestions, not blanket acceptance. The [bounded alpha scope and
 - UI is dark-only (light theme cut for beta).
 - XDesign multiplayer is intentionally out of scope.
 - img2model, advanced FX/shader/video export, website reconstruction and untested provider combinations remain **experimental**, not universal subscription parity.
-- Broader token-level streaming, accessibility, clean-machine upgrade/recovery, remote CI and final provenance/release approval remain open.
+- Full VoiceOver/accessibility, real historical-user upgrades and broader recovery/streaming/provider coverage remain incomplete; these are not blanket release promises.
+- Remote CI and user-reported fresh Apple Silicon installation, core save/reopen/PNG export and ChatGPT onboarding passed at `86ec7cf`. The setup/default logic also had isolated native checks before the final visual simplification. The final minimal setup and titlebar status have not had another human smoke test; automated release checks are tied to the tagged commit.
+- Five native UNIC maintenance advisories remain in the selected target graph; no blocking advisories remained in the patched baseline audit.
 
 ## Licenses and included source
 
@@ -88,4 +91,4 @@ Please include:
 4. **Theme** in use (Neon/Liquid/…) — some issues are theme-specific.
 5. The app version/build, provider/model and relevant error text. **Redact credentials, private prompts, paths and personal information** before sharing screenshots or logs. Never upload auth.json, API keys, your full database or session transcripts to a public issue.
 
-File issues on the GitHub repo. Thank you for helping shape the beta. 🛰️
+[Report an issue](https://github.com/chakra3301/OrionTerminal/issues/new). Please use redacted, minimal examples rather than raw profiles or credentials.

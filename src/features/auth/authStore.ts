@@ -57,6 +57,7 @@ type AuthState = {
     password: string,
     displayName: string,
   ) => Promise<void>;
+  skipSetup: () => Promise<void>;
   /** Change the password (verifies the current one first). Keeps username +
    * display name; rotates salt + session. */
   changePassword: (current: string, next: string) => Promise<boolean>;
@@ -67,7 +68,7 @@ type AuthState = {
   clearError: () => void;
 };
 
-export const useAuth = create<AuthState>((set) => ({
+export const useAuth = create<AuthState>((set, get) => ({
   phase: "probing",
   hasAccount: false,
   username: null,
@@ -86,9 +87,10 @@ export const useAuth = create<AuthState>((set) => ({
       if (!user) {
         // No account. Existing data ⇒ stay unlocked (opt-in via Settings);
         // a truly empty vault ⇒ first-run setup.
+        const skipped = await getAppState<boolean>("auth.setupSkipped");
         const hasData = await hasAnyUserData();
         set({
-          phase: hasData ? "unlocked" : "first-run",
+          phase: skipped === true || hasData ? "unlocked" : "first-run",
           hasAccount: false,
           warm: false,
           username: null,
@@ -149,6 +151,7 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   createAccount: async (username, password, displayName) => {
+    if (get().busy) return;
     set({ busy: true, error: null });
     try {
       const salt = randomSalt();
@@ -179,6 +182,20 @@ export const useAuth = create<AuthState>((set) => ({
       log.error("createAccount failed", e);
       set({ busy: false, error: "Couldn't create the account." });
       throw e;
+    }
+  },
+
+  skipSetup: async () => {
+    if (get().busy || get().phase !== "first-run" || get().hasAccount) return;
+    set({ busy: true, error: null });
+    try {
+      const user = await getAppState<AuthUser>("auth.user", true);
+      if (user) throw new Error("An account already exists; sign in instead.");
+      await setAppState("auth.setupSkipped", true);
+      set({ phase: "unlocked", hasAccount: false, username: null, displayName: null, warm: true, busy: false, error: null });
+    } catch (e) {
+      log.error("skip setup failed", e);
+      set({ busy: false, error: "Couldn't save your choice. Please try again." });
     }
   },
 
@@ -228,8 +245,9 @@ export const useAuth = create<AuthState>((set) => ({
     await deleteAppState("auth.user");
     await deleteAppState("auth.session");
     const hasData = await hasAnyUserData();
+    const skipped = await getAppState<boolean>("auth.setupSkipped");
     set({
-      phase: hasData ? "unlocked" : "first-run",
+      phase: skipped === true || hasData ? "unlocked" : "first-run",
       hasAccount: false,
       warm: false,
       username: null,

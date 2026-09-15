@@ -17,6 +17,7 @@ import { usePluginManager, type PluginEnablementV1 } from "@/store/pluginManager
 import { useCommunityPlugins } from "@/store/communityPluginStore";
 import { HotkeyHost } from "@/lib/hotkeys";
 import { getAppState, getDb } from "@/lib/db";
+import { initializeFirstLaunchDefaults } from "@/lib/firstLaunchDefaults";
 import { useHermes } from "@/store/hermesStore";
 import { useCommand } from "@/store/commandStore";
 import { useProvidersStore } from "@/store/providersStore";
@@ -64,6 +65,7 @@ installSpotifyCommands();
 
 async function hydrate() {
   await getDb();
+  await initializeFirstLaunchDefaults();
   const [
     theme,
     windowSize,

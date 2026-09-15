@@ -138,7 +138,14 @@ describe("plugin enablement persistence", () => {
     expect(appRegistry.list()).toEqual([]);
   });
 
-  it("defaults built-ins to enabled", () => {
+  it("activates only the core apps for the persisted first-install defaults", () => {
+    usePluginManager.getState().hydrate({ version: 1, disabled: [BUILTIN_APP_PLUGIN_IDS.hermes, BUILTIN_APP_PLUGIN_IDS.command] });
+    expect(appRegistry.list().map(app => app.id).sort()).toEqual(["archives", "orion", "xdesign"]);
+    expect(registry.has("app.openHermes")).toBe(false);
+    expect(registry.has("app.openCommandCenter")).toBe(false);
+  });
+
+  it("preserves legacy implicit enablement when no first-install defaults were seeded", () => {
     usePluginManager.getState().hydrate(null);
     expect(appRegistry.has("hermes")).toBe(true);
     expect(registry.has("app.openHermes")).toBe(true);

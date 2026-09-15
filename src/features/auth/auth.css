@@ -35,6 +35,22 @@
 .ot-auth-card.wide {
   max-width: 420px;
 }
+.ot-setup-backdrop { position: fixed; inset: 0; background-size: cover; background-position: center; }
+.ot-setup { position: relative; width: min(360px, 100%); }
+.ot-setup-overlay .ot-glass-tint { background: rgba(3, 6, 10, 0.55); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+.ot-setup-overlay .ot-glass-body { padding: 0; gap: 0; }
+.ot-setup-overlay .ot-auth-card { box-shadow: 0 16px 50px -16px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+.ot-setup-input-row { display: flex; align-items: center; gap: 4px; padding: 8px 12px 8px 20px; }
+.ot-setup-input-row input { flex: 1; min-width: 0; height: 42px; padding: 0; border: 0; outline: none; background: transparent; color: var(--t-primary); font: 14px var(--f-mono); }
+.ot-setup-input-row input::placeholder { color: var(--t-secondary); }
+.ot-setup-input-row button, .ot-setup-actions button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--r-sm); color: var(--t-secondary); }
+.ot-setup-input-row button:hover:not(:disabled), .ot-setup-actions button:hover:not(:disabled) { color: var(--t-primary); background: rgba(255, 255, 255, 0.04); }
+.ot-setup-input-row button:disabled, .ot-setup-actions button:disabled { opacity: 0.35; }
+.ot-setup-input-row button:focus-visible, .ot-setup-actions button:focus-visible, .ot-auth-reveal:focus-visible { outline: 1px solid var(--t-secondary); outline-offset: 2px; border-radius: 4px; }
+.ot-setup-overlay .ot-auth-card:focus-within { border-color: rgba(160, 220, 200, 0.3); }
+.ot-setup-overlay .ot-auth-error { margin: 0 12px 12px; }
+.ot-setup-actions { position: absolute; top: calc(100% + 10px); left: 0; right: 0; display: flex; justify-content: center; gap: 8px; }
+.ot-auth-title { overflow-wrap: anywhere; margin: 0; }
 
 /* ── Liquid glass ──────────────────────────────────────────────────────────
    Frosted, refractive, light-catching glass that the live red core glows
@@ -64,6 +80,8 @@
 .ot-glass-body {
   position: relative;
   z-index: 4;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;

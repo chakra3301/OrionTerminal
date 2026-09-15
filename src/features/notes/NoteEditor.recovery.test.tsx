@@ -57,7 +57,7 @@ it("retains a failed body across editor remount and exposes a working retry butt
   await act(async () => { fixture.editors[0]!.document = body("Retained body"); fixture.editors[0]!.change!(); });
   expect(useNotesStore.getState().get("a")?.plaintext).toBe("Retained body"); expect(fixture.update).not.toHaveBeenCalled();
   await act(async () => vi.advanceTimersByTimeAsync(510));
-  expect(host.textContent).toContain("Changes not saved"); expect(host.textContent).toContain("Retry save");
+  expect(host.textContent).toContain("status : unsaved"); expect(host.querySelector('[aria-label="Retry save"]')).not.toBeNull();
   await act(async () => root.render(<NoteEditor noteId="b" />));
   await act(async () => root.render(<NoteEditor noteId="a" />));
   expect(fixture.editors.at(-1)!.document).toEqual(body("Retained body"));

@@ -10,11 +10,11 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Rust](https://img.shields.io/badge/Rust-stable-CE412B?logo=rust&logoColor=white)](https://www.rust-lang.org)
-![Status](https://img.shields.io/badge/status-beta%20v1-39ff88)
+![Status](https://img.shields.io/badge/status-public%20alpha-39ff88)
 
-### [⬇️ Download for macOS (Apple Silicon)](https://github.com/chakra3301/OrionTerminal/releases/latest)
+### [⬇️ Releases for macOS (Apple Silicon)](https://github.com/chakra3301/OrionTerminal/releases)
 
-[![Download](https://img.shields.io/github/v/release/chakra3301/OrionTerminal?include_prereleases&label=download%20.dmg&color=39ff88)](https://github.com/chakra3301/OrionTerminal/releases/latest)
+[![Download](https://img.shields.io/github/v/release/chakra3301/OrionTerminal?include_prereleases&label=download%20.dmg&color=39ff88)](https://github.com/chakra3301/OrionTerminal/releases)
 
 </div>
 
@@ -22,15 +22,15 @@
 
 ## Download & install (macOS, Apple Silicon)
 
-1. Grab the latest **`.dmg`** from the [**Releases page**](https://github.com/chakra3301/OrionTerminal/releases/latest).
+**Public alpha**, not a stable release. Choose `v0.1.0-alpha.1` for these changes; earlier beta downloads predate them. See the [alpha guide](BETA.md).
+
+1. Choose a **`.dmg`** from the [**Releases page**](https://github.com/chakra3301/OrionTerminal/releases). For the new alpha, compare its SHA-256 with the attached `SHA256SUMS.txt` before opening it.
 2. Open the `.dmg` and drag **Orion Terminal** into **Applications**.
-3. The app is **ad-hoc signed, not notarized** (personal beta), so on first launch macOS warns it can’t verify the developer. To open it:
+3. The app is **ad-hoc signed, not notarized**, so macOS may warn it can’t verify the developer. Approve only a build you trust:
    - **macOS 14 Sonoma & earlier:** right-click the app → **Open** → **Open** in the dialog.
    - **macOS 15 Sequoia & later:** double-click (it’s blocked once), then go to **System Settings → Privacy & Security** → scroll down → **Open Anyway**.
-   - **Only for a build you trust from this repository**, you can remove its quarantine flag:
-     ```bash
-     xattr -dr com.apple.quarantine "/Applications/Orion Terminal.app"
-     ```
+   - If macOS refuses approval, stop and report the exact warning. Do not disable Gatekeeper.
+4. First launch shows a glass **Username** input, then **Password**. Use the arrow or Enter to continue; the skip icon (**Skip sign-in**) continues without an account. This is a local privacy gate, not encryption. The stock wallpaper is still by default; enable Matrix/Core in **Control Panel → Wallpaper**, or choose **Off**. Only Archives, Orion and XDesign start enabled; additional apps remain available in **Control Panel → Plugins**. Existing saved preferences are preserved.
 
 > macOS Apple Silicon (`aarch64`) is the release target. Other platforms are not verified. See [Getting started](#getting-started).
 
