@@ -1,0 +1,36 @@
+/* Subtle refinement: retain each component's original shape at 85% of its
+   former radius. Theme-token radii are calibrated separately; circles and
+   functional pills keep their original geometry. */
+:root body :is(
+  .ot-dock-item .icon-bed, .ot-rosie-input textarea, .ot-rosie-input .send,
+  .or-home-menu, .ar-nav, .ar-collection-color-pop, .ar-note-collection-menu,
+  .ot-settings-input, .ot-mcp-input,
+  .xd-home-menu, .xd-tool, .xd-edit-toolbar, .xd-edit-ai, .xd-artifact-frame,
+  .xd-tool-mode-bar, .xd-fx-add-menu,
+  .xd-fx-perf, .xd-fx-browser-search,
+  .xd-model-assist-render, .xd-model-assist-loopstop,
+  .ot-extras-reset, .ot-extras-style, .ot-extras-choices button
+) { border-radius: 6.8px; }
+:root body :is(
+  .cp-input, .cp-surface .ot-model-select, .cp-surface select,
+  .forge-btn, .pm-install, .cp-surface .ot-settings-radio,
+  .xd-home-start-item, .xd-fx-assist-msg, .xd-model-assist-msg
+) { border-radius: 7.65px; }
+:root body :is(
+  .or-home-btn, .ar-search-results, .ot-mcp-row, .ot-mcp-form,
+  .xd-home-new, .xd-fx-card, .xd-fx-drop-icon, .cp-rail-brand > span, .cp-close
+) { border-radius: 8.5px; }
+:root body :is(
+  .ot-rosie-msg .bubble, .or-home-card-preview,
+  .xd-home-card-preview, .xd-home-start-menu, .xd-home-start-card,
+  .ar-mood-tile.selected, .xd-fx-drop-overlay,
+  .xd-fx-modal, .xd-fx-assist, .xd-model-assist,
+  .cp-form, .cp-surface .ot-theme-card, .cp-surface .ot-wp-overlay-tile,
+  .ot-extras-preview-card, .ot-extras-styles
+) { border-radius: 10.2px; }
+:root body :is(
+  .ot-dock-item, .ot-companion-bubble, .or-home-empty-new, .xd-home-empty-new,
+  .xd-fx-browser, .ot-extras-preview, .cp-surface .ot-wp-preview
+) { border-radius: 11.9px; }
+:root body .ot-theme-extras { border-radius: 13.6px; }
+:root body .note-page .note-editor-body { border-radius: 17px; }

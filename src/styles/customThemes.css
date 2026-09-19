@@ -1,0 +1,39 @@
+:root[data-custom-surface] body :is(.ot-window, .cp-surface, .ot-menubar, .ot-dock, .ot-spotlight, .ot-prompt-card, .ot-welcome-card, .ot-rosie-panel, .ot-companion-bubble) {
+  background: var(--bg-1);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-custom-surface="solid"][data-color-mode="light"]:not(.ot-reduce-glass) {
+  --light-glass-surface: var(--bg-1);
+  --light-glass-popover: var(--bg-2);
+  --light-glass-rail: var(--bg-0);
+  --light-glass-chrome: var(--bg-1);
+  --light-glass-card: var(--bg-2);
+  --light-glass-control: var(--bg-2);
+  --light-glass-selected: var(--bg-3);
+  --light-glass-body: var(--bg-1);
+  --light-glass-backdrop: none;
+  --light-glass-scrim: #18202b24;
+  --light-glass-rim: var(--glass-border);
+  --light-glass-edge: 0 0 0 transparent;
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root[data-custom-surface="glass"][data-color-mode="dark"]:not(.ot-reduce-glass) {
+    --custom-glass-fill: color-mix(in srgb, var(--bg-1) 88%, transparent);
+    --custom-glass-body: transparent;
+    --custom-glass-backdrop: blur(12px);
+  }
+  :root[data-custom-surface="glass"][data-color-mode="dark"]:not(.ot-reduce-glass) body :is(.ot-window, .cp-surface, .ot-menubar, .ot-dock, .ot-spotlight, .ot-prompt-card, .ot-welcome-card, .ot-rosie-panel, .ot-companion-bubble) {
+    background: var(--custom-glass-fill);
+    backdrop-filter: var(--custom-glass-backdrop);
+    -webkit-backdrop-filter: var(--custom-glass-backdrop);
+  }
+  :root[data-custom-surface="glass"][data-color-mode="dark"]:not(.ot-reduce-glass) body :is(.ot-window-body, .or-app, .or-home, .ar-main, .ar-today, .ar-notes, .ot-workspace, .ot-panel, .ot-panel-body, .xd-root-home, .cp-main, .cp-main-body) { background: var(--custom-glass-body); }
+  @media (prefers-reduced-transparency: reduce) {
+    :root[data-custom-surface="glass"][data-color-mode="dark"]:not(.ot-reduce-glass) {
+      --custom-glass-fill: var(--bg-1);
+      --custom-glass-body: var(--bg-1);
+      --custom-glass-backdrop: none;
+    }
+  }
+}

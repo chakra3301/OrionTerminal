@@ -19,6 +19,7 @@ import {
   type HermesStatus,
 } from "@/store/hermesStore";
 import { useProjectStore } from "@/store/projectStore";
+import { AiActivity } from "@/components/effects/OrionOrb";
 import { HermesTaskDetail } from "@/apps/hermes/HermesTaskDetail";
 import {
   STATUS_LABEL,
@@ -384,7 +385,7 @@ function AgentCard({
           <div className="hm-logline error">{agent.error.split("\n")[0]}</div>
         ) : lines.length === 0 ? (
           <div className="hm-logline info">
-            {running ? "starting…" : "awaiting activity"}
+            {running ? <AiActivity label="starting" accent="var(--neon-violet)" /> : "awaiting activity"}
           </div>
         ) : (
           lines.map((l, i) => (

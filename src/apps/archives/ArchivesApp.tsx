@@ -431,6 +431,7 @@ function ArchivesSidebar({
             type="button"
             key={it.key}
             className={`ar-nav${view === it.key ? " active" : ""}`}
+            aria-current={view === it.key ? "page" : undefined}
             onClick={() => setView(it.key)}
           >
             <Icon size={14} />

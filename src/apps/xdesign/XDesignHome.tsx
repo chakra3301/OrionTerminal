@@ -105,6 +105,7 @@ function ProjectCard({
         onClick={open}
         onDoubleClick={open}
         title={`Open ${meta.name}`}
+        aria-label={`Open ${meta.name}`}
       >
         <ProjectThumb doc={doc} />
         {meta.kind === "fx" && <span className="xd-fx-badge">FX</span>}
@@ -134,7 +135,8 @@ function ProjectCard({
             type="button"
             className="xd-home-card-menu-btn"
             onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Project options"
+            aria-label={`Options for ${meta.name}`}
+            aria-expanded={menuOpen}
           >
             <MoreHorizontal size={15} />
           </button>
@@ -173,6 +175,7 @@ function NewProjectMenu() {
       <button
         type="button"
         className="xd-home-new"
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
         <Plus size={16} /> New project
@@ -226,8 +229,8 @@ export function XDesignHome() {
   }, [registry]);
 
   if (!ready) return <div className="xd-home">
-    <h1>XDesign</h1>
-    <p role={loadError ? "alert" : "status"}>{loadError ?? "Loading projects…"}</p>
+    <h1 className="xd-home-title">XDesign</h1>
+    <p className="xd-home-sub" role={loadError ? "alert" : "status"}>{loadError ?? "Loading projects…"}</p>
     {loadError && <button type="button" className="xd-home-new"
       onClick={() => { void useXDProjects.getState().init().catch(() => {}); }}>Retry loading projects</button>}
   </div>;
@@ -239,7 +242,7 @@ export function XDesignHome() {
       <header className="xd-home-header">
         <div>
           <h1 className="xd-home-title">XDesign</h1>
-          <p className="xd-home-sub">Your design projects, all in one place.</p>
+          <p className="xd-home-sub">Pick up a project or choose a starting point.</p>
         </div>
         <NewProjectMenu />
       </header>

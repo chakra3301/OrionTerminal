@@ -21,11 +21,16 @@ import {
 import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
 import { useFileDropZone } from "@/lib/fileDrop";
 import { ModelSelect } from "@/components/ModelSelect";
+import { AiActivity, OrionOrb } from "@/components/effects/OrionOrb";
 // Type-only — keeps ClaudeChat decoupled from any provider implementation.
 import type {
   ContextChip,
   ContextSuggestion,
 } from "@/features/context/contextProviders";
+
+function hasChatContent(content: ReactNode): boolean {
+  return typeof content === "string" ? content.trim().length > 0 : content != null && typeof content !== "boolean";
+}
 
 /** Display twin of chatStore's MessagePill — structural, no store import. */
 export type ClaudeChatPill = {
@@ -296,12 +301,7 @@ export function ClaudeChat(props: ClaudeChatProps) {
     }
   };
 
-  const orbStyle = {
-    background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.6), transparent 50%),
-                 radial-gradient(circle at 70% 70%, ${accentColor}, transparent 60%),
-                 radial-gradient(circle at 30% 70%, var(--neon-cyan), transparent 60%)`,
-    boxShadow: `0 0 16px ${accentColor}66, inset 0 0 8px rgba(0,224,255,0.4)`,
-  } as const;
+  const streaming = running && messages.some(m => m.role === "assistant" && m.pending && hasChatContent(m.content) && m.content !== "…");
 
   const showOpening = messages.length === 0 && openingLine;
   const showSuggest = !!suggestionChips?.length && messages.length < 2;
@@ -309,7 +309,7 @@ export function ClaudeChat(props: ClaudeChatProps) {
   return (
     <aside className="ot-claude-rail">
       <div className="ot-claude-header">
-        <div className="ot-claude-orb" style={orbStyle} />
+        <OrionOrb size={24} accent={accentColor} state={streaming ? "composing" : running ? "solving" : submitting ? "connecting" : "idle"} />
         <div className="ot-claude-identity">
           <div className="ot-claude-name">{name}</div>
           <div className="ot-claude-sub">{subtitle}</div>
@@ -345,7 +345,7 @@ export function ClaudeChat(props: ClaudeChatProps) {
         {messages.length === 0 && !openingLine && (
           <div className="ot-claude-empty">
             <div className="sparkle">
-              <Sparkles size={20} color={accentColor} />
+              <OrionOrb size={42} accent={accentColor} />
             </div>
             <div>Ready when you are.</div>
           </div>
@@ -354,6 +354,7 @@ export function ClaudeChat(props: ClaudeChatProps) {
           <div className="ot-msg assistant">{openingLine}</div>
         )}
         {messages.map((m) => {
+          if (m.role === "assistant" && (!hasChatContent(m.content) || (m.pending && m.content === "…")) && !m.pills?.length) return null;
           const userStyle =
             m.role === "user"
               ? {
@@ -364,7 +365,7 @@ export function ClaudeChat(props: ClaudeChatProps) {
           return (
             <div
               key={m.id}
-              className={`ot-msg ${m.role}${m.pending ? " thinking" : ""}`}
+              className={`ot-msg ${m.role}`}
               style={userStyle}
             >
               {m.planning ? (
@@ -376,7 +377,7 @@ export function ClaudeChat(props: ClaudeChatProps) {
             </div>
           );
         })}
-        {running && <div className="ot-msg assistant thinking">thinking</div>}
+        {running && <div className="ot-ai-progress"><AiActivity state={streaming ? "composing" : "solving"} label={streaming ? "responding" : "thinking"} /></div>}
       </div>
 
       {showSuggest && (
@@ -529,8 +530,8 @@ export function ClaudeChat(props: ClaudeChatProps) {
             type="button"
             className="send"
             style={{
-              background: "rgba(255, 94, 94, 0.15)",
-              color: "#ff8a8a",
+              background: "rgba(var(--neon-magenta-rgb), 0.12)",
+              color: "var(--neon-magenta)",
             }}
             onClick={onCancel}
             title="Cancel (⌘.)"
@@ -542,9 +543,6 @@ export function ClaudeChat(props: ClaudeChatProps) {
           <button
             type="button"
             className="send"
-            style={{
-              background: `linear-gradient(135deg, ${accentColor}, var(--neon-cyan))`,
-            }}
             onClick={() => void send()}
             disabled={!input.trim() || !!disabledReason || submitting}
             title="Send (↵)"

@@ -37,6 +37,8 @@ mod repolens_website;
 mod runtime;
 mod spotify;
 mod sysstats;
+mod subscription_quota;
+mod quota_keychain;
 mod terminal;
 mod ui_bridge;
 mod wallpaper;
@@ -293,6 +295,7 @@ pub fn run() {
             quit_guard::app_quit_decide,
             fs_ops::read_dir_tree,
             fs_ops::read_file,
+            fs_ops::theme_read_markdown,
             fs_ops::read_file_base64,
             fs_ops::count_files,
             fs_ops::save_file_atomic,
@@ -417,6 +420,7 @@ pub fn run() {
             sysstats::system_stats,
             sysstats::claude_usage,
             sysstats::claude_limits,
+            subscription_quota::subscription_quota,
             spotify::spotify_now_playing,
             spotify::spotify_control,
             spotify::spotify_seek,

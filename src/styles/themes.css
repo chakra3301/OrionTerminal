@@ -4,10 +4,9 @@
    `data-theme` attribute on <html>. The vast majority of the UI reads
    var(--token), so overriding tokens reskins the app wholesale.
 
-   "neon" is the default (the :root values in tokens.css), so it needs no
-   block here. All themes are dark-base for now — a light theme would need a
-   pass over the hardcoded rgba(255,255,255,…) / rgba(0,0,0,…) literals that
-   assume a dark canvas.
+   tokens.css provides shared base tokens. This file contains Liquid (the
+   default), Minimal and BMW M. lightThemes.css owns Ivory Keep and its
+   surface/contrast adaptations.
    ============================================================ */
 
 /* ---------- Liquid — hyperliquid frosted glass, heavy blur, icy edges ----------
@@ -58,11 +57,10 @@
   --glass-border-bright: rgba(230, 248, 255, 0.45);
   --glass-highlight: rgba(255, 255, 255, 0.16);
 
-  /* fluid, pill-leaning corners */
-  --r-sm: 8px;
-  --r-md: 14px;
-  --r-lg: 20px;
-  --r-xl: 26px;
+  --r-sm: 6.8px;
+  --r-md: 11.9px;
+  --r-lg: 17px;
+  --r-xl: 22.1px;
 
   --shadow-window: 0 30px 90px -22px rgba(0, 0, 0, 0.72),
     0 10px 30px -10px rgba(0, 0, 0, 0.5),
@@ -155,7 +153,6 @@ html[data-theme="liquid"] .learn-tutor-panel {
    translucent glass (faint tint + their own blur keeps text readable). */
 html[data-theme="liquid"]:not(.ot-reduce-glass) .note-page .note-editor-body,
 html[data-theme="liquid"]:not(.ot-reduce-glass) .ar-card,
-html[data-theme="liquid"]:not(.ot-reduce-glass) .or-home-card,
 html[data-theme="liquid"]:not(.ot-reduce-glass) .hm-card,
 html[data-theme="liquid"]:not(.ot-reduce-glass) .ar-db-card {
   background: rgba(120, 180, 230, 0.02) !important;
@@ -261,10 +258,10 @@ html[data-theme="liquid"] .xd-root {
   --glass-highlight: rgba(255, 255, 255, 0.03);
 
   /* flatter corners */
-  --r-sm: 4px;
-  --r-md: 6px;
-  --r-lg: 10px;
-  --r-xl: 14px;
+  --r-sm: 3.4px;
+  --r-md: 5.1px;
+  --r-lg: 8.5px;
+  --r-xl: 11.9px;
 
   /* no neon bloom — soft neutral shadow only */
   --shadow-window: 0 16px 44px -18px rgba(0, 0, 0, 0.6),
@@ -274,55 +271,6 @@ html[data-theme="liquid"] .xd-root {
   --shadow-glow-magenta: none;
 
   --xd-accent-rgb: 205, 214, 222;
-}
-
-/* ---------- Modern — refined slate + soft, tasteful accents ---------- */
-[data-theme="modern"] {
-  --bg-0: #0a0c12;
-  --bg-1: #10131c;
-  --bg-2: #161a26;
-  --bg-3: #1f2433;
-
-  /* vivid-but-not-neon (Tailwind-ish) palette */
-  --neon-green: #4ade80;
-  --neon-cyan: #38bdf8;
-  --neon-yellow: #fbbf24;
-  --neon-magenta: #f472b6;
-  --neon-violet: #a78bfa;
-
-  /* rgba() triplet twins of the accents above */
-  --neon-green-rgb: 74, 222, 128;
-  --neon-cyan-rgb: 56, 189, 248;
-  --neon-yellow-rgb: 251, 191, 36;
-  --neon-magenta-rgb: 244, 114, 182;
-  --neon-violet-rgb: 167, 139, 250;
-
-  --t-primary: #e8ecf4;
-  --t-secondary: #9aa3b8;
-  --t-tertiary: #5e6781;
-  --t-faint: #353c4d;
-
-  --glass-bg: rgba(22, 26, 38, 0.82);
-  --glass-bg-strong: rgba(16, 19, 28, 0.9);
-  --glass-bg-deep: rgba(10, 12, 18, 0.94);
-  --glass-border: rgba(148, 163, 184, 0.14);
-  --glass-border-bright: rgba(148, 163, 184, 0.24);
-  --glass-highlight: rgba(255, 255, 255, 0.05);
-
-  /* generous, modern corners */
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 18px;
-  --r-xl: 24px;
-
-  /* soft glows — present but restrained */
-  --shadow-window: 0 30px 80px -24px rgba(0, 0, 0, 0.7),
-    0 8px 28px -10px rgba(0, 0, 0, 0.5);
-  --shadow-glow-green: 0 0 20px -6px rgba(74, 222, 128, 0.4);
-  --shadow-glow-cyan: 0 0 20px -6px rgba(56, 189, 248, 0.4);
-  --shadow-glow-magenta: 0 0 20px -6px rgba(244, 114, 182, 0.4);
-
-  --xd-accent-rgb: 148, 163, 184;
 }
 
 /* ---------- BMW M — motorsport black, M tricolor, zero radius ---------- */
@@ -361,9 +309,9 @@ html[data-theme="liquid"] .xd-root {
 
   /* engineered precision — corners stay sharp */
   --r-sm: 0px;
-  --r-md: 2px;
-  --r-lg: 4px;
-  --r-xl: 6px;
+  --r-md: 1.7px;
+  --r-lg: 3.4px;
+  --r-xl: 5.1px;
 
   /* no neon bloom — flat, with a neutral shadow only for window separation */
   --shadow-window: 0 16px 44px -18px rgba(0, 0, 0, 0.7),

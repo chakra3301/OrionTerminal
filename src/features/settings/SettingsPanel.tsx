@@ -33,7 +33,12 @@ const CharacterPicker = lazy(() =>
 );
 import { useSettingsStore } from "@/store/settingsStore";
 import { PluginManagerPanel } from "@/features/controlpanel/PluginManagerPanel";
-import { useThemeStore, THEMES } from "@/store/themeStore";
+import { useThemeStore, THEMES, isLightTheme } from "@/store/themeStore";
+import { ThemeExtrasSection } from "./ThemeExtrasSection";
+import { CustomThemeSection } from "./CustomThemeSection";
+import { SettingsSlider } from "./SettingsSlider";
+import { ThemeSphere } from "./ThemeSphere";
+import { OverlayPreview } from "./OverlayPreview";
 import { STOCK_WALLPAPER_URL, useWallpaperStore } from "@/store/wallpaperStore";
 import { useMcpServers } from "@/store/mcpServersStore";
 import { registry, type Command } from "@/commands/registry";
@@ -402,26 +407,32 @@ export function ThemeSection() {
 
   return (
     <>
-      <h2 className="ot-settings-h2">Appearance</h2>
-      <p className="ot-settings-p">
-        Pick a visual theme. Each restyles the whole workstation; switches are
-        instant. All themes are dark-base for now (⇧⌘ via the “Cycle Theme”
-        command also rotates through them).
-      </p>
+      <div className="cp-appearance-intro"><h2 className="ot-settings-h2">Your workspace, your way.</h2>
+        <p className="ot-settings-p">Choose a theme, then adjust its surface finish. Your documents and artwork keep their own colors.</p>
+      </div>
+      {reduceGlass && (isLightTheme(theme) || theme === "liquid") && (
+        <div className="ot-settings-glass-notice" role="status">
+          <span>Glass is off because Reduce transparency is enabled.</span>
+          <button type="button" className="ot-settings-btn" onClick={() => setReduceGlass(false)}>
+            Enable glass
+          </button>
+        </div>
+      )}
+      <div className="cp-appearance-grid"><section className="cp-theme-section" aria-label="Visual theme">
+      <div className="cp-setting-heading"><h3>Theme</h3><span>{THEMES.filter(t => isLightTheme(t.id)).length} light · {THEMES.filter(t => !isLightTheme(t.id)).length} dark</span></div>
+      {([true, false] as const).map(light => <div className="ot-theme-group" key={String(light)}>
+      <h4 className="ot-theme-group-title">{light ? "Light" : "Dark"}</h4>
       <div className="ot-theme-picker">
-        {THEMES.map((t) => (
+        {THEMES.filter(t => isLightTheme(t.id) === light).map((t) => (
           <button
             key={t.id}
             type="button"
             className={`ot-theme-card${theme === t.id ? " active" : ""}`}
             data-theme-swatch={t.id}
+            aria-pressed={theme === t.id}
             onClick={() => setTheme(t.id)}
           >
-            <span className="ot-theme-swatch" aria-hidden="true">
-              <i className="s-green" />
-              <i className="s-cyan" />
-              <i className="s-magenta" />
-            </span>
+            <ThemeSphere theme={t.id} />
             <span className="ot-theme-meta">
               <span className="ot-theme-name">{t.label}</span>
               <span className="ot-theme-blurb">{t.blurb}</span>
@@ -433,16 +444,18 @@ export function ThemeSection() {
                 </span>
               )}
             </span>
+            <span className="ot-theme-selected" aria-hidden="true">
+              {theme === t.id && <Check size={14} />}
+            </span>
           </button>
         ))}
       </div>
+      </div>)}
       <div className="ot-settings-toggle">
         <div className="ot-settings-toggle-meta">
           <div className="ot-settings-toggle-name">Reduce transparency</div>
           <div className="ot-settings-toggle-blurb">
-            Turns off the glass blur behind panels. Noticeably lighter on the
-            GPU — try this if dragging or scrolling ever stutters with several
-            windows open.
+            Turns off light-theme glass and reduces blur. Also lighter on the GPU with several windows open.
           </div>
         </div>
         <button
@@ -454,6 +467,8 @@ export function ThemeSection() {
           onClick={() => setReduceGlass(!reduceGlass)}
         />
       </div>
+      </section><ThemeExtrasSection /></div>
+      <CustomThemeSection />
     </>
   );
 }
@@ -580,7 +595,7 @@ export function WallpaperSection() {
               aria-pressed={overlay === opt.key}
               onClick={() => setOverlay(opt.key)}
             >
-              <div className={`ot-wp-overlay-thumb ${opt.key}`} aria-hidden />
+              <OverlayPreview kind={opt.key} />
               <div className="ot-wp-overlay-name">{opt.label}</div>
               <div className="ot-wp-overlay-hint">{opt.hint}</div>
             </button>
@@ -590,12 +605,6 @@ export function WallpaperSection() {
 
       {overlay === "matrix" && (
       <div className="ot-wp-slider-row">
-        <label className="ot-wp-slider-label">
-          Matrix color
-          <span className="mono" style={{ color: glow }}>
-            {matrixHue}°
-          </span>
-        </label>
         <div
           className="ot-wp-color-preview"
           style={{ "--mx-glow": glow } as CSSProperties}
@@ -609,18 +618,8 @@ export function WallpaperSection() {
             タ 0 1 <span style={{ color: trail, textShadow: "none" }}>ワ</span> カ
           </span>
         </div>
-        <input
-          type="range"
-          min={0}
-          max={360}
-          step={1}
-          value={matrixHue}
-          onChange={(e) => setMatrixHue(parseInt(e.target.value, 10))}
-          style={{
-            background:
-              "linear-gradient(to right, hsl(0,100%,60%), hsl(60,100%,60%), hsl(120,100%,60%), hsl(180,100%,60%), hsl(240,100%,60%), hsl(300,100%,60%), hsl(360,100%,60%))",
-          }}
-        />
+        <SettingsSlider label="Matrix color" value={matrixHue} min={0} max={360} step={1} valueText={`${matrixHue}°`} onChange={setMatrixHue}
+          gradient="linear-gradient(to right, #fa7272, #edda72, #77e49a, #6fdde7, #8a91ef, #df83de, #fa7272)" />
         <div className="ot-wp-slider-hint">
           Sets the glyph color of the Matrix rain.
         </div>
@@ -629,15 +628,6 @@ export function WallpaperSection() {
 
       {overlay === "core" && (
       <div className="ot-wp-slider-row">
-        <label className="ot-wp-slider-label">
-          Core color
-          <span
-            className="mono"
-            style={{ color: `hsl(${coreHue}, 100%, 60%)` }}
-          >
-            {coreHue}°
-          </span>
-        </label>
         <div
           className="ot-wp-color-preview"
           style={{ "--mx-glow": `hsl(${coreHue}, 100%, 60%)` } as CSSProperties}
@@ -658,42 +648,16 @@ export function WallpaperSection() {
             reactor core
           </span>
         </div>
-        <input
-          type="range"
-          min={0}
-          max={360}
-          step={1}
-          value={coreHue}
-          onChange={(e) => setCoreHue(parseInt(e.target.value, 10))}
-          style={{
-            background:
-              "linear-gradient(to right, hsl(0,100%,60%), hsl(60,100%,60%), hsl(120,100%,60%), hsl(180,100%,60%), hsl(240,100%,60%), hsl(300,100%,60%), hsl(360,100%,60%))",
-          }}
-        />
+        <SettingsSlider label="Core color" value={coreHue} min={0} max={360} step={1} valueText={`${coreHue}°`} onChange={setCoreHue}
+          gradient="linear-gradient(to right, #fa7272, #edda72, #77e49a, #6fdde7, #8a91ef, #df83de, #fa7272)" />
         <div className="ot-wp-slider-hint">
           Sets the energy color of the reactor core.
         </div>
       </div>
       )}
 
-      {overlay !== "none" && <div className="ot-wp-slider-row">
-        <label className="ot-wp-slider-label">
-          Overlay intensity
-          <span className="mono">{Math.round(overlayIntensity * 100)}%</span>
-        </label>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={overlayIntensity}
-          aria-label="Overlay intensity"
-          onChange={(e) => setOverlayIntensity(parseFloat(e.target.value))}
-        />
-        <div className="ot-wp-slider-hint">
-          Adjusts the animation over your wallpaper.
-        </div>
-      </div>}
+      {overlay !== "none" && <SettingsSlider label="Overlay intensity" value={overlayIntensity}
+        valueText={`${Math.round(overlayIntensity * 100)}%`} onChange={setOverlayIntensity} hint="Adjusts the animation over your wallpaper." />}
 
       {msg && <div className="ot-settings-msg">{msg}</div>}
     </>

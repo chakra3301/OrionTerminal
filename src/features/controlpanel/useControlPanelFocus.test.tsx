@@ -12,6 +12,11 @@ beforeEach(() => {
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); before.remove(); document.querySelector(".ot-prompt-overlay")?.remove(); });
+it("starts on the current settings section", async () => {
+  function CurrentSection() { const ref = useControlPanelFocus(true, hide); return <div ref={ref}><button>Appearance</button><button aria-current="page">Providers</button></div>; }
+  await act(async () => root.render(<CurrentSection />));
+  expect(document.activeElement?.textContent).toBe("Providers");
+});
 it("traps Tab in both directions and restores prior focus", async () => {
   await act(async () => root.render(<Dialog />));
   const buttons = host.querySelectorAll("button");

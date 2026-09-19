@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Sparkles, Loader2, FileText, NotebookPen, FolderKanban } from "lucide-react";
+import { FileText, NotebookPen, FolderKanban } from "lucide-react";
+import { OrionOrb } from "@/components/effects/OrionOrb";
 import { useAskArchive, type Source } from "@/features/notes/askArchive";
 import { useArchives } from "@/apps/archives/useArchives";
 import { useShell } from "@/shell/store/useShell";
@@ -86,7 +87,7 @@ export function AskArchiveHost() {
     <div className="ot-ask-overlay" onMouseDown={hide}>
       <div className="ot-ask" onMouseDown={(e) => e.stopPropagation()}>
         <div className="ot-ask-bar">
-          <Sparkles size={15} className="ot-ask-spark" />
+          <OrionOrb size={24} state={loading ? "searching" : "idle"} accent="var(--neon-green)" />
           <input
             ref={ref}
             className="ot-ask-input"
@@ -103,7 +104,7 @@ export function AskArchiveHost() {
               }
             }}
           />
-          {loading && <Loader2 size={15} className="ot-ask-spin" />}
+
         </div>
 
         {error && <div className="ot-ask-error">{error}</div>}

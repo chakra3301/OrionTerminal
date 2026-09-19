@@ -13,6 +13,8 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { prettyToolName, formatToolResult } from "@/lib/toolFormat";
 import { useFileDropZone } from "@/lib/fileDrop";
 import { ModelSelect } from "@/components/ModelSelect";
+import { ThemeBorder } from "@/components/effects/ThemeBorder";
+import { AiActivity, OrionOrb } from "@/components/effects/OrionOrb";
 
 /** Extended-thinking block — claude emits these between/during turns when
  * reasoning. Collapsed by default so they don't dominate the surface.
@@ -89,10 +91,22 @@ function ToolChip({ call }: { call: ToolCall }) {
 }
 
 
+function hasVisibleContent(msg: RosieMessage, calls: Record<string, ToolCall>): boolean {
+  if (typeof msg.content === "string") return !!msg.content.trim();
+  return msg.content.some((block) => {
+    if (block.type === "text") return !!(block as { text: string }).text.trim();
+    if (block.type === "thinking") {
+      const content = block as { thinking?: string; text?: string };
+      return !!(content.thinking ?? content.text ?? "").trim();
+    }
+    return block.type === "tool_use" && !!calls[(block as { id: string }).id];
+  });
+}
+
 function MessageBody({ msg }: { msg: RosieMessage }) {
   const toolCalls = useRosie((s) => s.toolCalls);
   if (typeof msg.content === "string") {
-    if (!msg.content) return <span className="cursor" />;
+    if (!msg.content.trim()) return null;
     return (
       <div className="md">
         <ReactMarkdown
@@ -105,8 +119,8 @@ function MessageBody({ msg }: { msg: RosieMessage }) {
     );
   }
   // Render blocks in their original order so thinking → tool → text reads
-  // naturally as it happened. Empty pending case shows a cursor.
-  if (msg.content.length === 0) return <span className="cursor" />;
+  // naturally as it happened.
+  if (msg.content.length === 0) return null;
   return (
     <div className="ot-rosie-blocks">
       {msg.content.map((b, i) => {
@@ -117,6 +131,7 @@ function MessageBody({ msg }: { msg: RosieMessage }) {
           return <ThinkingBlock key={i} text={text} />;
         }
         if (b.type === "text") {
+          if (!(b as { text: string }).text.trim()) return null;
           return (
             <div className="md" key={i}>
               <ReactMarkdown
@@ -206,6 +221,7 @@ export function Rosie() {
   const close = useRosie((s) => s.closePanel);
   const newConversation = useRosie((s) => s.newConversation);
   const messages = useRosie((s) => s.messages);
+  const toolCalls = useRosie((s) => s.toolCalls);
   const running = useRosie((s) => s.running);
   const error = useRosie((s) => s.error);
   const cost = useRosie((s) => s.totalCostUsd);
@@ -271,10 +287,10 @@ export function Rosie() {
     // book-keeping for the API, not user-meaningful text.
     () =>
       messages.filter((m) => {
-        if (m.role !== "user") return true;
+        if (m.role !== "user") return hasVisibleContent(m, toolCalls);
         return typeof m.content === "string";
       }),
-    [messages],
+    [messages, toolCalls],
   );
 
   if (!open) return null;
@@ -289,9 +305,10 @@ export function Rosie() {
   return (
     <div className="ot-rosie-overlay">
       <div className="ot-rosie-panel">
+        <ThemeBorder />
         <div className="ot-rosie-head">
           <div className="ot-rosie-id">
-            <div className="ot-claude-orb" style={{ width: 18, height: 18 }} />
+            <OrionOrb size={22} state={running ? "thinking" : "idle"} />
             <div className="ot-rosie-title">
               <div className="primary">R.O.S.I.E</div>
               <div className="secondary">recursive oracle · sentient interface entity</div>
@@ -324,7 +341,7 @@ export function Rosie() {
         <div className="ot-rosie-body" ref={scrollRef}>
           {visibleMessages.length === 0 && (
             <div className="ot-rosie-empty">
-              <div className="ot-claude-orb" style={{ width: 56, height: 56 }} />
+              <OrionOrb size={64} />
               <div className="title">Ready when you are.</div>
               <div className="subtitle">
                 Choose a connected model, then ask for help with your apps,
@@ -358,6 +375,7 @@ export function Rosie() {
               </div>
             </div>
           ))}
+          {running && <div className="ot-ai-progress"><AiActivity /></div>}
         </div>
 
         <DiagnosticStrip />

@@ -1,3 +1,9 @@
+@import "./styles/sharpChrome.css";
+@import "./styles/workstation.css";
+@import "./styles/workstationApps.css";
+@import "./styles/lightThemes.css";
+@import "./styles/customThemes.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

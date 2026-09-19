@@ -1,4 +1,15 @@
 {
+  "metal-fx@2.0.10": {
+    "license": "MIT",
+    "reason": "The published package's NOTICE identifies inlined, unmodified Paper Shaders code under Apache-2.0 in addition to metal-fx's MIT grant. Preserve both obligations; LICENSE and NOTICE are collected directly from the package.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/Paper-Shaders-Apache-2.0.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "origin": "Apache-2.0 full license text; attribution and upstream provenance in metal-fx@2.0.10/NOTICE"
+      }
+    ]
+  },
   "onnxruntime-common@1.24.3": {
     "license": "MIT",
     "reason": "Published package omits license text; Microsoft upstream MIT license and supplementary notices retained at inspected revision b7804b056c. Not a claim that all JS packages have the same source revision.",

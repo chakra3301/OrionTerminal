@@ -16,6 +16,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useCommand } from "@/store/commandStore";
 import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
+import { AiActivity, OrionOrb } from "@/components/effects/OrionOrb";
 import { type CCProfile, type CCChannel } from "@/apps/command/ccTypes";
 import { AUTONOMY_LEVELS, autoDispatches } from "@/apps/command/ccAutonomy";
 import {
@@ -462,8 +463,7 @@ export function CommandCenterApp() {
 
               {planning && (
                 <div className="cc-m-status">
-                  <Loader2 size={14} className="cc-spin" /> The General is
-                  planning the mission…
+                  <AiActivity label="The General is planning the mission…" accent="var(--neon-yellow)" />
                 </div>
               )}
 
@@ -512,7 +512,7 @@ export function CommandCenterApp() {
               {dispatching && (
                 <div className="cc-dispatch">
                   <div className="cc-m-status">
-                    <Loader2 size={14} className="cc-spin" />
+                    <OrionOrb size={22} state="working" accent="var(--neon-yellow)" />
                     {activeRun
                       ? `${profiles.find((p) => p.id === activeRun.profileId)?.name ?? "A profile"} is working…`
                       : "Dispatching directives…"}
@@ -574,7 +574,7 @@ export function CommandCenterApp() {
                 <div className="cc-msg">
                   <div className="who" style={{ color: target?.accent }}>
                     {target?.name ?? "Agent"}
-                    <Loader2 size={11} className="cc-spin" />
+                    <OrionOrb size={20} state="working" accent={target?.accent ?? "var(--neon-yellow)"} />
                   </div>
                   {runHere.tools.map((t) => (
                     <div className="cc-tool" key={t.id}>
@@ -590,7 +590,7 @@ export function CommandCenterApp() {
                   ))}
                   <div className="body">
                     {runHere.text || (
-                      <span className="cc-thinking">thinking…</span>
+                      <AiActivity accent={target?.accent ?? "var(--neon-yellow)"} />
                     )}
                   </div>
                 </div>

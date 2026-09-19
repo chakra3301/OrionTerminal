@@ -9,7 +9,6 @@ import {
   Download,
   RefreshCw,
   Send,
-  Loader2,
   Presentation,
   Film,
   Pencil,
@@ -42,6 +41,7 @@ import {
   type PreviewSelection,
 } from "@/apps/xdesign/htmlPreviewBridge";
 import { confirmAction } from "@/components/ConfirmModal";
+import { AiActivity } from "@/components/effects/OrionOrb";
 import { ipc } from "@/lib/ipc";
 import { toast } from "@/store/toastStore";
 import { log } from "@/lib/log";
@@ -508,7 +508,7 @@ export function HtmlArtifactPreview() {
       <footer className="xd-artifact-refine">
         {running ? (
           <div className="xd-artifact-running">
-            <Loader2 size={13} className="spin" /> Working…
+            <AiActivity label="Working…" working accent="var(--neon-magenta)" />
           </div>
         ) : (
           <>

@@ -4,6 +4,7 @@ import { useShell } from "@/shell/store/useShell";
 import { useAppDescriptors, type AppId } from "@/plugins/appRegistry";
 import { useRosie } from "@/features/rosie/rosieStore";
 import { useControlPanel } from "@/store/controlPanelStore";
+import { ThemeBorder } from "@/components/effects/ThemeBorder";
 
 // Magnify tuning. `INFLUENCE` is how far (in px) the cursor's effect on a
 // dock item reaches; `MAX_SCALE` is the peak size of the closest item.
@@ -68,6 +69,7 @@ export function Dock() {
   return (
     <div className="ot-dock-wrap">
       <div className="ot-dock" ref={dockRef}>
+        <ThemeBorder />
         {apps.map((a) => {
           const Icon = a.dock.Icon;
           const active = activeIds.has(a.id);

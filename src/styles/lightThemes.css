@@ -1,0 +1,226 @@
+/* The light collection changes chrome, not image/video pixels or authored art. */
+:root[data-color-mode="light"] {
+  color-scheme: light;
+  --t-on-accent: #fffdf8;
+  --glass-bg: var(--bg-1);
+  --glass-bg-strong: var(--bg-1);
+  --glass-bg-deep: var(--bg-2);
+  --glass-border: color-mix(in srgb, var(--t-primary) 13%, transparent);
+  --glass-border-bright: color-mix(in srgb, var(--t-primary) 23%, transparent);
+  --glass-highlight: #ffffffa6;
+  --bg-0-solid: var(--bg-0);
+  --bg-1-solid: var(--bg-1);
+  --bg-2-solid: var(--bg-2);
+  --bg-3-solid: var(--bg-3);
+  --shadow-window: 0 28px 70px -24px #29344338, 0 6px 20px -8px #29344326;
+  --shadow-glow-green: 0 0 0 transparent;
+  --shadow-glow-cyan: 0 0 0 transparent;
+  --shadow-glow-magenta: 0 0 0 transparent;
+  --repolens-green: var(--neon-green);
+  --repolens-green-rgb: var(--neon-green-rgb);
+  --hermes-accent: var(--neon-yellow);
+  --hermes-accent-rgb: var(--neon-yellow-rgb);
+  --neon-amber: var(--neon-yellow);
+  --xd-accent: var(--neon-cyan); --xd-accent-rgb: var(--neon-cyan-rgb);
+  --light-accent: var(--neon-cyan); --light-accent-rgb: var(--neon-cyan-rgb);
+  --work-shadow-popup: 0 16px 40px -12px #29344326, 0 2px 8px #29344312;
+  --r-sm: 6.8px; --r-md: 10.2px; --r-lg: 15.3px; --r-xl: 20.4px;
+}
+:root[data-theme="ivory-keep"] {
+  --bg-0: #eae8e1; --bg-1: #f6f5ef; --bg-2: #fffef9; --bg-3: #ebe9e0;
+  --t-primary: #262820; --t-secondary: #3b3b30; --t-tertiary: #403f33; --t-faint: #77766a;
+  --neon-green: #254732; --neon-green-rgb: 37,71,50;
+  --neon-cyan: #2b465b; --neon-cyan-rgb: 43,70,91;
+  --neon-yellow: #543c0f; --neon-yellow-rgb: 84,60,15;
+  --neon-magenta: #6b2e3c; --neon-magenta-rgb: 107,46,60;
+  --neon-violet: #4e3b64; --neon-violet-rgb: 78,59,100;
+  --light-detail: #745420; --light-material: #f4ead2;
+}
+
+:root[data-color-mode="light"] body :is(.ot-titlebar, .ot-menubar, .cp-main-head) {
+  background: var(--bg-1);
+  border-bottom-color: var(--work-line);
+}
+:root[data-color-mode="light"] body :is(.ot-window, .cp-surface, .ot-dock, .ot-spotlight, .ot-prompt-card) {
+  border-color: var(--glass-border);
+  box-shadow: var(--shadow-window);
+}
+/* A selected shader finish owns the outer rim; never stack decorative trims. */
+:root[data-color-mode="light"] body :is(.ot-window, .cp-surface, .ot-dock, .ot-spotlight, .ot-prompt-card):has(> .ot-themed-border) { border-color: transparent; }
+:root[data-color-mode="light"] body .ot-dock { background: var(--bg-2); }
+:root[data-color-mode="light"] body .ot-welcome-card { background: var(--bg-1); border-color: var(--glass-border); box-shadow: var(--shadow-window); }
+:root[data-color-mode="light"] body :is(.or-home, .xd-root-home, .ar-today) { background: var(--bg-1); }
+:root[data-color-mode="light"] body :is(.ot-window-body, .ot-panel, .ar-main, .note-page, .or-preview-empty, .or-preview-md, .cp-main-body, .learn-body, .rl-view) { background: var(--bg-1); color: var(--t-primary); }
+:root[data-color-mode="light"] body :is(.ot-claude-rail, .ar-sidebar, .or-filetree, .ar-journal-rail, .ar-projects-rail, .cp-rail, .learn-rail, .ot-panel-tabs, .or-statusbar) { background: color-mix(in srgb, var(--bg-0) 45%, var(--bg-1)); border-color: var(--glass-border); }
+:root[data-color-mode="light"] body :is(.ar-toolbar, .ar-notes-detail-bar, .ar-db-bar) { background: var(--bg-1); }
+:root[data-color-mode="light"] body :is(.ar-note-card, .ar-card, .cp-form, .ot-mcp-row, .ot-mcp-form, .ot-theme-extras) { background: var(--bg-2); border-color: var(--glass-border); }
+:root[data-color-mode="light"] body :is(.or-home-card-preview, .ot-extras-preview-card) { background: var(--bg-2); }
+:root[data-color-mode="light"] body .cp-surface .ot-theme-card.active { background: var(--bg-2); border-color: var(--glass-border-bright); }
+:root[data-color-mode="light"] body .xd-root { --xd-bg: var(--work-raised); --xd-accent: var(--light-accent); --xd-accent-rgb: var(--light-accent-rgb); --bg-3: var(--work-selected); --t-faint: var(--work-muted); }
+:root[data-color-mode="light"] body .hm-shell { --accent: var(--neon-yellow); --accent-rgb: var(--neon-yellow-rgb); --c-working: var(--neon-yellow); --c-done: var(--neon-green); --c-error: var(--neon-magenta); --c-paused: var(--neon-yellow); }
+:root[data-color-mode="light"] body .cc-root { --cc-gold: var(--neon-yellow); --cc-gold-rgb: var(--neon-yellow-rgb); --cc-chrome: var(--bg-0); --cc-card: var(--bg-2); }
+
+:root[data-color-mode="light"] body :is(.ot-model-select, .cp-input, .ot-settings-input, .ot-mcp-input, .ot-prompt-input, .ar-search, .ar-notes-search, .rl-scan-field, .cc-input, .xd-num, .xd-color-input) { background: var(--bg-2); color: var(--t-primary); border-color: var(--glass-border-bright); }
+:root[data-color-mode="light"] body :is(.ot-claude-input, .ot-rosie-input) textarea { background: var(--bg-2); color: var(--t-primary); border-color: var(--glass-border-bright); }
+:root[data-color-mode="light"] body .ot-claude-input button.send:not([aria-label="Stop response"]) { background: var(--t-primary); color: var(--t-on-accent); }
+:root[data-color-mode="light"] body .note-page { background: var(--bg-1); }
+:root[data-color-mode="light"] body .note-page :is(.note-editor-title, .ProseMirror) { color: var(--t-primary); }
+:root[data-color-mode="light"] body .note-page .note-editor-title::placeholder { color: var(--t-tertiary); }
+:root[data-color-mode="light"] body .note-page .note-editor-body { background: var(--bg-2); color: var(--t-primary); border-color: var(--glass-border); box-shadow: 0 6px 24px -12px #302d2726; backdrop-filter: none; -webkit-backdrop-filter: none; }
+:root[data-color-mode="light"] body :is(.journal-meta-date, .journal-meta-row, .journal-meta-sep) { color: var(--t-secondary); }
+:root[data-color-mode="light"] body :is(.journal-meta-location, .journal-meta-location-input) { background: var(--bg-2); color: var(--neon-cyan); border-color: var(--glass-border-bright); }
+:root[data-color-mode="light"] body .ot-rosie-panel { background: var(--bg-1); color: var(--t-primary); border-color: var(--glass-border); box-shadow: var(--shadow-window); }
+:root[data-color-mode="light"] body :is(.ot-rosie-msg.user .bubble, .ot-rosie-context, .ot-pill, .ot-plan-block) { background: var(--bg-3); border-color: var(--glass-border); }
+:root[data-color-mode="light"] body :is(.ot-rosie-msg .md pre, .ot-msg pre) { background: var(--bg-0); color: var(--t-primary); }
+:root[data-color-mode="light"] body :is(.ot-ctx-menu, .ot-ctxpick, .or-home-menu, .xd-home-menu, .ot-prompt-card) { background: var(--bg-2); color: var(--t-primary); }
+:root[data-color-mode="light"] body :is(.ot-ctx-item, .ot-ctxpick-row):hover:not(:disabled) { background: var(--bg-3); }
+:root[data-color-mode="light"] body .ot-ctx-item.danger { color: var(--neon-magenta); }
+:root[data-color-mode="light"] body :is(.ot-resize-handle, .resize-handle) { background: var(--glass-border); }
+:root[data-color-mode="light"] body :is(.ot-resize-handle, .resize-handle):hover { background: var(--neon-cyan); }
+:root[data-color-mode="light"] body ::selection { background: color-mix(in srgb, var(--neon-cyan) 22%, transparent); }
+:root[data-color-mode="light"] body ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--t-primary) 24%, transparent); }
+:root[data-color-mode="light"] body ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--t-primary) 38%, transparent); }
+:root[data-color-mode="light"] body .ot-traffic .light { --neon-yellow: #d99b27; --neon-green: #48a264; }
+:root[data-color-mode="light"] body :is(.ot-char-check, .ar-media-check, .ot-prompt-btn.danger, .ot-notif-badge, .ot-spotify-play, .ot-spotify-connect-btn, .hm-card-act.go) { color: var(--t-on-accent); }
+:root[data-color-mode="light"] body :is(.ar-drop-card, .ar-brain-search, .ar-brain-detail) { background: var(--bg-2); color: var(--t-primary); border-color: var(--glass-border-bright); }
+:root[data-color-mode="light"] body .note-page .ProseMirror blockquote { color: var(--t-secondary); background: var(--bg-3); border-color: var(--neon-cyan); }
+:root[data-color-mode="light"] body .note-page .ProseMirror pre { background: var(--bg-0); border-color: var(--glass-border); }
+:root[data-color-mode="light"] body .note-page .ProseMirror code { background: var(--bg-3); }
+:root[data-color-mode="light"] body .note-page .ProseMirror pre code { background: none; }
+:root[data-color-mode="light"] body .note-page .ProseMirror :is(p.is-empty:first-child, p.is-editor-empty:first-child)::before { color: var(--t-tertiary); }
+:root[data-color-mode="light"] body .note-page .ProseMirror a { color: var(--neon-cyan); }
+:root[data-color-mode="light"] body :is(.or-terminal-panel, .or-terminal-wrap) { background: var(--bg-2); }
+:root[data-color-mode="light"] body .or-media-stage.checker { background-color: var(--bg-0); }
+/* These controls are composited over unmodified photography / shader output. */
+:root[data-color-mode="light"] body :is(.ar-media-delete, .ar-media-fav, .ar-mood-tile-remove, .xd-fx-perf) { color: #fff; }
+:root[data-color-mode="light"] body .ar-media-fav.active { color: #ffe18b; }
+:root[data-color-mode="light"] body .ot-themed-border[data-border="metal"] { --ot-metal-rim: #697983; }
+:root[data-color-mode="light"] body .ot-themed-border[data-border="metal"][data-finish="gold"] { --ot-metal-rim: #927132; }
+:root[data-color-mode="light"] body .ot-themed-border[data-border="beam"] .ot-border-still { border-color: var(--neon-cyan); box-shadow: none; }
+:root[data-color-mode="light"] body .ot-themed-border[data-border="beam"] .ot-border-still[data-palette="sunset"] { border-color: var(--neon-magenta); }
+:root[data-color-mode="light"] body .ot-themed-border[data-border="beam"] .ot-border-still[data-palette="mono"] { border-color: var(--t-secondary); }
+:root[data-color-mode="light"] body .ot-themed-border[data-border="beam"] .ot-border-still[data-palette="colorful"] { border-color: var(--neon-violet); }
+
+:root[data-color-mode="light"] body:has(.cp-overlay) .ot-welcome { visibility: hidden; }
+:root[data-color-mode="light"] body .ot-window.unfocused { opacity: 1; filter: none; box-shadow: 0 12px 40px -16px #29344330; }
+:root[data-color-mode="light"] body .ot-welcome-card { align-items: flex-start; width: min(520px, calc(100vw - 48px)); padding: 28px; gap: 12px; text-align: left; }
+:root[data-color-mode="light"] body .ot-welcome-greet { font-size: 32px; line-height: 1.15; letter-spacing: -.035em; }
+:root[data-color-mode="light"] body .ot-welcome-tag { font-size: 14px; line-height: 1.6; font-weight: 400; }
+:root[data-color-mode="light"] body .ot-welcome-time { letter-spacing: .1em; }
+:root[data-color-mode="light"] body :is(.ot-welcome-stats, .ot-welcome-recents, .ot-welcome-firstrun) { width: 100%; justify-content: flex-start; flex-wrap: wrap; border-top: 1px solid var(--work-line-strong); }
+:root[data-color-mode="light"] body .ot-welcome-stats { font-family: var(--f-display); font-size: 11px; letter-spacing: 0; gap: 12px; }
+:root[data-color-mode="light"] body .ot-welcome-recents { gap: 8px; padding-top: 14px; }
+:root[data-color-mode="light"] body .ot-welcome-recent { font-family: var(--f-display); font-size: 11px; letter-spacing: 0; padding: 6px 10px; border-color: var(--glass-border-bright); }
+:root[data-color-mode="light"] body .ot-welcome-sep { background: var(--glass-border-bright); }
+:root[data-color-mode="light"] body .ot-welcome-firstrun { align-items: flex-start; }
+:root[data-color-mode="light"] body .ot-welcome-firstrun-actions { flex-wrap: wrap; }
+:root[data-color-mode="light"] body .cp-rail-group-label { color: var(--t-secondary); }
+:root[data-color-mode="light"] body :is(.ot-theme-selected, .cp-rail-item.active svg) { color: var(--light-detail); }
+:root[data-color-mode="light"] body .cp-surface .ot-theme-card.active { border-color: color-mix(in srgb, var(--light-detail) 38%, transparent); }
+:root[data-color-mode="light"] body :is(.ot-model-select, .cp-input) option { background: var(--bg-2); color: var(--t-primary); }
+:root[data-color-mode="light"] body :is(.cp-input, .ot-prompt-input, .ot-claude-input textarea, .ot-rosie-input textarea)::placeholder { color: var(--t-tertiary); opacity: 1; }
+:root[data-color-mode="light"] body .ot-dock-item .icon-bed { box-shadow: none; }
+:root[data-color-mode="light"] body .ot-welcome-card :is(button, a):focus-visible { outline: 2px solid var(--light-detail); outline-offset: 3px; }
+
+/* Keep opaque palette tokens for native editors, artwork and no-blur fallback.
+   Frost only floating containers; their inner chrome shares that backdrop. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  /* Unsupported preference queries must not gate the default material. */
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) {
+      --light-glass-surface: color-mix(in srgb, var(--light-material) 22%, transparent);
+      --light-glass-popover: color-mix(in srgb, var(--bg-2) 58%, transparent);
+      --light-glass-rail: color-mix(in srgb, var(--bg-0) 16%, transparent);
+      --light-glass-chrome: color-mix(in srgb, var(--bg-2) 8%, transparent);
+      --light-glass-card: color-mix(in srgb, var(--bg-2) 12%, transparent);
+      --light-glass-control: color-mix(in srgb, var(--bg-2) 34%, transparent);
+      --light-glass-selected: color-mix(in srgb, var(--light-detail) 10%, transparent);
+      --light-glass-body: transparent;
+      /* Lift the backdrop's black point, not the content or wallpaper itself.
+         Dark ink then has a reading floor without an opaque white panel. */
+      --light-glass-backdrop: blur(6px) saturate(.9) brightness(.45) contrast(.32) brightness(2);
+      --light-glass-scrim: #18202b24;
+      --light-glass-rim: #ffffff66;
+      --light-glass-edge: inset 0 1px 0 #ffffff4d;
+    }
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
+      .ot-window, .cp-surface, .ot-menubar, .ot-dock, .ot-spotlight,
+      .ot-prompt-card, .ot-rosie-panel, .ot-welcome-card, .ot-companion-bubble
+    ) {
+      background: var(--light-glass-surface);
+      backdrop-filter: var(--light-glass-backdrop);
+      -webkit-backdrop-filter: var(--light-glass-backdrop);
+    }
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
+      .ot-window, .cp-surface, .ot-dock, .ot-spotlight, .ot-prompt-card,
+      .ot-welcome-card, .ot-rosie-panel, .ot-companion-bubble
+    ):not(:has(> .ot-themed-border)) {
+      border-color: var(--light-glass-rim);
+      box-shadow: var(--light-glass-edge), var(--shadow-window);
+    }
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
+      .ot-window-body, .ar-main, .ar-today, .ar-notes, .or-app, .or-home,
+      .note-page, .ar-notes-editor, .ar-journal-editor, .ar-projects-editor,
+      .ot-workspace, .ot-panel, .ot-panel-body, .xd-root-home, .cp-main, .cp-main-body
+    ) { background: var(--light-glass-body); }
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
+      .ot-titlebar, .cp-main-head, .ar-toolbar, .ar-notes-detail-bar,
+      .ar-db-bar, .ot-panel-tabs, .or-statusbar, .xd-tabs
+    ) { background: var(--light-glass-chrome); }
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
+      .ar-sidebar, .ar-journal-rail, .ar-projects-rail, .or-files-panel,
+      .cp-rail, .xd-toolrail, .xd-layers, .xd-inspector
+    ) { background: var(--light-glass-rail); }
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) body .ot-claude-rail {
+      background: var(--light-glass-chrome);
+    }
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
+      .ar-card, .ar-note-card, .cp-form, .ot-mcp-row, .ot-mcp-form, .ot-theme-extras,
+      .or-home-card-preview, .ot-extras-preview-card
+    ) { background: var(--light-glass-card); }
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
+      .ot-extras-preview, .ot-extras-styles
+    ) { background: var(--light-glass-chrome); }
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
+      .cp-surface .ot-theme-card.active, .cp-surface .ot-theme-card:hover,
+      .cp-surface .cp-rail-item.active, .ot-extras-style.selected,
+      .ot-extras-style:hover, .ot-extras-choices button[aria-pressed="true"]
+    ) { background: var(--light-glass-selected); }
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
+      .cp-input, .ot-model-select, .ot-settings-input, .ot-mcp-input,
+      .ot-prompt-input, .ar-search, .ar-notes-search, .xd-num, .xd-color-input
+    ),
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
+      .ot-claude-input, .ot-rosie-input
+    ) textarea { background: var(--light-glass-control); }
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
+      .cp-overlay, .ot-spotlight-overlay, .ot-prompt-overlay
+    ) {
+      background: var(--light-glass-scrim);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
+      .ot-ctx-menu, .ot-ctxpick, .or-home-menu, .xd-home-menu, .xd-home-start-menu
+    ) {
+      background: var(--light-glass-popover);
+      backdrop-filter: var(--light-glass-backdrop);
+      -webkit-backdrop-filter: var(--light-glass-backdrop);
+    }
+
+  @media (prefers-reduced-transparency: reduce) {
+    :root[data-color-mode="light"]:not(.ot-reduce-glass) {
+      --light-glass-surface: var(--bg-1);
+      --light-glass-popover: var(--bg-2);
+      --light-glass-rail: var(--bg-0);
+      --light-glass-chrome: var(--bg-1);
+      --light-glass-card: var(--bg-2);
+      --light-glass-control: var(--bg-2);
+      --light-glass-selected: var(--bg-3);
+      --light-glass-body: var(--bg-1);
+      --light-glass-backdrop: none;
+      --light-glass-scrim: #02040899;
+      --light-glass-rim: var(--glass-border);
+      --light-glass-edge: 0 0 0 transparent;
+    }
+  }
+}

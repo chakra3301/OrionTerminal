@@ -38,6 +38,7 @@ const SplashPreview = import.meta.env.DEV
   : null;
 import { startFileDropOrchestrator } from "@/lib/fileDrop";
 import { useThemeStore } from "@/store/themeStore";
+import { useThemeExtras } from "@/store/themeExtrasStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { useAppConfig, type AppConfigsPersist } from "@/store/appConfigStore";
 import { useWallpaperStore, type WallpaperState } from "@/store/wallpaperStore";
@@ -73,6 +74,8 @@ async function hydrate() {
     characters,
     modelPrefs,
     reduceGlass,
+    themeExtras,
+    customThemes,
     appConfigs,
     pluginState,
   ] = await Promise.all([
@@ -84,12 +87,16 @@ async function hydrate() {
     ),
     getAppState<Record<string, string>>("models"),
     getAppState<boolean>("reduce_glass"),
+    getAppState<unknown>("theme_extras", true).catch(() => undefined),
+    getAppState<unknown>("custom_themes", true).catch(() => undefined),
     getAppState<AppConfigsPersist>("appconfig"),
     getAppState<PluginEnablementV1>("plugins.state"),
   ]);
 
+  useThemeStore.getState().hydrateCustom(customThemes);
   useThemeStore.getState().hydrate(theme ?? null);
   useThemeStore.getState().hydrateGlass(reduceGlass);
+  useThemeExtras.getState().hydrate(themeExtras);
   if (wallpaper) useWallpaperStore.getState().hydrate(wallpaper);
   if (characters) useCharacterStore.getState().hydrate(characters);
   usePluginManager.getState().hydrate(pluginState);

@@ -7,7 +7,8 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, X, Trash2, LoaderCircle, Check, TriangleAlert, OctagonAlert } from "lucide-react";
+import { X, Trash2, Check, TriangleAlert, OctagonAlert } from "lucide-react";
+import { OrionOrb } from "@/components/effects/OrionOrb";
 import { useModelAssist, passProgressLabel } from "./modelAssist";
 import { useModelStore } from "./modelStore";
 import { useModelFeed } from "./modelTranscriptFeed";
@@ -54,7 +55,7 @@ export function ModelAssistPanel() {
     <div className="xd-model-assist">
       <div className="xd-model-assist-head">
         <span className="xd-model-assist-title">
-          <Sparkles size={13} /> img2model
+          <OrionOrb size={22} state={busy ? "thinking" : "idle"} accent="var(--neon-magenta)" /> img2model
         </span>
         <span className="xd-model-assist-pass">{passProgressLabel()}</span>
         <span className="xd-model-assist-actions">
@@ -114,7 +115,7 @@ export function ModelAssistPanel() {
         {streaming && <div className="xd-model-assist-msg assistant">{streaming}</div>}
         {busy && (
           <div className="xd-model-assist-busy">
-            <LoaderCircle size={12} className="xd-model-spin" />
+            <OrionOrb size={22} state="working" accent="var(--neon-magenta)" />
             {streaming ? "streaming" : "working"} · {elapsed}s {elapsed > 60 ? "— real passes can take a few minutes, this is normal" : ""}
           </div>
         )}
@@ -131,7 +132,7 @@ export function ModelAssistPanel() {
           }}
         />
         <button type="button" onClick={send} disabled={busy || (!draft.trim() && !reference)}>
-          {busy ? <LoaderCircle size={13} className="xd-model-spin" /> : "Send"}
+          {busy ? <OrionOrb size={18} state="working" accent="var(--neon-magenta)" /> : "Send"}
         </button>
       </div>
     </div>

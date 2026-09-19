@@ -114,6 +114,58 @@ pub fn read_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&p).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn theme_read_markdown(path: String) -> Result<String, String> {
+    use std::io::Read;
+    const LIMIT: u64 = 65_536;
+    let path = PathBuf::from(path);
+    let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    if extension != "md" && extension != "markdown" {
+        return Err("Choose a .md or .markdown file.".into());
+    }
+    let metadata = std::fs::metadata(&path).map_err(|_| "Could not read the design file.")?;
+    if !metadata.is_file() || metadata.len() > LIMIT {
+        return Err("Choose a regular Markdown file of 64 KiB or smaller.".into());
+    }
+    let file = std::fs::File::open(path).map_err(|_| "Could not open the design file.")?;
+    if !file.metadata().map_err(|_| "Could not inspect the design file.")?.is_file() {
+        return Err("Choose a regular Markdown file.".into());
+    }
+    let mut bytes = Vec::new();
+    file.take(LIMIT + 1).read_to_end(&mut bytes).map_err(|_| "Could not read the design file.")?;
+    if bytes.len() > LIMIT as usize { return Err("Design Markdown must be 64 KiB or smaller.".into()); }
+    let text = String::from_utf8(bytes).map_err(|_| "Design Markdown must be UTF-8 text.")?;
+    if text.trim().is_empty() || text.contains('\0') { return Err("Choose a non-empty Markdown text file.".into()); }
+    Ok(text)
+}
+
+#[cfg(test)]
+mod theme_import_tests {
+    use super::theme_read_markdown;
+    #[test]
+    fn theme_markdown_import_is_bounded_utf8_and_regular_file_only() {
+        let dir = std::env::temp_dir().join(format!("orion-theme-{}", ulid::Ulid::new()));
+        std::fs::create_dir(&dir).unwrap();
+        let path = dir.join("design.md");
+        let read = || theme_read_markdown(path.to_string_lossy().into_owned());
+        std::fs::write(&path, "# Carbon\nUse graphite.").unwrap();
+        assert_eq!(read().unwrap(), "# Carbon\nUse graphite.");
+        std::fs::write(&path, vec![b'a'; 65_537]).unwrap();
+        assert!(read().is_err());
+        std::fs::write(&path, [0xff, 0xfe]).unwrap();
+        assert!(read().is_err());
+        std::fs::write(&path, b"hello\0world").unwrap();
+        assert!(read().is_err());
+        std::fs::write(&path, "  ").unwrap();
+        assert!(read().is_err());
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        assert!(read().is_err());
+        assert!(theme_read_markdown(dir.join("design.js").to_string_lossy().into_owned()).is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}
+
 /// Read a (binary) file and return its bytes base64-encoded, for media the
 /// webview renders via a `data:` URL — images/video/audio/pdf clicked in the
 /// file tree. Capped so a giant file can't blow up the IPC payload; the

@@ -8,7 +8,6 @@ import {
   FileText,
   Music,
   RefreshCw,
-  Loader2,
 } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useNotesStore, type Note } from "@/store/notesStore";
@@ -29,6 +28,7 @@ import { runTextModel } from "@/features/agents/textCall";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { log } from "@/lib/log";
 import { relativeTime } from "@/lib/time";
+import { AiActivity } from "@/components/effects/OrionOrb";
 
 function greetingForHour(h: number): string {
   if (h < 5) return "Still up?";
@@ -433,7 +433,7 @@ export function WeekRead({
     <div className="ar-week-read">
       {loading && !cached ? (
         <div className="ar-week-read-loading">
-          <Loader2 size={12} className="ar-spin" /> Reading the week…
+          <AiActivity label="Reading the week…" accent="var(--neon-green)" />
         </div>
       ) : cached ? (
         <p style={{ whiteSpace: "pre-wrap" }}>{cached.text}</p>
@@ -463,7 +463,7 @@ export function WeekRead({
         >
           {loading ? (
             <>
-              <Loader2 size={11} className="ar-spin" /> Working…
+              <AiActivity label="Working…" working accent="var(--neon-green)" />
             </>
           ) : (
             <>

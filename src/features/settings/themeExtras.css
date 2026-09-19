@@ -1,0 +1,38 @@
+.ot-theme-extras { min-width: 0; margin-top: 24px; padding: 20px; border: 1px solid var(--glass-border); border-radius: 16px; background: color-mix(in srgb, var(--bg-2) 60%, transparent); }
+.ot-extras-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ot-extras-heading h3 { margin: 0; color: var(--t-primary); font: 500 14px/1.4 var(--f-display); }
+.ot-extras-heading p, .ot-extras-help { margin: 5px 0 0; color: var(--t-tertiary); font: 11px/1.65 var(--f-display); }
+.ot-extras-reset { display: grid; place-items: center; width: 30px; height: 30px; background: transparent; border: 1px solid transparent; color: var(--t-secondary); border-radius: 8px; cursor: pointer; }
+.ot-extras-reset:hover { color: var(--t-primary); background: var(--bg-3); border-color: var(--glass-border); }
+.ot-extras-preview { margin: 18px 0; padding: 12px; border-radius: 14px; background: radial-gradient(ellipse at 0% 100%, #00e0ff10, transparent 60%), radial-gradient(ellipse at 100% 0%, #b14cff13, transparent 60%), var(--bg-0); }
+.ot-extras-preview-card { position: relative; border: 1px solid var(--glass-border); border-radius: 12px; padding: 14px; background: linear-gradient(145deg, #d3eeff08, #03060a55); }
+.ot-extras-preview-top, .ot-extras-preview-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--t-tertiary); font: 10px/1.4 var(--f-display); }
+.ot-extras-live { display: inline-flex; align-items: center; gap: 5px; }
+.ot-extras-live i { width: 4px; height: 4px; border-radius: 50%; background: var(--neon-green); }
+.ot-extras-preview-core { display: flex; align-items: center; gap: 14px; padding: 18px 0; }
+.ot-extras-preview-core strong { display: block; font: 500 15px/1.4 var(--f-display); color: var(--t-primary); }
+.ot-extras-preview-core > div > span { display: block; margin-top: 5px; color: var(--t-tertiary); font: 10px/1.5 var(--f-display); }
+.ot-extras-styles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; padding: 4px; border: 1px solid var(--glass-border); border-radius: 12px; background: var(--bg-1); }
+.ot-extras-style { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 8px; border: 1px solid transparent; border-radius: 8px; color: var(--t-secondary); font: 500 12px var(--f-display); background: transparent; cursor: pointer; transition: background 140ms ease, color 140ms ease; }
+.ot-extras-style.selected { border-color: var(--glass-border-bright); color: var(--t-primary); background: var(--bg-3); box-shadow: 0 2px 5px #0002; }
+.ot-extras-style:hover { color: var(--t-primary); background: var(--bg-2); }
+.ot-extras-sample { width: 19px; height: 15px; flex: none; border: 1px solid #90a4a788; border-radius: 4px; }
+.ot-extras-style.beam .ot-extras-sample { border-color: #a9b9ff; box-shadow: 1px 0 5px #b14cff55, -1px 0 5px #00e0ff55; }
+.ot-extras-style.metal .ot-extras-sample { border: 2px solid transparent; background: linear-gradient(#111820, #111820) padding-box, conic-gradient(#d2f5ff, #3e4349, #e6d5fc, #585658, #d2f5ff) border-box; }
+.ot-extras-description { margin: 10px 0 0; color: var(--t-secondary); font: 11px/1.6 var(--f-display); }
+.ot-extras-options { min-width: 0; border: 0; margin: 18px 0 0; padding: 0; }
+.ot-extras-options legend { margin-bottom: 9px; padding: 0; color: var(--t-secondary); font: 500 12px var(--f-display); }
+.ot-extras-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.ot-extras-choices button { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 7px 10px; border: 1px solid var(--glass-border); border-radius: 8px; background: transparent; color: var(--t-secondary); font: 11px/1.3 var(--f-display); cursor: pointer; transition: background 140ms ease, border-color 140ms ease; }
+.ot-extras-choices button:hover { background: var(--bg-3); color: var(--t-primary); }
+.ot-extras-choices button[aria-pressed="true"] { background: color-mix(in srgb, var(--neon-cyan) 7%, var(--bg-1)); border-color: color-mix(in srgb, var(--neon-cyan) 40%, var(--glass-border)); color: var(--t-primary); }
+.ot-extras-materials button { flex: 1; justify-content: center; }
+.ot-finish-swatch { display: inline-block; width: 12px; height: 12px; flex: none; border-radius: 50%; background: linear-gradient(135deg, #dae6f7, #606070, #e6c8fb, #a3e8f3); }
+.ot-finish-swatch.silver, .ot-finish-swatch.mono { background: linear-gradient(135deg, #fafcff, #707c8d, #d5dce5); }
+.ot-finish-swatch.gold { background: linear-gradient(135deg, #fff3c5, #967338, #ebd499); }
+.ot-finish-swatch.colorful { background: conic-gradient(#f17ab0, #b09eff, #74d7ff, #91efb6, #f17ab0); }
+.ot-finish-swatch.ocean { background: linear-gradient(135deg, #54f1ee, #547aff); }
+.ot-finish-swatch.sunset { background: linear-gradient(135deg, #ffe39f, #ff8c66, #da527e); }
+.ot-theme-extras :is(button, select, input):focus-visible { outline: 2px solid var(--neon-cyan); outline-offset: 3px; }
+.ot-theme-extras .ot-extras-help { margin-top: 16px; font-size: 10px; }
+@media (prefers-reduced-motion: reduce) { .ot-extras-style, .ot-extras-choices button { transition: none; } }

@@ -1,0 +1,155 @@
+/* Resolve aliases above app-local palettes to avoid circular token remaps.
+   Explicit chrome selectors keep document, terminal and canvas styling local. */
+:root {
+  --work-panel: var(--bg-1-solid, var(--bg-1));
+  --work-raised: var(--bg-2-solid, var(--bg-2));
+  --work-text: var(--t-primary);
+  --work-secondary: var(--t-secondary);
+  --work-muted: color-mix(in srgb, var(--t-secondary) 82%, var(--t-primary));
+  --work-line: color-mix(in srgb, var(--t-primary) 10%, transparent);
+  --work-line-strong: color-mix(in srgb, var(--t-primary) 19%, transparent);
+  --work-hover: color-mix(in srgb, var(--t-primary) 6%, transparent);
+  --work-selected: color-mix(in srgb, var(--t-primary) 9%, transparent);
+  --work-shadow-popup: 0 16px 48px -16px #000a, 0 4px 12px #0003;
+}
+
+:root body :is(.ot-window-title, .ot-menubar-items button.ot-menubar-app) {
+  font-family: var(--f-display);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+:root body .ot-window-title { min-width: 0; }
+:root body .ot-titlebar { border-bottom-color: var(--work-line); background: var(--work-hover); }
+:root body .ot-traffic .light { box-shadow: none; }
+:root body .ot-menubar-items { gap: 16px; }
+:root body .ot-menubar-logo { font-weight: 500; letter-spacing: .05em; }
+:root body .ot-dock-item .icon-bed { box-shadow: inset 0 1px 0 #ffffff0d; }
+:root body .ot-dock-item::after { font-family: var(--f-display); letter-spacing: 0; }
+:root body .ot-welcome-hint { font-family: var(--f-display); font-size: 12px; letter-spacing: 0; text-transform: none; }
+
+:root body :is(
+  .ar-section, .ar-card h3, .ar-card .card-title, .ar-card-link,
+  .ar-journal-rail-head, .ar-projects-rail-head, .ar-fav-group-head,
+  .or-home-section-title, .xd-home-section-title, .or-files-header, .or-git-subhead,
+  .ot-claude-name, .ot-plan-head, .ot-rosie-title .primary,
+  .hm-fb-title, .hm-rail-tabs button, .cc-section-label, .cc-field .lbl,
+  .learn-rail-title, .learn-model-label, .xd-fx-panel-head
+) {
+  font-family: var(--f-display);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: .01em;
+  text-transform: none;
+}
+:root body :is(.ar-section, .cc-section-label, .learn-model-label) { font-size: 11px; color: var(--work-muted); }
+:root body :is(.ar-toolbar .crumb, .ar-notes-detail-crumb, .ar-today-hero .date, .ar-journal-entry .meta) {
+  font-family: var(--f-display);
+  font-size: 11px;
+  letter-spacing: .01em;
+  text-transform: none;
+  color: var(--work-muted);
+}
+:root body :is(.ar-toolbar, .ar-notes-detail-bar, .ot-claude-header, .ot-panel-tabs, .xd-tabs) {
+  border-bottom-color: var(--work-line);
+}
+:root body :is(.ar-toolbar, .ar-notes-detail-bar) { min-height: 40px; }
+
+:root body :is(
+  .or-home-btn, .xd-home-new, .ar-new-btn, .ar-db-newrow,
+  .hm-btn, .rl-btn, .ot-prompt-btn
+) {
+  min-height: 34px;
+  padding: 8px 13px;
+  font-family: var(--f-display);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
+  box-shadow: none;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+:root body :is(.or-home-btn-primary, .xd-home-new, .ar-new-btn, .rl-btn--primary, .hm-btn.primary, .ot-prompt-btn.primary) {
+  background: var(--work-text);
+  color: var(--t-on-accent);
+  border: 1px solid transparent;
+}
+:root body :is(.or-home-btn-primary, .xd-home-new, .ar-new-btn, .rl-btn--primary, .hm-btn.primary, .ot-prompt-btn.primary):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--work-text) 89%, var(--work-panel));
+  color: var(--t-on-accent);
+  box-shadow: none;
+  transform: none;
+  filter: none;
+}
+:root body .or-home-btn-ghost { background: transparent; border-color: var(--work-line-strong); }
+:root body .or-home-btn-ghost:hover { background: var(--work-hover); transform: none; }
+:root body :is(.ar-search, .ar-notes-search, .rl-scan-field, .cc-input) {
+  border-color: var(--work-line-strong);
+  background: var(--work-hover);
+}
+:root body :is(.ar-search, .ar-notes-search) { min-height: 34px; }
+:root body :is(.ar-search, .ar-notes-search input, .rl-url, .ot-model-select) { font-family: var(--f-display); }
+
+:root body :is(
+  .ar-sidebar, .ar-toolbar, .ar-notes, .ar-notes-detail-bar, .ar-db-bar,
+  .or-home, .xd-home, .xd-toolrail, .xd-layers, .xd-inspector, .xd-tabs,
+  .ot-claude-rail, .ot-rosie-panel, .hm-bar, .hm-floorbar, .hm-rail,
+  .cc-root, .rl-scanbar, .learn-rail, .ot-prompt-card,
+  .ot-ctx-menu, .ot-spotlight
+) :is(button, input, select, textarea, a, [role="button"]):focus-visible {
+  outline: 2px solid var(--neon-cyan);
+  outline-offset: 2px;
+}
+:root body :is(.ar-new-btn, .or-home-btn, .xd-home-new, .rl-btn):disabled { cursor: not-allowed; opacity: .45; }
+
+:root body .ot-claude-name { color: var(--t-primary); }
+:root body .ot-claude-sub { font-size: 11px; color: var(--work-muted); line-height: 1.5; }
+:root body .ot-claude-messages { padding: 18px 14px; gap: 16px; }
+:root body .ot-msg { font-size: 13px; line-height: 1.65; }
+:root body .ot-msg.assistant { background: transparent; border-color: transparent; padding-left: 0; padding-right: 0; max-width: 100%; }
+:root body .ot-claude-empty { color: var(--work-muted); line-height: 1.75; max-width: 240px; padding: 16px; }
+:root body .ot-claude-suggest { gap: 7px; }
+:root body .ot-claude-suggest .chip { background: transparent; color: var(--t-secondary); border-color: var(--work-line-strong); padding: 7px 11px; white-space: normal; text-align: left; line-height: 1.5; }
+:root body .ot-claude-suggest .chip:hover { background: var(--work-hover); color: var(--t-primary); }
+:root body .ot-claude-input { padding: 12px; border-top-color: var(--work-line); }
+:root body .ot-claude-input textarea { background: var(--work-hover); border-color: var(--work-line-strong); line-height: 1.5; }
+:root body .ot-claude-input textarea:focus { border-color: var(--t-secondary); box-shadow: none; }
+:root body .ot-claude-input button.send { background: var(--work-text); color: var(--t-on-accent); }
+:root body .ot-claude-input button.send:hover { filter: none; }
+:root body .ot-plan-block { background: var(--work-hover); }
+:root body .ot-rosie-msg .bubble { line-height: 1.65; }
+:root body .ot-rosie-msg.assistant .bubble { background: transparent; border-color: transparent; }
+:root body .ot-rosie-title .secondary { font: 11px/1.5 var(--f-display); letter-spacing: 0; text-transform: none; color: var(--work-muted); }
+:root body .ot-spotlight { box-shadow: var(--shadow-window); }
+:root body .ot-spotlight-section { padding-top: 12px; font: 500 11px/1.5 var(--f-display); letter-spacing: .01em; text-transform: none; color: var(--work-muted); }
+:root body .ot-spotlight-item { padding-top: 10px; padding-bottom: 10px; }
+:root body .ot-spotlight-item.selected { background: var(--work-selected); border-left-color: transparent; }
+:root body .ot-spotlight-item.selected > svg { color: var(--neon-green); }
+:root body .ot-spotlight-item .label .secondary { font: 11px/1.5 var(--f-display); letter-spacing: 0; color: var(--work-muted); }
+:root body .ot-ctx-hint { font-variant-numeric: tabular-nums; }
+:root body .ot-spotlight-footer { font-family: var(--f-display); letter-spacing: 0; }
+:root body .ot-ctx-item { min-height: 32px; padding-top: 8px; padding-bottom: 8px; font-family: var(--f-display); font-size: 12px; }
+:root body .ot-ctx-hint { font-size: 10px; color: var(--work-muted); }
+
+:root body .ot-prompt-title { font-family: var(--f-display); font-weight: 500; font-size: 18px; line-height: 1.4; letter-spacing: -.025em; text-transform: none; }
+:root body .ot-prompt-body { color: var(--t-secondary); line-height: 1.7; }
+:root body :is(.ot-ctx-menu, .or-home-menu, .xd-home-menu, .xd-home-start-menu) {
+  background: var(--work-panel);
+  border-color: var(--work-line-strong);
+  box-shadow: var(--work-shadow-popup);
+}
+:root body :is(.or-home-menu, .xd-home-menu) button.danger { color: var(--neon-magenta); }
+:root body .xd-home-start-menu { max-width: calc(100vw - 28px); max-height: min(480px, calc(100dvh - 120px)); overflow-y: auto; overscroll-behavior: contain; }
+:root body :is(.ot-panel-tab, .xd-tab, .ar-nav):focus-visible { outline: 2px solid var(--neon-cyan); outline-offset: -2px; }
+:root body .ot-ctx-menu { max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; }
+:root body :is(.or-home-menu, .xd-home-menu) button { min-height: 32px; font: 12px/1.4 var(--f-display); }
+:root body :is(.or-home-card, .xd-home-card):focus-within :is(.or-home-card-menu-btn, .xd-home-card-menu-btn),
+:root body :is(.ot-panel-tab, .xd-tab):focus-within :is(.x, .xd-tab-close),
+:root body .xd-page-row:focus-within .xd-page-del { opacity: 1; }
+:root body :is(.or-home-card-menu-btn, .xd-home-card-menu-btn) { width: 28px; height: 28px; color: var(--t-secondary); opacity: 1; }
+@media (hover: none) {
+  :root body :is(.or-home-card-menu-btn, .xd-home-card-menu-btn, .ot-panel-tab .x, .xd-tab-close, .xd-page-del) { opacity: 1; }
+}

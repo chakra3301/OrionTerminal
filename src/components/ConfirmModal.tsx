@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useModalRequest } from "./useModalRequest";
+import { ThemeBorder } from "./effects/ThemeBorder";
 
 type ConfirmOptions = {
   title: string;
@@ -42,6 +43,7 @@ export function ConfirmModalHost() {
       onMouseDown={(event) => { if (event.target === event.currentTarget) close(false); }}
     >
       <div className="ot-prompt-card">
+        <ThemeBorder />
         <div id={titleId} className="ot-prompt-title">{opts.title}</div>
         {opts.body && <div id={bodyId} className="ot-prompt-body">{opts.body}</div>}
         <div className="ot-prompt-actions">

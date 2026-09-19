@@ -1,4 +1,7 @@
 import Monaco, { type OnMount } from "@monaco-editor/react";
+import { useEditorTheme, editorThemeName } from "./editorAppearance";
+import { useThemeStore } from "@/store/themeStore";
+import { defineEditorThemes } from "./monacoTheme";
 import { useEffect, useRef, useState } from "react";
 import { ipc } from "@/lib/ipc";
 import { useTabsStore } from "@/store/tabsStore";
@@ -33,6 +36,7 @@ function blameAge(ts: number): string {
 }
 
 export function OrionEditor({ path }: { path: string }) {
+  const editorTheme = useEditorTheme();
   const buffer = useTabsStore((s) => s.fileBuffers[path]);
   const markLoaded = useTabsStore((s) => s.markLoaded);
   const updateBuffer = useTabsStore((s) => s.updateBuffer);
@@ -358,7 +362,7 @@ export function OrionEditor({ path }: { path: string }) {
   const onMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    monaco.editor.setTheme("orion-neon");
+    monaco.editor.setTheme(editorThemeName(useThemeStore.getState().theme));
 
     editor.onDidChangeCursorPosition(() => {
       reportStatus();
@@ -573,7 +577,8 @@ export function OrionEditor({ path }: { path: string }) {
         language={languageForPath(path)}
         value={buffer?.contents ?? ""}
         path={path}
-        theme="orion-neon"
+        theme={editorTheme}
+        beforeMount={defineEditorThemes}
         onMount={onMount}
         onChange={(v) => {
           if (typeof v === "string") updateBuffer(path, v);

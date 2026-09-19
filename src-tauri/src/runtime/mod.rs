@@ -20,6 +20,20 @@ use provider::{make_provider, ChatRequest, Msg, StreamItem};
 const MAX_ROUNDS: usize = 24;
 
 #[derive(Default)]
+struct ReportedUsage { completed: (u64, u64), current: (u64, u64), seen: bool }
+impl ReportedUsage {
+    fn observe(&mut self, input: u64, output: u64) -> (u64, u64) {
+        self.current = (input, output);
+        self.seen = true;
+        self.totals()
+    }
+    fn totals(&self) -> (u64, u64) {
+        (self.completed.0.saturating_add(self.current.0), self.completed.1.saturating_add(self.current.1))
+    }
+    fn finish_round(&mut self) { self.completed = self.totals(); self.current = (0, 0); }
+}
+
+#[derive(Default)]
 struct RunSignal { notify: Notify, cancelled: AtomicBool }
 
 static STREAMS: Lazy<Mutex<HashMap<String, Arc<RunSignal>>>> =
@@ -203,9 +217,7 @@ pub async fn runtime_send(
     let tools = crate::runtime::tools::filter_tools(&allowed_tools);
     let client = http_client().map_err(|e| e.to_string())?;
     let mut working: Vec<Msg> = history;
-    let mut total_in: u64 = 0;
-    let mut total_out: u64 = 0;
-    let mut had_usage = false;
+    let mut usage = ReportedUsage::default();
 
     'rounds: for round in 0..MAX_ROUNDS {
         if !run.active() { break 'rounds; }
@@ -288,9 +300,13 @@ pub async fn runtime_send(
                                             acc_tools.push(index, id.as_deref(), name.as_deref(), &args);
                                         }
                                         StreamItem::Usage { in_tokens, out_tokens } => {
-                                            total_in += in_tokens;
-                                            total_out += out_tokens;
-                                            had_usage = true;
+                                            // SSE usage is a cumulative snapshot for this API round,
+                                            // not a delta (Gemini may repeat it on many chunks).
+                                            let (input, output) = usage.observe(in_tokens, out_tokens);
+                                            emit_event(&app, &chat_id, serde_json::json!({
+                                                "type": "usage", "usage_run_id": ui_run_id,
+                                                "usage": { "input_tokens": input, "output_tokens": output }
+                                            }));
                                         }
                                         StreamItem::Done => {}
                                     }
@@ -304,6 +320,7 @@ pub async fn runtime_send(
             }
         }
 
+        usage.finish_round();
         if cancelled {
             break 'rounds;
         }
@@ -365,7 +382,8 @@ pub async fn runtime_send(
         // loop to next round
     }
 
-    let cost = if had_usage {
+    let (total_in, total_out) = usage.totals();
+    let cost = if usage.seen {
         pricing::estimate_cost(&provider_kind, &model, total_in, total_out)
     } else {
         0.0
@@ -376,6 +394,8 @@ pub async fn runtime_send(
         serde_json::json!({
             "type": "result",
             "total_cost_usd": cost,
+            "usage_run_id": ui_run_id,
+            "usage": if usage.seen { serde_json::json!({ "input_tokens": total_in, "output_tokens": total_out }) } else { serde_json::Value::Null },
             "session_id": serde_json::Value::Null
         }),
     );
@@ -398,6 +418,21 @@ pub fn runtime_cancel(chat_id: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{take_lines, tool_result_event, tool_use_blocks};
+
+    #[test]
+    fn usage_snapshots_replace_within_round_and_add_across_rounds() {
+        let mut usage = super::ReportedUsage::default();
+        assert!(!usage.seen);
+        assert_eq!(usage.observe(100, 10), (100, 10));
+        assert_eq!(usage.observe(100, 20), (100, 20));
+        assert_eq!(usage.observe(100, 20), (100, 20));
+        usage.finish_round();
+        assert_eq!(usage.observe(200, 5), (300, 25));
+        usage.finish_round();
+        usage.finish_round();
+        assert_eq!(usage.totals(), (300, 25));
+        assert!(usage.seen);
+    }
 
     #[tokio::test]
     async fn cancel_prevents_replacement_until_the_old_turn_retires() {

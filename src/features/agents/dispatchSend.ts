@@ -1,5 +1,6 @@
 import { ipc } from "@/lib/ipc";
-import { beginUiRun, revokeUiRun } from "./uiActionRuns";
+import { beginUiRun, currentUiRun, revokeUiRun } from "./uiActionRuns";
+import { beginProviderUsage } from "@/store/providerUsageStore";
 import { emit } from "@tauri-apps/api/event";
 import { log } from "@/lib/log";
 import { toast } from "@/store/toastStore";
@@ -182,6 +183,7 @@ export async function dispatchResolved(
   conversationRoutes.set(chatId, identity);
   if (conversationRoutes.size > 256) conversationRoutes.delete(conversationRoutes.keys().next().value!);
   const endUiRun = beginUiRun(chatId);
+  const endUsage = beginProviderUsage(currentUiRun(chatId), findOwningProvider(providers, r.model)!, model);
   try {
     if (route === "claude") {
       return await ipc.claudeSend(
@@ -229,6 +231,7 @@ export async function dispatchResolved(
       mapToRuntimeTools(r.allowedTools),
     );
   } finally {
+    endUsage();
     endUiRun();
   }
 }

@@ -1,5 +1,49 @@
 # Third-party notices
 
+## LobeHub provider marks
+
+The notch uses bundled LobeHub provider SVGs (MIT © 2023 LobeHub), sourced from
+the pinned Codenotch reference and `@lobehub/icons-static-svg` 1.95.0.
+Full grant: `THIRD_PARTY_LICENSES/LobeIcons-MIT.txt`; per-file provenance:
+`src/shell/notch/logos/NOTICE.md` and `sources.json`. Marks identify their
+respective products; trademark rights remain with their owners.
+
+## Codenotch side-notch design implementation
+
+Orion's monitor adapts Codenotch's measured geometry, ring proportions, spring
+parameters and hover behavior into React/CSS/SVG, plus Claude/Codex read-only
+subscription quota protocols and scoped credential lookup into Rust. Upstream:
+https://github.com/vinzdg/codenotch, revision
+`9156c615bcd75eb50683f047d733bc39738dd7c3`, copyright (c) 2026 Vinz, MIT.
+The complete grant is retained in `THIRD_PARTY_LICENSES/Codenotch-MIT.txt`;
+port scope is documented in `src/shell/notch/NOTICE.md`. No upstream credentials
+or account data are included. Provider marks have separate provenance above.
+
+## Libraries.dev border effects
+
+`border-beam` 1.3.0 and `metal-fx` 2.0.10 by Jakub Antalik are used as
+unmodified npm packages for optional theme borders. Both package grants are
+MIT, copyright (c) 2026 Jakub Antalik; copies are retained in
+`THIRD_PARTY_LICENSES/border-beam-MIT.txt` and `metal-fx-MIT.txt`.
+
+Metal v2 also bundles Paper Shaders code, copyright (c) Paper Design, Inc.,
+under Apache-2.0. The package's exact upstream notice is retained in
+`THIRD_PARTY_LICENSES/metal-fx-NOTICE.txt`, with the full Apache-2.0 grant in
+`Paper-Shaders-Apache-2.0.txt`. Emitted frontend notices include the package
+LICENSE/NOTICE and this additional Apache grant. The metadata's MIT declaration
+does not remove the bundled shaders' Apache obligations.
+
+https://github.com/Jakubantalik/border-beam · https://github.com/Jakubantalik/metal-fx
+
+## Libraries.dev thinking orbs
+
+AI activity indicators use the unmodified `thinking-orbs` 0.3.1 npm package
+by Jakub Antalik, MIT, copyright (c) 2026 Jakub Antalik. The grant is retained
+in `THIRD_PARTY_LICENSES/thinking-orbs-MIT.txt` and collected in emitted
+frontend notices. This replaces Orion's earlier custom orb design.
+
+https://github.com/Jakubantalik/thinking-orbs
+
 ## OpenAI OAuth
 
 Orion Terminal's native ChatGPT subscription transport was informed by the

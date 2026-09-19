@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useModalRequest } from "./useModalRequest";
+import { ThemeBorder } from "./effects/ThemeBorder";
 
 type PromptOptions = {
   title: string;
@@ -47,6 +48,7 @@ export function PromptModalHost() {
       onMouseDown={(event) => { if (event.target === event.currentTarget) close(null); }}
     >
       <div className="ot-prompt-card">
+        <ThemeBorder />
         <div id={titleId} className="ot-prompt-title">{opts.title}</div>
         {opts.label && <label className="ot-prompt-label" htmlFor={inputId}>{opts.label}</label>}
         <input

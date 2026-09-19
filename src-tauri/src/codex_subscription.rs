@@ -481,6 +481,35 @@ pub async fn generate_image(
     crate::xdesign_image::parse_openai_image(&value)
 }
 
+pub(crate) fn quota_authorization(interactive: bool) -> Result<(HeaderMap, String), String> {
+    use std::io::Read;
+    // Same scope/parser as inference, without refresh writes or implicit keychain UI.
+    let home = codex_home()?;
+    let path = home.join("auth.json");
+    let (source, bytes) = match std::fs::File::open(&path) {
+        Ok(file) => {
+            let mut bytes = Vec::new();
+            file.take(1_048_577).read_to_end(&mut bytes).map_err(|_| "Could not read Codex credentials")?;
+            (AuthSource::File(path), bytes)
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            let account = direct_keyring_account(&home);
+            let bytes = crate::quota_keychain::read(CODEX_KEYRING_SERVICE, Some(&account), interactive)?
+                .ok_or("ChatGPT subscription credentials unavailable")?;
+            (AuthSource::DirectKeyring { account }, bytes)
+        }
+        Err(_) => return Err("Could not read Codex credentials".into()),
+    };
+    if bytes.len() > 1_048_576 { return Err("Invalid credential document size".into()); }
+    let document = serde_json::from_slice(&bytes).map_err(|_| "Invalid Codex credential document")?;
+    let session = session_from(StoredAuth { source, document })?;
+    let identity = format!("{:x}", Sha256::digest(format!("{:?}|{}|{}", session.source, session.account_id, session.access_token).as_bytes()));
+    let mut headers = image_headers(&session)?;
+    if let Some(value) = headers.get_mut(AUTHORIZATION) { value.set_sensitive(true); }
+    if let Some(value) = headers.get_mut("chatgpt-account-id") { value.set_sensitive(true); }
+    Ok((headers, identity))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

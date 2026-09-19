@@ -5,7 +5,7 @@ export function useControlPanelFocus(open: boolean, hide: () => void) {
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement;
-    ref.current?.querySelector<HTMLElement>("button")?.focus();
+    (ref.current?.querySelector<HTMLElement>('[aria-current="page"]') ?? ref.current?.querySelector<HTMLElement>("button"))?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || document.querySelector("dialog[open], .ot-prompt-overlay, .ot-spotlight-overlay")) return;
       if (event.key === "Escape") { event.preventDefault(); hide(); return; }

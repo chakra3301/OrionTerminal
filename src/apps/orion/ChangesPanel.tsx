@@ -33,6 +33,7 @@ import { ipc } from "@/lib/ipc";
 import { toast } from "@/store/toastStore";
 import { confirmAction } from "@/components/ConfirmModal";
 import { log } from "@/lib/log";
+import { OrionOrb } from "@/components/effects/OrionOrb";
 import {
   beginOrionActivity,
   trackOrionActivity,
@@ -354,7 +355,7 @@ function GitSection() {
             disabled={busy !== ""}
             onClick={() => void generateMessage()}
           >
-            {busy === "ai" ? <Loader2 size={12} className="or-ke-spin" /> : <Wand2 size={12} />}
+            {busy === "ai" ? <OrionOrb size={18} state="thinking" /> : <Wand2 size={12} />}
             AI
           </button>
           <button

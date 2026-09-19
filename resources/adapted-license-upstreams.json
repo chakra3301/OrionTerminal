@@ -1,5 +1,26 @@
 [
   {
+    "name": "LobeHub provider marks via Codenotch",
+    "repository": "https://github.com/vinzdg/codenotch",
+    "inspectedRevision": "9156c615bcd75eb50683f047d733bc39738dd7c3",
+    "license": "MIT",
+    "notice": "THIRD_PARTY_LICENSES/LobeIcons-MIT.txt",
+    "noticeSha256": "add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a",
+    "scope": ["src/shell/notch/logos/"],
+    "originalPortRevisionKnown": true,
+    "additionalUpstream": "@lobehub/icons-static-svg@1.95.0 (Nous Research); per-file provenance and hashes in src/shell/notch/logos/sources.json"
+  },
+  {
+    "name": "Codenotch notch design and subscription quotas",
+    "repository": "https://github.com/vinzdg/codenotch",
+    "inspectedRevision": "9156c615bcd75eb50683f047d733bc39738dd7c3",
+    "license": "MIT",
+    "notice": "THIRD_PARTY_LICENSES/Codenotch-MIT.txt",
+    "noticeSha256": "2868a2239cb49e84eae28db7a9069c6c04f8f9d4623aa360fd69feefa96edc63",
+    "scope": ["src/shell/notch/", "src/shell/monitorNotch.css", "src-tauri/src/subscription_quota.rs", "src-tauri/src/quota_keychain.rs"],
+    "originalPortRevisionKnown": true
+  },
+  {
     "name": "repolens",
     "repository": "https://github.com/New1Direction/repolens",
     "inspectedRevision": "94816c57d2b7dd6aa87b95e8c416f99fb32fc8d6",

@@ -22,6 +22,7 @@ Durable source of truth for Orion Terminal so context survives a lost chat. **Ke
 1. **In-canvas windowing**, not Tauri native multi-window. One OS window; apps render as React components positioned absolutely inside an HTML canvas.
 2. **Hard cutover on aesthetics.** All surfaces move to new design tokens in one pass — no half-old / half-new state for more than a day.
 3. **Unified Spotlight**, replacing the standalone `cmdk` palette. Same command registry underneath. `>` prefix = commands only; otherwise fuzzy match across apps, notes, files, recent chats, commands.
+4. **Reference fidelity is the default.** When the user says “just like” a supplied reference, match its visuals, actual brand marks, motion, behavior and visibility rules—not an approximation—unless explicitly told otherwise. Provider trackers show only providers enabled and connected/configured in Orion; idle is not disconnected.
 
 ---
 
@@ -56,13 +57,21 @@ Durable source of truth for Orion Terminal so context survives a lost chat. **Ke
 --t-tertiary   #5a706a
 --t-faint      #324036
 
---r-sm 6px   --r-md 10px   --r-lg 16px (windows)   --r-xl 22px (dock)   --r-pill 999px
+--r-sm 5.1px   --r-md 8.5px   --r-lg 13.6px (windows)   --r-xl 18.7px (dock)   --r-pill 999px
 
 --shadow-window:       0 30px 80px -20px rgba(0,0,0,0.7), 0 8px 24px -8px rgba(0,0,0,0.5)
 --shadow-glow-green:   0 0 24px -4px rgba(57, 255, 136, 0.5)
 --shadow-glow-cyan:    0 0 24px -4px rgba(0, 224, 255, 0.5)
 --shadow-glow-magenta: 0 0 24px -4px rgba(255, 62, 165, 0.5)
 ```
+
+**2026-09-15 corrected visual preference:** keep soft, rounded chrome—only **15% less radius than the original**, not the rejected angular 2/4/6/8px pass. Preserve each theme's original corner proportions (Liquid windows 20→17px, medium controls 14→11.9px); circles and functional pills stay round. Filled controls use opaque `--t-on-accent`, never translucent glass `--bg-*` for text. Theme choices use material spheres; wallpaper previews share the real overlay renderers.
+
+**Built-in theme lineup (user-pruned 2026-09-16):** **Ivory Keep** only in light; **Liquid, Minimal, BMW M** only in dark. Retired themes' palettes and sphere materials removed; saved retired light choices map to Ivory, retired/unknown dark choices to Liquid (new default), without hydration writes or deleting saved finish metadata. Ivory retains restrained Space Grotesk, a material sphere, strong ink, 22% shell tint/58% menus/34% controls and 6px frost with bounded backdrop brightness (raw alpha is not perceived transparency). Glass uses positive capability + positive OS reduced-transparency override; never negated preference queries (both failed in native WebKit). Explicit Reduce transparency remains. Quiet rims exclude genuine effects; welcome hides behind Settings to avoid stacked glass. Renderer palette tokens stay solid and editor/terminal/effect instances update in place. 24 focused theme/finish/border tests and tsc pass; retained-theme native visual acceptance pending.
+
+**Frontend direction (refined 2026-09-16):** extend the modern Control Panel's restrained look across app chrome. `styles/workstation.css` + `workstationApps.css` own shared typography, controls and surfaces; second pass uses compact Orion recent-project rows, quieter XDesign start options, explicit theme selection and mode-aware menu shadows. Preserve theme identity, soft radii, semantic colors and independent document/canvas/code styling. Code-only; no new UI/native acceptance.
+
+**Custom themes (2026-09-16):** Appearance accepts a design Markdown (64 KiB), explicitly generates through the selected `theme` AI surface with zero tools, validates token data (never executable CSS), offers a 30s reversible desktop preview, then saves up to 24 custom themes. Strict `custom_themes` hydration precedes active theme; failed/unknown-version loads block registry writes. Saved PBR spheres, per-theme finishes and live Monaco/PTY updates supported. New native `theme_read_markdown` requires an updated binary. 57 focused frontend tests + bounded native importer test + tsc pass; live-provider/native visual acceptance pending. [Guide](docs/custom-themes.md).
 
 Spacing scale: 4 / 8 / 12 / 14 / 18 / 28 / 44. Window padding 14–18px; section padding 28–44px.
 
@@ -135,7 +144,7 @@ type WindowState = {
 
 Multi-session rebuild (started 2026-06-10): Orion ≥ Cursor, Archives ≥ Notion, XDesign ≥ Figma (single-player), shell = real OS. Per-phase protocol: research → audit → ranked plan (user approval) → green slices (commit each) → user smoke test → ✅. Full per-phase build detail + CUT lists live in [CLAUDE_LOG_ARCHIVE.md](CLAUDE_LOG_ARCHIVE.md).
 
-**Locked first-session decisions (2026-06-10):** Tab autocomplete via Messages API + keychain key, model = Haiku 4.5 (`claude-haiku-4-5-20251001`). New deps OK: LSP servers (typescript-language-server, pyright, rust-analyzer) + a geometry lib for XDesign boolean ops. Light theme CUT (dark-only). Release: unsigned personal .app/.dmg (no signing/notarization).
+**Locked first-session decisions (2026-06-10):** Tab autocomplete via Messages API + keychain key, model = Haiku 4.5 (`claude-haiku-4-5-20251001`). New deps OK: LSP servers (typescript-language-server, pyright, rust-analyzer) + a geometry lib for XDesign boolean ops. Light themes originally CUT; **reopened by user 2026-09-15** (five light material themes). Release: unsigned personal .app/.dmg (no signing/notarization).
 
 - **Phase 0 — Foundation** ✅ 2026-06-10 — perf, toast/notification queue, per-window error boundaries, confirmAction + toast.undo, db backup rotation, design tightening.
 - **Phase 1 — Orion ≥ Cursor** ✅ 2026-06-13 ([research](docs/research/cursor-2026.md)) — AI editing core, Tab autocomplete, nav/feel, Git panel, checkpoints + blame, real LSP. **User must install**: `npm i -g typescript-language-server typescript pyright`, `rustup component add rust-analyzer`.
@@ -146,9 +155,13 @@ Multi-session rebuild (started 2026-06-10): Orion ≥ Cursor, Archives ≥ Notio
 
 ---
 
+## Mobile companion (2026-09-15)
+
+`archives-companion/` = native SwiftUI Archives iOS app + Mac sync helper. **0.2 (3) uploaded successfully to Apple for internal TestFlight**; processing/tester availability not yet verified (ASC browser signed out). Keychain pairing, authenticated v2 sync, explicit import review, backups/draft recovery and bounded opt-in Claude chat. Both apps must update together. 30 Swift tests + signed builds/resource checks passed; real-device/owner acceptance pending. No production helper launch or database changes. [Setup](archives-companion/README.md) · [receipt/artifacts/limits](archives-companion/docs/release-0.2.md).
+
 ## Current state (2026-09-11) — polish / shared AI routing
 
-**Public alpha (2026-09-15):** user authorized commit/push and public prerelease `v0.1.0-alpha.1`. Baseline `86ec7cf` passed remote CI and user-reported fresh-Tahoe core/ChatGPT smoke checks. New install: minimal glass username→password or skip, creator-owned stock wallpaper, animations off, only three core apps enabled; Archives save status moved to quiet titlebar text. Existing preferences preserved. **User wants code-only work, no repeated local tests/UI automation unless requested**; publication uses existing automated release gates. Final minimal UI changes have no new human acceptance. [Release notes](docs/releases/v0.1.0-alpha.1.md).
+**Public alpha (2026-09-15):** user authorized commit/push and public prerelease `v0.1.0-alpha.1`. Baseline `86ec7cf` passed remote CI and user-reported fresh-Tahoe core/ChatGPT smoke checks. New install: minimal glass username→password or skip, creator-owned stock wallpaper, animations off, only three core apps enabled; Archives save status moved to quiet titlebar text. Existing preferences preserved. **User clarified 2026-09-16: focused tests/native inspection are allowed; keep turns short and cost-conscious, avoid repeated broad suites/builds**; publication uses existing automated release gates. Final minimal UI changes have no new human acceptance. [Release notes](docs/releases/v0.1.0-alpha.1.md).
 
 Shared rails, Learn/Tutor/RepoLens text, FX Assist and shader generation now honor provider-qualified selections and global/per-surface defaults. FX has 10 MCP/runtime tools; Cursor SDK now receives Orion MCP config. img2model supports Claude/Codex and fixes late listeners + overwritten reference snapshots; references autosave. XDesign project transitions/document saves/registry writes serialize and block during generation. File/process safety, connector probes, LSP setup, and provider-neutral copy tightened. Node **22.13+**; `npm run doctor` / `npm run verify`; release CI blocks high/critical production advisories.
 

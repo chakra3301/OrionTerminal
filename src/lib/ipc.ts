@@ -48,6 +48,8 @@ export const ipc = {
     invoke<TreeNode>("read_dir_tree", { path, maxDepth }),
   readFile: (path: string): Promise<string> =>
     invoke<string>("read_file", { path }),
+  themeReadMarkdown: (path: string): Promise<string> =>
+    invoke<string>("theme_read_markdown", { path }),
   readFileBase64: (path: string): Promise<string> =>
     invoke<string>("read_file_base64", { path }),
   countFiles: (path: string): Promise<number> =>
@@ -556,6 +558,7 @@ export const ipc = {
   systemStats: (): Promise<SystemStats> => invoke("system_stats"),
   claudeUsage: (): Promise<ClaudeUsage> => invoke("claude_usage"),
   claudeLimits: (): Promise<ClaudeLimits> => invoke("claude_limits"),
+  subscriptionQuota: (providerId: string, allowKeychain = false): Promise<SubscriptionQuota> => invoke("subscription_quota", { providerId, allowKeychain }),
 
   spotifyNowPlaying: (): Promise<SpotifyNowPlaying> =>
     invoke("spotify_now_playing"),
@@ -607,7 +610,24 @@ export type ClaudeUsage = {
   last_24h: UsageWindow;
 };
 
-/** Authoritative subscription limits scraped from `claude --print '/usage'`. */
+/** Account endpoint readings, never estimated from local token totals. */
+export type QuotaWindow = { id: string; label: string; usedPercent: number; resetAt: string | number | null; windowSeconds: number | null };
+export type SubscriptionQuota = {
+  status: "ok" | "auth" | "keychain_access" | "rate_limited" | "error" | "unavailable";
+  message: string | null;
+  plan: string | null;
+  windows: QuotaWindow[];
+  fetchedAt: number;
+  retryAt: number | null;
+  profile: null | {
+    lifetime_tokens: number | null; peak_daily_tokens: number | null;
+    longest_running_turn_sec: number | null; current_streak_days: number | null; longest_streak_days: number | null;
+    daily_usage_buckets?: { start_date: string; tokens: number }[];
+  };
+  resetCredits: null | { availableCount: number; expiresAt: string[] };
+};
+
+/** Legacy unavailable response; retained for older monitor clients. */
 export type ClaudeLimits = {
   ok: boolean;
   session_pct: number | null;

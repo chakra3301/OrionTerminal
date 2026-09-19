@@ -208,7 +208,7 @@
 .forge-twopass { color: var(--neon-violet); font-weight: 600; }
 .forge-btn {
   display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px; border: none; cursor: pointer;
-  font: 700 12px var(--f-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--bg-0);
+  font: 700 12px var(--f-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--t-on-accent);
   border-radius: var(--r-sm);
   background: linear-gradient(100deg, var(--neon-violet), var(--neon-cyan));
   box-shadow: 0 0 22px -8px rgba(var(--neon-violet-rgb), 0.8); transition: filter .14s, transform .1s;
@@ -260,7 +260,7 @@ textarea.cp-input { resize: vertical; line-height: 1.55; font-family: var(--f-mo
 .cp-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   min-height: 34px; padding: 8px 14px; border-radius: var(--r-sm); border: 1px solid transparent;
-  background: linear-gradient(100deg, var(--neon-violet), var(--neon-cyan)); color: var(--bg-0);
+  background: linear-gradient(100deg, var(--neon-violet), var(--neon-cyan)); color: var(--t-on-accent);
   font: 600 12px/1 var(--f-display); white-space: nowrap; cursor: pointer; box-shadow: 0 0 16px -8px rgba(var(--neon-violet-rgb), 0.7); transition: filter .14s;
 }
 .cp-btn svg { flex: 0 0 auto; }

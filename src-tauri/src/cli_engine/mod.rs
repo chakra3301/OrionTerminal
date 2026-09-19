@@ -452,7 +452,10 @@ pub async fn cli_send(
                                 CliEngine::Codex => transcode::codex_line_to_events(&text, &mut codex_state),
                                 CliEngine::Gemini => transcode::gemini_line_to_events(&text, &mut gemini_state),
                             };
-                            for ev in events {
+                            for mut ev in events {
+                                if ev.get("usage").is_some_and(|usage| usage.is_object()) {
+                                    ev["usage_run_id"] = serde_json::json!(ui_run_id);
+                                }
                                 if let Some(detail) = protocol_diagnostic(&ev) { protocol_error = detail; }
                                 let _ = app_loop.emit("claude:event", EventPayload {
                                     chat_id: chat_loop.clone(), event: ev });

@@ -2,6 +2,7 @@ import { useCallback, useRef, useState, type ReactNode } from "react";
 import { useShell, type WindowState } from "@/shell/store/useShell";
 import { useDraggable } from "@/shell/useDraggable";
 import { WindowTitleStatusContext } from "@/shell/WindowTitleStatusContext";
+import { ThemeBorder } from "@/components/effects/ThemeBorder";
 
 type WindowFrameProps = {
   window: WindowState;
@@ -131,6 +132,7 @@ export function WindowFrame({
       style={style}
       onMouseDown={() => focusWindow(w.id)}
     >
+      <ThemeBorder active={!occluded} />
       <div
         className="ot-titlebar"
         onMouseDown={w.fullscreen ? undefined : onMouseDown}

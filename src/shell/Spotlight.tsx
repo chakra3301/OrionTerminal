@@ -13,6 +13,7 @@ import { routeToSearchHit } from "@/apps/archives/searchNav";
 import { usePluginManager } from "@/store/pluginManagerStore";
 import { BUILTIN_APP_PLUGIN_IDS } from "@/plugins/builtinApps";
 import { log } from "@/lib/log";
+import { ThemeBorder } from "@/components/effects/ThemeBorder";
 
 type SpotlightKind =
   | "app"
@@ -440,6 +441,7 @@ export function Spotlight() {
       }}
     >
       <div className="ot-spotlight" onMouseDown={(e) => e.stopPropagation()}>
+        <ThemeBorder />
         <div className="ot-spotlight-input">
           <Sparkles size={16} color="var(--neon-green)" />
           <input

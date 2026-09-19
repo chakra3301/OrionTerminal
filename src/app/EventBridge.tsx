@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { observeProviderUsage } from "@/store/providerUsageStore";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { ContentBlock } from "@/store/chatStore";
 import {
@@ -289,6 +290,7 @@ function trackOrionToolSideEffects(env: ClaudeEnvelope) {
 }
 
 function handleClaude(env: ClaudeEnvelope) {
+  observeProviderUsage(env.event);
   if (env.event.type === "system" && env.event.subtype === "init" && typeof env.event.session_id === "string") {
     recordDispatchedSession(env.chatId, env.event.session_id);
   }

@@ -12,6 +12,7 @@ fn obj(line: &str) -> Option<Value> {
 pub struct CursorState {
     /// Accumulated assistant text per run_id (stream may send partial snapshots).
     text_by_run: std::collections::HashMap<String, String>,
+    usage_sequence: u64,
 }
 
 fn assistant_from_text(id: &str, text: &str) -> Value {
@@ -84,6 +85,11 @@ fn sdk_message(msg: Option<&Value>, st: &mut CursorState) -> Vec<Value> {
         return vec![];
     };
     match m.get("type").and_then(|t| t.as_str()) {
+        Some("usage") => {
+            if !m.get("usage").is_some_and(|usage| usage.is_object()) { return vec![]; }
+            st.usage_sequence += 1;
+            vec![json!({ "type": "usage", "usage": m.get("usage"), "usage_sequence": st.usage_sequence })]
+        }
         Some("system") if m.get("subtype").and_then(|s| s.as_str()) == Some("init") => {
             let agent_id = m
                 .get("agent_id")
@@ -219,6 +225,18 @@ fn sdk_message(msg: Option<&Value>, st: &mut CursorState) -> Vec<Value> {
 #[cfg(test)]
 mod tests {
     use super::{cursor_line_to_events, CursorState};
+
+    #[test]
+    fn usage_preserves_counts_and_sequences_independent_sdk_turns() {
+        let mut st = CursorState::default();
+        let line = r#"{"type":"sdk","message":{"type":"usage","usage":{"inputTokens":20,"outputTokens":10,"cacheReadTokens":40,"cacheWriteTokens":5,"totalTokens":75,"reasoningTokens":8}}}"#;
+        let first = cursor_line_to_events(line, &mut st);
+        let second = cursor_line_to_events(line, &mut st);
+        assert_eq!(first[0]["usage"]["totalTokens"], 75);
+        assert_eq!(first[0]["usage_sequence"], 1);
+        assert_eq!(second[0]["usage_sequence"], 2);
+        assert!(cursor_line_to_events(r#"{"type":"sdk","message":{"type":"usage"}}"#, &mut st).is_empty());
+    }
 
     #[test]
     fn agent_line_emits_session_init() {

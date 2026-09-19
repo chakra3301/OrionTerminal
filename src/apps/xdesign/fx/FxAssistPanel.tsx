@@ -4,7 +4,8 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, X, Trash2, LoaderCircle, Check, TriangleAlert, StopCircle } from "lucide-react";
+import { Sparkles, X, Trash2, Check, TriangleAlert, StopCircle } from "lucide-react";
+import { AiActivity, OrionOrb } from "@/components/effects/OrionOrb";
 import { useFxAssist } from "./fxAssist";
 import { ModelSelect } from "@/components/ModelSelect";
 
@@ -41,7 +42,7 @@ export function FxAssistPanel() {
     <div className="xd-fx-assist">
       <div className="xd-fx-assist-head">
         <span className="xd-fx-assist-title">
-          <Sparkles size={13} /> FX Assist
+          <OrionOrb size={22} accent="var(--neon-magenta)" state={busy ? "thinking" : "idle"} /> FX Assist
         </span>
         <span className="xd-fx-assist-actions">
           {busy && <button type="button" onClick={() => useFxAssist.getState().cancel()} title="Stop" aria-label="Stop response"><StopCircle size={13} /></button>}
@@ -93,7 +94,7 @@ export function FxAssistPanel() {
         {streaming && <div className="xd-fx-assist-msg assistant">{streaming}</div>}
         {busy && !streaming && (
           <div className="xd-fx-assist-busy">
-            <LoaderCircle size={12} className="xd-fx-spin" /> building…
+            <AiActivity label="building" state="shaping" />
           </div>
         )}
       </div>
@@ -109,7 +110,7 @@ export function FxAssistPanel() {
           }}
         />
         <button type="button" disabled={busy || !draft.trim()} onClick={send} aria-label="Send">
-          {busy ? <LoaderCircle size={13} className="xd-fx-spin" /> : <Sparkles size={13} />}
+          {busy ? <OrionOrb size={18} state="working" accent="var(--neon-magenta)" /> : <Sparkles size={13} />}
         </button>
       </div>
     </div>

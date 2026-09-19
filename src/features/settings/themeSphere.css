@@ -1,0 +1,10 @@
+.ot-theme-sphere { position: relative; display: block; width: 64px; height: 64px; flex: none; pointer-events: none; --sphere-tint: #9dcdda; }
+.ot-theme-sphere[data-material="liquid"] { --sphere-tint: #9dcdda; }
+.ot-theme-sphere[data-material="minimal"] { --sphere-tint: #8b9c95; }
+.ot-theme-sphere[data-material="bmw-m"] { --sphere-tint: #234d7a; }
+.ot-theme-sphere[data-material="ivory-keep"] { --sphere-tint: #e8dfc9; }
+.ot-theme-group + .ot-theme-group { margin-top: 24px; }
+.ot-theme-group-title { margin: 0 0 10px; font: 500 11px/1.5 var(--f-display); color: var(--t-secondary); }
+.ot-theme-sphere::before { content: ""; position: absolute; inset: 51px 10px 0; background: radial-gradient(ellipse, #0009, transparent 70%); }
+.ot-theme-sphere[data-rendered="false"]::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: radial-gradient(ellipse at 32% 22%, #fff 0%, var(--sphere-tint) 20%, #08121c 75%); box-shadow: inset -2px -2px 4px #b4e0ff55; }
+.ot-theme-sphere img { position: relative; display: block; width: 100%; height: 100%; object-fit: contain; }

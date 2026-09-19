@@ -2,13 +2,23 @@ import { loader } from "@monaco-editor/react";
 import { useDiagnosticsStore } from "@/store/diagnosticsStore";
 import { registerTabAutocomplete } from "@/features/autocomplete/tabAutocomplete";
 import { registerLsp } from "@/features/lsp/lspManager";
+import { registerLightEditorTheme } from "./editorAppearance";
 
 let registerPromise: Promise<void> | null = null;
 
 export function ensureOrionTheme(): Promise<void> {
   if (registerPromise) return registerPromise;
   registerPromise = loader.init().then((monaco) => {
-    // Service initialization failures must not leave the light fallback theme.
+    defineEditorThemes(monaco);
+    configureTypescript(monaco);
+    trackMarkers(monaco);
+    registerTabAutocomplete(monaco);
+    registerLsp(monaco);
+  });
+  return registerPromise;
+}
+
+export function defineEditorThemes(monaco: Monaco) {
     monaco.editor.defineTheme("orion-neon", {
       base: "vs-dark",
       inherit: true,
@@ -58,12 +68,7 @@ export function ensureOrionTheme(): Promise<void> {
         "editorStickyScroll.background": "#060a0f",
       },
     });
-    configureTypescript(monaco);
-    trackMarkers(monaco);
-    registerTabAutocomplete(monaco);
-    registerLsp(monaco);
-  });
-  return registerPromise;
+    registerLightEditorTheme(monaco);
 }
 
 type Monaco = Awaited<ReturnType<typeof loader.init>>;

@@ -1,0 +1,66 @@
+{
+  "repository": "https://github.com/vinzdg/codenotch",
+  "revision": "9156c615bcd75eb50683f047d733bc39738dd7c3",
+  "files": [
+    {
+      "file": "claude.svg",
+      "source": "windows/codenotch/glyphs/claude.svg",
+      "sha256": "6d979b0fb68cc799da4a8b1fef6f4e671395bfb588b431d41a54d65d04ef1225"
+    },
+    {
+      "file": "openai.svg",
+      "source": "windows/codenotch/glyphs/codex.svg",
+      "sha256": "df7aa1b1139ac362a95b9f94ad4837cf562ed4030072178794b1bd2b665fd880"
+    },
+    {
+      "file": "gemini.svg",
+      "source": "windows/codenotch/glyphs/gemini-alt.svg",
+      "sha256": "de77d6a0d316623846278085a9a5ed00c78b51f9f95ec4d468f99be4624f9e5a"
+    },
+    {
+      "file": "cursor.svg",
+      "source": "windows/codenotch/glyphs/cursor.svg",
+      "sha256": "d17021dc62788bd7d82e73561361645817bda0221faecdc7a68d4c6210dbdd70"
+    },
+    {
+      "file": "ollama.svg",
+      "source": "Sources/Assets.xcassets/glyph-ollama.imageset/ollama.svg",
+      "sha256": "397a6ee071cce1496edd8a86dd1c91ce005712ec161690e411b3dc7f151181f5"
+    },
+    {
+      "file": "lmstudio.svg",
+      "source": "Sources/Assets.xcassets/glyph-lmstudio.imageset/lmstudio.svg",
+      "sha256": "119ede584a3cf1aacb68df02cdbd9c6016547c0fd96adee2d16bc29cbd49ad3f"
+    },
+    {
+      "file": "deepseek.svg",
+      "source": "Sources/Assets.xcassets/glyph-deepseek.imageset/deepseek.svg",
+      "sha256": "573e9ceb7f84e7bd80e4610cb95e15d7b67ea7399687dd76359cc8557cad33af"
+    },
+    {
+      "file": "mistral.svg",
+      "source": "Sources/Assets.xcassets/glyph-mistral.imageset/mistral.svg",
+      "sha256": "ae10f0cf2272811a8c9d386e6e412813bcce2c88638578bb62a112b002513f1f"
+    },
+    {
+      "file": "qwen.svg",
+      "source": "Sources/Assets.xcassets/glyph-qwen.imageset/qwen.svg",
+      "sha256": "e15af619acc91c108aa6096d2282c3aabea184b38626d2984260aaa8908597dc"
+    },
+    {
+      "file": "meta.svg",
+      "source": "Sources/Assets.xcassets/glyph-meta.imageset/meta.svg",
+      "sha256": "3d8fcc9485b5ea5df159784c62292b71b9eea7ec6d2b7c7a34c8f802b95b350d"
+    },
+    {
+      "file": "gemma.svg",
+      "source": "Sources/Assets.xcassets/glyph-gemma.imageset/gemma.svg",
+      "sha256": "5f3a1a1f07888d550672bc9c287fe37b4c633c53f10beee85945fbb49772b666"
+    },
+    {
+      "file": "nousresearch.svg",
+      "source": "https://unpkg.com/@lobehub/icons-static-svg@1.95.0/icons/nousresearch.svg",
+      "sha256": "4dc3c7cdf13d2f0bdf16b872d76293f048010a00f580df68a85e1f9c4e500e5d"
+    }
+  ]
+}

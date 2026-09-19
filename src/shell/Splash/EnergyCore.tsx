@@ -370,17 +370,17 @@ export function EnergyCore({
   reduced = false,
   particleCount = 1600,
   hue,
+  paused = false,
 }: {
   mode?: CoreMode;
   reduced?: boolean;
   particleCount?: number;
   hue?: number;
+  paused?: boolean;
 }) {
   return (
     <Canvas
-      // Cold-start splash and the calm login backdrop both fully unmount once
-      // the shell takes over, so "always" here costs nothing in normal use.
-      frameloop="always"
+      frameloop={paused ? "demand" : "always"}
       camera={{ position: [0, 0, 3.4], fov: 52 }}
       dpr={[1, 1.75]}
       gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}

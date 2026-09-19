@@ -99,6 +99,7 @@ pub fn codex_line_to_events(line: &str, st: &mut CodexState) -> Vec<Value> {
         }
         Some("turn.completed") => {
             vec![json!({ "type": "result", "total_cost_usd": 0,
+                "usage": v.get("usage"),
                 "session_id": st.thread_id.clone().unwrap_or_default() })]
         }
         Some("turn.failed") => {
@@ -239,6 +240,7 @@ pub fn gemini_line_to_events(line: &str, st: &mut GeminiState) -> Vec<Value> {
         }
         Some("result") => {
             vec![json!({ "type": "result", "total_cost_usd": 0,
+                "usage": v.get("stats"),
                 "session_id": st.session_id.clone().unwrap_or_default() })]
         }
         _ => vec![],
@@ -378,6 +380,16 @@ mod gemini_transcode_tests {
         assert_eq!(r[0]["message"]["content"][0]["tool_use_id"], "t1");
         assert_eq!(r[0]["message"]["content"][0]["content"], "ok");
     }
+    #[test]
+    fn usage_preserves_cli_counters_without_inventing_missing_reports() {
+        let codex = super::codex_line_to_events(r#"{"type":"turn.completed","usage":{"input_tokens":100,"output_tokens":20,"cached_input_tokens":80}}"#, &mut super::CodexState::default());
+        assert_eq!(codex[0]["usage"]["input_tokens"], 100);
+        let gemini = gemini_line_to_events(r#"{"type":"result","stats":{"input_tokens":100,"output_tokens":20,"total_tokens":140,"cached":80}}"#, &mut GeminiState::default());
+        assert_eq!(gemini[0]["usage"]["total_tokens"], 140);
+        let absent = gemini_line_to_events(r#"{"type":"result"}"#, &mut GeminiState::default());
+        assert!(absent[0]["usage"].is_null());
+    }
+
     #[test]
     fn result_emits_session_zero_cost() {
         let mut st = GeminiState { session_id: Some("s1".into()), ..Default::default() };

@@ -5,11 +5,11 @@ import { toast } from "@/store/toastStore";
 
 // Each interactive Claude surface remembers its own model choice. Hermes is
 // excluded — its model is per-agent (stored on the agent row), not per-surface.
-export type ModelSurface = "default" | "archives" | "orion" | "xdesign" | "rosie" | "learn" | "model3d" | "fx";
+export type ModelSurface = "default" | "archives" | "orion" | "xdesign" | "rosie" | "learn" | "model3d" | "fx" | "theme";
 
 type Prefs = Record<ModelSurface, string>;
 
-const EMPTY: Prefs = { default: "", archives: "", orion: "", xdesign: "", rosie: "", learn: "", model3d: "", fx: "" };
+const EMPTY: Prefs = { default: "", archives: "", orion: "", xdesign: "", rosie: "", learn: "", model3d: "", fx: "", theme: "" };
 let persistence: Promise<unknown> = Promise.resolve();
 
 type ModelPrefsState = {

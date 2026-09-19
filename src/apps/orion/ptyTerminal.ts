@@ -7,6 +7,8 @@ import "@xterm/xterm/css/xterm.css";
 import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
 import { beginLiveTerminal } from "@/apps/orion/terminalActivity";
+import { isLightTheme, useThemeStore } from "@/store/themeStore";
+import { readLightPalette } from "./editorAppearance";
 
 const THEME = {
   background: "#03060a",
@@ -31,6 +33,20 @@ const THEME = {
   brightCyan: "#7fefff",
   brightWhite: "#ffffff",
 } as const;
+
+function terminalTheme() {
+  const theme = useThemeStore.getState().theme;
+  if (!isLightTheme(theme) && !theme.startsWith("custom:")) return THEME;
+  const p = readLightPalette();
+  return {
+    background: p.background, foreground: p.foreground, cursor: p.blue, cursorAccent: p.background,
+    selectionBackground: p.blue + "30", black: p.foreground, brightBlack: p.muted,
+    red: p.red, brightRed: p.red, green: p.green, brightGreen: p.green,
+    yellow: p.amber, brightYellow: p.amber, blue: p.blue, brightBlue: p.blue,
+    magenta: p.violet, brightMagenta: p.violet, cyan: p.blue, brightCyan: p.blue,
+    white: p.muted, brightWhite: p.foreground,
+  };
+}
 
 export type PtyTerminalHandle = {
   term: XTerm;
@@ -98,7 +114,8 @@ export function attachPtyTerminal(opts: PtyTerminalOptions): PtyTerminalHandle {
     fontFamily:
       "JetBrains Mono, SF Mono, ui-monospace, SFMono-Regular, Menlo, monospace",
     fontSize: 12,
-    theme: THEME,
+    theme: terminalTheme(),
+    minimumContrastRatio: isLightTheme(useThemeStore.getState().theme) ? 4.5 : 1,
     cursorBlink: true,
     allowTransparency: false,
     scrollback: 5000,
@@ -107,6 +124,12 @@ export function attachPtyTerminal(opts: PtyTerminalOptions): PtyTerminalHandle {
   term.loadAddon(fit);
   term.loadAddon(new WebLinksAddon());
   term.open(opts.container);
+  const unsubscribeTheme = useThemeStore.subscribe((state, previous) => {
+    if (state.theme !== previous.theme) {
+      term.options.theme = terminalTheme();
+      term.options.minimumContrastRatio = isLightTheme(state.theme) ? 4.5 : 1;
+    }
+  });
 
   // GPU renderer for crisp text. If the webview can't give us a context (or
   // loses it later) we dispose the addon and xterm falls back to its DOM
@@ -218,6 +241,7 @@ export function attachPtyTerminal(opts: PtyTerminalOptions): PtyTerminalHandle {
     term,
     dispose: () => {
       disposed = true;
+      unsubscribeTheme();
       endLiveTerminal();
       liveTerminals.delete(opts.ptyId);
       if (resizeTimer != null) window.clearTimeout(resizeTimer);

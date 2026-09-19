@@ -8,6 +8,7 @@ import { useContextMenu } from "@/components/ContextMenu";
 import { buildMenu, appMenu } from "@/shell/menus";
 import { NotificationCenter } from "@/shell/NotificationCenter";
 import { SpotifyWidget } from "@/shell/SpotifyWidget";
+import { ThemeBorder } from "@/components/effects/ThemeBorder";
 
 // Twelve bars driven by CSS animations. Heights/delays are pseudo-random
 // (hand-picked) so each bar moves on its own beat — gives the impression of
@@ -142,6 +143,7 @@ export function MenuBar() {
 
   return (
     <div className="ot-menubar">
+      <ThemeBorder />
       <div className="ot-menubar-logo">
         <span className="dot" />
         <span>ORION TERMINAL</span>
