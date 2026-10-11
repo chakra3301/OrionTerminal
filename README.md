@@ -4,7 +4,7 @@
 
 # Orion Terminal
 
-**A JARVIS-style personal workstation — one desktop shell, deeply integrated apps, and your choice of context-aware AI collaborator.**
+**A personal workstation — one desktop shell, deeply integrated apps, and your choice of context-aware AI collaborator.**
 
 [![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)](https://tauri.app)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
