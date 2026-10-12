@@ -150,7 +150,7 @@ summary:focus-visible,
 [type="checkbox"]:focus-visible,
 [type="radio"]:focus-visible,
 [type="range"]:focus-visible {
-  outline: 1px solid var(--neon-cyan);
+  outline: 1px solid color-mix(in srgb, var(--t-primary) 62%, transparent);
   outline-offset: 2px;
 }
 
@@ -3406,17 +3406,20 @@ summary:focus-visible,
 }
 
 /* ── Brain — automatic knowledge graph ─────────────────────────────── */
+/* Monochrome annotation wireframe: a drafting sheet with a faint dot grid;
+   all ink follows --t-primary so it holds in every theme. */
 .ar-brain {
+  --brain-line: color-mix(in srgb, var(--t-primary) 12%, transparent);
+  --brain-line-strong: color-mix(in srgb, var(--t-primary) 24%, transparent);
+  --brain-fill: color-mix(in srgb, var(--bg-0) 80%, transparent);
   position: relative;
   flex: 1;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  /* Deep-space void with a faint center bloom — same stage the energy core
-   * sits on. The additive-blended wireframe graph glows against it. */
   background:
-    radial-gradient(ellipse 60% 50% at 50% 48%, rgba(57, 255, 136, 0.05), transparent 65%),
-    radial-gradient(ellipse 120% 100% at 50% 50%, #03060a 40%, #010203 100%);
+    radial-gradient(circle, color-mix(in srgb, var(--t-primary) 7%, transparent) 0.7px, transparent 1px) 0 0 / 24px 24px,
+    var(--bg-0);
 }
 .ar-brain-canvas {
   position: absolute;
@@ -3426,7 +3429,7 @@ summary:focus-visible,
 }
 .ar-brain-topbar {
   position: absolute;
-  top: 12px;
+  top: 14px;
   left: 14px;
   right: 14px;
   display: flex;
@@ -3439,25 +3442,27 @@ summary:focus-visible,
 .ar-brain-search {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 10px;
-  background: rgba(6, 10, 15, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: var(--r-pill);
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px;
+  background: var(--brain-fill);
+  border: 1px solid var(--brain-line-strong);
+  border-radius: var(--r-sm);
   color: var(--t-tertiary);
-  backdrop-filter: blur(8px);
-  width: 200px;
+  width: 210px;
 }
+.ar-brain-search:focus-within { border-color: color-mix(in srgb, var(--t-primary) 45%, transparent); }
 .ar-brain-search input {
   flex: 1;
   min-width: 0;
   background: none;
   border: 0;
   outline: 0;
-  font-size: 12px;
+  font-family: var(--f-mono);
+  font-size: 11px;
   color: var(--t-primary);
 }
-.ar-brain-search input::placeholder { color: var(--t-faint); }
+.ar-brain-search input::placeholder { color: var(--t-tertiary); }
 .ar-brain-search button {
   background: none;
   border: 0;
@@ -3469,48 +3474,63 @@ summary:focus-visible,
 .ar-brain-chips {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0;
   flex-wrap: wrap;
   min-width: 0;
+  border: 1px solid var(--brain-line);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--brain-fill);
 }
 .ar-brain-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
+  gap: 7px;
+  height: 28px;
+  padding: 0 10px;
   font-family: var(--f-mono);
   font-size: 10px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   color: var(--t-secondary);
-  background: rgba(6, 10, 15, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: var(--r-pill);
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--brain-line);
+  border-radius: 0;
   cursor: pointer;
-  backdrop-filter: blur(8px);
   white-space: nowrap;
+  transition: color 140ms ease, background-color 140ms ease;
 }
-.ar-brain-chip:hover { color: var(--t-primary); }
-.ar-brain-chip .dot {
+.ar-brain-chip:last-child { border-right: 0; }
+.ar-brain-chip:hover { color: var(--t-primary); background: var(--work-hover); }
+.ar-brain-chip .n { color: var(--t-tertiary); font-variant-numeric: tabular-nums; }
+.ar-brain-chip.off { color: var(--t-faint); }
+.ar-brain-chip.off .ar-brain-glyph { opacity: 0.4; }
+.ar-brain-glyph {
+  flex-shrink: 0;
   width: 7px;
   height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
+  border: 1px solid currentColor;
+  box-sizing: border-box;
 }
-.ar-brain-chip .n { color: var(--t-faint); }
-.ar-brain-chip.off { opacity: 0.4; }
-.ar-brain-chip.off .dot { background: var(--t-faint) !important; }
+.ar-brain-glyph[data-shape="circle"] { border-radius: 50%; }
+.ar-brain-glyph[data-shape="ring"] {
+  border-radius: 50%;
+  background: radial-gradient(circle, currentColor 1.2px, transparent 1.5px);
+}
+.ar-brain-glyph[data-shape="diamond"] { transform: rotate(45deg) scale(0.86); }
+.ar-brain-glyph[data-shape="dot"] { width: 4px; height: 4px; border-radius: 50%; background: currentColor; margin: 0 1.5px; }
 .ar-brain-refresh {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 7px;
-  background: rgba(6, 10, 15, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  background: var(--brain-fill);
+  border: 1px solid var(--brain-line-strong);
+  border-radius: var(--r-sm);
   color: var(--t-tertiary);
   cursor: pointer;
-  backdrop-filter: blur(8px);
 }
 .ar-brain-refresh:hover { color: var(--t-primary); }
 .ar-brain-refresh .spin { animation: ar-brain-spin 0.9s linear infinite; }
@@ -3521,12 +3541,13 @@ summary:focus-visible,
   bottom: 12px;
   font-family: var(--f-mono);
   font-size: 10px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   color: var(--t-tertiary);
   pointer-events: none;
   z-index: 2;
+  font-variant-numeric: tabular-nums;
 }
-.ar-brain-status .auto { color: var(--neon-violet); }
+.ar-brain-status .auto { color: var(--t-secondary); }
 .ar-brain-empty {
   position: absolute;
   inset: 0;
@@ -3547,38 +3568,33 @@ summary:focus-visible,
   font-size: 12px;
   color: var(--t-tertiary);
   max-width: 380px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 .ar-brain-detail {
   position: absolute;
-  top: 52px;
+  top: 56px;
   right: 14px;
-  width: 248px;
-  max-height: calc(100% - 110px);
+  width: 256px;
+  max-height: calc(100% - 112px);
   display: flex;
   flex-direction: column;
-  background: rgba(6, 10, 15, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bg-0) 90%, transparent);
+  border: 1px solid var(--brain-line-strong);
   border-radius: var(--r-md);
-  backdrop-filter: blur(10px);
   z-index: 3;
   overflow: hidden;
 }
 .ar-brain-detail-head {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 12px 12px 8px;
-}
-.ar-brain-detail-head .dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex-shrink: 0;
+  gap: 10px;
+  padding: 12px 12px 10px;
+  color: var(--t-secondary);
 }
 .ar-brain-detail-head .titles { flex: 1; min-width: 0; }
 .ar-brain-detail-head .title {
   font-size: 13px;
+  font-weight: 500;
   color: var(--t-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -3586,11 +3602,10 @@ summary:focus-visible,
 }
 .ar-brain-detail-head .sub {
   font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 10px;
   color: var(--t-tertiary);
-  margin-top: 2px;
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
 }
 .ar-brain-detail-head .close {
   background: none;
@@ -3604,7 +3619,7 @@ summary:focus-visible,
 .ar-brain-detail-actions {
   display: flex;
   gap: 6px;
-  padding: 0 12px 10px;
+  padding: 0 12px 12px;
 }
 .ar-brain-detail-actions button {
   flex: 1;
@@ -3612,31 +3627,31 @@ summary:focus-visible,
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 8px;
-  font-size: 11px;
+  height: 28px;
+  font-family: var(--f-display);
+  font-size: 12px;
   color: var(--t-secondary);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: transparent;
+  border: 1px solid var(--brain-line-strong);
   border-radius: var(--r-sm);
   cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease;
 }
-.ar-brain-detail-actions button:hover { color: var(--t-primary); }
+.ar-brain-detail-actions button:hover { color: var(--t-primary); background: var(--work-hover); }
 .ar-brain-detail-actions button.ask {
-  color: var(--neon-green);
-  border-color: rgba(57, 255, 136, 0.25);
-  background: rgba(57, 255, 136, 0.06);
+  color: var(--t-on-accent);
+  background: var(--t-primary);
+  border-color: transparent;
 }
 .ar-brain-detail-actions button.ask:hover {
-  background: rgba(57, 255, 136, 0.12);
+  background: color-mix(in srgb, var(--t-primary) 88%, var(--bg-0));
 }
 .ar-brain-detail-section {
-  padding: 4px 12px;
+  padding: 8px 12px 4px;
   font-family: var(--f-mono);
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--t-faint);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 10px;
+  color: var(--t-tertiary);
+  border-top: 1px solid var(--brain-line);
 }
 .ar-brain-detail-links {
   overflow-y: auto;
@@ -3648,11 +3663,11 @@ summary:focus-visible,
 .ar-brain-detail-links .link {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 6px;
+  gap: 9px;
+  padding: 6px;
   background: none;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   cursor: pointer;
   text-align: left;
   color: var(--t-secondary);
@@ -3660,20 +3675,23 @@ summary:focus-visible,
   min-width: 0;
 }
 .ar-brain-detail-links .link:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--work-hover);
   color: var(--t-primary);
 }
-.ar-brain-detail-links .link .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
 .ar-brain-detail-links .link .lbl {
+  flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.ar-brain-detail-links .link .kind {
+  flex-shrink: 0;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  color: var(--t-faint);
+}
+.ar-brain-detail-links .link:hover .kind { color: var(--t-tertiary); }
 
 .ar-main h1 {
   font-size: 36px;
@@ -7648,18 +7666,47 @@ summary:focus-visible,
 }
 
 .ot-resize-handle {
-  background: rgba(255, 255, 255, 0.07);
+  position: relative;
+  z-index: 3;
+  flex: none;
+  background: var(--work-line);
   transition: background 0.15s ease;
 }
-.ot-resize-handle:hover,
-.ot-resize-handle[data-resize-handle-active] {
-  background: rgba(var(--neon-cyan-rgb), 0.4);
+/* Real grab zone over the neighbours. The library's coordinate hit margins
+   can't help when the neighbour is an iframe (Preview) — the iframe gets the
+   pointerdown — so the handle itself must sit on top. */
+.ot-resize-handle::before {
+  content: "";
+  position: absolute;
 }
-.ot-resize-handle.vertical {
-  width: 1px;
+.ot-resize-handle.vertical::before { inset: 0 -5px; }
+.ot-resize-handle.horizontal::before { inset: -5px 0; }
+/* This 3px bar only shows which divider is live, so the 1px line never
+   shifts the layout. */
+.ot-resize-handle::after {
+  content: "";
+  position: absolute;
+  background: transparent;
+  border-radius: var(--r-pill);
+  transition: background 0.15s ease;
 }
-.ot-resize-handle.horizontal {
-  height: 1px;
+.ot-resize-handle.vertical { width: 1px; }
+.ot-resize-handle.vertical::after { inset: 0 -1px; }
+.ot-resize-handle.horizontal { height: 1px; }
+.ot-resize-handle.horizontal::after { inset: -1px 0; }
+.ot-resize-handle[data-resize-handle-state="hover"]::after {
+  background: var(--work-line-strong);
+}
+.ot-resize-handle[data-resize-handle-state="drag"]::after {
+  background: color-mix(in srgb, var(--t-primary) 42%, transparent);
+}
+/* Iframes (Preview) and webviews swallow pointer events, which stalled drags
+   whenever the cursor crossed them. */
+body.ot-panel-resizing :is(iframe, webview, embed, object) {
+  pointer-events: none !important;
+}
+body.ot-panel-resizing {
+  user-select: none;
 }
 
 .ot-panel {

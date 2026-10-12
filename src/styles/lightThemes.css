@@ -76,7 +76,7 @@
 :root[data-color-mode="light"] body :is(.ot-ctx-item, .ot-ctxpick-row):hover:not(:disabled) { background: var(--bg-3); }
 :root[data-color-mode="light"] body .ot-ctx-item.danger { color: var(--neon-magenta); }
 :root[data-color-mode="light"] body :is(.ot-resize-handle, .resize-handle) { background: var(--glass-border); }
-:root[data-color-mode="light"] body :is(.ot-resize-handle, .resize-handle):hover { background: var(--neon-cyan); }
+:root[data-color-mode="light"] body .resize-handle:hover { background: var(--work-line-strong); }
 :root[data-color-mode="light"] body ::selection { background: color-mix(in srgb, var(--neon-cyan) 22%, transparent); }
 :root[data-color-mode="light"] body ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--t-primary) 24%, transparent); }
 :root[data-color-mode="light"] body ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--t-primary) 38%, transparent); }

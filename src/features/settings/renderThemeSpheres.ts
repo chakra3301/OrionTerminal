@@ -3,7 +3,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { useThemeStore, type BuiltinThemeName, type ThemeName } from "@/store/themeStore";
 
 const MATERIALS: Record<BuiltinThemeName, THREE.MeshPhysicalMaterialParameters> = {
-  liquid: { color: "#294857", metalness: .1, roughness: .035, transmission: .45, thickness: 1.2, ior: 1.46, clearcoat: 1, attenuationColor: new THREE.Color("#5fe8ff"), attenuationDistance: 2 },
+  liquid: { color: "#294857", metalness: .1, roughness: .035, transmission: .45, thickness: 1.2, ior: 1.46, clearcoat: 1, attenuationColor: new THREE.Color("#9ccbe6"), attenuationDistance: 2 },
   minimal: { color: "#8b9c95", metalness: .05, roughness: .72 },
   "bmw-m": { color: "#ffffff", metalness: .5, roughness: .19, clearcoat: 1 },
   "ivory-keep": { color: "#e8dfc9", metalness: .2, roughness: .32, clearcoat: .6 },

@@ -4,9 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // so tests don't need a live Tauri sqlite connection.
 vi.mock("@/lib/db", () => ({ setAppState: vi.fn() }));
 
+import { setAppState } from "@/lib/db";
 import {
   useWorkspace,
   defaultOrionLayout,
+  preferredSizes,
 } from "@/components/workspace/workspaceStore";
 import type {
   LayoutNode,
@@ -338,5 +340,35 @@ describe("splitFocusedPanel (⌘\\ split editor right)", () => {
     const before = collectPanels(useWorkspace.getState().root).length;
     useWorkspace.getState().splitFocusedPanel();
     expect(collectPanels(useWorkspace.getState().root).length).toBe(before);
+  });
+});
+
+describe("divider resizing", () => {
+  beforeEach(() => {
+    useWorkspace.getState().resetLayout(defaultOrionLayout);
+    vi.mocked(setAppState).mockClear();
+  });
+
+  it("ignores a settled layout that matches the stored sizes", () => {
+    const root = asSplit(useWorkspace.getState().root);
+    useWorkspace.getState().setSplitSizes(root.id, [16.01, 59.99, 24]);
+    expect(useWorkspace.getState().root).toBe(root);
+    expect(setAppState).not.toHaveBeenCalled();
+  });
+
+  it("commits a real change and ignores unknown splits", () => {
+    const root = asSplit(useWorkspace.getState().root);
+    useWorkspace.getState().setSplitSizes("missing", [50, 50]);
+    expect(useWorkspace.getState().root).toBe(root);
+    useWorkspace.getState().setSplitSizes(root.id, [22, 54, 24]);
+    expect(asSplit(useWorkspace.getState().root).sizes).toEqual([22, 54, 24]);
+  });
+
+  it("resets side surfaces to their comfortable width and shares the rest", () => {
+    const root = asSplit(useWorkspace.getState().root);
+    expect(preferredSizes(root)).toEqual([16, 60, 24]);
+    useWorkspace.getState().openTab({ kind: "terminal" });
+    const vertical = asSplit(useWorkspace.getState().root);
+    expect(preferredSizes(vertical)).toEqual([70, 30]);
   });
 });

@@ -2,6 +2,22 @@
 
 Newest session first. Every session ends by adding an entry here (see the session routine in AGENTS.md).
 
+## 2026-10-12 — Claude / Orion resizing, Brain wireframe, Liquid de-neon
+
+**Branch:** validation/alpha-2026-09-14
+
+Owner screenshot pass (Oct 8 captures). The five temp screenshots were already purged by macOS; #1 (Orion resizing), #3 (Brain) and the global neon note were actionable from the text. **#2, #4 ("blue highlight too much") and #5 were not identifiable; ask the owner to re-send them as saved files.**
+
+- **Panel resizing (`src/components/workspace/Workspace.tsx`, `workspaceStore.ts`):** `onLayout` used to commit to the store on every pointer move, re-rendering every pane and writing SQLite twice per frame. Sizes now commit when a drag ends (160ms debounce otherwise), and `setSplitSizes` no-ops on unchanged or unknown splits. The divider is a real 11px grab zone above its neighbours, because the library's coordinate hit margins fail next to the Preview iframe, which takes the pointerdown. Iframes get `pointer-events: none` while dragging. Double-click resets the split to role sizes (`preferredSizes`: explorer 16, claude 24, terminal 30, rest shared). Explorer and AI rail snap closed past their minimum and are stashed (⌘B/⌘J restore). Minimums are by role (editor 20%). Dividers are neutral: hover and drag show a 3px ink bar, no cyan.
+- **Brain (`src/apps/archives/brain/BrainView.tsx`, tokens.css `.ar-brain*`):** replaced neon additive-glow gyroscope spheres with a monochrome annotation wireframe after the owner's Pinterest reference. Hairline links, hollow junction circles, mono labels in ruled paper-filled boxes with `.type` suffixes, a shape marker per type, collision-culled hub labels, fit-to-view zoom (wheel overrides it; double-click empty space restores it), and selection brackets with a coordinate readout. Faint construction arcs sit on a dot-grid sheet. Ink and paper read `--t-primary`/`--bg-0`, so light themes work. DOM chips and the detail rail are monochrome and keep the soft theme radii.
+- **Liquid de-neon (`themes.css`, `LiquidLens.tsx`, `renderThemeSpheres.ts`):** retuned the existing Liquid `--neon-*`/`-rgb` values, glow shadows and `--xd-accent-rgb`, and dimmed the aurora. The global focus ring is neutral ink. Recorded in `design/DESIGN.md`. No new tokens. Light-theme divider hover is no longer cyan.
+
+**Verified:** `tsc --noEmit` clean. 273 focused tests / 40 files pass (workspace, archives, styles, theme, settings), including 3 new resize tests. A throwaway Vite+Playwright harness (`/tmp/ot-harness`, mocked graph/db, not in repo) screenshotted Brain in Liquid and Ivory, and drove the real Workspace: a 400px drag across an iframe in one gesture with 3 renders and 1 commit, explorer snap-closed and stashed, and double-click reset. Not verified in the native Tauri app.
+
+**Next / open:** get screenshots #2/#4/#5 re-sent. XDesign keeps Figma blue `#0d99ff` for selection and was deliberately left alone; it may be what #4 meant. Decide whether to extend no-neon beyond Liquid (Minimal is already pastel; BMW M untouched). About 25 files still hard-code Phase A neon hex, mostly canvas, syntax or semantic; not swept. Pre-existing uncommitted `themes.css`/`workstation.css` edits were preserved.
+
+Uncommitted; no commits, dependencies, migrations or new tokens.
+
 ## 2026-10-09 — Claude Code / claude-opus-5-5
 
 **Branch:** validation/alpha-2026-09-14

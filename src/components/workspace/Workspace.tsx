@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -10,9 +11,10 @@ import {
   Panel,
   PanelGroup,
   PanelResizeHandle,
+  type ImperativePanelGroupHandle,
 } from "react-resizable-panels";
 import { X, Plus } from "lucide-react";
-import { useWorkspace } from "@/components/workspace/workspaceStore";
+import { preferredSizes, useWorkspace } from "@/components/workspace/workspaceStore";
 import type {
   DropZone,
   LayoutNode,
@@ -80,6 +82,16 @@ function NodeView({
   return <SplitNode split={node} registry={registry} />;
 }
 
+/** Side surfaces snap closed when dragged past their minimum, like VS Code. */
+const SNAP_CLOSED_ROLES = new Set<LayoutPanel["role"]>(["explorer", "claude"]);
+
+function minSizeFor(node: LayoutNode): number {
+  if (node.kind !== "panel") return 12;
+  if (node.role === "editor") return 20;
+  if (node.role === "explorer" || node.role === "claude") return 10;
+  return 8;
+}
+
 function SplitNode({
   split,
   registry,
@@ -88,19 +100,75 @@ function SplitNode({
   registry: ContentRegistry;
 }) {
   const setSplitSizes = useWorkspace((s) => s.setSplitSizes);
+  const togglePanelByRole = useWorkspace((s) => s.togglePanelByRole);
+  const groupRef = useRef<ImperativePanelGroupHandle>(null);
+  // onLayout fires on every pointer move. Committing each frame re-rendered
+  // every pane (Monaco, xterm, rails) and wrote SQLite twice per frame, so the
+  // live layout stays inside react-resizable-panels until the gesture settles.
+  const pending = useRef<number[] | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+  const dragging = useRef(false);
+  const snapped = useRef<LayoutPanel["role"] | null>(null);
+  const lastDown = useRef(0);
+
+  const commit = useCallback(() => {
+    window.clearTimeout(timer.current);
+    const sizes = pending.current;
+    pending.current = null;
+    if (sizes) setSplitSizes(split.id, sizes);
+  }, [setSplitSizes, split.id]);
+
+  useEffect(() => () => commit(), [commit]);
+
+  const onLayout = (sizes: number[]) => {
+    pending.current = sizes;
+    if (dragging.current) return;
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(commit, 160);
+  };
+
+  const onDragging = (active: boolean) => {
+    dragging.current = active;
+    document.body.classList.toggle("ot-panel-resizing", active);
+    if (active) return;
+    commit();
+    const role = snapped.current;
+    snapped.current = null;
+    if (role) togglePanelByRole(role);
+  };
+
+  const onHandlePointerDown = () => {
+    const now = performance.now();
+    if (now - lastDown.current < 320) {
+      lastDown.current = 0;
+      const sizes = preferredSizes(split);
+      groupRef.current?.setLayout(sizes);
+      pending.current = sizes;
+      return;
+    }
+    lastDown.current = now;
+  };
+
   return (
     <PanelGroup
+      ref={groupRef}
       direction={split.direction}
       autoSaveId={undefined}
-      onLayout={(sizes) => setSplitSizes(split.id, sizes)}
+      onLayout={onLayout}
     >
       {split.children.map((child, i) => {
         const last = i === split.children.length - 1;
+        const role = child.kind === "panel" ? child.role : undefined;
+        const snaps = !!role && SNAP_CLOSED_ROLES.has(role) && split.direction === "horizontal";
         return (
-          <Fragment key={child.kind === "panel" ? child.id : child.id}>
+          <Fragment key={child.id}>
             <Panel
               defaultSize={split.sizes[i] ?? 100 / split.children.length}
-              minSize={8}
+              minSize={minSizeFor(child)}
+              collapsible={snaps}
+              collapsedSize={snaps ? 0 : undefined}
+              onCollapse={snaps ? () => { snapped.current = role; } : undefined}
+              onExpand={snaps ? () => { snapped.current = null; } : undefined}
             >
               <NodeView node={child} registry={registry} />
             </Panel>
@@ -111,6 +179,10 @@ function SplitNode({
                     ? "ot-resize-handle vertical"
                     : "ot-resize-handle horizontal"
                 }
+                hitAreaMargins={{ coarse: 15, fine: 6 }}
+                onDragging={onDragging}
+                onPointerDown={onHandlePointerDown}
+                title="Drag to resize · double-click to reset"
               />
             )}
           </Fragment>

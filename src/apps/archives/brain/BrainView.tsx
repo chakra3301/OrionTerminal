@@ -4,12 +4,13 @@
  * title mentions and semantic-embedding similarity become edges — no manual
  * linking required.
  *
- * Rendered in the energy-core visual language: a 3D force layout projected
- * with a slow orbital camera, additive-blended glowing wireframe spheres for
- * nodes (gyroscope rings, hot center) and luminous link lines — not flat
- * dots. Drag empty space to orbit, wheel to zoom, drag a node to move it.
- * Click a node → detail rail with its connections, Open, and Ask Claude
- * (routes into the live Archives chat). */
+ * Rendered as a monochrome annotation wireframe (owner reference, 2026-10-12):
+ * hairline links ending in hollow junctions, mono labels in ruled boxes for
+ * hubs, small type markers for everything else, faint construction geometry
+ * behind. Ink follows the theme's text color — no neon, no glow. A 3D force
+ * layout under a slow orbital camera gives depth. Drag empty space to orbit,
+ * wheel to zoom, drag a node to move it. Click a node → detail rail with its
+ * connections, Open, and Ask Claude (routes into the live Archives chat). */
 import {
   useCallback,
   useEffect,
@@ -36,15 +37,29 @@ import {
 } from "@/apps/archives/brain/forceLayout";
 import { log } from "@/lib/log";
 
-const TYPE_COLOR: Record<BrainNodeType, string> = {
-  note: "#39ff88",
-  journal: "#e6ff3a",
-  project: "#00e0ff",
-  chat: "#b14cff",
-  asset: "#ff3ea5",
-  board: "#ff8a3c",
-  tag: "#4d6a5f",
-  collection: "#9ab0a8",
+type MarkerShape = "circle" | "ring" | "square" | "diamond" | "dot";
+
+/** Monochrome identity: type reads from marker shape and a mono suffix. */
+const TYPE_MARKER: Record<BrainNodeType, MarkerShape> = {
+  note: "circle",
+  journal: "ring",
+  project: "square",
+  chat: "diamond",
+  asset: "square",
+  board: "square",
+  tag: "dot",
+  collection: "dot",
+};
+
+const TYPE_SUFFIX: Record<BrainNodeType, string> = {
+  note: ".note",
+  journal: ".journal",
+  project: ".project",
+  chat: ".chat",
+  asset: ".media",
+  board: ".board",
+  tag: ".tag",
+  collection: ".set",
 };
 
 const TYPE_LABEL: Record<BrainNodeType, string> = {
@@ -88,15 +103,6 @@ function radiusFor(n: BrainNode): number {
   return base + Math.min(11, Math.sqrt(n.degree) * 1.9);
 }
 
-function hashPhase(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return ((h >>> 0) % 628) / 100;
-}
-
 /** Route "open this node" to the right surface, same rules as global search. */
 function openNode(n: BrainNode) {
   const a = useArchives.getState();
@@ -135,33 +141,75 @@ function openNode(n: BrainNode) {
   }
 }
 
-/** Wireframe-sphere node glyph — outline + two gyroscope ellipses + hot
- * center. Reads as a tiny energy core under additive blending. */
-function drawNodeGlyph(
+function drawMarker(
   ctx: CanvasRenderingContext2D,
+  shape: MarkerShape,
   x: number,
   y: number,
-  r: number,
-  color: string,
-  spin: number,
-  detailed: boolean,
+  s: number,
 ) {
-  ctx.strokeStyle = color;
   ctx.beginPath();
-  ctx.arc(x, y, r, 0, TAU);
-  ctx.stroke();
-  if (detailed) {
-    ctx.beginPath();
-    ctx.ellipse(x, y, r, r * 0.36, spin, 0, TAU);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.ellipse(x, y, r * 0.36, r, spin * 0.6 + 1.1, 0, TAU);
-    ctx.stroke();
+  switch (shape) {
+    case "circle":
+      ctx.arc(x, y, s, 0, TAU);
+      ctx.stroke();
+      return;
+    case "ring":
+      ctx.arc(x, y, s, 0, TAU);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(0.7, s * 0.32), 0, TAU);
+      ctx.fill();
+      return;
+    case "square":
+      ctx.rect(Math.round(x - s) + 0.5, Math.round(y - s) + 0.5, Math.round(s * 2), Math.round(s * 2));
+      ctx.stroke();
+      return;
+    case "diamond":
+      ctx.moveTo(x, y - s * 1.2);
+      ctx.lineTo(x + s * 1.2, y);
+      ctx.lineTo(x, y + s * 1.2);
+      ctx.lineTo(x - s * 1.2, y);
+      ctx.closePath();
+      ctx.stroke();
+      return;
+    case "dot":
+      ctx.arc(x, y, Math.max(1, s * 0.55), 0, TAU);
+      ctx.fill();
+      return;
   }
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x, y, Math.max(0.8, r * 0.2), 0, TAU);
-  ctx.fill();
+}
+
+/** Where the segment from a box's center toward (tx, ty) leaves the box. */
+function exitPoint(
+  cx: number,
+  cy: number,
+  hw: number,
+  hh: number,
+  tx: number,
+  ty: number,
+): [number, number] | null {
+  const dx = tx - cx;
+  const dy = ty - cy;
+  const t = Math.min(
+    dx === 0 ? Infinity : hw / Math.abs(dx),
+    dy === 0 ? Infinity : hh / Math.abs(dy),
+  );
+  if (t >= 1) return null;
+  return [cx + dx * t, cy + dy * t];
+}
+
+/** Resolve any CSS color the theme hands us to an "r, g, b" triplet. */
+function inkTriplet(ctx: CanvasRenderingContext2D, css: string): string {
+  ctx.fillStyle = "#000";
+  ctx.fillStyle = css.trim() || "#e6f4ec";
+  const v = ctx.fillStyle;
+  if (v.startsWith("#")) {
+    const n = parseInt(v.slice(1), 16);
+    return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+  }
+  const m = v.match(/[\d.]+/g);
+  return m && m.length >= 3 ? `${m[0]}, ${m[1]}, ${m[2]}` : "230, 244, 236";
 }
 
 export function BrainView() {
@@ -201,10 +249,9 @@ export function BrainView() {
     nodes: LayoutNode[];
     edges: LayoutEdge[];
     byId: Map<string, number>;
-    phases: Float32Array;
-  }>({ nodes: [], edges: [], byId: new Map(), phases: new Float32Array(0) });
+  }>({ nodes: [], edges: [], byId: new Map() });
   const alphaRef = useRef(1);
-  const camRef = useRef({ rx: -0.28, ry: 0.4, zoom: 1, lastInteract: 0 });
+  const camRef = useRef({ rx: -0.28, ry: 0.4, zoom: 1, lastInteract: 0, userZoomed: false });
   const hoverRef = useRef<string | null>(null);
   const dragRef = useRef<
     | { mode: "orbit"; sx: number; sy: number; orx: number; ory: number; moved: boolean }
@@ -215,6 +262,15 @@ export function BrainView() {
   selectedRef.current = selectedId;
   const matchRef = useRef<Set<string> | null>(null);
   matchRef.current = matchIds;
+  const boxesRef = useRef<Float32Array>(new Float32Array(0));
+  const hubOrder = useMemo(
+    () => [...visible.nodes].sort((a, b) => b.degree - a.degree).map((n) => n.id),
+    [visible],
+  );
+  const hubOrderRef = useRef(hubOrder);
+  hubOrderRef.current = hubOrder;
+  const nodeIndexRef = useRef(nodeById);
+  nodeIndexRef.current = nodeById;
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
 
@@ -241,8 +297,6 @@ export function BrainView() {
       };
     });
     const byId = new Map(nodes.map((n, i) => [n.id, i]));
-    const phases = new Float32Array(nodes.length);
-    for (let i = 0; i < nodes.length; i++) phases[i] = hashPhase(nodes[i]!.id);
     const edges: LayoutEdge[] = [];
     for (const e of visible.edges) {
       const a = byId.get(e.a);
@@ -250,7 +304,7 @@ export function BrainView() {
       if (a == null || b == null) continue;
       edges.push({ a, b, weight: EDGE_SPRING[e.kind] ?? 0.5 });
     }
-    simRef.current = { nodes, edges, byId, phases };
+    simRef.current = { nodes, edges, byId };
     alphaRef.current = Math.max(alphaRef.current, 0.6);
   }, [visible]);
 
@@ -337,27 +391,132 @@ export function BrainView() {
     const depthT = (persp: number) =>
       Math.min(1, Math.max(0, (persp - 0.68) / 0.75));
 
+    // Ink follows the theme; re-read about once a second so theme switches land.
+    const readInk = () => {
+      const cs = getComputedStyle(container);
+      ink = inkTriplet(ctx, cs.getPropertyValue("--t-primary"));
+      paper = inkTriplet(ctx, cs.getPropertyValue("--bg-0"));
+    };
+    let ink = "";
+    let paper = "";
+    readInk();
+    let inkReadAt = 0;
+    const stroke = (a: number) => `rgba(${ink}, ${a})`;
+
+    // Label boxes per node index: [cx, cy, halfW, halfH]; halfW < 0 = no box.
+    let boxes = new Float32Array(0);
+    const textWidth = new Map<string, number>();
+    const measure = (font: string, text: string) => {
+      const key = `${font}|${text}`;
+      let v = textWidth.get(key);
+      if (v == null) {
+        ctx.font = font;
+        v = ctx.measureText(text).width;
+        if (textWidth.size > 4000) textWidth.clear();
+        textWidth.set(key, v);
+      }
+      return v;
+    };
+
+    /** Faint drafting geometry, fixed to the viewport like a printed sheet. */
+    const drawConstruction = () => {
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = stroke(0.07);
+      ctx.beginPath();
+      ctx.arc(w * 0.8, h * 0.08, Math.max(w, h) * 0.3, 0, TAU);
+      ctx.stroke();
+      ctx.strokeStyle = stroke(0.05);
+      ctx.beginPath();
+      ctx.arc(w * 0.06, h * 1.02, Math.min(w, h) * 0.52, 0, TAU);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.22);
+      ctx.lineTo(w, -h * 0.04);
+      ctx.moveTo(w * 0.1, h);
+      ctx.lineTo(w * 0.78, 0);
+      ctx.stroke();
+      ctx.fillStyle = stroke(0.16);
+      for (const [x, y] of [[w * 0.8, h * 0.08], [w * 0.06, h * 1.02]] as const) {
+        ctx.beginPath();
+        ctx.arc(x, y, 1.6, 0, TAU);
+        ctx.fill();
+      }
+    };
+
+    const drawBrackets = (cx: number, cy: number, hw: number, hh: number, a: number) => {
+      const l = Math.round(cx - hw) - 3.5;
+      const r = Math.round(cx + hw) + 3.5;
+      const t = Math.round(cy - hh) - 3.5;
+      const b = Math.round(cy + hh) + 3.5;
+      const k = 5;
+      ctx.strokeStyle = stroke(a);
+      ctx.beginPath();
+      ctx.moveTo(l, t + k); ctx.lineTo(l, t); ctx.lineTo(l + k, t);
+      ctx.moveTo(r - k, t); ctx.lineTo(r, t); ctx.lineTo(r, t + k);
+      ctx.moveTo(r, b - k); ctx.lineTo(r, b); ctx.lineTo(r - k, b);
+      ctx.moveTo(l + k, b); ctx.lineTo(l, b); ctx.lineTo(l, b - k);
+      ctx.stroke();
+    };
+
+    const drawReadout = (i: number, cx: number, cy: number, hw: number, hh: number) => {
+      const nd = simRef.current.nodes[i]!;
+      const text = `${nd.x.toFixed(2)}, ${(-nd.y).toFixed(2)}`;
+      const x0 = Math.round(cx + hw) + 0.5;
+      const y0 = Math.round(cy - hh) + 0.5;
+      const x1 = x0 + 14;
+      const y1 = y0 - 14;
+      ctx.strokeStyle = stroke(0.45);
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+      ctx.fillStyle = stroke(0.6);
+      ctx.beginPath();
+      ctx.arc(x1, y1, 1.6, 0, TAU);
+      ctx.fill();
+      ctx.font = '9px "JetBrains Mono", monospace';
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = stroke(0.55);
+      ctx.fillText(text, x1 + 5, y1);
+    };
+
     const draw = (nowMs: number) => {
       if (alphaRef.current > 0.02) {
         stepLayout(simRef.current.nodes, simRef.current.edges, alphaRef.current);
         alphaRef.current *= 0.985;
       }
-      const t = nowMs / 1000;
-      const { byId, phases } = simRef.current;
+      if (nowMs - inkReadAt > 1000) {
+        inkReadAt = nowMs;
+        readInk();
+      }
+      const { byId, nodes: simNodes } = simRef.current;
       const g = visibleRef.current;
       const hover = hoverRef.current;
       const selected = selectedRef.current;
       const matches = matchRef.current;
 
-      // Slow auto-orbit — the core's idle spin. Pauses while the user is
-      // interacting so hover targets stay put.
+      // Slow drift so depth reads; pauses while the user is interacting.
       const idle =
         !dragRef.current && !hover && nowMs - cam.lastInteract > 2000;
-      if (idle) cam.ry += 0.0016;
+      if (idle) cam.ry += 0.0007;
 
       projectAll();
 
-      // Neighborhood of the focused (hover-or-selected) node.
+      // Fit the graph to the sheet until the user zooms by hand.
+      if (!cam.userZoomed && simNodes.length > 0) {
+        let maxR = 1;
+        for (let i = 0; i < simNodes.length; i++) {
+          const d = Math.hypot(proj[i * 3]! - w / 2, proj[i * 3 + 1]! - h / 2) / cam.zoom;
+          if (d > maxR) maxR = d;
+        }
+        const fit = Math.min(4, Math.max(0.25, (0.4 * Math.min(w, h)) / maxR));
+        if (Math.abs(fit - cam.zoom) > 0.002) {
+          cam.zoom += (fit - cam.zoom) * 0.08;
+          projectAll();
+        }
+      }
+
       const focus = hover ?? selected;
       let focusSet: Set<string> | null = null;
       if (focus) {
@@ -367,109 +526,198 @@ export function BrainView() {
           else if (e.b === focus) focusSet.add(e.a);
         }
       }
+      const isDimmed = (id: string) =>
+        (!!focusSet && !focusSet.has(id)) || (!!matches && !matches.has(id));
+
+      // Ruled label boxes, in priority order: the interaction set, then hubs
+      // by degree. A candidate that would overlap a placed box stays a marker,
+      // so labels never pile up; focus and selection always place.
+      const candidates: string[] = [];
+      if (selected) candidates.push(selected);
+      if (focus && focus !== selected) candidates.push(focus);
+      if (matches) candidates.push(...matches);
+      if (focusSet) candidates.push(...focusSet);
+      candidates.push(...hubOrderRef.current);
+      const hubBudget = Math.round(10 * Math.pow(cam.zoom, 1.4));
+
+      if (boxes.length < simNodes.length * 4) boxes = new Float32Array(simNodes.length * 4);
+      boxes.fill(-1);
+      const placed: number[] = [];
+      let hubs = 0;
+      for (const id of candidates) {
+        const i = byId.get(id);
+        if (i == null || boxes[i * 4 + 2]! > 0) continue;
+        const forced = id === selected || id === focus;
+        if (!forced && isDimmed(id)) continue;
+        const n = nodeIndexRef.current.get(id);
+        if (!n) continue;
+        const persp = proj[i * 3 + 2]!;
+        const size = Math.round(Math.max(9, Math.min(11, 10 * persp * Math.sqrt(cam.zoom))));
+        const font = `${size}px "JetBrains Mono", monospace`;
+        const label = n.label.length > 30 ? `${n.label.slice(0, 29)}…` : n.label;
+        const hw = (measure(font, label) + measure(font, ` ${TYPE_SUFFIX[n.type]}`)) / 2 + 7;
+        const hh = size / 2 + 5;
+        const cx = proj[i * 3]!;
+        const cy = proj[i * 3 + 1]!;
+        let clear = true;
+        for (let k = 0; k < placed.length && !forced; k += 4) {
+          if (
+            Math.abs(cx - placed[k]!) < hw + placed[k + 2]! + 6 &&
+            Math.abs(cy - placed[k + 1]!) < hh + placed[k + 3]! + 6
+          ) {
+            clear = false;
+            break;
+          }
+        }
+        if (!clear) continue;
+        const isHub = !forced && !(matches?.has(id)) && !(focusSet?.has(id));
+        if (isHub) {
+          if (hubs >= hubBudget) continue;
+          hubs++;
+        }
+        boxes[i * 4] = cx;
+        boxes[i * 4 + 1] = cy;
+        boxes[i * 4 + 2] = hw;
+        boxes[i * 4 + 3] = hh;
+        placed.push(cx, cy, hw, hh);
+      }
+      boxesRef.current = boxes;
 
       ctx.clearRect(0, 0, w, h);
-      // Everything glows: additive blending, exactly like the core's shells.
-      ctx.globalCompositeOperation = "lighter";
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
+      drawConstruction();
 
-      // Edges.
+      // Links — straight hairlines from box edge (or marker rim) to box edge.
       ctx.lineWidth = 1;
+      const junctions: number[] = [];
       for (const e of g.edges) {
         const ia = byId.get(e.a);
         const ib = byId.get(e.b);
         if (ia == null || ib == null) continue;
-        const ax = proj[ia * 3]!;
-        const ay = proj[ia * 3 + 1]!;
-        const bx = proj[ib * 3]!;
-        const by = proj[ib * 3 + 1]!;
+        let ax = proj[ia * 3]!;
+        let ay = proj[ia * 3 + 1]!;
+        let bx = proj[ib * 3]!;
+        let by = proj[ib * 3 + 1]!;
+        const ahw = boxes[ia * 4 + 2]!;
+        const bhw = boxes[ib * 4 + 2]!;
+        const aBox = ahw > 0;
+        const bBox = bhw > 0;
+        if (aBox) {
+          const p = exitPoint(ax, ay, ahw, boxes[ia * 4 + 3]!, bx, by);
+          if (!p) continue;
+          [ax, ay] = p;
+        }
+        if (bBox) {
+          const p = exitPoint(bx, by, bhw, boxes[ib * 4 + 3]!, ax, ay);
+          if (!p) continue;
+          [bx, by] = p;
+        }
+        const len = Math.hypot(bx - ax, by - ay);
+        if (len < 4) continue;
+        // Unboxed ends stop at the marker rim so hollow markers stay clean.
+        const ux = (bx - ax) / len;
+        const uy = (by - ay) / len;
+        if (!aBox) {
+          const s = markerSize(ia);
+          ax += ux * (s + 1.5);
+          ay += uy * (s + 1.5);
+        }
+        if (!bBox) {
+          const s = markerSize(ib);
+          bx -= ux * (s + 1.5);
+          by -= uy * (s + 1.5);
+        }
         const depth = depthT((proj[ia * 3 + 2]! + proj[ib * 3 + 2]!) / 2);
-        const inFocus = focusSet ? focusSet.has(e.a) && focusSet.has(e.b) : true;
+        const inFocus = !!focusSet && focusSet.has(e.a) && focusSet.has(e.b);
         const dimmed =
           (focusSet && !inFocus) ||
           (matches && !(matches.has(e.a) && matches.has(e.b)));
-        let base: number;
-        if (dimmed) base = 0.025;
-        else base = (0.08 + depth * 0.16) * (inFocus && focusSet ? 2.2 : 1);
+        let a = dimmed ? 0.035 : inFocus ? 0.62 : 0.09 + depth * 0.17;
+        if (e.kind === "semantic") ctx.setLineDash([3, 4]);
+        else if (e.kind === "mention") ctx.setLineDash([1, 3]);
+        else {
+          ctx.setLineDash([]);
+          if (e.kind !== "wikilink" && e.kind !== "parent") a *= 0.75;
+        }
+        ctx.strokeStyle = stroke(a);
         ctx.beginPath();
         ctx.moveTo(ax, ay);
         ctx.lineTo(bx, by);
-        if (e.kind === "semantic") {
-          ctx.setLineDash([3, 5]);
-          ctx.strokeStyle = `rgba(177, 76, 255, ${Math.min(1, base * (0.8 + e.weight))})`;
-        } else if (e.kind === "wikilink" || e.kind === "parent") {
-          ctx.setLineDash([]);
-          ctx.strokeStyle = `rgba(57, 255, 136, ${base})`;
-        } else {
-          ctx.setLineDash([]);
-          ctx.strokeStyle = `rgba(120, 180, 160, ${base * 0.8})`;
-        }
         ctx.stroke();
+        if (!dimmed) {
+          if (aBox) junctions.push(ax, ay, a);
+          if (bBox) junctions.push(bx, by, a);
+        }
       }
       ctx.setLineDash([]);
 
-      // Nodes — glowing wireframe spheres, depth-faded and depth-scaled.
-      for (const n of g.nodes) {
-        const i = byId.get(n.id);
-        if (i == null) continue;
-        const sx = proj[i * 3]!;
-        const sy = proj[i * 3 + 1]!;
-        const persp = proj[i * 3 + 2]!;
-        const depth = depthT(persp);
-        const r = simRef.current.nodes[i]!.r * persp * cam.zoom;
-        const color = TYPE_COLOR[n.type];
-        const isFocus = n.id === focus;
-        const isMatch = matches ? matches.has(n.id) : false;
-        const dimmed = (focusSet && !focusSet.has(n.id)) || (matches && !isMatch);
-
-        ctx.globalAlpha = dimmed ? 0.07 : 0.32 + depth * 0.68;
-        if (isFocus || isMatch) {
-          ctx.shadowColor = color;
-          ctx.shadowBlur = 18;
-          ctx.globalAlpha = 1;
-        }
-        const spin = t * 0.6 + phases[i]!;
-        ctx.lineWidth = isFocus ? 1.4 : 1;
-        drawNodeGlyph(ctx, sx, sy, r, color, spin, r >= 5 && !dimmed);
-        ctx.shadowBlur = 0;
-
-        if (n.id === selected) {
-          // Selection halo — a slow-pulsing outer ring.
-          const pulse = 1 + Math.sin(t * 2.4) * 0.08;
-          ctx.beginPath();
-          ctx.arc(sx, sy, (r + 5) * pulse, 0, TAU);
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
-        ctx.globalAlpha = 1;
+      // Hollow junction circles where links meet a box.
+      for (let k = 0; k < junctions.length; k += 3) {
+        ctx.strokeStyle = stroke(Math.min(0.85, junctions[k + 2]! + 0.2));
+        ctx.beginPath();
+        ctx.arc(junctions[k]!, junctions[k + 1]!, 2.2, 0, TAU);
+        ctx.stroke();
       }
 
-      // Labels — normal compositing so text stays crisp.
-      ctx.globalCompositeOperation = "source-over";
+      // Markers for unboxed nodes.
+      for (const n of g.nodes) {
+        const i = byId.get(n.id);
+        if (i == null || boxes[i * 4 + 2]! > 0) continue;
+        const depth = depthT(proj[i * 3 + 2]!);
+        const a = isDimmed(n.id) ? 0.08 : 0.3 + depth * 0.5;
+        ctx.strokeStyle = stroke(a);
+        ctx.fillStyle = stroke(a);
+        drawMarker(ctx, TYPE_MARKER[n.type], proj[i * 3]!, proj[i * 3 + 1]!, markerSize(i));
+      }
+
+      // Ruled label boxes.
       for (const n of g.nodes) {
         const i = byId.get(n.id);
         if (i == null) continue;
-        const persp = proj[i * 3 + 2]!;
-        const r = simRef.current.nodes[i]!.r * persp * cam.zoom;
+        const hw = boxes[i * 4 + 2]!;
+        if (hw <= 0) continue;
+        const cx = boxes[i * 4]!;
+        const cy = boxes[i * 4 + 1]!;
+        const hh = boxes[i * 4 + 3]!;
+        const depth = depthT(proj[i * 3 + 2]!);
         const isFocus = n.id === focus;
-        const isMatch = matches ? matches.has(n.id) : false;
-        const dimmed = (focusSet && !focusSet.has(n.id)) || (matches && !isMatch);
-        const show =
-          !dimmed && (isFocus || n.id === selected || isMatch || r >= 8.5);
-        if (!show) continue;
-        const sx = proj[i * 3]!;
-        const sy = proj[i * 3 + 1]!;
-        const size = Math.max(9, Math.min(12, 10 * persp * cam.zoom));
+        const isSel = n.id === selected;
+        const isMatch = !!matches && matches.has(n.id);
+        const strong = isFocus || isSel || isMatch;
+        const base = strong ? 0.9 : 0.4 + depth * 0.4;
+        const x = Math.round(cx - hw) + 0.5;
+        const y = Math.round(cy - hh) + 0.5;
+        const bw = Math.round(hw * 2);
+        const bh = Math.round(hh * 2);
+        // Paper fill occludes links passing beneath, like a printed callout.
+        ctx.fillStyle = `rgba(${paper}, 0.94)`;
+        ctx.fillRect(x, y, bw, bh);
+        if (isSel || isFocus) {
+          ctx.fillStyle = stroke(isSel ? 0.1 : 0.06);
+          ctx.fillRect(x, y, bw, bh);
+        }
+        ctx.strokeStyle = stroke(base * 0.75);
+        ctx.strokeRect(x, y, bw, bh);
+        const size = Math.round((hh - 5) * 2);
         ctx.font = `${size}px "JetBrains Mono", monospace`;
-        ctx.textAlign = "center";
-        ctx.globalAlpha = isFocus || isMatch ? 1 : 0.35 + depthT(persp) * 0.5;
-        ctx.fillStyle = isFocus ? "#e6f4ec" : TYPE_COLOR[n.type];
-        const label = n.label.length > 28 ? `${n.label.slice(0, 27)}…` : n.label;
-        ctx.fillText(label, sx, sy + r + size + 3);
-        ctx.globalAlpha = 1;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        const label = n.label.length > 30 ? `${n.label.slice(0, 29)}…` : n.label;
+        const tx = x + 6.5;
+        ctx.fillStyle = stroke(base);
+        ctx.fillText(label, tx, cy + 0.5);
+        ctx.fillStyle = stroke(base * 0.45);
+        ctx.fillText(` ${TYPE_SUFFIX[n.type]}`, tx + measure(ctx.font, label), cy + 0.5);
+        if (isSel) drawBrackets(cx, cy, hw, hh, 0.8);
+        if (isSel || isFocus) drawReadout(i, cx, cy, hw, hh);
       }
 
       raf = requestAnimationFrame(draw);
+    };
+    const markerSize = (i: number) => {
+      const r = simRef.current.nodes[i]!.r * proj[i * 3 + 2]! * cam.zoom;
+      return Math.max(1.8, Math.min(5, r * 0.36));
     };
     raf = requestAnimationFrame(draw);
 
@@ -479,16 +727,24 @@ export function BrainView() {
       const mx = clientX - rect.left;
       const my = clientY - rect.top;
       const { nodes } = simRef.current;
+      const bx = boxesRef.current;
       let best = -1;
       let bestPersp = -Infinity;
       for (let i = 0; i < nodes.length; i++) {
-        const sx = proj[i * 3]!;
-        const sy = proj[i * 3 + 1]!;
         const persp = proj[i * 3 + 2]!;
-        const r = nodes[i]!.r * persp * cam.zoom + 3;
-        const dx = mx - sx;
-        const dy = my - sy;
-        if (dx * dx + dy * dy <= r * r && persp > bestPersp) {
+        const hw = bx.length > i * 4 + 3 ? bx[i * 4 + 2]! : -1;
+        let hit: boolean;
+        if (hw > 0) {
+          hit =
+            Math.abs(mx - bx[i * 4]!) <= hw + 2 &&
+            Math.abs(my - bx[i * 4 + 1]!) <= bx[i * 4 + 3]! + 2;
+        } else {
+          const r = markerSize(i) + 5;
+          const dx = mx - proj[i * 3]!;
+          const dy = my - proj[i * 3 + 1]!;
+          hit = dx * dx + dy * dy <= r * r;
+        }
+        if (hit && persp > bestPersp) {
           best = i;
           bestPersp = persp;
         }
@@ -564,7 +820,10 @@ export function BrainView() {
     };
     const onDoubleClick = (e: MouseEvent) => {
       const hit = hitTest(e.clientX, e.clientY);
-      if (hit < 0) return;
+      if (hit < 0) {
+        cam.userZoomed = false;
+        return;
+      }
       const id = simRef.current.nodes[hit]!.id;
       const node = visibleRef.current.nodes.find((n) => n.id === id);
       if (node) openNode(node);
@@ -574,6 +833,7 @@ export function BrainView() {
       cam.lastInteract = performance.now();
       const factor = Math.exp(-e.deltaY * 0.0016);
       cam.zoom = Math.min(4, Math.max(0.25, cam.zoom * factor));
+      cam.userZoomed = true;
     };
 
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -664,7 +924,7 @@ export function BrainView() {
                 onClick={() => toggleType(t)}
                 title={`${off ? "Show" : "Hide"} ${TYPE_LABEL[t].toLowerCase()}`}
               >
-                <span className="dot" style={{ background: TYPE_COLOR[t] }} />
+                <TypeGlyph type={t} />
                 {TYPE_LABEL[t]}
                 <span className="n">{count}</span>
               </button>
@@ -701,13 +961,13 @@ export function BrainView() {
       {selected && (
         <div className="ar-brain-detail">
           <div className="ar-brain-detail-head">
-            <span className="dot" style={{ background: TYPE_COLOR[selected.type] }} />
+            <TypeGlyph type={selected.type} />
             <div className="titles">
               <div className="title" title={selected.label}>
                 {selected.label}
               </div>
               <div className="sub">
-                {TYPE_LABEL[selected.type]} · {selected.degree}{" "}
+                {TYPE_SUFFIX[selected.type]} · {selected.degree}{" "}
                 {selected.degree === 1 ? "link" : "links"}
               </div>
             </div>
@@ -741,8 +1001,9 @@ export function BrainView() {
                     onDoubleClick={() => openNode(n)}
                     title={n.label}
                   >
-                    <span className="dot" style={{ background: TYPE_COLOR[n.type] }} />
+                    <TypeGlyph type={n.type} />
                     <span className="lbl">{n.label}</span>
+                    <span className="kind">{TYPE_SUFFIX[n.type]}</span>
                   </button>
                 ))}
               </div>
@@ -752,4 +1013,8 @@ export function BrainView() {
       )}
     </div>
   );
+}
+
+function TypeGlyph({ type }: { type: BrainNodeType }) {
+  return <span className="ar-brain-glyph" data-shape={TYPE_MARKER[type]} aria-hidden />;
 }

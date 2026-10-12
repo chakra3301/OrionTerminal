@@ -188,6 +188,16 @@ function mapTree(node: LayoutNode, fn: (n: LayoutNode) => LayoutNode): LayoutNod
   return transformed;
 }
 
+function findSplitIn(node: LayoutNode, splitId: string): LayoutSplit | null {
+  if (isPanel(node)) return null;
+  if (node.id === splitId) return node;
+  for (const c of node.children) {
+    const hit = findSplitIn(c, splitId);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 function findPanelIn(node: LayoutNode, panelId: string): LayoutPanel | null {
   if (isPanel(node)) return node.id === panelId ? node : null;
   for (const c of node.children) {
@@ -508,6 +518,28 @@ export function defaultOrionLayout(): LayoutNode {
   };
 }
 
+/** Comfortable size (percent) for side surfaces; null = share the rest. */
+const PREFERRED_SIZE: Partial<Record<PanelRole, number>> = {
+  explorer: 16,
+  claude: 24,
+  terminal: 30,
+};
+
+/** Double-clicking a divider restores these: side surfaces at their
+ * comfortable width, everything else sharing the remainder evenly. */
+export function preferredSizes(split: LayoutSplit): number[] {
+  const fixed = split.children.map((c) =>
+    c.kind === "panel" && c.role ? PREFERRED_SIZE[c.role] ?? null : null,
+  );
+  const fixedSum = fixed.reduce<number>((s, v) => s + (v ?? 0), 0);
+  const flexible = fixed.filter((v) => v == null).length;
+  if (flexible === 0 || fixedSum >= 90) {
+    return split.children.map(() => 100 / split.children.length);
+  }
+  const share = (100 - fixedSum) / flexible;
+  return fixed.map((v) => v ?? share);
+}
+
 function persistLayout(root: LayoutNode, focusedPanelId: string | null) {
   void setAppState(PERSIST_KEY, root);
   void setAppState(PERSIST_FOCUSED, focusedPanelId);
@@ -815,6 +847,14 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   setSplitSizes: (splitId, sizes) => {
     const root = get().root;
+    const current = findSplitIn(root, splitId);
+    if (
+      !current ||
+      (current.sizes.length === sizes.length &&
+        current.sizes.every((s, i) => Math.abs(s - sizes[i]!) < 0.05))
+    ) {
+      return;
+    }
     const nextRoot = mapTree(root, (n) => {
       if (n.kind === "split" && n.id === splitId) return { ...n, sizes };
       return n;

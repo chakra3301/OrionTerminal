@@ -31,18 +31,19 @@
   --bg-2-solid: #08111c;
   --bg-3-solid: #0d1928;
 
-  /* accents stay vivid — they glow through the frost */
-  --neon-green: #4dffa0;
-  --neon-cyan: #5fe8ff;
-  --neon-yellow: #eaff5c;
-  --neon-magenta: #ff5cb8;
-  --neon-violet: #c07bff;
+  /* Owner direction 2026-10-12: no neon. Accents are clear, cool tints that
+     keep app identity without glowing; the glass carries the look. */
+  --neon-green: #7ccfa6;
+  --neon-cyan: #9ccbe6;
+  --neon-yellow: #e2cf8e;
+  --neon-magenta: #e39ac0;
+  --neon-violet: #b2a4ee;
 
-  --neon-green-rgb: 77, 255, 160;
-  --neon-cyan-rgb: 95, 232, 255;
-  --neon-yellow-rgb: 234, 255, 92;
-  --neon-magenta-rgb: 255, 92, 184;
-  --neon-violet-rgb: 192, 123, 255;
+  --neon-green-rgb: 124, 207, 166;
+  --neon-cyan-rgb: 156, 203, 230;
+  --neon-yellow-rgb: 226, 207, 142;
+  --neon-magenta-rgb: 227, 154, 192;
+  --neon-violet-rgb: 178, 164, 238;
 
   --t-primary: #f1faff;
   --t-secondary: #aac6d6;
@@ -65,11 +66,11 @@
   --shadow-window: 0 30px 90px -22px rgba(0, 0, 0, 0.72),
     0 10px 30px -10px rgba(0, 0, 0, 0.5),
     0 0 60px -30px rgba(95, 232, 255, 0.35);
-  --shadow-glow-green: 0 0 26px -4px rgba(77, 255, 160, 0.5);
-  --shadow-glow-cyan: 0 0 26px -4px rgba(95, 232, 255, 0.55);
-  --shadow-glow-magenta: 0 0 26px -4px rgba(255, 92, 184, 0.5);
+  --shadow-glow-green: 0 0 18px -8px rgba(124, 207, 166, 0.22);
+  --shadow-glow-cyan: 0 0 18px -8px rgba(156, 203, 230, 0.22);
+  --shadow-glow-magenta: 0 0 18px -8px rgba(227, 154, 192, 0.22);
 
-  --xd-accent-rgb: 95, 232, 255;
+  --xd-accent-rgb: 156, 203, 230;
 }
 
 /* Global liquid amplifier — crank the backdrop on every glass surface and add a
@@ -188,9 +189,9 @@ html[data-theme="liquid"] [class*="-field"] {
      real refraction on top of this. Also a mount diagnostic: matrix replaced
      by this gradient ⇒ the component mounted. */
   background:
-    radial-gradient(ellipse 1300px 700px at 50% 112%, rgba(192, 123, 255, 0.16), transparent 62%),
-    radial-gradient(ellipse  900px 520px at 16%  96%, rgba(95, 232, 255, 0.09), transparent 60%),
-    radial-gradient(ellipse 1000px 700px at 85%   4%, rgba(77, 255, 160, 0.06), transparent 60%),
+    radial-gradient(ellipse 1300px 700px at 50% 112%, rgba(178, 164, 238, 0.07), transparent 62%),
+    radial-gradient(ellipse  900px 520px at 16%  96%, rgba(156, 203, 230, 0.05), transparent 60%),
+    radial-gradient(ellipse 1000px 700px at 85%   4%, rgba(124, 207, 166, 0.025), transparent 60%),
     linear-gradient(to top, #05111e 0%, #03070d 55%, #02050a 100%);
 }
 .ot-liquid-lens canvas {
