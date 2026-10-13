@@ -41,12 +41,29 @@ when changing characters. Falling and Sitting Clap remain manual. Kneeling
 Pointing and Female Dynamic Pose retain placement notes in the manifest.
 
 The packed Blender masters, source models and downloaded motion files remain
-local under the ignored `scripts/characters-src/` directory. To reinstall the
-verified runtime files from those local masters:
+local under the ignored `scripts/characters-src/` directory. Fox, Angel and Robot
+retain their original Tripo bones and skin weights. Their finger rotation keys
+now transfer bends in each hand's anatomical bind frame: the donor and target
+palms differ by roughly 90 degrees, which previously curled fingers sideways,
+especially during Texting. All 20 clips receive the correction; mesh, skin,
+textures, body motion and animation timing stay unchanged.
+
+The three Mixamo rigs are unchanged. Demon has only thumb and index chains on
+each hand; its original download contains bones but no usable finger skin
+weights. Independent motion for all five fingers would require reskinning that
+character. Mushroom's original skin was malformed, and Pigtail's supplied FBX
+had no skeleton.
+
+To regenerate the corrected library from the preserved canonical models and
+cached donor FBX, then reinstall its verified runtime files:
 
 ```sh
+node scripts/repair-companion-fingers.mjs
 node scripts/install-companion-library.mjs
 ```
 
 The installer checks all six hashes and their mesh/skin/clip contract before
 copying any model. An optional first argument selects another library index.
+The corrected index lives in `scripts/characters-src/companion-finger-repair-2026-10-12/`.
+The original Blender masters predate this correction; import the corrected GLBs
+for their updated hand motion, or run the repair after rebuilding a library.

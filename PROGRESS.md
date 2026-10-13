@@ -1,3 +1,15 @@
+## 2026-10-12 — Codex / Original-rig finger retargeting repaired
+
+**Branch:** `validation/alpha-2026-09-14`. Owner's companion commit/push authorization continues; unrelated dirty work remains preserved and excluded.
+
+**Found / changed:** Fox, Angel and Robot still have their original 30 finger bones and skin weights. Their palms differ from the Mixamo donor by roughly 90 degrees; the old world-space transfer preserved bend amounts but sent those bends sideways. Corrected only their finger quaternion keys in all 20 clips using anatomical palm/finger bind frames (600 rotation channels per character). Added a reproducible offline repair script, safe shared-accessor/sampler handling, updated hashed GLBs/manifest, installer default and companion documentation. Preserved the original downloads/canonical assets and pre-repair Blender masters. The corrected GLBs are the handoff for updated finger motion; rebuilding old masters requires rerunning the repair.
+
+**Verified:** Four Node regression tests, 25 focused Vitest tests/seven files and `npm run typecheck` pass. Real-asset checks establish anatomical bend axes on both hands of the three original rigs, all 120 clip bindings/deformations, ragdoll bounds/recovery and unchanged reactions. Compared 59 geometry/skin/image data sets and 17,520 non-finger rotation/position/scale tracks against canonical assets; all unchanged, with animation timing and node/skin/material/mesh definitions preserved. Browser close-ups compare both hands during Texting, and the corrected Fox loads in Orion's frontend. No native package rebuild/install, dependencies, migrations or tokens.
+
+**Next / limitation:** Demon, Mushroom and Pigtail's existing Mixamo GLBs are byte-for-byte unchanged. Demon's original GLB has no usable finger weights; its replacement rig has only thumb/index chains per hand. Full five-finger articulation needs a separate hand reskin. Mushroom's supplied skin was malformed; Pigtail's supplied FBX had no skeleton. No new design-token gap. The paused session's files and character-orb removal remain untouched and uncommitted.
+
+---
+
 ## 2026-10-12 — Codex / Grab-point ragdolls, texting idle and additive request reactions
 
 **Branch:** `validation/alpha-2026-09-14`. Owner's companion commit/push authorization continues; the paused session's dirty work is preserved and excluded.

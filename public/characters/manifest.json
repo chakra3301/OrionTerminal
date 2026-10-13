@@ -11,13 +11,18 @@
       "id": "anthropomorphic-fox",
       "name": "Fox",
       "model": "/characters/anthropomorphic-fox.glb",
-      "sha256": "0d34d8a934311f91c9ca05512e11ed93446a70e910a672553a4d9d0384435e60",
-      "bytes": 6044544,
+      "sha256": "00503efc2c36ef4b24f949594815437117fd6596d801dc085d8d51384441acb6",
+      "bytes": 6214180,
       "boneCount": 61,
       "weightedBoneGroups": 60,
       "animationCount": 20,
       "sourceFilename": "anthropomorphic+fox+3d+model.glb",
       "rigSource": "Original Tripo rig, with offline retargeted motion",
+      "fingerRetarget": {
+        "method": "anatomical-palm-frame-v1",
+        "fingerBones": 30,
+        "rotationChannels": 600
+      },
       "animations": [
         {
           "id": "sad-idle",
@@ -232,6 +237,11 @@
       "animationCount": 20,
       "sourceFilename": "demon figure 3d model.glb",
       "rigSource": "Fresh Mixamo auto-rig; replaced original root-bound skin",
+      "fingerRetarget": {
+        "method": "unchanged-mixamo-rig",
+        "fingerBones": 0,
+        "rotationChannels": 0
+      },
       "animations": [
         {
           "id": "sad-idle",
@@ -446,6 +456,11 @@
       "animationCount": 20,
       "sourceFilename": "stylized character 3d model (1).glb",
       "rigSource": "Fresh Mixamo auto-rig; replaced original malformed skin",
+      "fingerRetarget": {
+        "method": "unchanged-mixamo-rig",
+        "fingerBones": 0,
+        "rotationChannels": 0
+      },
       "animations": [
         {
           "id": "sad-idle",
@@ -653,13 +668,18 @@
       "id": "angelic-winged-figure",
       "name": "Angelic Winged Figure",
       "model": "/characters/angelic-winged-figure.glb",
-      "sha256": "aea45e1fb20b11d029dbbca8b43099ba307706a3fbda0ed51399479d75984335",
-      "bytes": 5978492,
+      "sha256": "2f53d967ae57478db06a05e5f0d39df1e68bd4f45d5f406c7c28c76026d34371",
+      "bytes": 6148096,
       "boneCount": 61,
       "weightedBoneGroups": 60,
       "animationCount": 20,
       "sourceFilename": "angelic+winged+figure+3d+model.zip",
       "rigSource": "Original Tripo rig with offline retargeted Mixamo motion",
+      "fingerRetarget": {
+        "method": "anatomical-palm-frame-v1",
+        "fingerBones": 30,
+        "rotationChannels": 600
+      },
       "animations": [
         {
           "id": "sad-idle",
@@ -867,13 +887,18 @@
       "id": "stylized-humanoid-robot",
       "name": "Stylized Humanoid Robot",
       "model": "/characters/stylized-humanoid-robot.glb",
-      "sha256": "1584ced3f8d7c27979d93d7241a20f7266723bea49b3db86fba7c72941ba5378",
-      "bytes": 5814760,
+      "sha256": "de9972f3596c9b31f480cc48a7d8b91933ad00cdbbc0a5adc9e447ea59536cc5",
+      "bytes": 5984396,
       "boneCount": 61,
       "weightedBoneGroups": 59,
       "animationCount": 20,
       "sourceFilename": "stylized+humanoid+robot+3d+model.zip",
       "rigSource": "Original Tripo rig with offline retargeted Mixamo motion",
+      "fingerRetarget": {
+        "method": "anatomical-palm-frame-v1",
+        "fingerBones": 30,
+        "rotationChannels": 600
+      },
       "animations": [
         {
           "id": "sad-idle",
@@ -1088,6 +1113,11 @@
       "animationCount": 20,
       "sourceFilename": "stylized+character+3d+model (1).zip",
       "rigSource": "Mixamo auto-rig; original source FBX has no skeleton",
+      "fingerRetarget": {
+        "method": "unchanged-mixamo-rig",
+        "fingerBones": 0,
+        "rotationChannels": 0
+      },
       "animations": [
         {
           "id": "sad-idle",

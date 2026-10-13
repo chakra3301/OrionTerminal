@@ -38,6 +38,24 @@ it("ships six independent skinned companions whose 120 clips bind and deform rea
     scene.traverse((node) => { if ((node as THREE.SkinnedMesh).isSkinnedMesh) meshes.push(node as THREE.SkinnedMesh); });
     expect(meshes[0]!.skeleton.bones).toContain(hips);
     expect(meshes[0]!.frustumCulled).toBe(false);
+    meshes[0]!.skeleton.pose();
+    scene.updateMatrixWorld(true);
+    const fingerChecks: { bone: THREE.Bone; rest: THREE.Quaternion; parent: THREE.Quaternion; axis: THREE.Vector3 }[] = [];
+    if (scene.getObjectByName("hand_l")) {
+      for (const side of ["l", "r"]) {
+        const joint = (name: string) => scene.getObjectByName(`${name}_${side}`) as THREE.Bone;
+        const point = (bone: THREE.Bone) => bone.getWorldPosition(new THREE.Vector3());
+        const wrist = point(joint("hand"));
+        const normal = point(joint("index_01")).sub(wrist).normalize()
+          .cross(point(joint("pinky_01")).sub(wrist).normalize()).normalize();
+        for (const digit of ["index", "middle", "ring", "pinky"]) {
+          const bone = joint(`${digit}_02`);
+          const direction = point(joint(`${digit}_03`)).sub(point(bone)).normalize();
+          fingerChecks.push({ bone, rest: bone.quaternion.clone(), parent: bone.parent!.getWorldQuaternion(new THREE.Quaternion()),
+            axis: normal.clone().cross(direction).normalize() });
+        }
+      }
+    }
     const animator = new CompanionAnimator(scene, gltf.animations);
     const anchor = new HorizontalRootAnchor(scene, hips);
     const poses = new Map<string, THREE.Vector3[]>();
@@ -57,6 +75,13 @@ it("ships six independent skinned companions whose 120 clips bind and deform rea
     expect(Math.max(...jump.map((point, i) => point.distanceTo(idle[i]!)))).toBeGreaterThan(0.05);
     expect(Math.max(...greeting.map((point, i) => point.distanceTo(idle[i]!)))).toBeGreaterThan(0.05);
     animator.update(0.5, true, "Texting While Standing");
+    animator.mixer.setTime(3);
+    for (const check of fingerChecks) {
+      const delta = check.bone.quaternion.clone().multiply(check.rest.clone().invert());
+      const axis = new THREE.Vector3(delta.x, delta.y, delta.z).normalize().applyQuaternion(check.parent);
+      expect(delta.angleTo(new THREE.Quaternion())).toBeGreaterThan(0.3);
+      expect(Math.abs(axis.dot(check.axis))).toBeGreaterThan(0.95);
+    }
     const body = new THREE.Group();
     body.add(scene);
     body.updateMatrixWorld(true);
