@@ -11,7 +11,7 @@ const index = JSON.parse(await readFile(indexFile, "utf8"));
 if (index.characterCount !== 6 || index.motionCountPerCharacter !== 20) throw new Error("Expected six companions with twenty clips each");
 const out = path.join(root, "public/characters");
 await mkdir(out, { recursive: true });
-const manifest = { schemaVersion: 1, defaultCharacter: "anthropomorphic-fox", defaultAnimation: "Sad Idle", fps: 30, upAxis: "+Y", forwardAxis: "+Z", units: "meters", characters: [] };
+const manifest = { schemaVersion: 1, defaultCharacter: "anthropomorphic-fox", defaultAnimation: "Texting While Standing", fps: 30, upAxis: "+Y", forwardAxis: "+Z", units: "meters", characters: [] };
 const validated = [];
 
 for (const entry of index.characters) {

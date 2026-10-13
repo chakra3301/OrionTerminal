@@ -10,7 +10,7 @@ function fixture() {
   const bone = new THREE.Bone();
   bone.name = "Hips";
   scene.add(bone);
-  const clips = ["Sad Idle", "Standing Greeting", "Angry", "Happy", "Talking"].map((name, i) =>
+  const clips = ["Texting While Standing", "Standing Greeting", "Angry", "Happy", "Talking", "Sad Idle", "Silly Dancing", "Joyful Jump", "Female Dynamic Pose"].map((name, i) =>
     new THREE.AnimationClip(name, 2, [new THREE.NumberKeyframeTrack("Hips.position[y]", [0, 2], [i + 1, i + 1])]),
   );
   return { bone, clips, animator: new CompanionAnimator(scene, clips, () => 0) };
@@ -21,10 +21,11 @@ function advance(animator: CompanionAnimator, seconds: number, idle = true, test
 }
 
 describe("companion playback", () => {
-  it("starts in Sad Idle, completes an error while working, then revives the cached idle action", () => {
+  it("starts in Texting, completes an error while working, then revives the cached idle action", () => {
     const { animator, bone, clips } = fixture();
     animator.update(0.1, true);
     expect(bone.position.y).toBeCloseTo(1);
+    expect(animator.idleName).toBe("Texting While Standing");
     expect(animator.gesture).toBe("Talking");
     animator.queue(animator.error);
     advance(animator, 1, false);
@@ -65,6 +66,30 @@ describe("companion playback", () => {
     const staticModel = new CompanionAnimator(new THREE.Group(), []);
     expect(() => staticModel.update(1, true)).not.toThrow();
     staticModel.dispose();
+  });
+
+  it("keeps existing fidgets and includes the new random motions without double-playing Texting", () => {
+    for (const [choice, expected] of ["Happy", "Sad Idle", "Silly Dancing", "Joyful Jump", "Female Dynamic Pose"].entries()) {
+      const { clips, bone, animator: original } = fixture();
+      original.dispose();
+      const animator = new CompanionAnimator(bone.parent!, clips, () => (choice + 0.1) / 5);
+      advance(animator, 75.5);
+      expect(bone.position.y).toBeCloseTo(clips.findIndex((clip) => clip.name === expected) + 1);
+      animator.dispose();
+    }
+  });
+
+  it("completes queued priority reactions in sequence so an added reaction does not erase Angry", () => {
+    const { animator, bone } = fixture();
+    animator.queue("Angry");
+    animator.queue("Talking");
+    advance(animator, 1, false);
+    expect(bone.position.y).toBeCloseTo(3);
+    advance(animator, 2, false);
+    expect(bone.position.y).toBeCloseTo(5);
+    advance(animator, 3, false);
+    expect(bone.position.y).toBeCloseTo(1);
+    animator.dispose();
   });
 });
 

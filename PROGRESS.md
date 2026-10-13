@@ -1,3 +1,15 @@
+## 2026-10-12 — Codex / Grab-point ragdolls, texting idle and additive request reactions
+
+**Branch:** `validation/alpha-2026-09-14`. Owner's companion commit/push authorization continues; the paused session's dirty work is preserved and excluded.
+
+**Changed:** Restoring authored bone poses before procedural offsets fixes repeated head/spine rotation on sparse clips. Grabs choose a body joint from the clicked mesh's skin weights and anchor the surface point, with gravity, damped joint limits and release recovery. Playback pauses during holds. Expanded drawing room preserves framing and click-through outside the widget; dragging uses DOM positioning and 60fps rendering, idle remains 30fps, and long holds no longer open chat. Texting While Standing is the main idle. Silly Dancing, Joyful Jump, Female Dynamic Pose and Sad Idle join existing fidgets. R.O.S.I.E requests add Kneeling Pointing at start, Clapping on success, Rejected on refusal/error and Surprised when the final response asks for input. Greeting, Talking, existing fidgets and Angry (before Rejected on errors) remain. Priority reactions now finish in sequence.
+
+**Verified:** `npm run typecheck`; 25 focused Vitest tests across seven files, covering all six actual rigs/120 clips, long-hold bounds, head/hand/foot anchors, release recovery, request outcomes, preserved reaction ordering, drag rendering and chat suppression. Frontend browser preview confirmed a steady head during a prolonged hold, foot-anchored hanging/swinging, recovery, retained widget position and outside click-through. No native package rebuild/install, dependencies, migrations, tokens or GLB changes.
+
+**Next / open questions:** Optional owner tuning after trying the behavior. Surprised uses the completed R.O.S.I.E response asking for input; no separate provider permission-wait state exists. No new design-token gaps. The other session's character-orb removal and all unrelated work remain untouched and uncommitted.
+
+---
+
 ## 2026-10-12 — Codex / Six animated companions replace the built-in library
 
 **Branch:** `validation/alpha-2026-09-14`. Owner authorized committing and pushing this companion replacement; unrelated dirty work is preserved and excluded.

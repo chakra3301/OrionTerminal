@@ -30,7 +30,7 @@ export function characterBones(scene: THREE.Object3D) {
   return {
     hips: bones.hips ?? bones.pelvis ?? bones.root,
     head: bones.head,
-    neck: bones.neck,
+    neck: bones.neck ?? bones.neck01,
     spine: bones.spine ?? bones.spine01,
   };
 }

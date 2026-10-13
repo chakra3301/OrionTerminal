@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "defaultCharacter": "anthropomorphic-fox",
-  "defaultAnimation": "Sad Idle",
+  "defaultAnimation": "Texting While Standing",
   "fps": 30,
   "upAxis": "+Y",
   "forwardAxis": "+Z",

@@ -11,21 +11,34 @@ These files need no runtime retargeting or external texture requests.
 
 | Trigger | Animation |
 | --- | --- |
-| Resting | Sad Idle, looping |
+| Resting | Texting While Standing, looping |
 | Picker selection / summon after dismissal | Standing Greeting, once |
-| R.O.S.I.E error | Angry, once |
+| R.O.S.I.E error | Angry followed by Rejected, once each |
+| Request starts | Kneeling Pointing, once |
+| Request completes successfully | Clapping, once |
+| Request refused | Rejected, once |
+| Completed response asks for input | Surprised, once |
 | Proactive question | Talking, once |
-| Occasional idle fidget | Happy, Bashful, Thankful or Cheering, once |
+| Occasional idle fidget | Sad Idle, Happy, Bashful, Thankful, Cheering, Silly Dancing, Joyful Jump or Female Dynamic Pose |
 
-Reactions crossfade back to Sad Idle. Each preview and companion owns an
+Reactions crossfade back to Texting While Standing. Each preview and companion owns an
 independent skeleton and mixer, so opening the picker cannot change the floating
 companion's pose. Horizontal root travel is anchored in model space; vertical
-motion is retained. Hidden companions pause rendering and playback.
+motion is retained. Hidden companions pause rendering and playback. Fidgets begin
+after 75 seconds of visible playback, then recur every 2–5 minutes while idle.
+
+Grabbing the character picks a body joint from the clicked mesh's skin weights.
+That surface point stays fixed under the cursor while gravity and damped,
+bounded joints make the body and limbs hang around it. Authored animation pauses
+during the hold, then resumes as the joints settle on release. The canvas has
+extra drawing room and passes clicks outside the companion through to the app.
+Bone offsets are restored before each mixer update so sparse clips cannot
+accumulate head or spine rotations.
 
 Spotlight's **Companion: Test Animation Clips** command opens the existing clip tester.
 It exposes all 20 clips for the selected character and resets to the first clip
-when changing characters. Falling, Sitting Clap, Kneeling Pointing and Female
-Dynamic Pose have placement notes in the manifest and are not automatic fidgets.
+when changing characters. Falling and Sitting Clap remain manual. Kneeling
+Pointing and Female Dynamic Pose retain placement notes in the manifest.
 
 The packed Blender masters, source models and downloaded motion files remain
 local under the ignored `scripts/characters-src/` directory. To reinstall the

@@ -25,6 +25,7 @@ const defaultPos = () => ({
  * (Spotlight → "Summon ROSIE", or ⌥R). Otherwise she snaps back on-screen.
  */
 export function CompanionAvatar() {
+  const container = useRef<HTMLDivElement>(null!);
   const visible = useRosie((s) => s.companionVisible);
   const togglePanel = useRosie((s) => s.togglePanel);
   const openPanel = useRosie((s) => s.openPanel);
@@ -32,6 +33,7 @@ export function CompanionAvatar() {
   const proactivePrompt = useCompanionProactive((s) => s.prompt);
   const dismissProactive = useCompanionProactive((s) => s.dismiss);
   const [box, setBox] = useState(defaultPos);
+  const boxRef = useRef(box);
   const [dragging, setDragging] = useState(false);
   // Track the OS window being hidden/minimized so we can park the render loop.
   const [docHidden, setDocHidden] = useState(() => document.hidden);
@@ -40,12 +42,15 @@ export function CompanionAvatar() {
     left: 0,
     top: 0,
     moved: false,
+    startedAt: 0,
     lastT: 0,
     lastDx: 0,
     lastDy: 0,
     vx: 0,
     vy: 0,
   });
+
+  useEffect(() => { boxRef.current = box; }, [box]);
 
   // Keep her on-screen when the OS window is resized.
   useEffect(() => {
@@ -83,9 +88,10 @@ export function CompanionAvatar() {
   const { onMouseDown } = useDraggable({
     onStart: () => {
       drag.current = {
-        left: box.left,
-        top: box.top,
+        left: boxRef.current.left,
+        top: boxRef.current.top,
         moved: false,
+        startedAt: performance.now(),
         lastT: performance.now(),
         lastDx: 0,
         lastDy: 0,
@@ -112,33 +118,38 @@ export function CompanionAvatar() {
       dragState.vx = drag.current.vx;
       dragState.vy = drag.current.vy;
       // No clamp during the drag — she's allowed off-screen so she can be thrown.
-      setBox({ left: drag.current.left + dx, top: drag.current.top + dy });
+      const next = { left: drag.current.left + dx, top: drag.current.top + dy };
+      boxRef.current = next;
+      if (container.current) {
+        container.current.style.left = `${next.left}px`;
+        container.current.style.top = `${next.top}px`;
+      }
     },
     onEnd: () => {
+      if (performance.now() - drag.current.startedAt > 250) drag.current.moved = true;
       setDragging(false);
       // Released: the rig's spring keeps her momentum, then flops back upright.
       dragState.dragging = false;
       const stale = performance.now() - drag.current.lastT > VELOCITY_STALE_MS;
       const speed = stale ? 0 : Math.hypot(drag.current.vx, drag.current.vy);
-      setBox((b) => {
-        const cx = b.left + W / 2;
-        const cy = b.top + H / 2;
-        const offscreen =
-          cx < 0 || cx > window.innerWidth || cy < 0 || cy > window.innerHeight;
-        if (offscreen || speed > THROW_SPEED) {
-          dismissCompanion();
-          return b; // about to unmount anyway
-        }
-        return {
-          left: clamp(b.left, 8, window.innerWidth - W - 8),
-          top: clamp(b.top, 36, window.innerHeight - H - 8),
-        };
-      });
+      const b = boxRef.current;
+      const cx = b.left + W / 2;
+      const cy = b.top + H / 2;
+      const offscreen = cx < 0 || cx > window.innerWidth || cy < 0 || cy > window.innerHeight;
+      if (offscreen || speed > THROW_SPEED) {
+        dismissCompanion();
+        setBox(b);
+      } else {
+        const next = { left: clamp(b.left, 8, window.innerWidth - W - 8), top: clamp(b.top, 36, window.innerHeight - H - 8) };
+        boxRef.current = next;
+        setBox(next);
+      }
     },
   });
 
   return (
     <div
+      ref={container}
       className={`ot-companion${dragging ? " dragging" : ""}${
         visible ? "" : " hidden"
       }`}
@@ -192,7 +203,7 @@ export function CompanionAvatar() {
           <span className="bubble-text">{proactivePrompt}</span>
         </div>
       )}
-      <CompanionScene frameloop={visible && !docHidden ? "demand" : "never"} />
+      <CompanionScene eventSource={container} dragging={dragging} frameloop={visible && !docHidden ? "demand" : "never"} />
       <div className="ot-companion-base" aria-hidden />
     </div>
   );

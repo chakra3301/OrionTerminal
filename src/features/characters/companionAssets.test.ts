@@ -9,9 +9,11 @@ import manifest from "../../../public/characters/manifest.json";
 import { BUILTIN_CHARACTERS, DEFAULT_CHARACTER_ID, resolveClips } from "./catalog";
 import { cloneCharacter, characterBones, HorizontalRootAnchor } from "./modelInstance";
 import { CompanionAnimator } from "./companionAnimator";
+import { CompanionRagdoll } from "./companionRagdoll";
 
 it("ships six independent skinned companions whose 120 clips bind and deform real geometry", async () => {
   expect(manifest.defaultCharacter).toBe(DEFAULT_CHARACTER_ID);
+  expect(manifest.defaultAnimation).toBe("Texting While Standing");
   expect(BUILTIN_CHARACTERS.map((c) => c.id)).toEqual(manifest.characters.map((c) => c.id));
   const loader = new GLTFLoader();
   // Texture decoding requires a browser; these checks exercise the actual mesh, rig and motion data.
@@ -27,7 +29,7 @@ it("ships six independent skinned companions whose 120 clips bind and deform rea
     const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "");
     expect(gltf.animations.map((clip) => clip.name)).toEqual(character.animations.map((clip) => clip.name));
     expect(gltf.animations).toHaveLength(20);
-    expect(resolveClips(gltf.animations.map((clip) => clip.name))).toEqual({ idle: "Sad Idle", select: "Standing Greeting" });
+    expect(resolveClips(gltf.animations.map((clip) => clip.name))).toEqual({ idle: "Texting While Standing", select: "Standing Greeting" });
     const scene = cloneCharacter(gltf.scene);
     const hips = characterBones(scene).hips;
     expect(hips).toBeDefined();
@@ -54,6 +56,30 @@ it("ships six independent skinned companions whose 120 clips bind and deform rea
     const greeting = poses.get("Standing Greeting")!;
     expect(Math.max(...jump.map((point, i) => point.distanceTo(idle[i]!)))).toBeGreaterThan(0.05);
     expect(Math.max(...greeting.map((point, i) => point.distanceTo(idle[i]!)))).toBeGreaterThan(0.05);
+    animator.update(0.5, true, "Texting While Standing");
+    const body = new THREE.Group();
+    body.add(scene);
+    body.updateMatrixWorld(true);
+    const head = characterBones(scene).head!;
+    const headPose = head.quaternion.clone();
+    const grip = hips!.getWorldPosition(new THREE.Vector3());
+    const ragdoll = new CompanionRagdoll(scene, body);
+    ragdoll.setGrip(grip);
+    for (let frame = 0; frame < 450; frame++) {
+      ragdoll.restorePose();
+      ragdoll.capturePose();
+      ragdoll.update(1 / 30, true, 0.2, 0);
+    }
+    expect(hips!.getWorldPosition(new THREE.Vector3()).distanceTo(grip)).toBeLessThan(1e-6);
+    expect(head.quaternion.angleTo(headPose)).toBeLessThanOrEqual(0.451);
+    expect(head.quaternion.length()).toBeCloseTo(1);
+    for (let frame = 0; frame < 120; frame++) {
+      ragdoll.restorePose();
+      ragdoll.capturePose();
+      ragdoll.update(1 / 30, false, 0, 0);
+    }
+    expect(body.position.length()).toBeLessThan(0.001);
+    expect(head.quaternion.angleTo(headPose)).toBeLessThan(0.001);
     animator.dispose();
   }
 }, 20_000);

@@ -98,6 +98,7 @@ export function resolveClips(names: string[]): {
     return i >= 0 ? names[i] : null;
   };
   const idle =
+    find((n) => n === "texting while standing") ??
     find((n) => n === "sad idle") ??
     find((n) => n.includes("idle")) ??
     find((n) => n.includes("swim")) ??

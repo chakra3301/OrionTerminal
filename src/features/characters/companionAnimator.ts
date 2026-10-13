@@ -30,7 +30,7 @@ export class CompanionAnimator {
     this.greeting = resolved.select === resolved.idle ? null : resolved.select;
     this.error = this.names.find((name) => /angry|rejected|error/i.test(name)) ?? null;
     this.gesture = this.names.find((name) => /^talking$/i.test(name)) ?? this.greeting;
-    this.fidgets = this.names.filter((name) => /^(happy|bashful|thankful|cheering)$/i.test(name));
+    this.fidgets = this.names.filter((name) => name !== this.idleName && /^(sad idle|happy|bashful|thankful|cheering|silly dancing|joyful jump|female dynamic pose)$/i.test(name));
     if (!this.fidgets.length && this.greeting) this.fidgets = [this.greeting];
     const idleClip = this.idleName ? this.clips.get(this.idleName) : undefined;
     this.idle = idleClip ? this.mixer.clipAction(idleClip) : null;
@@ -78,7 +78,7 @@ export class CompanionAnimator {
         this.restoreIdle(0.3);
         this.nextFidget = this.time + 75;
       }
-      if (this.active && !this.fadeEnd && (this.time >= this.endAt || this.pending.length || (!idleMode && !this.priority))) {
+      if (this.active && !this.fadeEnd && (this.time >= this.endAt || (this.pending.length && !this.priority) || (!idleMode && !this.priority))) {
         this.active.fadeOut(0.4);
         this.restoreIdle(0.4);
         this.fadeEnd = this.time + 0.4;
