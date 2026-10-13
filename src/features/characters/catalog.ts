@@ -85,6 +85,14 @@ export const BUILTIN_CHARACTERS: BuiltinCharacter[] = [
     color: "#b14cff",
     url: "/characters/pigtail-character.glb",
   },
+  {
+    id: "rosie-stylized",
+    name: "Rosie",
+    blurb: "Matte cybernetic styling and twin pigtails.",
+    accent: "cyan",
+    color: "#00e0ff",
+    url: "/characters/rosie-stylized.glb",
+  },
 ];
 
 export const ACCENT_VAR: Record<CharacterAccent, string> = {

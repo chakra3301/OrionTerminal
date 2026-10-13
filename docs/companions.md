@@ -1,9 +1,46 @@
 # Companion library
 
-Orion's built-in companions are Fox, Demon, Mushroom, Angel, Robot and Pigtail.
-Choose one in Settings → Characters. Each GLB contains its own rig, textures
-and the same 20 Mixamo clips. Fox is the default; retired built-in selections
+Orion's built-in companions are Fox, Demon, Mushroom, Angel, Robot, Pigtail and Rosie.
+Choose one in Settings → Characters. Each GLB contains its own rig,
+textures and the same 20 Mixamo clip names. Fox is the default; retired built-in selections
 fall back to Fox. Saved custom uploads remain selectable.
+
+Rosie's fitted source has no skeleton. Her runtime copy uses a local humanoid rig
+and Blender heat binding, after Mixamo repeatedly returned “Unknown error while
+generating motion.” Coincident UV-seam vertices are welded before reduction so
+the body forms one connected mesh. The copy has 79,999 triangles (down from
+1,909,852), a self-contained 2K matte atlas, zero metallic and 0.88 roughness.
+The editable source Blender master, fitted GLB, shape keys and original 4K atlas
+remain unchanged.
+
+Her hands are closed glove shapes. They follow their wrists as rigid mitts, with
+unweighted thumb/index landmarks used only to calibrate palm orientation; there
+is no independent finger deformation. Texting uses the existing anatomical hand
+transfer with a glove surface contact limit. Clapping and Sitting Clap also keep the surfaces separated and add the
+donor's normalized opening stroke beyond contact, scaled to her glove size. Her
+Angry clip is a fresh, verified standing motion rather than the older duplicated
+Sitting Clap source. The original six assets and their accepted grips remain exact.
+
+Prepare, bind, bake, correct and reinstall her with the local source files present:
+
+```sh
+/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python-exit-code 1 --python scripts/prepare-rosie-companion.py
+/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python-exit-code 1 --python scripts/rig-rosie-companion.py
+/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python-exit-code 1 --python scripts/build-rosie-animations.py
+node scripts/repair-rosie-animations.mjs
+node scripts/install-rosie-companion.mjs
+```
+
+The preparation also exports `scripts/characters-src/rosie-companion-2026-10-13/sources/rosie-static-mixamo.fbx`
+for auto-rigging. It contains geometry only; the matte material stays local for restoration
+after rigging. Cached donors remain in the original library; Rosie's genuine Angry
+download is `rosie-companion-2026-10-13/sources/angry.fbx`. Her installer checks the
+prepared, bound, baked and corrected source hashes, and preserves separately installed
+companions. The local pre-correction Blender library is
+`rosie-companion-2026-10-13/exports/rosie-animation-library.blend`; import the final
+`public/characters/rosie-stylized.glb` for the corrected wrist keys. A packed final
+copy with all 20 corrected actions and Texting selected is saved locally at
+`rosie-companion-2026-10-13/exports/rosie-companion-ready.blend`.
 
 The runtime contract is `public/characters/manifest.json`: stable character IDs,
 model URLs, SHA-256 hashes, rig details, clip names, durations and placement notes.
@@ -78,7 +115,7 @@ had no skeleton.
 
 The [dated animation audit](companion-animation-review-2026-10-13.md) records the
 original issues. Hand orientation is now repaired. Its separate Angry-download
-and kneeling-grounding findings remain outstanding; hand-angle corrections cannot
+and kneeling-grounding findings on the original six remain outstanding; hand-angle corrections cannot
 replace a mislabeled source motion or establish floor contact.
 
 To regenerate the corrected library from the preserved canonical models and
@@ -92,7 +129,8 @@ node scripts/install-companion-library.mjs
 ```
 
 The installer checks all six hashes and their mesh/skin/clip contract before
-copying any model. An optional first argument selects another library index.
+copying any model, and verifies and retains separately installed companions such as Rosie.
+An optional first argument selects another library index.
 The current index lives in `scripts/characters-src/companion-hand-library-2026-10-13/`.
 The original Blender masters predate this correction; import the corrected GLBs
 for their updated hand motion, or run the repair after rebuilding a library.

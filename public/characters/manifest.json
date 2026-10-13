@@ -1436,6 +1436,271 @@
           "needsPositioningReview": false
         }
       ]
+    },
+    {
+      "id": "rosie-stylized",
+      "name": "Rosie",
+      "model": "/characters/rosie-stylized.glb",
+      "sha256": "22e709c0e279f33769e8f31bad2d360e0cedca87027ee62ee944eab07a53e40d",
+      "bytes": 6584636,
+      "boneCount": 41,
+      "weightedBoneGroups": 22,
+      "animationCount": 20,
+      "animations": [
+        {
+          "name": "Sad Idle",
+          "motionId": "123770901",
+          "duration": 4,
+          "frameRange": [
+            0,
+            120
+          ],
+          "loopHint": true,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Silly Dancing",
+          "motionId": "101920902",
+          "duration": 3.8333333333333335,
+          "frameRange": [
+            0,
+            115
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Joyful Jump",
+          "motionId": "106090904",
+          "duration": 1.8666666666666667,
+          "frameRange": [
+            0,
+            56
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Female Dynamic Pose",
+          "motionId": "140300903",
+          "duration": 1,
+          "frameRange": [
+            0,
+            30
+          ],
+          "loopHint": false,
+          "needsPositioningReview": true
+        },
+        {
+          "name": "Sitting Clap",
+          "motionId": "116190901",
+          "duration": 5.666666666666667,
+          "frameRange": [
+            0,
+            170
+          ],
+          "loopHint": false,
+          "needsPositioningReview": true
+        },
+        {
+          "name": "Angry",
+          "motionId": "117940901",
+          "duration": 19.166666666666668,
+          "frameRange": [
+            0,
+            575
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Falling",
+          "motionId": "131120901",
+          "duration": 11.366666666666667,
+          "frameRange": [
+            0,
+            341
+          ],
+          "loopHint": false,
+          "needsPositioningReview": true
+        },
+        {
+          "name": "Standing Greeting",
+          "motionId": "113350901",
+          "duration": 5.1,
+          "frameRange": [
+            0,
+            153
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Telling A Secret",
+          "motionId": "109900901",
+          "duration": 10.9,
+          "frameRange": [
+            0,
+            327
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Kiss",
+          "motionId": "115410903",
+          "duration": 3.7333333333333334,
+          "frameRange": [
+            0,
+            112
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Thankful",
+          "motionId": "118020901",
+          "duration": 3,
+          "frameRange": [
+            0,
+            90
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Texting While Standing",
+          "motionId": "119340901",
+          "duration": 23.566666666666666,
+          "frameRange": [
+            0,
+            707
+          ],
+          "loopHint": true,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Kneeling Pointing",
+          "motionId": "130520901",
+          "duration": 3.9,
+          "frameRange": [
+            0,
+            117
+          ],
+          "loopHint": false,
+          "needsPositioningReview": true
+        },
+        {
+          "name": "Rejected",
+          "motionId": "117960901",
+          "duration": 4.8,
+          "frameRange": [
+            0,
+            144
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Cheering",
+          "motionId": "102100901",
+          "duration": 2.9,
+          "frameRange": [
+            0,
+            87
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Clapping",
+          "motionId": "100570901",
+          "duration": 1.1666666666666667,
+          "frameRange": [
+            0,
+            35
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Talking",
+          "motionId": "108420902",
+          "duration": 5.166666666666667,
+          "frameRange": [
+            0,
+            155
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Surprised",
+          "motionId": "110150902",
+          "duration": 4,
+          "frameRange": [
+            0,
+            120
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Bashful",
+          "motionId": "117540901",
+          "duration": 11,
+          "frameRange": [
+            0,
+            330
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        },
+        {
+          "name": "Happy",
+          "motionId": "117920901",
+          "duration": 10,
+          "frameRange": [
+            0,
+            300
+          ],
+          "loopHint": false,
+          "needsPositioningReview": false
+        }
+      ],
+      "sourceFilename": "rosie-stylized.glb",
+      "rigSource": "Local humanoid landmarks and Blender heat binding; unweighted glove landmarks",
+      "preparation": {
+        "sourceSha256": "00e66a7229715baa5f7d765bab72d04e3550e5f0209709a29362bd3990af9c03",
+        "sourceTriangles": 1909852,
+        "triangles": 79999,
+        "textureSize": 2048,
+        "metallic": 0,
+        "roughness": 0.88
+      },
+      "fingerRetarget": {
+        "method": "rigid-closed-gloves",
+        "independentFingerMotion": false
+      },
+      "textingRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "fullFingerRig": false,
+        "surfaceContact": true,
+        "rotationChannels": 22
+      },
+      "handRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "correctedClips": 19,
+        "acceptedTextingPreserved": true,
+        "contactSpacingClips": [
+          "Clapping",
+          "Sitting Clap"
+        ],
+        "sourceSpacingClips": [
+          "Clapping",
+          "Sitting Clap"
+        ]
+      }
     }
   ]
 }

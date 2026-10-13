@@ -100,7 +100,7 @@ export function solveTwoBoneArm(wrist, target, previousPole = null, preferredPol
   return pole.clone();
 }
 
-export function handTransfer(target, source, { matchGripSpacing = true, continuousElbows = false, limitContact = false } = {}) {
+export function handTransfer(target, source, { matchGripSpacing = true, continuousElbows = false, limitContact = false, contactOpening = () => 0 } = {}) {
   const targetRest = bindTransforms(target);
   const sourceRest = bindTransforms(source);
   const hands = [];
@@ -153,8 +153,10 @@ export function handTransfer(target, source, { matchGripSpacing = true, continuo
       }
       target.updateMatrixWorld(true);
       if (contact) {
+        const requiredGap = contact.margin + Math.max(0, contactOpening());
         for (let iteration = 0; iteration < 8; iteration++) {
-          const { axis, correction } = contact.measure();
+          const { axis, gap } = contact.measure();
+          const correction = Math.max(0, requiredGap - gap);
           if (correction < contact.margin * 0.01) break;
           for (const [index, sign] of [1, -1].entries()) {
             const wrist = hands[index].target.wrist;

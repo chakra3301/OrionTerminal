@@ -6,8 +6,8 @@ import { expect, it } from "vitest";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import manifest from "../../../public/characters/manifest.json";
-import { BUILTIN_CHARACTERS, DEFAULT_CHARACTER_ID, resolveClips } from "./catalog";
-import { cloneCharacter, characterBones, HorizontalRootAnchor } from "./modelInstance";
+import { BUILTIN_CHARACTERS, DEFAULT_CHARACTER_ID, resolveClips, versionedCharacterUrl } from "./catalog";
+import { cloneCharacter, characterBones, fitCharacter, HorizontalRootAnchor } from "./modelInstance";
 import { CompanionAnimator } from "./companionAnimator";
 
 // Palm normals sampled from the original Mixamo Texting donor, in the library's +Y-up coordinates.
@@ -29,16 +29,19 @@ const acceptedTexting: Record<string, string> = {
   "angelic-winged-figure": "d1e651ba3c2dc4d92977f87b1053f12120699fa6721f1158a3dec68f76b60616",
   "stylized-humanoid-robot": "5a47077fe0a8e00b4822bdec8e5cc84a4fad40f6ef972fe1b07cc0f5b40e2fe4",
   "pigtail-character": "cbaee919e02cf9c6694ffffcc340798cbfa75b50b03e8bd56cd609a6ec267218",
+  "rosie-stylized": "8abff70a727704c11ca0eadb23c76abd828b9e365cbb092eacd39e71f45b8707",
 };
 
-it("ships six independent skinned companions whose 120 clips bind and deform real geometry", async () => {
+it("ships seven independent skinned companions whose 140 clips bind and deform real geometry", async () => {
   expect(manifest.defaultCharacter).toBe(DEFAULT_CHARACTER_ID);
   expect(manifest.defaultAnimation).toBe("Texting While Standing");
   expect(BUILTIN_CHARACTERS.map((c) => c.id)).toEqual(manifest.characters.map((c) => c.id));
+  const animated = manifest.characters.filter((character) => character.animationCount > 0);
+  expect(animated).toHaveLength(7);
   const loader = new GLTFLoader();
   // Texture decoding requires a browser; these checks exercise the actual mesh, rig and motion data.
   loader.register(() => ({ name: "EXT_texture_webp", loadTexture: async () => new THREE.Texture() }));
-  for (const character of manifest.characters) {
+  for (const character of animated) {
     const bytes = readFileSync(resolve("public", character.model.slice(1)));
     expect(bytes.byteLength).toBe(character.bytes);
     expect(createHash("sha256").update(bytes).digest("hex")).toBe(character.sha256);
@@ -55,8 +58,8 @@ it("ships six independent skinned companions whose 120 clips bind and deform rea
       for (const array of [track.times, track.values]) textingHash.update(new Uint8Array(array.buffer, array.byteOffset, array.byteLength));
     }
     expect(textingHash.digest("hex")).toBe(acceptedTexting[character.id]);
-    expect(character.handRetarget.correctedClips).toBe(19);
-    expect(character.handRetarget.acceptedTextingPreserved).toBe(true);
+    expect(character.handRetarget?.correctedClips).toBe(19);
+    expect(character.handRetarget?.acceptedTextingPreserved).toBe(true);
     expect(resolveClips(gltf.animations.map((clip) => clip.name))).toEqual({ idle: "Texting While Standing", select: "Standing Greeting" });
     const scene = cloneCharacter(gltf.scene);
     const hips = characterBones(scene).hips;
@@ -110,9 +113,9 @@ it("ships six independent skinned companions whose 120 clips bind and deform rea
       expect(delta.angleTo(new THREE.Quaternion())).toBeGreaterThan(0.3);
       expect(Math.abs(axis.dot(check.axis))).toBeGreaterThan(0.95);
     }
-    expect(character.textingRetarget.method).toBe("source-anatomical-hand-frame-v2");
-    const partial = character.id === "horned-demon";
-    expect(character.textingRetarget.fullFingerRig).toBe(!partial);
+    expect(character.textingRetarget?.method).toBe("source-anatomical-hand-frame-v2");
+    const partial = character.id === "horned-demon" || character.id === "rosie-stylized";
+    expect(character.textingRetarget?.fullFingerRig).toBe(!partial);
     const joint = (side: string, digit: string) => meshes[0]!.skeleton.bones.find((bone) =>
       bone.name === `${digit}_${side}` || bone.name === `mixamorig${side === "l" ? "Left" : "Right"}Hand${digit === "hand" ? "" : digit === "index_01" ? "Index1" : digit === "thumb_01" ? "Thumb1" : "Pinky1"}`)!;
     for (const sample of textingPalms) {
@@ -149,3 +152,56 @@ it("ships six independent skinned companions whose 120 clips bind and deform rea
     animator.dispose();
   }
 }, 20_000);
+
+it("preserves Rosie's matte styling and keeps her closed gloves bound to wrists without invented finger deformations", async () => {
+  const character = manifest.characters.find((entry) => entry.id === "rosie-stylized")!;
+  const bytes = readFileSync(resolve("public", character.model.slice(1)));
+  expect(bytes.length).toBe(character.bytes);
+  expect(createHash("sha256").update(bytes).digest("hex")).toBe(character.sha256);
+  expect(bytes.length).toBeLessThan(8_000_000);
+  expect(character.animationCount).toBe(20);
+  expect(character.boneCount).toBe(41);
+  expect(versionedCharacterUrl(character.model)).toContain(character.sha256.slice(0, 12));
+  const document = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
+  expect(document.skins).toHaveLength(1);
+  expect(document.animations).toHaveLength(20);
+  const primitive = document.meshes[0].primitives[0];
+  expect(document.accessors[primitive.indices].count / 3).toBeGreaterThan(75_000);
+  expect(document.accessors[primitive.indices].count / 3).toBeLessThanOrEqual(80_000);
+  const material = document.materials[primitive.material];
+  expect(material.pbrMetallicRoughness.metallicFactor).toBe(0);
+  expect(material.pbrMetallicRoughness.roughnessFactor).toBeCloseTo(0.88);
+  expect(material.normalTexture).toBeUndefined();
+  const loader = new GLTFLoader();
+  loader.register(() => ({ name: "EXT_texture_webp", loadTexture: async () => new THREE.Texture() }));
+  const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "");
+  const scene = cloneCharacter(gltf.scene);
+  expect(scene).not.toBe(gltf.scene);
+  const weighted = new Set<THREE.Bone>();
+  scene.traverse((node) => {
+    const mesh = node as THREE.SkinnedMesh;
+    if (!mesh.isSkinnedMesh) return;
+    const joints = mesh.geometry.attributes.skinIndex!, weights = mesh.geometry.attributes.skinWeight!;
+    for (let index = 0; index < joints.count; index++) {
+      let total = 0;
+      for (let slot = 0; slot < 4; slot++) {
+        const weight = weights.getComponent(index, slot); total += weight;
+        if (weight > 0) weighted.add(mesh.skeleton.bones[joints.getComponent(index, slot)]!);
+      }
+      expect(total).toBeCloseTo(1, 3);
+    }
+  });
+  expect(weighted.size).toBeGreaterThan(15);
+  expect([...weighted].some((bone) => /Hand(?:Index|Thumb)/.test(bone.name))).toBe(false);
+  expect([...weighted].some((bone) => /LeftHand$/.test(bone.name))).toBe(true);
+  expect([...weighted].some((bone) => /RightHand$/.test(bone.name))).toBe(true);
+  const fit = fitCharacter(scene, 1.7);
+  expect(fit.scale).toBeGreaterThan(0);
+  expect([fit.center.x, fit.center.y, fit.center.z, fit.scale].every(Number.isFinite)).toBe(true);
+  const animator = new CompanionAnimator(scene, gltf.animations);
+  expect(animator.idleName).toBe("Texting While Standing");
+  animator.queue("Clapping");
+  expect(() => animator.update(180, true)).not.toThrow();
+  expect(gltf.animations.find((clip) => clip.name === "Angry")!.duration).toBeGreaterThan(15);
+  animator.dispose();
+});

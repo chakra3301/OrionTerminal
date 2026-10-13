@@ -29,11 +29,26 @@ for (const entry of index.characters) {
   manifest.characters.push({ id: entry.id, name: entry.name, model: `/characters/${entry.id}.glb`, sha256: hash, bytes: data.length, boneCount: character.boneCount, weightedBoneGroups: character.weightedBoneGroups, animationCount: 20, sourceFilename: character.sourceFilename, rigSource: character.rigSource, fingerRetarget: character.fingerRetarget, textingRetarget: character.textingRetarget, handRetarget: character.handRetarget, animations: character.animations });
 }
 
+// Rebuilding the original six must retain companions installed separately.
+const manifestPath = path.join(out, "manifest.json");
+const existing = await readFile(manifestPath, "utf8").catch((error) => {
+  if (error.code !== "ENOENT") throw error;
+  return null;
+});
+if (existing) {
+  for (const character of JSON.parse(existing).characters) {
+    if (manifest.characters.some((entry) => entry.id === character.id)) continue;
+    if (!/^[a-z0-9-]+$/.test(character.id) || character.model !== `/characters/${character.id}.glb`) throw new Error("Invalid retained companion");
+    const data = await readFile(path.join(out, `${character.id}.glb`));
+    if (data.length !== character.bytes || createHash("sha256").update(data).digest("hex") !== character.sha256) throw new Error(`Retained companion changed: ${character.id}`);
+    manifest.characters.push(character);
+  }
+}
+
 for (const { source, destination } of validated) {
   await copyFile(source, destination + ".tmp");
   await rename(destination + ".tmp", destination);
 }
-const manifestPath = path.join(out, "manifest.json");
 await writeFile(manifestPath + ".tmp", JSON.stringify(manifest, null, 2) + "\n");
 await rename(manifestPath + ".tmp", manifestPath);
-console.log(`Installed ${manifest.characters.length} verified companions with 20 animations each`);
+console.log(`Installed six verified animated companions; ${manifest.characters.length} total companions retained`);
