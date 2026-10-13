@@ -79,3 +79,37 @@ test("matches a reachable grip position by bending the elbow without stretching 
   assert.ok(point(wrist).length() <= 1.8);
   assert.ok(wrist.quaternion.toArray().every(Number.isFinite));
 });
+
+test("keeps the bend plane continuous when the authored elbow crosses the contact axis", () => {
+  const root = new THREE.Group(), upper = new THREE.Bone(), lower = new THREE.Bone(), wrist = new THREE.Bone();
+  root.add(upper); upper.add(lower); lower.add(wrist);
+  lower.position.set(1, 0, 0); wrist.position.set(0.8, 0, 0); upper.rotation.z = 0.2;
+  root.updateMatrixWorld(true);
+  const target = new THREE.Vector3(1.5, 0, 0);
+  const previous = solveTwoBoneArm(wrist, target);
+  upper.rotation.z = -0.2; lower.quaternion.identity(); root.updateMatrixWorld(true);
+  const next = solveTwoBoneArm(wrist, target, previous);
+  assert.ok(previous.dot(next) > 0.999);
+  assert.ok(lower.getWorldPosition(new THREE.Vector3()).y > 0);
+  assert.ok(wrist.getWorldPosition(new THREE.Vector3()).distanceTo(target) < 1e-7);
+});
+
+test("corrects palm rotation for a wave without moving its wrist or changing authored arms", () => {
+  const source = rig(0), target = rig(Math.PI / 2);
+  const root = new THREE.Group();
+  for (const wrist of [...target.children]) {
+    const upper = new THREE.Bone(), lower = new THREE.Bone(); root.add(upper); upper.add(lower); lower.add(wrist);
+    lower.position.set(0.3, 0, 0); wrist.position.set(0.2, 0, 0); upper.rotation.z = 0.8; lower.rotation.y = 0.2;
+  }
+  root.updateMatrixWorld(true);
+  const wrists = root.children.map((upper) => upper.children[0].children[0]);
+  const positions = wrists.map((bone) => bone.getWorldPosition(new THREE.Vector3()));
+  const authored = root.children.flatMap((upper) => [upper.quaternion.clone(), upper.children[0].quaternion.clone()]);
+  const transfer = handTransfer(root, source, { matchGripSpacing: false }); transfer.apply();
+  assert.equal(transfer.arms.length, 0);
+  for (const [index, wrist] of wrists.entries()) {
+    assert.ok(wrist.getWorldPosition(new THREE.Vector3()).distanceTo(positions[index]) < 1e-7);
+    assert.ok(root.children[index].quaternion.angleTo(authored[index * 2]) < 1e-7);
+    assert.ok(root.children[index].children[0].quaternion.angleTo(authored[index * 2 + 1]) < 1e-7);
+  }
+});

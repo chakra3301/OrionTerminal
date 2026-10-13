@@ -17,6 +17,20 @@ const textingPalms = [
   { time: 20, palms: [[0.85308038, -0.16920221, 0.4935833], [0.79273858, -0.5796176, -0.18870342]], thumbs: [[-0.85656691, 0.16001659, -0.49059944], [-0.73898088, 0.67306552, -0.02983379]] },
 ];
 
+const gesturePalms = [
+  { name: "Clapping", palms: [[0.99875281, 0.03861966, -0.03164396], [0.96075064, -0.07237206, -0.26780681]], thumbs: [[-0.9981927, -0.04554493, 0.03920451], [-0.98220619, 0.18084497, 0.05065662]] },
+  { name: "Standing Greeting", palms: [[0.9305322, 0.34931968, 0.10993442], [0.3303672, -0.04436489, 0.94280925]], thumbs: [[-0.92831458, -0.35203923, -0.11958434], [-0.12092896, -0.0708628, -0.9901286]] },
+];
+
+const acceptedTexting: Record<string, string> = {
+  "anthropomorphic-fox": "ff4760e477a6e5e8d1f5386d9f2752604592da559d9c7138915a3deaf7311671",
+  "horned-demon": "496d0527d8f382ec90597e6357dc5e32a1700c88c0d91781523f90ce951d035d",
+  "mushroom-character": "ff3cca8206b306bce6c24207dceeb5da6747f7047d0f0fb09bd8eab43edf542f",
+  "angelic-winged-figure": "d1e651ba3c2dc4d92977f87b1053f12120699fa6721f1158a3dec68f76b60616",
+  "stylized-humanoid-robot": "5a47077fe0a8e00b4822bdec8e5cc84a4fad40f6ef972fe1b07cc0f5b40e2fe4",
+  "pigtail-character": "cbaee919e02cf9c6694ffffcc340798cbfa75b50b03e8bd56cd609a6ec267218",
+};
+
 it("ships six independent skinned companions whose 120 clips bind and deform real geometry", async () => {
   expect(manifest.defaultCharacter).toBe(DEFAULT_CHARACTER_ID);
   expect(manifest.defaultAnimation).toBe("Texting While Standing");
@@ -35,6 +49,14 @@ it("ships six independent skinned companions whose 120 clips bind and deform rea
     const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "");
     expect(gltf.animations.map((clip) => clip.name)).toEqual(character.animations.map((clip) => clip.name));
     expect(gltf.animations).toHaveLength(20);
+    const textingHash = createHash("sha256");
+    for (const track of gltf.animations.find((clip) => clip.name === "Texting While Standing")!.tracks) {
+      textingHash.update(track.name);
+      for (const array of [track.times, track.values]) textingHash.update(new Uint8Array(array.buffer, array.byteOffset, array.byteLength));
+    }
+    expect(textingHash.digest("hex")).toBe(acceptedTexting[character.id]);
+    expect(character.handRetarget.correctedClips).toBe(19);
+    expect(character.handRetarget.acceptedTextingPreserved).toBe(true);
     expect(resolveClips(gltf.animations.map((clip) => clip.name))).toEqual({ idle: "Texting While Standing", select: "Standing Greeting" });
     const scene = cloneCharacter(gltf.scene);
     const hips = characterBones(scene).hips;
@@ -105,6 +127,24 @@ it("ships six independent skinned companions whose 120 clips bind and deform rea
       }
       const points = Array.from({ length: 32 }, (_, i) => meshes[0]!.getVertexPosition(Math.floor(i * meshes[0]!.geometry.attributes.position!.count / 32), new THREE.Vector3()));
       expect(points.every((point) => [point.x, point.y, point.z].every(Number.isFinite))).toBe(true);
+    }
+    for (const sample of gesturePalms) {
+      const clip = gltf.animations.find((clip) => clip.name === sample.name)!;
+      animator.update(0, true, sample.name);
+      animator.mixer.setTime(clip.duration / 2);
+      scene.updateMatrixWorld(true);
+      for (const [index, side] of ["l", "r"].entries()) {
+        const point = (bone: THREE.Bone) => bone.getWorldPosition(new THREE.Vector3());
+        const wrist = point(joint(side, "hand"));
+        const normal = point(joint(side, "index_01")).sub(wrist).cross(point(joint(side, partial ? "thumb_01" : "pinky_01")).sub(wrist)).normalize();
+        expect(normal.dot(new THREE.Vector3().fromArray((partial ? sample.thumbs : sample.palms)[index]!))).toBeGreaterThan(0.999);
+      }
+    }
+    const clap = gltf.animations.find((clip) => clip.name === "Clapping")!;
+    for (const track of clap.tracks.filter((track) => /(?:arm|hand)(?:_[lr])?\.quaternion$/i.test(track.name))) {
+      for (let offset = 4; offset < track.values.length; offset += 4) {
+        expect(new THREE.Quaternion().fromArray(track.values, offset - 4).angleTo(new THREE.Quaternion().fromArray(track.values, offset))).toBeLessThan(Math.PI / 4);
+      }
     }
     animator.dispose();
   }

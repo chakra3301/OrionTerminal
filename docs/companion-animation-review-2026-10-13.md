@@ -4,6 +4,15 @@ Reviewed the 19 non-Texting clips on all six companions at commit `1cb4a9a`.
 The accepted Texting repair remains intact. This review changes no models,
 animation tracks, triggers or production UI.
 
+**Follow-up:** The remaining gesture hand angles have since been repaired with
+anatomical wrist/finger transfer. Full hand rigs also receive contact-specific
+spacing correction for clapping. All six receive a mesh-based contact limit,
+verified at 120 Hz between baked keys; Demon uses its original wrist paths as
+the reference instead of donor spacing.
+The accepted Texting tracks are preserved exactly. The Angry source and kneeling
+grounding issues below remain outstanding. The findings and screenshots in this
+document describe the original audited state at `1cb4a9a`.
+
 The library needs further repair. The largest issues are the wrong Angry motion,
 hand orientation in gesture clips, and grounding in Kneeling Pointing.
 

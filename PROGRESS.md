@@ -1,3 +1,15 @@
+## 2026-10-13 — Codex / Gesture palm orientation and clap contact repaired
+
+**Branch:** `validation/alpha-2026-09-14`. Owner confirmed the palm angles looked better, then reported the clapping hands passing through each other. Companion commit/push authorization continues; paused-session work stays preserved and excluded.
+
+**Changed:** Extended anatomical wrist/finger transfer to all 19 non-Texting clips on six characters. Clapping/Sitting Clap and the currently mislabeled Angry clip use actual skinned palm/finger surfaces to keep the hands on opposite anatomical sides. Stable downward elbow bends and 60 Hz contact keys prevent crossings between keys; the limit preserves reopening. Full hand rigs begin from donor wrist spacing; Demon begins from its original wrist paths and receives the surface constraint without donor spacing. Other gestures retain their arm positions. Updated six hashed GLBs, manifest provenance, installer, reproducible gesture repair and documentation. Accepted Texting channel definitions and sample bytes remain exact; all mesh/skin/texture/bone definitions, non-hand body channels and non-contact arm channels are preserved. Ragdoll remains removed.
+
+**Verified:** 19 focused Vitest tests/six files, 11 Node tests and `npm run typecheck` pass. Real-asset regressions preserve all six accepted Texting hashes, compare clapping/waving palm normals with the donor, bound clapping rotation steps and replay all 18 contact clips at 120 Hz, including samples between baked keys. Selected hand surfaces stay separated and reopen on every rig; smallest gap is about 1.35 mm. All 114 non-Texting character/clip pairs sampled at seven points remain finite and within about one degree of donor palm orientation. Browser comparisons show corrected waves, pointing, surprised gestures and clapping; all 18 final contact reactions return to full-weight Texting. Updated result gallery is left open at `scripts/characters-src/companion-hand-library-2026-10-13/gallery.html`. All pre-existing dirty-file hashes match the baseline; no dependencies, migrations, tokens or native build/install.
+
+**Next / limitations:** Owner trial of the final contact correction. The audit's wrong Angry download and kneeling-grounding issues remain separate repairs; Demon's independent five-finger motion still requires reskinning. Preserved Blender masters predate the baked repair; import the corrected GLBs or run the documented repair pipeline. No design-token gap. Commit and push only this companion patch and this progress entry.
+
+---
+
 ## 2026-10-13 — Codex / Other companion animations reviewed
 
 **Branch:** `validation/alpha-2026-09-14`. Owner asked to check the remaining animations after accepting Texting. This pass reviews all 19 other clips on six characters; no GLBs, runtime source, triggers or accepted Texting tracks changed. Companion commit/push authorization continues for the review documentation, excluding paused-session work.

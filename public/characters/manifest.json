@@ -11,8 +11,8 @@
       "id": "anthropomorphic-fox",
       "name": "Fox",
       "model": "/characters/anthropomorphic-fox.glb",
-      "sha256": "aa3d12d3eefc96cb2035a2c1b3267e07e76ab07e326b3802ba5564e987519af7",
-      "bytes": 6631196,
+      "sha256": "dd6dec77eb4e0cb556b830a320042155414a25a10096a47b04a8c32516fc8059",
+      "bytes": 8510396,
       "boneCount": 61,
       "weightedBoneGroups": 60,
       "animationCount": 20,
@@ -27,6 +27,21 @@
         "method": "source-anatomical-hand-frame-v2",
         "rotationChannels": 36,
         "fullFingerRig": true
+      },
+      "handRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "correctedClips": 19,
+        "acceptedTextingPreserved": true,
+        "contactSpacingClips": [
+          "Clapping",
+          "Sitting Clap",
+          "Angry"
+        ],
+        "sourceSpacingClips": [
+          "Clapping",
+          "Sitting Clap",
+          "Angry"
+        ]
       },
       "animations": [
         {
@@ -235,8 +250,8 @@
       "id": "horned-demon",
       "name": "Demon",
       "model": "/characters/horned-demon.glb",
-      "sha256": "faa61389b1e3daae766035967f9aa04a4439e8489f5c575206286d78a43c29c8",
-      "bytes": 5060232,
+      "sha256": "69879b072b7dc0112318f52bcd82c5635c224fe43601411c3cc0cc1b1102eab6",
+      "bytes": 6146108,
       "boneCount": 41,
       "weightedBoneGroups": 34,
       "animationCount": 20,
@@ -251,6 +266,17 @@
         "method": "source-anatomical-hand-frame-v2",
         "rotationChannels": 22,
         "fullFingerRig": false
+      },
+      "handRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "correctedClips": 19,
+        "acceptedTextingPreserved": true,
+        "contactSpacingClips": [
+          "Clapping",
+          "Sitting Clap",
+          "Angry"
+        ],
+        "sourceSpacingClips": []
       },
       "animations": [
         {
@@ -459,8 +485,8 @@
       "id": "mushroom-character",
       "name": "Mushroom character",
       "model": "/characters/mushroom-character.glb",
-      "sha256": "b66b677174b4f17fccf039938bb266ba20cbab06ea39d644e9533859516602f7",
-      "bytes": 6266820,
+      "sha256": "4ec5b577011256959a897edac4f881040e22ea9e8cfad6fad1685b8bbd8a2a70",
+      "bytes": 8711664,
       "boneCount": 65,
       "weightedBoneGroups": 52,
       "animationCount": 20,
@@ -475,6 +501,21 @@
         "method": "source-anatomical-hand-frame-v2",
         "rotationChannels": 46,
         "fullFingerRig": true
+      },
+      "handRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "correctedClips": 19,
+        "acceptedTextingPreserved": true,
+        "contactSpacingClips": [
+          "Clapping",
+          "Sitting Clap",
+          "Angry"
+        ],
+        "sourceSpacingClips": [
+          "Clapping",
+          "Sitting Clap",
+          "Angry"
+        ]
       },
       "animations": [
         {
@@ -683,8 +724,8 @@
       "id": "angelic-winged-figure",
       "name": "Angelic Winged Figure",
       "model": "/characters/angelic-winged-figure.glb",
-      "sha256": "c0b26fb376d93362b33c29a008e49ce6b6907d0dee947af8568bd05992678c5d",
-      "bytes": 6565108,
+      "sha256": "cdd174b54727c3250261aa03a9c373bfb722849f0a831e767f674ed7dfaf0924",
+      "bytes": 8444196,
       "boneCount": 61,
       "weightedBoneGroups": 60,
       "animationCount": 20,
@@ -699,6 +740,21 @@
         "method": "source-anatomical-hand-frame-v2",
         "rotationChannels": 36,
         "fullFingerRig": true
+      },
+      "handRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "correctedClips": 19,
+        "acceptedTextingPreserved": true,
+        "contactSpacingClips": [
+          "Clapping",
+          "Sitting Clap",
+          "Angry"
+        ],
+        "sourceSpacingClips": [
+          "Clapping",
+          "Sitting Clap",
+          "Angry"
+        ]
       },
       "animations": [
         {
@@ -907,8 +963,8 @@
       "id": "stylized-humanoid-robot",
       "name": "Stylized Humanoid Robot",
       "model": "/characters/stylized-humanoid-robot.glb",
-      "sha256": "e65ce7444fee9feb99ba3ff6c34f385bb5d863a424ea9ed30dd3d550a2a56d94",
-      "bytes": 6401408,
+      "sha256": "73cdfb9fa02f34ad66500543d98bcf4a6a49dd313b14db1bfe18e1586911087f",
+      "bytes": 8279980,
       "boneCount": 61,
       "weightedBoneGroups": 59,
       "animationCount": 20,
@@ -923,6 +979,21 @@
         "method": "source-anatomical-hand-frame-v2",
         "rotationChannels": 36,
         "fullFingerRig": true
+      },
+      "handRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "correctedClips": 19,
+        "acceptedTextingPreserved": true,
+        "contactSpacingClips": [
+          "Clapping",
+          "Sitting Clap",
+          "Angry"
+        ],
+        "sourceSpacingClips": [
+          "Clapping",
+          "Sitting Clap",
+          "Angry"
+        ]
       },
       "animations": [
         {
@@ -1131,8 +1202,8 @@
       "id": "pigtail-character",
       "name": "Pigtail Character",
       "model": "/characters/pigtail-character.glb",
-      "sha256": "a4f6cb39f7de63aeacc387c7e95d189d5e661a65322ad1b63cd36b330090767e",
-      "bytes": 6564444,
+      "sha256": "9cc952c0e8d2221fa37277a3d5e1481d80acd532321d83b9979987c2adb71ad9",
+      "bytes": 9009252,
       "boneCount": 65,
       "weightedBoneGroups": 52,
       "animationCount": 20,
@@ -1147,6 +1218,21 @@
         "method": "source-anatomical-hand-frame-v2",
         "rotationChannels": 46,
         "fullFingerRig": true
+      },
+      "handRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "correctedClips": 19,
+        "acceptedTextingPreserved": true,
+        "contactSpacingClips": [
+          "Clapping",
+          "Sitting Clap",
+          "Angry"
+        ],
+        "sourceSpacingClips": [
+          "Clapping",
+          "Sitting Clap",
+          "Angry"
+        ]
       },
       "animations": [
         {

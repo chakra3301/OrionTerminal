@@ -42,8 +42,20 @@ preserving bone lengths and the gesture's original center. The old runtime
 relaxed-finger substitution is removed. These corrected tracks live in the GLBs,
 so the companion, picker, clip tester and Blender imports share the same grip.
 Built-in model URLs include their manifest hash so repaired files replace stale
-loader-cache entries. Other clips, Texting's remaining body movement, meshes,
-textures and skin weights stay intact.
+loader-cache entries. The accepted Texting tracks are preserved exactly.
+
+The remaining 19 clips now transfer wrist orientation and local finger bends in
+the same anatomical frames. Waving exposes the palm, pointing retains its grip,
+and clapping turns the palms toward each other. Clapping and Sitting Clap also
+match donor wrist spacing at each full hand rig's proportions. A mesh-based contact
+limit keeps the palms/fingers on their anatomical sides, using the actual skinned
+hand surfaces rather than the source's thin human hands. Stable downward elbow
+bends and contact keys sampled at 60 Hz prevent crossings between keys. The
+currently mislabeled Angry source uses the same seated-clap contact treatment.
+Other gestures keep their authored arm positions. Demon uses its authored wrist
+paths as the contact reference, without donor spacing, and receives the same
+surface limit. Meshes, textures, skin weights, timing and other body channels
+are preserved; only the three contact clips adjust arm rotations.
 
 Spotlight's **Companion: Test Animation Clips** command opens the existing clip tester.
 It exposes all 20 clips for the selected character and resets to the first clip
@@ -54,15 +66,20 @@ The packed Blender masters, source models and downloaded motion files remain
 local under the ignored `scripts/characters-src/` directory. Fox, Angel and Robot
 retain their original Tripo bones and skin weights. Their finger rotation keys
 now transfer bends in each hand's anatomical bind frame: the donor and target
-palms differ by roughly 90 degrees, which previously curled fingers sideways,
-especially during Texting. All 20 clips receive the correction; mesh, skin,
-textures, body motion and animation timing stay unchanged.
+palms differ by roughly 90 degrees, which previously curled fingers sideways
+and presented the backs or edges of hands during gestures. All 20 clips now
+receive anatomical hand transfer while retaining their original rigs and weights.
 
-Texting's correction also covers the three Mixamo rigs. Demon has only thumb and index chains on
-each hand; its original download contains bones but no usable finger skin
+The correction also covers the three Mixamo rigs. Demon has only thumb and index
+chains on each hand; its original download contains bones but no usable finger skin
 weights. Independent motion for all five fingers would require reskinning that
 character. Mushroom's original skin was malformed, and Pigtail's supplied FBX
 had no skeleton.
+
+The [dated animation audit](companion-animation-review-2026-10-13.md) records the
+original issues. Hand orientation is now repaired. Its separate Angry-download
+and kneeling-grounding findings remain outstanding; hand-angle corrections cannot
+replace a mislabeled source motion or establish floor contact.
 
 To regenerate the corrected library from the preserved canonical models and
 cached donor FBX, then reinstall its verified runtime files:
@@ -70,11 +87,12 @@ cached donor FBX, then reinstall its verified runtime files:
 ```sh
 node scripts/repair-companion-fingers.mjs
 node scripts/repair-companion-texting.mjs
+node scripts/repair-companion-gestures.mjs
 node scripts/install-companion-library.mjs
 ```
 
 The installer checks all six hashes and their mesh/skin/clip contract before
 copying any model. An optional first argument selects another library index.
-The current index lives in `scripts/characters-src/companion-texting-repair-2026-10-13/`.
+The current index lives in `scripts/characters-src/companion-hand-library-2026-10-13/`.
 The original Blender masters predate this correction; import the corrected GLBs
 for their updated hand motion, or run the repair after rebuilding a library.

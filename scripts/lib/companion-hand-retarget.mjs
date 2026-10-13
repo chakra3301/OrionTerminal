@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { fingerIdentity } from "./companion-fingers.mjs";
+import { handContactGeometry } from "./companion-hand-contact.mjs";
 
 const normalize = (name) => name.toLowerCase().replace(/[^a-z0-9]/g, "");
 const rotation = (matrix) => {
@@ -65,9 +66,9 @@ export function handFrame(rest, side, secondDigit = "pinky") {
   return { wrist, local, fingers, palmLength };
 }
 
-export function solveTwoBoneArm(wrist, target) {
+export function solveTwoBoneArm(wrist, target, previousPole = null, preferredPole = null) {
   const lower = wrist.parent, upper = lower?.parent;
-  if (!lower?.isBone || !upper?.isBone) return;
+  if (!lower?.isBone || !upper?.isBone) return null;
   const position = (bone) => bone.getWorldPosition(new THREE.Vector3());
   const shoulder = position(upper), elbow = position(lower), hand = position(wrist);
   const a = shoulder.distanceTo(elbow), b = elbow.distanceTo(hand);
@@ -75,14 +76,18 @@ export function solveTwoBoneArm(wrist, target) {
   const axis = target.clone().sub(shoulder);
   const distance = THREE.MathUtils.clamp(axis.length(), Math.abs(a - b) + 1e-7, a + b - 1e-7);
   axis.normalize();
-  const pole = elbow.clone().sub(shoulder);
+  const pole = preferredPole?.clone() ?? elbow.clone().sub(shoulder);
   pole.addScaledVector(axis, -pole.dot(axis));
+  const previous = previousPole?.clone().addScaledVector(axis, -previousPole.dot(axis));
+  if (previous?.lengthSq() > 1e-12 && pole.lengthSq() < a * a * 1e-6) pole.copy(previous);
   if (pole.lengthSq() < 1e-12) {
     pole.set(0, 0, 1).applyQuaternion(upper.getWorldQuaternion(new THREE.Quaternion()));
     pole.addScaledVector(axis, -pole.dot(axis));
   }
   if (pole.lengthSq() < 1e-12) pole.set(1, 0, 0).cross(axis);
   pole.normalize();
+  // Near a straight arm, the authored elbow can cross the IK axis and reverse the bend plane.
+  if (previous?.lengthSq() > 1e-12 && pole.dot(previous) < 0) pole.negate();
   const cosine = THREE.MathUtils.clamp((a * a + distance * distance - b * b) / (2 * a * distance), -1, 1);
   const desiredElbow = shoulder.clone().addScaledVector(axis, a * cosine).addScaledVector(pole, a * Math.sqrt(1 - cosine * cosine));
   const upperTurn = new THREE.Quaternion().setFromUnitVectors(elbow.clone().sub(shoulder).normalize(), desiredElbow.sub(shoulder).normalize());
@@ -92,9 +97,10 @@ export function solveTwoBoneArm(wrist, target) {
   const lowerTurn = new THREE.Quaternion().setFromUnitVectors(position(wrist).sub(movedElbow).normalize(), target.clone().sub(movedElbow).normalize());
   lower.quaternion.copy(lower.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(lowerTurn).multiply(lower.getWorldQuaternion(new THREE.Quaternion())));
   lower.updateWorldMatrix(false, true);
+  return pole.clone();
 }
 
-export function handTransfer(target, source) {
+export function handTransfer(target, source, { matchGripSpacing = true, continuousElbows = false, limitContact = false } = {}) {
   const targetRest = bindTransforms(target);
   const sourceRest = bindTransforms(source);
   const hands = [];
@@ -106,21 +112,33 @@ export function handTransfer(target, source) {
     const landmark = hasPinky ? "pinky" : "thumb";
     hands.push({ target: handFrame(targetRest, side, landmark), source: handFrame(sourceRest, side, landmark) });
   }
-  const arms = hands.flatMap(({ target }) => target.wrist.parent?.isBone && target.wrist.parent.parent?.isBone
-    ? [target.wrist.parent.parent, target.wrist.parent] : []);
+  const arms = matchGripSpacing || limitContact ? hands.flatMap(({ target }) => target.wrist.parent?.isBone && target.wrist.parent.parent?.isBone
+    ? [target.wrist.parent.parent, target.wrist.parent] : []) : [];
   const bones = [...arms, ...hands.flatMap(({ target }) => [target.wrist, ...[...target.fingers.values()].map(({ bone }) => bone)])];
+  const poles = [null, null];
+  const contactPole = limitContact ? new THREE.Vector3(0, -1, 0) : null;
+  const contact = limitContact ? handContactGeometry(target, hands.map((hand) => hand.target), targetRest) : null;
   return {
-    bones, arms, fullFingerRig: hands.every(({ target }) => target.fingers.size >= 15),
+    bones, arms, contact, fullFingerRig: hands.every(({ target }) => target.fingers.size >= 15),
     apply() {
       source.updateMatrixWorld(true);
       target.updateMatrixWorld(true);
-      const position = (bone) => bone.getWorldPosition(new THREE.Vector3());
-      const center = position(hands[0].target.wrist).add(position(hands[1].target.wrist)).multiplyScalar(0.5);
-      const ratio = hands.reduce((sum, hand) => sum + hand.target.palmLength / hand.source.palmLength, 0) / 2;
-      const halfGrip = position(hands[0].source.wrist).sub(position(hands[1].source.wrist)).multiplyScalar(ratio / 2);
-      solveTwoBoneArm(hands[0].target.wrist, center.clone().add(halfGrip));
-      solveTwoBoneArm(hands[1].target.wrist, center.clone().sub(halfGrip));
-      target.updateMatrixWorld(true);
+      if (matchGripSpacing) {
+        const position = (bone) => bone.getWorldPosition(new THREE.Vector3());
+        const center = position(hands[0].target.wrist).add(position(hands[1].target.wrist)).multiplyScalar(0.5);
+        const ratio = hands.reduce((sum, hand) => sum + hand.target.palmLength / hand.source.palmLength, 0) / 2;
+        const halfGrip = position(hands[0].source.wrist).sub(position(hands[1].source.wrist)).multiplyScalar(ratio / 2);
+        for (const [index, sign] of [1, -1].entries()) {
+          poles[index] = solveTwoBoneArm(hands[index].target.wrist, center.clone().addScaledVector(halfGrip, sign), continuousElbows ? poles[index] : null, contactPole);
+        }
+        target.updateMatrixWorld(true);
+      } else if (contact) {
+        for (const [index, hand] of hands.entries()) {
+          const wrist = hand.target.wrist;
+          poles[index] = solveTwoBoneArm(wrist, wrist.getWorldPosition(new THREE.Vector3()), poles[index], contactPole);
+        }
+        target.updateMatrixWorld(true);
+      }
       for (const { target: to, source: from } of hands) {
         // Match the donor's anatomical palm, rather than its arbitrary bone roll or the camera direction.
         const world = from.wrist.getWorldQuaternion(new THREE.Quaternion()).multiply(from.local).multiply(to.local.clone().invert());
@@ -134,6 +152,22 @@ export function handTransfer(target, source) {
         }
       }
       target.updateMatrixWorld(true);
+      if (contact) {
+        for (let iteration = 0; iteration < 8; iteration++) {
+          const { axis, correction } = contact.measure();
+          if (correction < contact.margin * 0.01) break;
+          for (const [index, sign] of [1, -1].entries()) {
+            const wrist = hands[index].target.wrist;
+            const position = wrist.getWorldPosition(new THREE.Vector3()).addScaledVector(axis, sign * correction * 0.51);
+            poles[index] = solveTwoBoneArm(wrist, position, poles[index], contactPole);
+            const world = hands[index].source.wrist.getWorldQuaternion(new THREE.Quaternion())
+              .multiply(hands[index].source.local).multiply(hands[index].target.local.clone().invert());
+            wrist.quaternion.copy(wrist.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(world));
+          }
+          target.updateMatrixWorld(true);
+        }
+        if (contact.measure().gap < -contact.margin) throw new Error("Clapping surfaces cannot be separated within this arm rig");
+      }
     },
   };
 }

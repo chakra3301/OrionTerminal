@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const indexPath = process.argv[2] ?? "scripts/characters-src/companion-texting-repair-2026-10-13/all-six-companions-index.json";
+const indexPath = process.argv[2] ?? "scripts/characters-src/companion-hand-library-2026-10-13/all-six-companions-index.json";
 const indexFile = path.resolve(root, indexPath);
 const bundle = path.dirname(indexFile);
 const index = JSON.parse(await readFile(indexFile, "utf8"));
@@ -26,7 +26,7 @@ for (const entry of index.characters) {
   if (!character || doc.animations?.length !== 20 || doc.meshes?.length !== 1 || doc.skins?.length !== 1) throw new Error(`Invalid prepared asset: ${entry.id}`);
   if (JSON.stringify(doc.animations.map((clip) => clip.name)) !== JSON.stringify(character.animations.map((clip) => clip.name))) throw new Error(`Animation names differ: ${entry.id}`);
   validated.push({ source, destination: path.join(out, `${entry.id}.glb`) });
-  manifest.characters.push({ id: entry.id, name: entry.name, model: `/characters/${entry.id}.glb`, sha256: hash, bytes: data.length, boneCount: character.boneCount, weightedBoneGroups: character.weightedBoneGroups, animationCount: 20, sourceFilename: character.sourceFilename, rigSource: character.rigSource, fingerRetarget: character.fingerRetarget, textingRetarget: character.textingRetarget, animations: character.animations });
+  manifest.characters.push({ id: entry.id, name: entry.name, model: `/characters/${entry.id}.glb`, sha256: hash, bytes: data.length, boneCount: character.boneCount, weightedBoneGroups: character.weightedBoneGroups, animationCount: 20, sourceFilename: character.sourceFilename, rigSource: character.rigSource, fingerRetarget: character.fingerRetarget, textingRetarget: character.textingRetarget, handRetarget: character.handRetarget, animations: character.animations });
 }
 
 for (const { source, destination } of validated) {
