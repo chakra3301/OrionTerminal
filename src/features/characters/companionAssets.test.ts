@@ -9,7 +9,7 @@ import manifest from "../../../public/characters/manifest.json";
 import { BUILTIN_CHARACTERS, DEFAULT_CHARACTER_ID, resolveClips } from "./catalog";
 import { cloneCharacter, characterBones, HorizontalRootAnchor } from "./modelInstance";
 import { CompanionAnimator } from "./companionAnimator";
-import { CompanionRagdoll } from "./companionRagdoll";
+import { prepareCompanionAnimations } from "./companionHands";
 
 it("ships six independent skinned companions whose 120 clips bind and deform real geometry", async () => {
   expect(manifest.defaultCharacter).toBe(DEFAULT_CHARACTER_ID);
@@ -82,29 +82,20 @@ it("ships six independent skinned companions whose 120 clips bind and deform rea
       expect(delta.angleTo(new THREE.Quaternion())).toBeGreaterThan(0.3);
       expect(Math.abs(axis.dot(check.axis))).toBeGreaterThan(0.95);
     }
-    const body = new THREE.Group();
-    body.add(scene);
-    body.updateMatrixWorld(true);
-    const head = characterBones(scene).head!;
-    const headPose = head.quaternion.clone();
-    const grip = hips!.getWorldPosition(new THREE.Vector3());
-    const ragdoll = new CompanionRagdoll(scene, body);
-    ragdoll.setGrip(grip);
-    for (let frame = 0; frame < 450; frame++) {
-      ragdoll.restorePose();
-      ragdoll.capturePose();
-      ragdoll.update(1 / 30, true, 0.2, 0);
-    }
-    expect(hips!.getWorldPosition(new THREE.Vector3()).distanceTo(grip)).toBeLessThan(1e-6);
-    expect(head.quaternion.angleTo(headPose)).toBeLessThanOrEqual(0.451);
-    expect(head.quaternion.length()).toBeCloseTo(1);
-    for (let frame = 0; frame < 120; frame++) {
-      ragdoll.restorePose();
-      ragdoll.capturePose();
-      ragdoll.update(1 / 30, false, 0, 0);
-    }
-    expect(body.position.length()).toBeLessThan(0.001);
-    expect(head.quaternion.angleTo(headPose)).toBeLessThan(0.001);
     animator.dispose();
+    const prepared = prepareCompanionAnimations(gltf.animations);
+    const gentle = new CompanionAnimator(scene, prepared);
+    const fingerBones = meshes[0]!.skeleton.bones.filter((bone) => /index|middle|ring|pinky/i.test(bone.name));
+    gentle.update(0.5, true, "Texting While Standing");
+    const relaxed = fingerBones.map((bone) => bone.quaternion.clone());
+    for (const time of [3, 10, 20]) {
+      gentle.mixer.setTime(time);
+      scene.updateMatrixWorld(true);
+      meshes[0]!.skeleton.update();
+      for (const [i, bone] of fingerBones.entries()) expect(bone.quaternion.angleTo(relaxed[i]!)).toBeLessThan(0.001);
+      const points = Array.from({ length: 32 }, (_, i) => meshes[0]!.getVertexPosition(Math.floor(i * meshes[0]!.geometry.attributes.position!.count / 32), new THREE.Vector3()));
+      expect(points.every((point) => [point.x, point.y, point.z].every(Number.isFinite))).toBe(true);
+    }
+    gentle.dispose();
   }
 }, 20_000);

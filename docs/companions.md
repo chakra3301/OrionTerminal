@@ -27,13 +27,21 @@ companion's pose. Horizontal root travel is anchored in model space; vertical
 motion is retained. Hidden companions pause rendering and playback. Fidgets begin
 after 75 seconds of visible playback, then recur every 2–5 minutes while idle.
 
-Grabbing the character picks a body joint from the clicked mesh's skin weights.
-That surface point stays fixed under the cursor while gravity and damped,
-bounded joints make the body and limbs hang around it. Authored animation pauses
-during the hold, then resumes as the joints settle on release. The canvas has
-extra drawing room and passes clicks outside the companion through to the app.
-Bone offsets are restored before each mixer update so sparse clips cannot
-accumulate head or spine rotations.
+Dragging repositions the widget while its normal animation keeps playing.
+Fling-to-dismiss, hide, click-to-chat and long-hold chat suppression remain;
+there is no ragdoll or procedural body swing. The canvas has extra drawing room
+for motion clips and passes clicks outside the companion through to the app.
+Authored bone rotations are restored before each mixer update so sparse clips
+cannot accumulate procedural attention offsets.
+
+Texting keeps its authored body, wrist and arm movement. At runtime, its four
+finger chains use a relaxed pose sampled from each character's Sad Idle; thumbs
+retain 15% of the imported Texting movement. This avoids the tight human phone
+grip folding the stylized fingers into each other. The adjustment applies to all
+six companions, the picker and the clip tester without mutating shared GLB clips.
+The raw GLBs retain their authored finger tracks; Blender imports show those
+tracks unless this runtime adaptation is applied. Built-in model URLs include
+their manifest hash so repaired files replace stale loader-cache entries.
 
 Spotlight's **Companion: Test Animation Clips** command opens the existing clip tester.
 It exposes all 20 clips for the selected character and resets to the first clip

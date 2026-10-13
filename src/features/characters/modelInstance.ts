@@ -35,6 +35,25 @@ export function characterBones(scene: THREE.Object3D) {
   };
 }
 
+export class AuthoredBonePose {
+  private poses: { bone: THREE.Bone; quaternion: THREE.Quaternion }[] = [];
+
+  constructor(scene: THREE.Object3D) {
+    scene.traverse((node) => {
+      const bone = node as THREE.Bone;
+      if (bone.isBone) this.poses.push({ bone, quaternion: bone.quaternion.clone() });
+    });
+  }
+
+  restore() {
+    for (const pose of this.poses) pose.bone.quaternion.copy(pose.quaternion);
+  }
+
+  capture() {
+    for (const pose of this.poses) pose.quaternion.copy(pose.bone.quaternion);
+  }
+}
+
 export class HorizontalRootAnchor {
   private rest = new THREE.Vector3();
   private point = new THREE.Vector3();

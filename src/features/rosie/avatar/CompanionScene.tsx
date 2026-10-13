@@ -5,13 +5,13 @@ import {
   useRef,
 } from "react";
 import { CharacterModelBoundary } from "@/features/characters/CharacterModelBoundary";
-import { Canvas, events, useFrame, useThree, type CanvasProps, type ThreeEvent } from "@react-three/fiber";
+import { Canvas, events, useFrame, useThree, type CanvasProps } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import * as THREE from "three";
-import { cloneCharacter, fitCharacter, characterBones, HorizontalRootAnchor } from "@/features/characters/modelInstance";
+import { cloneCharacter, fitCharacter, characterBones, HorizontalRootAnchor, AuthoredBonePose } from "@/features/characters/modelInstance";
 import { CompanionAnimator } from "@/features/characters/companionAnimator";
-import { CompanionRagdoll } from "@/features/characters/companionRagdoll";
+import { prepareCompanionAnimations } from "@/features/characters/companionHands";
 import { CompanionRequestReactions } from "@/features/characters/companionRequests";
 import { useVoice } from "@/store/voiceStore";
 import { useRosie } from "@/features/rosie/rosieStore";
@@ -23,11 +23,12 @@ import { useCharacterStore } from "@/store/characterStore";
 import {
   BUILTIN_CHARACTERS,
   type Character,
+  versionedCharacterUrl,
 } from "@/features/characters/catalog";
 
 const FIT_HEIGHT = 1.7;
 const MODEL_FACING = 0;
-const OVERSCAN = 2.5;
+const OVERSCAN = 1.5;
 
 // Procedural attention stays separate from the authored motion clips.
 const LOOK_AROUND_MODES = new Set<CompanionMode>([
@@ -108,15 +109,15 @@ function Placeholder({ mode }: { mode: CompanionMode }) {
 }
 
 function CharacterCompanion({ url, mode }: { url: string; mode: CompanionMode }) {
-  const gltf = useGLTF(url);
+  const gltf = useGLTF(versionedCharacterUrl(url));
   const scene = useMemo(() => cloneCharacter(gltf.scene), [gltf.scene]);
+  const animations = useMemo(() => prepareCompanionAnimations(gltf.animations), [gltf.animations]);
   const frameWidth = useThree((s) => s.viewport.width);
   const fit = useMemo(() => fitCharacter(gltf.scene, FIT_HEIGHT, frameWidth * 0.8 / OVERSCAN), [gltf.scene, frameWidth]);
   const bones = useMemo(() => characterBones(scene), [scene]);
   const animator = useRef<CompanionAnimator | null>(null);
   const anchor = useRef<HorizontalRootAnchor | null>(null);
-  const swingRef = useRef<THREE.Group>(null);
-  const ragdoll = useRef<CompanionRagdoll | null>(null);
+  const pose = useMemo(() => new AuthoredBonePose(scene), [scene]);
   const visible = useRosie((s) => s.companionVisible);
   const motion = useRef({
     time: 0, lookW: 0, lastVisible: true, lastGesture: 0,
@@ -125,12 +126,11 @@ function CharacterCompanion({ url, mode }: { url: string; mode: CompanionMode })
   const lookQuat = useMemo(() => new THREE.Quaternion(), []);
 
   useEffect(() => {
-    const controller = new CompanionAnimator(scene, gltf.animations);
+    const controller = new CompanionAnimator(scene, animations);
     animator.current = controller;
     anchor.current = new HorizontalRootAnchor(scene, bones.hips);
     useCompanionDebug.getState().setNames(controller.names);
     motion.current.lastVisible = useRosie.getState().companionVisible;
-    if (swingRef.current) ragdoll.current = new CompanionRagdoll(scene, swingRef.current);
     const requests = new CompanionRequestReactions(useRosie.getState());
     const unsubscribe = useRosie.subscribe((state) => {
       const reactions = requests.observe(state);
@@ -142,11 +142,10 @@ function CharacterCompanion({ url, mode }: { url: string; mode: CompanionMode })
     return () => {
       unsubscribe();
       controller.dispose();
-      ragdoll.current = null;
       animator.current = null;
       anchor.current = null;
     };
-  }, [scene, gltf.animations, bones]);
+  }, [scene, animations, bones]);
 
   useEffect(() => {
     // Hidden canvases do not tick, so remember dismissal outside the frame loop.
@@ -169,13 +168,12 @@ function CharacterCompanion({ url, mode }: { url: string; mode: CompanionMode })
     }
     r.lastVisible = rosie.companionVisible;
     r.lastGesture = gesture;
-    const physics = ragdoll.current;
-    physics?.restorePose();
-    if (!dragState.dragging) controller.update(dt, mode === "idle", dbg.testMode ? dbg.names[dbg.index] ?? null : null);
+    pose.restore();
+    controller.update(dt, mode === "idle", dbg.testMode ? dbg.names[dbg.index] ?? null : null);
     anchor.current?.update();
-    physics?.capturePose();
+    pose.capture();
 
-    const lookTarget = !dbg.testMode && !dragState.dragging && !physics?.active && LOOK_AROUND_MODES.has(mode) ? 1 : 0;
+    const lookTarget = !dbg.testMode && !dragState.dragging && LOOK_AROUND_MODES.has(mode) ? 1 : 0;
     r.lookW += (lookTarget - r.lookW) * Math.min(1, dt * 2.5);
     if (r.lookW > 0.01 && bones.head) {
       const yaw = (Math.sin(t * 0.5) * 0.32 + Math.sin(t * 0.21) * 0.13) * r.lookW;
@@ -189,22 +187,13 @@ function CharacterCompanion({ url, mode }: { url: string; mode: CompanionMode })
         bones.neck.quaternion.multiply(lookQuat);
       }
     }
-    dragState.vx *= Math.exp(-dt * 7);
-    dragState.vy *= Math.exp(-dt * 7);
-    physics?.update(dt, dragState.dragging, dragState.vx, dragState.vy);
-
   });
 
   return (
-    <group ref={swingRef} name="companion-body">
+    <group name="companion-body" position={[0, 0, 0]} rotation={[0, 0, 0]}>
       <group rotation={[0, MODEL_FACING, 0]} scale={fit.scale}>
         <group position={[-fit.center.x, -fit.center.y, -fit.center.z]}>
-          <primitive object={scene} onPointerDown={(event: ThreeEvent<PointerEvent>) => {
-            const target = event.nativeEvent.target;
-            if (event.button !== 0 || (target instanceof Element && target.closest("[data-no-drag]"))) return;
-            ragdoll.current?.setGrip(event.point, (event.object as THREE.SkinnedMesh).isSkinnedMesh
-              ? event.object as THREE.SkinnedMesh : undefined, event.face);
-          }} />
+          <primitive object={scene} />
         </group>
       </group>
     </group>
@@ -317,4 +306,4 @@ export function CompanionScene({
 }
 
 const defaultCharacter = BUILTIN_CHARACTERS[0];
-if (defaultCharacter) useGLTF.preload(defaultCharacter.url);
+if (defaultCharacter) useGLTF.preload(versionedCharacterUrl(defaultCharacter.url));

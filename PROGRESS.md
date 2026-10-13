@@ -1,3 +1,15 @@
+## 2026-10-13 — Codex / Remove ragdoll and relax Texting hands
+
+**Branch:** `validation/alpha-2026-09-14`. Owner requested scrapping the ragdoll and reported the fingers still looked wrong mainly during Texting in the dev app. Companion commit/push authorization continues; unrelated dirty work is preserved and excluded.
+
+**Changed:** Deleted the articulated ragdoll and its tests. Dragging now moves the upright widget while normal playback continues; fling-to-dismiss, hide, click-to-chat, long-hold suppression, 60fps drag positioning and proactive drag suppression remain. Kept a small authored-bone rotation buffer to prevent attention offsets accumulating on sparse clips. Reduced excess canvas drawing room after removing body swinging. All six characters' runtime Texting clips now use their own relaxed Sad Idle finger pose with 15% of imported thumb motion; body, wrist, arm movement and other animations remain intact. Picker and clip tester use the same preparation without mutating cached clips. Built-in model loads use manifest-hash URL versions to replace stale loader-cache entries; custom URLs stay intact. Updated companion documentation. Raw GLBs and the prior offline axis repair are unchanged.
+
+**Verified:** 24 focused Vitest tests/seven files and `npm run typecheck` pass; four hand/pose/cache cases reran after a type-only guard correction. Actual six-rig Texting samples at 3/10/20 seconds keep relaxed fingers stable and geometry finite; all 120 authored clip bindings still pass. Browser hand comparisons cover all six characters. On `http://localhost:1420` (the dev frontend), dragging moves the widget while the body group's position/rotation stay zero during hold/release. No native build/install, dependencies, migrations, tokens or model-file changes. Native inspection selected an older installed app; it is not evidence for the owner's dev build.
+
+**Next / limitation:** Owner visual acceptance of the gentler Texting pose is pending; do not claim every rig defect is solved. Demon's original finger weights are unusable and its Mixamo hand rig still has only thumb/index chains, so clean independent five-finger motion needs reskinning. Original model files and Blender masters remain untouched. No new design-token gap. All paused-session files and its character-orb removal remain uncommitted and unchanged.
+
+---
+
 ## 2026-10-12 — Codex / Original-rig finger retargeting repaired
 
 **Branch:** `validation/alpha-2026-09-14`. Owner's companion commit/push authorization continues; unrelated dirty work remains preserved and excluded.

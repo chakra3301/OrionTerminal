@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef } from "react";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { resolveClips } from "./catalog";
+import { resolveClips, versionedCharacterUrl } from "./catalog";
 import { cloneCharacter, fitCharacter } from "./modelInstance";
+import { prepareCompanionAnimations } from "./companionHands";
 
 // One skinned character: clone (so the same cached GLB can render in several
 // canvases), normalize to a unit height standing on the floor, loop its idle,
@@ -21,7 +22,7 @@ export function CharacterModel({
   fitHeight?: number;
   onReady?: () => void;
 }) {
-  const gltf = useGLTF(url);
+  const gltf = useGLTF(versionedCharacterUrl(url));
   const group = useRef<THREE.Group>(null);
   const spin = useRef(0); // remaining extra spin (radians)
 
@@ -41,7 +42,8 @@ export function CharacterModel({
     };
   }, [scene, fitHeight]);
 
-  const { actions, names, mixer } = useAnimations(gltf.animations, scene);
+  const animations = useMemo(() => prepareCompanionAnimations(gltf.animations), [gltf.animations]);
+  const { actions, names, mixer } = useAnimations(animations, scene);
   const clips = useMemo(() => resolveClips(names), [names]);
 
   useEffect(() => {

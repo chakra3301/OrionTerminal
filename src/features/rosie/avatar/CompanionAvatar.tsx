@@ -100,8 +100,6 @@ export function CompanionAvatar() {
       };
       setDragging(true);
       dragState.dragging = true;
-      dragState.vx = 0;
-      dragState.vy = 0;
     },
     onDrag: (dx, dy) => {
       const now = performance.now();
@@ -114,9 +112,6 @@ export function CompanionAvatar() {
         drag.current.lastDy = dy;
       }
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) drag.current.moved = true;
-      // Feed the rig so she ragdolls toward the drag motion.
-      dragState.vx = drag.current.vx;
-      dragState.vy = drag.current.vy;
       // No clamp during the drag — she's allowed off-screen so she can be thrown.
       const next = { left: drag.current.left + dx, top: drag.current.top + dy };
       boxRef.current = next;
@@ -128,7 +123,6 @@ export function CompanionAvatar() {
     onEnd: () => {
       if (performance.now() - drag.current.startedAt > 250) drag.current.moved = true;
       setDragging(false);
-      // Released: the rig's spring keeps her momentum, then flops back upright.
       dragState.dragging = false;
       const stale = performance.now() - drag.current.lastT > VELOCITY_STALE_MS;
       const speed = stale ? 0 : Math.hypot(drag.current.vx, drag.current.vy);

@@ -1,3 +1,5 @@
+import manifest from "../../../public/characters/manifest.json";
+
 export type CharacterAccent = "cyan" | "green" | "magenta" | "violet" | "yellow";
 
 export type BuiltinCharacter = {
@@ -28,6 +30,11 @@ export type Character =
   | CustomCharacter;
 
 export const DEFAULT_CHARACTER_ID = "anthropomorphic-fox";
+
+export function versionedCharacterUrl(url: string) {
+  const asset = manifest.characters.find((character) => character.model === url);
+  return asset ? `${url}?v=${asset.sha256.slice(0, 12)}` : url;
+}
 
 export const BUILTIN_CHARACTERS: BuiltinCharacter[] = [
   {
