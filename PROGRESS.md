@@ -1,3 +1,15 @@
+## 2026-10-13 — Codex / Other companion animations reviewed
+
+**Branch:** `validation/alpha-2026-09-14`. Owner asked to check the remaining animations after accepting Texting. This pass reviews all 19 other clips on six characters; no GLBs, runtime source, triggers or accepted Texting tracks changed. Companion commit/push authorization continues for the review documentation, excluding paused-session work.
+
+**Found:** Angry duplicates Sitting Clap in all six GLBs; the cached FBX files also decode to identical animation tracks, so the source download must be replaced. Anatomical palm orientation remains roughly a quarter-turn from the donor on Fox/Angel/Robot/Pigtail outside Texting; Clapping/Sitting Clap show crossed wrists or forward-facing palms, and Surprised/Kneeling Pointing also need hand review. Kneeling grounding varies: Angel floats above its standing baseline; Fox's tail/body reaches below it. Sitting Clap/Falling remain context-dependent manual clips; Female Dynamic Pose retains its intentionally floating forward-bent pose and requested fidget mapping. Demon's partial thumb/index hand rig still needs reskinning for independent five-finger motion.
+
+**Verified / artifacts:** All 114 character/clip pairs sampled at seven times (798 poses); bone transforms and 256 skinned vertices per pose remain finite. Browser gallery renders all 19 clips across six full-body/hand views with extra early/late checks for key gestures. All 114 reactions run through the actual CompanionAnimator at 30 Hz and return to full-weight Texting without sticking. Findings and limits are in `docs/companion-animation-review-2026-10-13.md`; gallery/script/JSON are local under ignored `scripts/characters-src/animation-audit-2026-10-13/`. No broad builds, new dependencies, migrations or tokens. Existing dirty-file hashes remain unchanged.
+
+**Next:** Replace the incorrect Angry download, transfer the remaining hand gestures anatomically with contact correction only where appropriate, then fix kneeling floor contact and review native framing. Preserve the accepted Texting keys and the removed ragdoll. This audit is complete; these repairs remain outstanding. Commit/push only the report and this entry.
+
+---
+
 ## 2026-10-13 — Codex / Accepted anatomical Texting grip repair
 
 **Branch:** `validation/alpha-2026-09-14`. Owner rejected the camera-facing wrist adjustment and accepted the new source-grip comparison. Existing companion commit/push authorization continues; paused-session changes stay preserved and excluded.
