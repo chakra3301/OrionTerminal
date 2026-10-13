@@ -1,0 +1,1295 @@
+{
+  "schemaVersion": 1,
+  "defaultCharacter": "anthropomorphic-fox",
+  "defaultAnimation": "Sad Idle",
+  "fps": 30,
+  "upAxis": "+Y",
+  "forwardAxis": "+Z",
+  "units": "meters",
+  "characters": [
+    {
+      "id": "anthropomorphic-fox",
+      "name": "Fox",
+      "model": "/characters/anthropomorphic-fox.glb",
+      "sha256": "0d34d8a934311f91c9ca05512e11ed93446a70e910a672553a4d9d0384435e60",
+      "bytes": 6044544,
+      "boneCount": 61,
+      "weightedBoneGroups": 60,
+      "animationCount": 20,
+      "sourceFilename": "anthropomorphic+fox+3d+model.glb",
+      "rigSource": "Original Tripo rig, with offline retargeted motion",
+      "animations": [
+        {
+          "id": "sad-idle",
+          "name": "Sad Idle",
+          "mixamoMotionId": "123770901",
+          "description": "Standing In A Sad Disposition",
+          "durationSeconds": 4,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "silly-dancing",
+          "name": "Silly Dancing",
+          "mixamoMotionId": "101920902",
+          "description": "Silly Dancing The Cabbage Patch",
+          "durationSeconds": 3.8333333333333335,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "joyful-jump",
+          "name": "Joyful Jump",
+          "mixamoMotionId": "106090904",
+          "description": "Ecstatic Jumping With Both Legs And Arms",
+          "durationSeconds": 1.8666666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "female-dynamic-pose",
+          "name": "Female Dynamic Pose",
+          "mixamoMotionId": "140300903",
+          "description": "Floating, Bent Forwards",
+          "durationSeconds": 1,
+          "suggestedPlayback": "hold",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "sitting-clap",
+          "name": "Sitting Clap",
+          "mixamoMotionId": "116190901",
+          "description": "Sitting Unethusiastic Clap",
+          "durationSeconds": 5.666666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "angry",
+          "name": "Angry",
+          "mixamoMotionId": "117940901",
+          "description": "Standing Angrily",
+          "durationSeconds": 5.666666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "falling",
+          "name": "Falling",
+          "mixamoMotionId": "131120901",
+          "description": "Falling Over A Rope Down To The Floor",
+          "durationSeconds": 11.366666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "standing-greeting",
+          "name": "Standing Greeting",
+          "mixamoMotionId": "113350901",
+          "description": "Greeting While Standing",
+          "durationSeconds": 5.1,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "telling-a-secret",
+          "name": "Telling A Secret",
+          "mixamoMotionId": "109900901",
+          "description": "Telling A Secret",
+          "durationSeconds": 10.9,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "kiss",
+          "name": "Kiss",
+          "mixamoMotionId": "115410903",
+          "description": "Kissing A Taller Person For A Short Period",
+          "durationSeconds": 3.7333333333333334,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "thankful",
+          "name": "Thankful",
+          "mixamoMotionId": "118020901",
+          "description": "Being Thankful While Standing",
+          "durationSeconds": 3,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "texting-while-standing",
+          "name": "Texting While Standing",
+          "mixamoMotionId": "119340901",
+          "description": "Texting On A Smart Phone While Standing",
+          "durationSeconds": 23.566666666666666,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "kneeling-pointing",
+          "name": "Kneeling Pointing",
+          "mixamoMotionId": "130520901",
+          "description": "Kneeling To Pointing",
+          "durationSeconds": 3.9,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "rejected",
+          "name": "Rejected",
+          "mixamoMotionId": "117960901",
+          "description": "Being Rejected While Standing",
+          "durationSeconds": 4.8,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "cheering",
+          "name": "Cheering",
+          "mixamoMotionId": "102100901",
+          "description": "Male Cheering With Two Fists Pump",
+          "durationSeconds": 2.9,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "clapping",
+          "name": "Clapping",
+          "mixamoMotionId": "100570901",
+          "description": "Clap While Standing",
+          "durationSeconds": 1.1666666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "talking",
+          "name": "Talking",
+          "mixamoMotionId": "108420902",
+          "description": "Asking A Question",
+          "durationSeconds": 5.166666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "surprised",
+          "name": "Surprised",
+          "mixamoMotionId": "110150902",
+          "description": "Finding Something And Wiggling Fingers",
+          "durationSeconds": 4,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "bashful",
+          "name": "Bashful",
+          "mixamoMotionId": "117540901",
+          "description": "Being Bashful While Standing",
+          "durationSeconds": 11,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "happy",
+          "name": "Happy",
+          "mixamoMotionId": "117920901",
+          "description": "Standing Happily",
+          "durationSeconds": 10,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        }
+      ]
+    },
+    {
+      "id": "horned-demon",
+      "name": "Demon",
+      "model": "/characters/horned-demon.glb",
+      "sha256": "b2b881f4e2fc9ed4723c981e9f9699419083844d30f9f17742a39d1b34475cd3",
+      "bytes": 4804224,
+      "boneCount": 41,
+      "weightedBoneGroups": 34,
+      "animationCount": 20,
+      "sourceFilename": "demon figure 3d model.glb",
+      "rigSource": "Fresh Mixamo auto-rig; replaced original root-bound skin",
+      "animations": [
+        {
+          "id": "sad-idle",
+          "name": "Sad Idle",
+          "mixamoMotionId": "123770901",
+          "description": "Standing In A Sad Disposition",
+          "durationSeconds": 4,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "silly-dancing",
+          "name": "Silly Dancing",
+          "mixamoMotionId": "101920902",
+          "description": "Silly Dancing The Cabbage Patch",
+          "durationSeconds": 3.8333333333333335,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "joyful-jump",
+          "name": "Joyful Jump",
+          "mixamoMotionId": "106090904",
+          "description": "Ecstatic Jumping With Both Legs And Arms",
+          "durationSeconds": 1.8666666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "female-dynamic-pose",
+          "name": "Female Dynamic Pose",
+          "mixamoMotionId": "140300903",
+          "description": "Floating, Bent Forwards",
+          "durationSeconds": 1,
+          "suggestedPlayback": "hold",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "sitting-clap",
+          "name": "Sitting Clap",
+          "mixamoMotionId": "116190901",
+          "description": "Sitting Unethusiastic Clap",
+          "durationSeconds": 5.666666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "angry",
+          "name": "Angry",
+          "mixamoMotionId": "117940901",
+          "description": "Standing Angrily",
+          "durationSeconds": 5.666666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "falling",
+          "name": "Falling",
+          "mixamoMotionId": "131120901",
+          "description": "Falling Over A Rope Down To The Floor",
+          "durationSeconds": 11.366666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "standing-greeting",
+          "name": "Standing Greeting",
+          "mixamoMotionId": "113350901",
+          "description": "Greeting While Standing",
+          "durationSeconds": 5.1,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "telling-a-secret",
+          "name": "Telling A Secret",
+          "mixamoMotionId": "109900901",
+          "description": "Telling A Secret",
+          "durationSeconds": 10.9,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "kiss",
+          "name": "Kiss",
+          "mixamoMotionId": "115410903",
+          "description": "Kissing A Taller Person For A Short Period",
+          "durationSeconds": 3.7333333333333334,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "thankful",
+          "name": "Thankful",
+          "mixamoMotionId": "118020901",
+          "description": "Being Thankful While Standing",
+          "durationSeconds": 3,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "texting-while-standing",
+          "name": "Texting While Standing",
+          "mixamoMotionId": "119340901",
+          "description": "Texting On A Smart Phone While Standing",
+          "durationSeconds": 23.566666666666666,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "kneeling-pointing",
+          "name": "Kneeling Pointing",
+          "mixamoMotionId": "130520901",
+          "description": "Kneeling To Pointing",
+          "durationSeconds": 3.9,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "rejected",
+          "name": "Rejected",
+          "mixamoMotionId": "117960901",
+          "description": "Being Rejected While Standing",
+          "durationSeconds": 4.8,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "cheering",
+          "name": "Cheering",
+          "mixamoMotionId": "102100901",
+          "description": "Male Cheering With Two Fists Pump",
+          "durationSeconds": 2.9,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "clapping",
+          "name": "Clapping",
+          "mixamoMotionId": "100570901",
+          "description": "Clap While Standing",
+          "durationSeconds": 1.1666666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "talking",
+          "name": "Talking",
+          "mixamoMotionId": "108420902",
+          "description": "Asking A Question",
+          "durationSeconds": 5.166666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "surprised",
+          "name": "Surprised",
+          "mixamoMotionId": "110150902",
+          "description": "Finding Something And Wiggling Fingers",
+          "durationSeconds": 4,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "bashful",
+          "name": "Bashful",
+          "mixamoMotionId": "117540901",
+          "description": "Being Bashful While Standing",
+          "durationSeconds": 11,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "happy",
+          "name": "Happy",
+          "mixamoMotionId": "117920901",
+          "description": "Standing Happily",
+          "durationSeconds": 10,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        }
+      ]
+    },
+    {
+      "id": "mushroom-character",
+      "name": "Mushroom character",
+      "model": "/characters/mushroom-character.glb",
+      "sha256": "9b18903d2696a78992f0cd2fe9d03702b87b03a0db0e8951dcbf6fec5cc89d2f",
+      "bytes": 5734812,
+      "boneCount": 65,
+      "weightedBoneGroups": 52,
+      "animationCount": 20,
+      "sourceFilename": "stylized character 3d model (1).glb",
+      "rigSource": "Fresh Mixamo auto-rig; replaced original malformed skin",
+      "animations": [
+        {
+          "id": "sad-idle",
+          "name": "Sad Idle",
+          "mixamoMotionId": "123770901",
+          "description": "Standing In A Sad Disposition",
+          "durationSeconds": 4,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "silly-dancing",
+          "name": "Silly Dancing",
+          "mixamoMotionId": "101920902",
+          "description": "Silly Dancing The Cabbage Patch",
+          "durationSeconds": 3.8333333333333335,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "joyful-jump",
+          "name": "Joyful Jump",
+          "mixamoMotionId": "106090904",
+          "description": "Ecstatic Jumping With Both Legs And Arms",
+          "durationSeconds": 1.8666666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "female-dynamic-pose",
+          "name": "Female Dynamic Pose",
+          "mixamoMotionId": "140300903",
+          "description": "Floating, Bent Forwards",
+          "durationSeconds": 1,
+          "suggestedPlayback": "hold",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "sitting-clap",
+          "name": "Sitting Clap",
+          "mixamoMotionId": "116190901",
+          "description": "Sitting Unethusiastic Clap",
+          "durationSeconds": 5.666666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "angry",
+          "name": "Angry",
+          "mixamoMotionId": "117940901",
+          "description": "Standing Angrily",
+          "durationSeconds": 5.666666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "falling",
+          "name": "Falling",
+          "mixamoMotionId": "131120901",
+          "description": "Falling Over A Rope Down To The Floor",
+          "durationSeconds": 11.366666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "standing-greeting",
+          "name": "Standing Greeting",
+          "mixamoMotionId": "113350901",
+          "description": "Greeting While Standing",
+          "durationSeconds": 5.1,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "telling-a-secret",
+          "name": "Telling A Secret",
+          "mixamoMotionId": "109900901",
+          "description": "Telling A Secret",
+          "durationSeconds": 10.9,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "kiss",
+          "name": "Kiss",
+          "mixamoMotionId": "115410903",
+          "description": "Kissing A Taller Person For A Short Period",
+          "durationSeconds": 3.7333333333333334,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "thankful",
+          "name": "Thankful",
+          "mixamoMotionId": "118020901",
+          "description": "Being Thankful While Standing",
+          "durationSeconds": 3,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "texting-while-standing",
+          "name": "Texting While Standing",
+          "mixamoMotionId": "119340901",
+          "description": "Texting On A Smart Phone While Standing",
+          "durationSeconds": 23.566666666666666,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "kneeling-pointing",
+          "name": "Kneeling Pointing",
+          "mixamoMotionId": "130520901",
+          "description": "Kneeling To Pointing",
+          "durationSeconds": 3.9,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "rejected",
+          "name": "Rejected",
+          "mixamoMotionId": "117960901",
+          "description": "Being Rejected While Standing",
+          "durationSeconds": 4.8,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "cheering",
+          "name": "Cheering",
+          "mixamoMotionId": "102100901",
+          "description": "Male Cheering With Two Fists Pump",
+          "durationSeconds": 2.9,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "clapping",
+          "name": "Clapping",
+          "mixamoMotionId": "100570901",
+          "description": "Clap While Standing",
+          "durationSeconds": 1.1666666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "talking",
+          "name": "Talking",
+          "mixamoMotionId": "108420902",
+          "description": "Asking A Question",
+          "durationSeconds": 5.166666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "surprised",
+          "name": "Surprised",
+          "mixamoMotionId": "110150902",
+          "description": "Finding Something And Wiggling Fingers",
+          "durationSeconds": 4,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "bashful",
+          "name": "Bashful",
+          "mixamoMotionId": "117540901",
+          "description": "Being Bashful While Standing",
+          "durationSeconds": 11,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "happy",
+          "name": "Happy",
+          "mixamoMotionId": "117920901",
+          "description": "Standing Happily",
+          "durationSeconds": 10,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        }
+      ]
+    },
+    {
+      "id": "angelic-winged-figure",
+      "name": "Angelic Winged Figure",
+      "model": "/characters/angelic-winged-figure.glb",
+      "sha256": "aea45e1fb20b11d029dbbca8b43099ba307706a3fbda0ed51399479d75984335",
+      "bytes": 5978492,
+      "boneCount": 61,
+      "weightedBoneGroups": 60,
+      "animationCount": 20,
+      "sourceFilename": "angelic+winged+figure+3d+model.zip",
+      "rigSource": "Original Tripo rig with offline retargeted Mixamo motion",
+      "animations": [
+        {
+          "id": "sad-idle",
+          "name": "Sad Idle",
+          "mixamoMotionId": "123770901",
+          "description": "Standing In A Sad Disposition",
+          "durationSeconds": 4,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "silly-dancing",
+          "name": "Silly Dancing",
+          "mixamoMotionId": "101920902",
+          "description": "Silly Dancing The Cabbage Patch",
+          "durationSeconds": 3.8333333333333335,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "joyful-jump",
+          "name": "Joyful Jump",
+          "mixamoMotionId": "106090904",
+          "description": "Ecstatic Jumping With Both Legs And Arms",
+          "durationSeconds": 1.8666666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "female-dynamic-pose",
+          "name": "Female Dynamic Pose",
+          "mixamoMotionId": "140300903",
+          "description": "Floating, Bent Forwards",
+          "durationSeconds": 1,
+          "suggestedPlayback": "hold",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "sitting-clap",
+          "name": "Sitting Clap",
+          "mixamoMotionId": "116190901",
+          "description": "Sitting Unethusiastic Clap",
+          "durationSeconds": 5.666666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "angry",
+          "name": "Angry",
+          "mixamoMotionId": "117940901",
+          "description": "Standing Angrily",
+          "durationSeconds": 5.666666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "falling",
+          "name": "Falling",
+          "mixamoMotionId": "131120901",
+          "description": "Falling Over A Rope Down To The Floor",
+          "durationSeconds": 11.366666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "standing-greeting",
+          "name": "Standing Greeting",
+          "mixamoMotionId": "113350901",
+          "description": "Greeting While Standing",
+          "durationSeconds": 5.1,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "telling-a-secret",
+          "name": "Telling A Secret",
+          "mixamoMotionId": "109900901",
+          "description": "Telling A Secret",
+          "durationSeconds": 10.9,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "kiss",
+          "name": "Kiss",
+          "mixamoMotionId": "115410903",
+          "description": "Kissing A Taller Person For A Short Period",
+          "durationSeconds": 3.7333333333333334,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "thankful",
+          "name": "Thankful",
+          "mixamoMotionId": "118020901",
+          "description": "Being Thankful While Standing",
+          "durationSeconds": 3,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "texting-while-standing",
+          "name": "Texting While Standing",
+          "mixamoMotionId": "119340901",
+          "description": "Texting On A Smart Phone While Standing",
+          "durationSeconds": 23.566666666666666,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "kneeling-pointing",
+          "name": "Kneeling Pointing",
+          "mixamoMotionId": "130520901",
+          "description": "Kneeling To Pointing",
+          "durationSeconds": 3.9,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "rejected",
+          "name": "Rejected",
+          "mixamoMotionId": "117960901",
+          "description": "Being Rejected While Standing",
+          "durationSeconds": 4.8,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "cheering",
+          "name": "Cheering",
+          "mixamoMotionId": "102100901",
+          "description": "Male Cheering With Two Fists Pump",
+          "durationSeconds": 2.9,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "clapping",
+          "name": "Clapping",
+          "mixamoMotionId": "100570901",
+          "description": "Clap While Standing",
+          "durationSeconds": 1.1666666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "talking",
+          "name": "Talking",
+          "mixamoMotionId": "108420902",
+          "description": "Asking A Question",
+          "durationSeconds": 5.166666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "surprised",
+          "name": "Surprised",
+          "mixamoMotionId": "110150902",
+          "description": "Finding Something And Wiggling Fingers",
+          "durationSeconds": 4,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "bashful",
+          "name": "Bashful",
+          "mixamoMotionId": "117540901",
+          "description": "Being Bashful While Standing",
+          "durationSeconds": 11,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "happy",
+          "name": "Happy",
+          "mixamoMotionId": "117920901",
+          "description": "Standing Happily",
+          "durationSeconds": 10,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        }
+      ]
+    },
+    {
+      "id": "stylized-humanoid-robot",
+      "name": "Stylized Humanoid Robot",
+      "model": "/characters/stylized-humanoid-robot.glb",
+      "sha256": "1584ced3f8d7c27979d93d7241a20f7266723bea49b3db86fba7c72941ba5378",
+      "bytes": 5814760,
+      "boneCount": 61,
+      "weightedBoneGroups": 59,
+      "animationCount": 20,
+      "sourceFilename": "stylized+humanoid+robot+3d+model.zip",
+      "rigSource": "Original Tripo rig with offline retargeted Mixamo motion",
+      "animations": [
+        {
+          "id": "sad-idle",
+          "name": "Sad Idle",
+          "mixamoMotionId": "123770901",
+          "description": "Standing In A Sad Disposition",
+          "durationSeconds": 4,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "silly-dancing",
+          "name": "Silly Dancing",
+          "mixamoMotionId": "101920902",
+          "description": "Silly Dancing The Cabbage Patch",
+          "durationSeconds": 3.8333333333333335,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "joyful-jump",
+          "name": "Joyful Jump",
+          "mixamoMotionId": "106090904",
+          "description": "Ecstatic Jumping With Both Legs And Arms",
+          "durationSeconds": 1.8666666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "female-dynamic-pose",
+          "name": "Female Dynamic Pose",
+          "mixamoMotionId": "140300903",
+          "description": "Floating, Bent Forwards",
+          "durationSeconds": 1,
+          "suggestedPlayback": "hold",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "sitting-clap",
+          "name": "Sitting Clap",
+          "mixamoMotionId": "116190901",
+          "description": "Sitting Unethusiastic Clap",
+          "durationSeconds": 5.666666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "angry",
+          "name": "Angry",
+          "mixamoMotionId": "117940901",
+          "description": "Standing Angrily",
+          "durationSeconds": 5.666666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "falling",
+          "name": "Falling",
+          "mixamoMotionId": "131120901",
+          "description": "Falling Over A Rope Down To The Floor",
+          "durationSeconds": 11.366666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "standing-greeting",
+          "name": "Standing Greeting",
+          "mixamoMotionId": "113350901",
+          "description": "Greeting While Standing",
+          "durationSeconds": 5.1,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "telling-a-secret",
+          "name": "Telling A Secret",
+          "mixamoMotionId": "109900901",
+          "description": "Telling A Secret",
+          "durationSeconds": 10.9,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "kiss",
+          "name": "Kiss",
+          "mixamoMotionId": "115410903",
+          "description": "Kissing A Taller Person For A Short Period",
+          "durationSeconds": 3.7333333333333334,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "thankful",
+          "name": "Thankful",
+          "mixamoMotionId": "118020901",
+          "description": "Being Thankful While Standing",
+          "durationSeconds": 3,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "texting-while-standing",
+          "name": "Texting While Standing",
+          "mixamoMotionId": "119340901",
+          "description": "Texting On A Smart Phone While Standing",
+          "durationSeconds": 23.566666666666666,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "kneeling-pointing",
+          "name": "Kneeling Pointing",
+          "mixamoMotionId": "130520901",
+          "description": "Kneeling To Pointing",
+          "durationSeconds": 3.9,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "rejected",
+          "name": "Rejected",
+          "mixamoMotionId": "117960901",
+          "description": "Being Rejected While Standing",
+          "durationSeconds": 4.8,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "cheering",
+          "name": "Cheering",
+          "mixamoMotionId": "102100901",
+          "description": "Male Cheering With Two Fists Pump",
+          "durationSeconds": 2.9,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "clapping",
+          "name": "Clapping",
+          "mixamoMotionId": "100570901",
+          "description": "Clap While Standing",
+          "durationSeconds": 1.1666666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "talking",
+          "name": "Talking",
+          "mixamoMotionId": "108420902",
+          "description": "Asking A Question",
+          "durationSeconds": 5.166666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "surprised",
+          "name": "Surprised",
+          "mixamoMotionId": "110150902",
+          "description": "Finding Something And Wiggling Fingers",
+          "durationSeconds": 4,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "bashful",
+          "name": "Bashful",
+          "mixamoMotionId": "117540901",
+          "description": "Being Bashful While Standing",
+          "durationSeconds": 11,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "happy",
+          "name": "Happy",
+          "mixamoMotionId": "117920901",
+          "description": "Standing Happily",
+          "durationSeconds": 10,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        }
+      ]
+    },
+    {
+      "id": "pigtail-character",
+      "name": "Pigtail Character",
+      "model": "/characters/pigtail-character.glb",
+      "sha256": "354d21ab15707af350e2f3f514a9945e25ee3703ac6f82a98cb0f1da5bdd5b6c",
+      "bytes": 6032436,
+      "boneCount": 65,
+      "weightedBoneGroups": 52,
+      "animationCount": 20,
+      "sourceFilename": "stylized+character+3d+model (1).zip",
+      "rigSource": "Mixamo auto-rig; original source FBX has no skeleton",
+      "animations": [
+        {
+          "id": "sad-idle",
+          "name": "Sad Idle",
+          "mixamoMotionId": "123770901",
+          "description": "Standing In A Sad Disposition",
+          "durationSeconds": 4,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "silly-dancing",
+          "name": "Silly Dancing",
+          "mixamoMotionId": "101920902",
+          "description": "Silly Dancing The Cabbage Patch",
+          "durationSeconds": 3.8333333333333335,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "joyful-jump",
+          "name": "Joyful Jump",
+          "mixamoMotionId": "106090904",
+          "description": "Ecstatic Jumping With Both Legs And Arms",
+          "durationSeconds": 1.8666666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "female-dynamic-pose",
+          "name": "Female Dynamic Pose",
+          "mixamoMotionId": "140300903",
+          "description": "Floating, Bent Forwards",
+          "durationSeconds": 1,
+          "suggestedPlayback": "hold",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "sitting-clap",
+          "name": "Sitting Clap",
+          "mixamoMotionId": "116190901",
+          "description": "Sitting Unethusiastic Clap",
+          "durationSeconds": 5.666666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "angry",
+          "name": "Angry",
+          "mixamoMotionId": "117940901",
+          "description": "Standing Angrily",
+          "durationSeconds": 5.666666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "falling",
+          "name": "Falling",
+          "mixamoMotionId": "131120901",
+          "description": "Falling Over A Rope Down To The Floor",
+          "durationSeconds": 11.366666666666667,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "standing-greeting",
+          "name": "Standing Greeting",
+          "mixamoMotionId": "113350901",
+          "description": "Greeting While Standing",
+          "durationSeconds": 5.1,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "telling-a-secret",
+          "name": "Telling A Secret",
+          "mixamoMotionId": "109900901",
+          "description": "Telling A Secret",
+          "durationSeconds": 10.9,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "kiss",
+          "name": "Kiss",
+          "mixamoMotionId": "115410903",
+          "description": "Kissing A Taller Person For A Short Period",
+          "durationSeconds": 3.7333333333333334,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "thankful",
+          "name": "Thankful",
+          "mixamoMotionId": "118020901",
+          "description": "Being Thankful While Standing",
+          "durationSeconds": 3,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "texting-while-standing",
+          "name": "Texting While Standing",
+          "mixamoMotionId": "119340901",
+          "description": "Texting On A Smart Phone While Standing",
+          "durationSeconds": 23.566666666666666,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "kneeling-pointing",
+          "name": "Kneeling Pointing",
+          "mixamoMotionId": "130520901",
+          "description": "Kneeling To Pointing",
+          "durationSeconds": 3.9,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": true
+        },
+        {
+          "id": "rejected",
+          "name": "Rejected",
+          "mixamoMotionId": "117960901",
+          "description": "Being Rejected While Standing",
+          "durationSeconds": 4.8,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "cheering",
+          "name": "Cheering",
+          "mixamoMotionId": "102100901",
+          "description": "Male Cheering With Two Fists Pump",
+          "durationSeconds": 2.9,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "clapping",
+          "name": "Clapping",
+          "mixamoMotionId": "100570901",
+          "description": "Clap While Standing",
+          "durationSeconds": 1.1666666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "talking",
+          "name": "Talking",
+          "mixamoMotionId": "108420902",
+          "description": "Asking A Question",
+          "durationSeconds": 5.166666666666667,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "surprised",
+          "name": "Surprised",
+          "mixamoMotionId": "110150902",
+          "description": "Finding Something And Wiggling Fingers",
+          "durationSeconds": 4,
+          "suggestedPlayback": "once",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "bashful",
+          "name": "Bashful",
+          "mixamoMotionId": "117540901",
+          "description": "Being Bashful While Standing",
+          "durationSeconds": 11,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        },
+        {
+          "id": "happy",
+          "name": "Happy",
+          "mixamoMotionId": "117920901",
+          "description": "Standing Happily",
+          "durationSeconds": 10,
+          "suggestedPlayback": "loop",
+          "preservesRootMotion": true,
+          "needsPositioningReview": false
+        }
+      ]
+    }
+  ]
+}

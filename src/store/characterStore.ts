@@ -5,7 +5,7 @@ import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
 import {
   BUILTIN_CHARACTERS,
-  ROSIE_ID,
+  DEFAULT_CHARACTER_ID,
   type Character,
   type CustomCharacter,
 } from "@/features/characters/catalog";
@@ -26,7 +26,7 @@ type CharacterStore = Persisted & {
   urlFor: (c: Character) => string;
 };
 
-const DEFAULT_SELECTED = ROSIE_ID;
+const DEFAULT_SELECTED = DEFAULT_CHARACTER_ID;
 
 function persist(s: CharacterStore) {
   void setAppState("characters", {
@@ -40,18 +40,20 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
   custom: [],
 
   hydrate: (s) =>
-    set((prev) => ({
-      ...prev,
-      selectedId:
-        typeof s.selectedId === "string" ? s.selectedId : prev.selectedId,
-      custom: Array.isArray(s.custom) ? s.custom : prev.custom,
-    })),
+    set((prev) => {
+      const custom = Array.isArray(s.custom) ? s.custom : prev.custom;
+      const requested = typeof s.selectedId === "string" ? s.selectedId : prev.selectedId;
+      const selectedId = [...BUILTIN_CHARACTERS, ...custom].some((c) => c.id === requested)
+        ? requested
+        : DEFAULT_SELECTED;
+      return { custom, selectedId };
+    }),
 
   all: () => [...BUILTIN_CHARACTERS, ...get().custom],
 
   selected: () => {
     const { selectedId } = get();
-    return get().all().find((c) => c.id === selectedId) ?? null;
+    return get().all().find((c) => c.id === selectedId) ?? BUILTIN_CHARACTERS[0] ?? null;
   },
 
   setSelected: (id) => {

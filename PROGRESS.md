@@ -1,3 +1,15 @@
+## 2026-10-12 — Codex / Six animated companions replace the built-in library
+
+**Branch:** `validation/alpha-2026-09-14`. Owner authorized committing and pushing this companion replacement; unrelated dirty work is preserved and excluded.
+
+**Changed:** Fox, Demon, Mushroom, Angel, Robot and Pigtail replace the eight retired runtime models. Each self-contained GLB has 20 Mixamo clips; Fox is the default and every character starts with Sad Idle. Shared playback preserves error/proactive/summon reactions, quiet fidgets, drag inertia and hidden-canvas pausing. Independent skeletons prevent picker/companion interference; model-space anchoring preserves jump height across rig axes, and viewport-aware framing keeps wings visible. Retired selections fall back to Fox; existing custom uploads remain available. The clip tester exposes all 20 clips and resets its index on character changes. Added a hashed runtime manifest, verified local installer and `docs/companions.md`.
+
+**Verified:** `npm run typecheck`; 11 focused Vitest tests across five files, including actual binding/deformation of all 120 clips, idle recovery, priority reactions, rig anchoring and saved-selection behavior. Full frontend browser preview: all six selections loaded without model errors; clip tester opened via its shortcut, Sad Idle and Joyful Jump rendered on Angel with wings inside the companion canvas. Native SQL persistence is covered by store tests; the packaged desktop app was not rebuilt or installed. No dependency, migration or design-token changes.
+
+**Next / open questions:** Optional owner tuning of event mappings; placement-specific clips remain manual in the tester. No new design-token gaps. Local Blender masters and original downloads remain intact. The other session's existing character-orb removal and all unrelated changes remain uncommitted.
+
+---
+
 # Progress
 
 Newest session first. Every session ends by adding an entry here (see the session routine in AGENTS.md).

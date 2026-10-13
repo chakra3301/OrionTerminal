@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef } from "react";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { resolveClips } from "./catalog";
+import { cloneCharacter, fitCharacter } from "./modelInstance";
 
 // One skinned character: clone (so the same cached GLB can render in several
 // canvases), normalize to a unit height standing on the floor, loop its idle,
@@ -26,22 +26,13 @@ export function CharacterModel({
   const spin = useRef(0); // remaining extra spin (radians)
 
   // Clone the scene + retarget the skeleton for this instance.
-  const scene = useMemo(() => cloneSkeleton(gltf.scene), [gltf.scene]);
+  const scene = useMemo(() => cloneCharacter(gltf.scene), [gltf.scene]);
 
   // Fit to ~1.7 units tall and center the bounding box on the origin, so the
   // camera (aimed at 0,0,0) frames the whole body and the turntable spins
   // around the body's center rather than its feet.
   const fit = useMemo(() => {
-    // The clone's world matrices are identity until updated; quantized geometry
-    // bakes its dequant scale into node transforms, so measuring before this
-    // gives a wildly wrong box (giant / off-frame models).
-    scene.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(scene);
-    const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
-    box.getSize(size);
-    box.getCenter(center);
-    const scale = fitHeight / (size.y || 1);
+    const { scale, center } = fitCharacter(scene, fitHeight);
     return {
       scale,
       x: -center.x * scale,
@@ -68,12 +59,10 @@ export function CharacterModel({
   }, [actions, clips.idle]);
 
   // Fire the select one-shot when the signal bumps (skip initial 0).
-  const firstSignal = useRef(true);
+  const previousSignal = useRef(selectSignal);
   useEffect(() => {
-    if (firstSignal.current) {
-      firstSignal.current = false;
-      return;
-    }
+    if (previousSignal.current === selectSignal) return;
+    previousSignal.current = selectSignal;
     spin.current = Math.PI * 2;
     if (!clips.select || clips.select === clips.idle) return;
 
