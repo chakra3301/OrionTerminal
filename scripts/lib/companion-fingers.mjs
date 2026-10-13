@@ -83,7 +83,7 @@ export function readGlb(bytes) {
   return { doc, binary: Buffer.from(bytes.subarray(binaryStart, binaryStart + bytes.readUInt32LE(binaryStart - 8))) };
 }
 
-function writeGlb(doc, binary) {
+export function writeGlb(doc, binary) {
   doc.buffers[0].byteLength = binary.length;
   const json = Buffer.from(JSON.stringify(doc));
   const jsonPadding = Buffer.alloc((-json.length) & 3, 0x20);

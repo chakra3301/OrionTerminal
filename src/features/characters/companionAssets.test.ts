@@ -9,7 +9,13 @@ import manifest from "../../../public/characters/manifest.json";
 import { BUILTIN_CHARACTERS, DEFAULT_CHARACTER_ID, resolveClips } from "./catalog";
 import { cloneCharacter, characterBones, HorizontalRootAnchor } from "./modelInstance";
 import { CompanionAnimator } from "./companionAnimator";
-import { prepareCompanionAnimations } from "./companionHands";
+
+// Palm normals sampled from the original Mixamo Texting donor, in the library's +Y-up coordinates.
+const textingPalms = [
+  { time: 3, palms: [[0.90936135, 0.00862899, 0.41591762], [0.85730765, 0.13924137, -0.49561622]], thumbs: [[-0.90943568, -0.01888459, -0.41541558], [-0.90108219, 0.0896185, 0.42428695]] },
+  { time: 10, palms: [[0.90052769, -0.09244918, 0.42485647], [0.77756555, -0.01526478, -0.62861658]], thumbs: [[-0.90226518, 0.08246182, -0.42322288], [-0.81678481, 0.23351464, 0.5275732]] },
+  { time: 20, palms: [[0.85308038, -0.16920221, 0.4935833], [0.79273858, -0.5796176, -0.18870342]], thumbs: [[-0.85656691, 0.16001659, -0.49059944], [-0.73898088, 0.67306552, -0.02983379]] },
+];
 
 it("ships six independent skinned companions whose 120 clips bind and deform real geometry", async () => {
   expect(manifest.defaultCharacter).toBe(DEFAULT_CHARACTER_ID);
@@ -82,20 +88,24 @@ it("ships six independent skinned companions whose 120 clips bind and deform rea
       expect(delta.angleTo(new THREE.Quaternion())).toBeGreaterThan(0.3);
       expect(Math.abs(axis.dot(check.axis))).toBeGreaterThan(0.95);
     }
-    animator.dispose();
-    const prepared = prepareCompanionAnimations(gltf.animations);
-    const gentle = new CompanionAnimator(scene, prepared);
-    const fingerBones = meshes[0]!.skeleton.bones.filter((bone) => /index|middle|ring|pinky/i.test(bone.name));
-    gentle.update(0.5, true, "Texting While Standing");
-    const relaxed = fingerBones.map((bone) => bone.quaternion.clone());
-    for (const time of [3, 10, 20]) {
-      gentle.mixer.setTime(time);
+    expect(character.textingRetarget.method).toBe("source-anatomical-hand-frame-v2");
+    const partial = character.id === "horned-demon";
+    expect(character.textingRetarget.fullFingerRig).toBe(!partial);
+    const joint = (side: string, digit: string) => meshes[0]!.skeleton.bones.find((bone) =>
+      bone.name === `${digit}_${side}` || bone.name === `mixamorig${side === "l" ? "Left" : "Right"}Hand${digit === "hand" ? "" : digit === "index_01" ? "Index1" : digit === "thumb_01" ? "Thumb1" : "Pinky1"}`)!;
+    for (const sample of textingPalms) {
+      animator.mixer.setTime(sample.time);
       scene.updateMatrixWorld(true);
       meshes[0]!.skeleton.update();
-      for (const [i, bone] of fingerBones.entries()) expect(bone.quaternion.angleTo(relaxed[i]!)).toBeLessThan(0.001);
+      for (const [index, side] of ["l", "r"].entries()) {
+        const point = (bone: THREE.Bone) => bone.getWorldPosition(new THREE.Vector3());
+        const wrist = point(joint(side, "hand"));
+        const normal = point(joint(side, "index_01")).sub(wrist).cross(point(joint(side, partial ? "thumb_01" : "pinky_01")).sub(wrist)).normalize();
+        expect(normal.dot(new THREE.Vector3().fromArray((partial ? sample.thumbs : sample.palms)[index]!))).toBeGreaterThan(0.999);
+      }
       const points = Array.from({ length: 32 }, (_, i) => meshes[0]!.getVertexPosition(Math.floor(i * meshes[0]!.geometry.attributes.position!.count / 32), new THREE.Vector3()));
       expect(points.every((point) => [point.x, point.y, point.z].every(Number.isFinite))).toBe(true);
     }
-    gentle.dispose();
+    animator.dispose();
   }
 }, 20_000);

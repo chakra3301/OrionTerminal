@@ -34,14 +34,16 @@ for motion clips and passes clicks outside the companion through to the app.
 Authored bone rotations are restored before each mixer update so sparse clips
 cannot accumulate procedural attention offsets.
 
-Texting keeps its authored body, wrist and arm movement. At runtime, its four
-finger chains use a relaxed pose sampled from each character's Sad Idle; thumbs
-retain 15% of the imported Texting movement. This avoids the tight human phone
-grip folding the stylized fingers into each other. The adjustment applies to all
-six companions, the picker and the clip tester without mutating shared GLB clips.
-The raw GLBs retain their authored finger tracks; Blender imports show those
-tracks unless this runtime adaptation is applied. Built-in model URLs include
-their manifest hash so repaired files replace stale loader-cache entries.
+Texting transfers the donor's actual palm orientation and finger bends in each
+character's anatomical bind frame. The donor and target palms can differ by a
+quarter-turn even when both rigs use Mixamo bone names. Arm rotations are baked
+with two-bone IK to match the source wrist spacing at each character's hand size,
+preserving bone lengths and the gesture's original center. The old runtime
+relaxed-finger substitution is removed. These corrected tracks live in the GLBs,
+so the companion, picker, clip tester and Blender imports share the same grip.
+Built-in model URLs include their manifest hash so repaired files replace stale
+loader-cache entries. Other clips, Texting's remaining body movement, meshes,
+textures and skin weights stay intact.
 
 Spotlight's **Companion: Test Animation Clips** command opens the existing clip tester.
 It exposes all 20 clips for the selected character and resets to the first clip
@@ -56,7 +58,7 @@ palms differ by roughly 90 degrees, which previously curled fingers sideways,
 especially during Texting. All 20 clips receive the correction; mesh, skin,
 textures, body motion and animation timing stay unchanged.
 
-The three Mixamo rigs are unchanged. Demon has only thumb and index chains on
+Texting's correction also covers the three Mixamo rigs. Demon has only thumb and index chains on
 each hand; its original download contains bones but no usable finger skin
 weights. Independent motion for all five fingers would require reskinning that
 character. Mushroom's original skin was malformed, and Pigtail's supplied FBX
@@ -67,11 +69,12 @@ cached donor FBX, then reinstall its verified runtime files:
 
 ```sh
 node scripts/repair-companion-fingers.mjs
+node scripts/repair-companion-texting.mjs
 node scripts/install-companion-library.mjs
 ```
 
 The installer checks all six hashes and their mesh/skin/clip contract before
 copying any model. An optional first argument selects another library index.
-The corrected index lives in `scripts/characters-src/companion-finger-repair-2026-10-12/`.
+The current index lives in `scripts/characters-src/companion-texting-repair-2026-10-13/`.
 The original Blender masters predate this correction; import the corrected GLBs
 for their updated hand motion, or run the repair after rebuilding a library.

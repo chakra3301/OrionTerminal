@@ -11,8 +11,8 @@
       "id": "anthropomorphic-fox",
       "name": "Fox",
       "model": "/characters/anthropomorphic-fox.glb",
-      "sha256": "00503efc2c36ef4b24f949594815437117fd6596d801dc085d8d51384441acb6",
-      "bytes": 6214180,
+      "sha256": "aa3d12d3eefc96cb2035a2c1b3267e07e76ab07e326b3802ba5564e987519af7",
+      "bytes": 6631196,
       "boneCount": 61,
       "weightedBoneGroups": 60,
       "animationCount": 20,
@@ -22,6 +22,11 @@
         "method": "anatomical-palm-frame-v1",
         "fingerBones": 30,
         "rotationChannels": 600
+      },
+      "textingRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "rotationChannels": 36,
+        "fullFingerRig": true
       },
       "animations": [
         {
@@ -230,8 +235,8 @@
       "id": "horned-demon",
       "name": "Demon",
       "model": "/characters/horned-demon.glb",
-      "sha256": "b2b881f4e2fc9ed4723c981e9f9699419083844d30f9f17742a39d1b34475cd3",
-      "bytes": 4804224,
+      "sha256": "faa61389b1e3daae766035967f9aa04a4439e8489f5c575206286d78a43c29c8",
+      "bytes": 5060232,
       "boneCount": 41,
       "weightedBoneGroups": 34,
       "animationCount": 20,
@@ -241,6 +246,11 @@
         "method": "unchanged-mixamo-rig",
         "fingerBones": 0,
         "rotationChannels": 0
+      },
+      "textingRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "rotationChannels": 22,
+        "fullFingerRig": false
       },
       "animations": [
         {
@@ -449,8 +459,8 @@
       "id": "mushroom-character",
       "name": "Mushroom character",
       "model": "/characters/mushroom-character.glb",
-      "sha256": "9b18903d2696a78992f0cd2fe9d03702b87b03a0db0e8951dcbf6fec5cc89d2f",
-      "bytes": 5734812,
+      "sha256": "b66b677174b4f17fccf039938bb266ba20cbab06ea39d644e9533859516602f7",
+      "bytes": 6266820,
       "boneCount": 65,
       "weightedBoneGroups": 52,
       "animationCount": 20,
@@ -460,6 +470,11 @@
         "method": "unchanged-mixamo-rig",
         "fingerBones": 0,
         "rotationChannels": 0
+      },
+      "textingRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "rotationChannels": 46,
+        "fullFingerRig": true
       },
       "animations": [
         {
@@ -668,8 +683,8 @@
       "id": "angelic-winged-figure",
       "name": "Angelic Winged Figure",
       "model": "/characters/angelic-winged-figure.glb",
-      "sha256": "2f53d967ae57478db06a05e5f0d39df1e68bd4f45d5f406c7c28c76026d34371",
-      "bytes": 6148096,
+      "sha256": "c0b26fb376d93362b33c29a008e49ce6b6907d0dee947af8568bd05992678c5d",
+      "bytes": 6565108,
       "boneCount": 61,
       "weightedBoneGroups": 60,
       "animationCount": 20,
@@ -679,6 +694,11 @@
         "method": "anatomical-palm-frame-v1",
         "fingerBones": 30,
         "rotationChannels": 600
+      },
+      "textingRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "rotationChannels": 36,
+        "fullFingerRig": true
       },
       "animations": [
         {
@@ -887,8 +907,8 @@
       "id": "stylized-humanoid-robot",
       "name": "Stylized Humanoid Robot",
       "model": "/characters/stylized-humanoid-robot.glb",
-      "sha256": "de9972f3596c9b31f480cc48a7d8b91933ad00cdbbc0a5adc9e447ea59536cc5",
-      "bytes": 5984396,
+      "sha256": "e65ce7444fee9feb99ba3ff6c34f385bb5d863a424ea9ed30dd3d550a2a56d94",
+      "bytes": 6401408,
       "boneCount": 61,
       "weightedBoneGroups": 59,
       "animationCount": 20,
@@ -898,6 +918,11 @@
         "method": "anatomical-palm-frame-v1",
         "fingerBones": 30,
         "rotationChannels": 600
+      },
+      "textingRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "rotationChannels": 36,
+        "fullFingerRig": true
       },
       "animations": [
         {
@@ -1106,8 +1131,8 @@
       "id": "pigtail-character",
       "name": "Pigtail Character",
       "model": "/characters/pigtail-character.glb",
-      "sha256": "354d21ab15707af350e2f3f514a9945e25ee3703ac6f82a98cb0f1da5bdd5b6c",
-      "bytes": 6032436,
+      "sha256": "a4f6cb39f7de63aeacc387c7e95d189d5e661a65322ad1b63cd36b330090767e",
+      "bytes": 6564444,
       "boneCount": 65,
       "weightedBoneGroups": 52,
       "animationCount": 20,
@@ -1117,6 +1142,11 @@
         "method": "unchanged-mixamo-rig",
         "fingerBones": 0,
         "rotationChannels": 0
+      },
+      "textingRetarget": {
+        "method": "source-anatomical-hand-frame-v2",
+        "rotationChannels": 46,
+        "fullFingerRig": true
       },
       "animations": [
         {

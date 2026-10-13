@@ -1,3 +1,15 @@
+## 2026-10-13 — Codex / Accepted anatomical Texting grip repair
+
+**Branch:** `validation/alpha-2026-09-14`. Owner rejected the camera-facing wrist adjustment and accepted the new source-grip comparison. Existing companion commit/push authorization continues; paused-session changes stay preserved and excluded.
+
+**Found / changed:** Mixamo bone names did not guarantee matching hand bind orientations: Pigtail's palms differed from the motion donor by roughly a quarter-turn. Replaced the runtime Sad Idle finger substitution with an offline transfer of Texting's actual palm orientation and local finger bends in anatomical bind frames. Read inverse-bind transforms without altering posed bones or dropping non-bone parents. Baked arm rotations with two-bone IK to match source wrist spacing at each character's hand size while preserving limb lengths and the original gesture center. Updated all six hashed GLBs, manifest provenance, installer, regeneration script and documentation. Only Texting arm/wrist/finger quaternion channels change; the other 19 clips, remaining body motion, geometry, textures, bone definitions and skin weights are preserved. Companion, picker, clip tester and Blender imports now use the same baked grip. Ragdoll remains removed.
+
+**Verified:** 19 focused Vitest tests/six files, eight Node retargeting tests and `npm run typecheck` pass. Asset tests compare both palms at 3/10/20 seconds to source-donor normals and exercise all 120 clip bindings/deformations. Source-alignment checks sampled the wrists through the clip; bind/skin/texture data and all non-Texting animations match their baseline exactly. Browser comparisons cover all six rigs; Orion's actual dev frontend loads the repaired Pigtail, and the owner accepted its front-view comparison. Unrelated dirty-file hashes match the saved baseline. No dependencies, migrations, tokens or native package build/install.
+
+**Next / limitation:** The accepted Texting repair is complete. Demon still has only thumb/index chains per hand; independent motion of its remaining fingers requires reskinning. Preserved Blender masters predate the repair; import the corrected GLBs or run both repair scripts after rebuilding. No new design-token gap. Commit and push only this companion patch and the prior local ragdoll-removal commit.
+
+---
+
 ## 2026-10-13 — Codex / Remove ragdoll and relax Texting hands
 
 **Branch:** `validation/alpha-2026-09-14`. Owner requested scrapping the ragdoll and reported the fingers still looked wrong mainly during Texting in the dev app. Companion commit/push authorization continues; unrelated dirty work is preserved and excluded.

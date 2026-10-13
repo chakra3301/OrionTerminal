@@ -4,7 +4,6 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { resolveClips, versionedCharacterUrl } from "./catalog";
 import { cloneCharacter, fitCharacter } from "./modelInstance";
-import { prepareCompanionAnimations } from "./companionHands";
 
 // One skinned character: clone (so the same cached GLB can render in several
 // canvases), normalize to a unit height standing on the floor, loop its idle,
@@ -42,8 +41,7 @@ export function CharacterModel({
     };
   }, [scene, fitHeight]);
 
-  const animations = useMemo(() => prepareCompanionAnimations(gltf.animations), [gltf.animations]);
-  const { actions, names, mixer } = useAnimations(animations, scene);
+  const { actions, names, mixer } = useAnimations(gltf.animations, scene);
   const clips = useMemo(() => resolveClips(names), [names]);
 
   useEffect(() => {

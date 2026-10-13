@@ -11,7 +11,6 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import * as THREE from "three";
 import { cloneCharacter, fitCharacter, characterBones, HorizontalRootAnchor, AuthoredBonePose } from "@/features/characters/modelInstance";
 import { CompanionAnimator } from "@/features/characters/companionAnimator";
-import { prepareCompanionAnimations } from "@/features/characters/companionHands";
 import { CompanionRequestReactions } from "@/features/characters/companionRequests";
 import { useVoice } from "@/store/voiceStore";
 import { useRosie } from "@/features/rosie/rosieStore";
@@ -111,7 +110,6 @@ function Placeholder({ mode }: { mode: CompanionMode }) {
 function CharacterCompanion({ url, mode }: { url: string; mode: CompanionMode }) {
   const gltf = useGLTF(versionedCharacterUrl(url));
   const scene = useMemo(() => cloneCharacter(gltf.scene), [gltf.scene]);
-  const animations = useMemo(() => prepareCompanionAnimations(gltf.animations), [gltf.animations]);
   const frameWidth = useThree((s) => s.viewport.width);
   const fit = useMemo(() => fitCharacter(gltf.scene, FIT_HEIGHT, frameWidth * 0.8 / OVERSCAN), [gltf.scene, frameWidth]);
   const bones = useMemo(() => characterBones(scene), [scene]);
@@ -126,7 +124,7 @@ function CharacterCompanion({ url, mode }: { url: string; mode: CompanionMode })
   const lookQuat = useMemo(() => new THREE.Quaternion(), []);
 
   useEffect(() => {
-    const controller = new CompanionAnimator(scene, animations);
+    const controller = new CompanionAnimator(scene, gltf.animations);
     animator.current = controller;
     anchor.current = new HorizontalRootAnchor(scene, bones.hips);
     useCompanionDebug.getState().setNames(controller.names);
@@ -145,7 +143,7 @@ function CharacterCompanion({ url, mode }: { url: string; mode: CompanionMode })
       animator.current = null;
       anchor.current = null;
     };
-  }, [scene, animations, bones]);
+  }, [scene, gltf.animations, bones]);
 
   useEffect(() => {
     // Hidden canvases do not tick, so remember dismissal outside the frame loop.
