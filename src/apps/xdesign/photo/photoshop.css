@@ -1,0 +1,183 @@
+/* XDesign image editing — Photoshop workspace layout (owner, 2026-10-21: "look exactly like
+   photoshops layout"). Menu bar · options bar · document tab · one-column Tools panel ·
+   pasteboard · right dock (icon strip + stacked panel groups) · status bar. Colors come from
+   the --xd-* scope so every Orion theme still applies. */
+
+.xd-photo { font-size: 11px; background: var(--xd-bg); }
+.xd-photo:focus { outline: none; }
+.xd-photo .xd-ps-spacer { flex: 1; min-width: 0; }
+
+/* Menu bar */
+.xd-photo .xd-ps-menubar { display: flex; align-items: center; gap: 2px; min-height: 30px; padding: 0 6px; border-bottom: 1px solid var(--xd-border); background: var(--xd-panel); }
+.xd-photo .xd-ps-menubar > .xd-editor-icon-button { width: 26px; height: 26px; }
+.xd-photo .xd-ps-menubar .xd-editor-history { gap: 0; }
+.xd-photo .xd-ps-menubar :is(.xd-editor-history, .xd-editor-panel-toggles) .xd-editor-icon-button { width: 26px; height: 26px; }
+.xd-photo .xd-ps-menubar .xd-editor-panel-toggles { padding-left: 4px; }
+
+/* Options bar */
+.xd-photo .xd-ps-options { gap: 10px; min-height: 34px; padding: 3px 8px; background: var(--xd-panel); border-bottom: 1px solid var(--xd-border); }
+.xd-ps-tool-preset { display: inline-flex; align-items: center; gap: 1px; flex: none; height: 26px; padding: 0 6px 0 4px; margin-right: 2px; border-right: 1px solid var(--xd-border); color: var(--xd-text); }
+.xd-ps-tool-preset svg:last-child { color: var(--xd-text-3); }
+.xd-photo .xd-ps-options label { gap: 4px; color: var(--xd-text-2); }
+.xd-photo .xd-ps-options :is(input[type=number], select) { height: 22px; padding: 0 4px; font-size: 11px; background: var(--xd-raised); border: 1px solid var(--xd-border); border-radius: 2px; }
+.xd-photo .xd-ps-options input[type=number] { width: 52px; }
+.xd-photo .xd-ps-options > button { padding: 2px 8px; border: 1px solid var(--xd-border); border-radius: 2px; background: var(--xd-raised); }
+.xd-ps-tool-options { display: flex; align-items: center; flex: none; }
+.xd-ps-tool-options .xd-photo-paint-options { display: flex; align-items: center; gap: 10px; }
+.xd-ps-tool-options .xd-photo-paint-options label { flex: none; justify-content: flex-start; gap: 4px; white-space: nowrap; }
+.xd-ps-tool-options .xd-photo-paint-options input[type=number] { width: 52px; }
+.xd-ps-tool-options .xd-photo-paint-options select { max-width: 130px; }
+.xd-ps-tool-options .xd-photo-brush-search { width: 140px; }
+.xd-photo .xd-ps-options .xd-photo-tool-hint { color: var(--xd-text-3); }
+
+/* Document tab */
+.xd-ps-doctabs { display: flex; align-items: flex-end; gap: 6px; min-height: 26px; padding: 0 0 0 40px; background: var(--xd-panel); border-bottom: 1px solid var(--xd-border); flex: none; }
+.xd-ps-doctab { display: flex; align-items: center; gap: 8px; max-width: 60%; height: 25px; padding: 0 6px 0 10px; background: var(--xd-bg); border: 1px solid var(--xd-border); border-bottom: 0; border-radius: var(--r-sm) var(--r-sm) 0 0; color: var(--xd-text); margin-bottom: -1px; }
+.xd-ps-doctab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xd-photo .xd-ps-doctab button { width: 16px; height: 16px; padding: 0; color: var(--xd-text-3); border-radius: 2px; }
+.xd-photo .xd-ps-doctab button:hover { color: var(--xd-text); }
+.xd-ps-doctabs .xd-photo-contents-actions { align-self: center; }
+
+/* Tools panel: one narrow column, color chips under the tools */
+.xd-photo .xd-ps-body { background: var(--xd-bg); }
+.xd-photo .xd-ps-body > .xd-editor-toolrail { flex: 0 0 40px; width: 40px; padding: 6px 3px; gap: 8px; background: var(--xd-panel); border-right: 1px solid var(--xd-border); }
+.xd-photo .xd-ps-body > .xd-editor-toolrail .xd-editor-toolrail-primary { gap: 1px; }
+.xd-photo .xd-ps-body > .xd-editor-toolrail .xd-editor-tool-button { width: 32px; height: 28px; border-radius: 3px; }
+.xd-photo .xd-ps-body > .xd-editor-toolrail .xd-editor-tool.active .xd-editor-tool-button { color: var(--xd-text); background: var(--bg-3); }
+.xd-photo .xd-ps-body > .xd-editor-toolrail .xd-editor-toolrail-secondary { margin-top: 2px; padding-top: 8px; gap: 8px; }
+.xd-photo .xd-ps-body[data-tools-wrap] > .xd-editor-toolrail { flex-basis: 72px; width: 72px; }
+.xd-photo .xd-ps-body[data-tools-wrap] > .xd-editor-toolrail .xd-editor-toolrail-primary { display: grid; grid-template-columns: repeat(2, 32px); justify-content: center; }
+.xd-photo .xd-ps-body[data-tools-wrap] > .xd-editor-toolrail .xd-editor-toolrail-secondary { display: grid; grid-template-columns: repeat(2, 32px); justify-content: center; align-items: center; }
+.xd-photo .xd-ps-body[data-tools-wrap] > .xd-editor-toolrail .xd-ps-colors { grid-column: 1 / -1; justify-self: center; }
+.xd-ps-colors { position: relative; width: 32px; height: 32px; flex: none; }
+.xd-photo .xd-ps-color { position: absolute; width: 20px; height: 20px; padding: 0; border: 1px solid var(--xd-text-2); border-radius: 0; background: none; cursor: pointer; box-shadow: 0 0 0 1px var(--xd-panel); }
+.xd-photo .xd-ps-color.fg { left: 0; top: 0; z-index: 1; }
+.xd-photo .xd-ps-color.bg { right: 0; bottom: 0; }
+.xd-photo :is(.xd-ps-color-swap, .xd-ps-color-default) { position: absolute; width: 11px; height: 11px; padding: 0; border: 0; color: var(--xd-text-2); }
+.xd-photo .xd-ps-color-swap { right: 0; top: 0; }
+.xd-photo .xd-ps-color-default { left: 0; bottom: 0; }
+.xd-photo .xd-ps-body > .xd-editor-toolrail .xd-editor-toolrail-secondary > .xd-editor-icon-button { width: 32px; height: 26px; }
+
+/* Pasteboard and contextual task bar */
+.xd-ps-canvas { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }
+.xd-photo .xd-ps-canvas > .xd-photo-stage { background: var(--xd-bg); }
+/* Show Cropped Area off has to blend into the pasteboard with no visible canvas edge. */
+.xd-photo .xd-ps-canvas .xd-photo-crop-shade[data-hidden] { fill: var(--xd-bg); }
+.xd-photo[data-screen-mode="full"] .xd-ps-canvas .xd-photo-crop-shade[data-hidden] { fill: #000; }
+/* Photoshop's screen modes (F): both full-screen modes drop the status bar and scroll bars; Full Screen Mode also drops
+   the menu bar and, until Tab, the tools, options and panels, on Photoshop's black. */
+.xd-photo[data-screen-mode] .xd-ps-status { display: none; }
+.xd-photo[data-screen-mode] .xd-photo-stage { scrollbar-width: none; }
+.xd-photo[data-screen-mode] .xd-photo-stage::-webkit-scrollbar { display: none; }
+.xd-photo[data-screen-mode="full"] .xd-ps-menubar,
+.xd-photo[data-screen-mode="full"]:not([data-full-panels]) :is(.xd-ps-options, .xd-editor-toolrail, .xd-ps-dock) { display: none; }
+.xd-photo[data-screen-mode="full"] .xd-ps-canvas > .xd-photo-stage { background: #000; }
+.xd-ps-taskbar { position: absolute; left: 50%; bottom: 14px; z-index: 6; display: flex; align-items: center; gap: 2px; max-width: calc(100% - 24px); padding: 3px; transform: translateX(-50%); background: var(--xd-panel); border: 1px solid var(--xd-border); border-radius: var(--r-md); box-shadow: 0 6px 18px -6px rgba(0, 0, 0, .5); overflow-x: auto; scrollbar-width: none; }
+.xd-photo .xd-ps-taskbar button { flex: none; height: 26px; padding: 0 10px; border-radius: var(--r-sm); color: var(--xd-text); white-space: nowrap; }
+.xd-photo .xd-ps-taskbar button:hover:not(:disabled) { background: var(--xd-hover); }
+
+/* Right dock: flyout · icon strip · panel groups */
+.xd-photo .xd-ps-dock { flex-direction: row; max-width: none; padding: 0; background: var(--xd-panel); border-left: 1px solid var(--xd-border); }
+.xd-ps-strip { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 0 0 36px; width: 36px; padding: 6px 0; border-right: 1px solid var(--xd-border); overflow-y: auto; }
+.xd-photo .xd-ps-strip button { width: 28px; height: 28px; padding: 0; color: var(--xd-text-2); border-radius: 3px; }
+.xd-photo .xd-ps-strip button:hover { color: var(--xd-text); background: var(--xd-hover); }
+.xd-photo .xd-ps-strip button[aria-pressed=true] { color: var(--xd-text); background: var(--bg-3); }
+.xd-ps-flyout { position: absolute; top: 0; right: calc(100% + 1px); z-index: 20; display: flex; flex-direction: column; width: 260px; max-height: 100%; background: var(--xd-panel); border: 1px solid var(--xd-border); box-shadow: -8px 8px 24px -10px rgba(0, 0, 0, .55); }
+.xd-ps-flyout > header { display: flex; align-items: center; justify-content: space-between; height: 28px; padding: 0 2px 0 10px; border-bottom: 1px solid var(--xd-border); flex: none; font-weight: 600; }
+.xd-ps-flyout-body { flex: 1; min-height: 0; overflow: auto; }
+.xd-ps-groups { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.xd-ps-group { display: flex; flex-direction: column; min-height: 0; border-bottom: 1px solid var(--xd-border); }
+.xd-ps-group[hidden] { display: none; }
+.xd-ps-group-color { flex: 0 1 auto; max-height: 30%; }
+.xd-ps-group-properties { flex: 1 1 0; min-height: 120px; }
+.xd-ps-group-layers { flex: 1.25 1 0; min-height: 160px; border-bottom: 0; }
+.xd-ps-group[data-collapsed=true] { flex: 0 0 auto; min-height: 0; }
+.xd-ps-group-color > .xd-editor-panel-scroll { flex: 1; }
+.xd-ps-tabs { display: flex; align-items: flex-end; height: 26px; padding: 0 2px 0 0; background: var(--xd-bg); flex: none; }
+.xd-photo .xd-ps-tabs [role=tab] { height: 26px; padding: 0 9px; border: 0; border-radius: 0; color: var(--xd-text-3); font-weight: 600; white-space: nowrap; }
+.xd-photo .xd-ps-tabs [role=tab]:hover { color: var(--xd-text); background: transparent; }
+.xd-photo .xd-ps-tabs [role=tab][aria-selected=true] { color: var(--xd-text); background: var(--xd-panel); }
+.xd-photo .xd-ps-collapse { align-self: center; width: 20px; height: 20px; padding: 0; color: var(--xd-text-3); }
+.xd-photo .xd-ps-collapse[aria-expanded=false] svg { transform: rotate(-90deg); }
+.xd-ps-pad { padding: 8px 10px; }
+.xd-photo .xd-ps-group .xd-editor-section { padding: 0 10px; }
+.xd-photo .xd-ps-group .xd-editor-section > summary { padding: 8px 0; font-size: 11px; font-weight: 600; }
+
+/* Layers panel */
+.xd-photo .xd-ps-group-layers .xd-photo-layer-controls { flex-wrap: nowrap; gap: 6px; padding: 6px 8px 4px; border-bottom: 0; }
+.xd-photo .xd-ps-group-layers .xd-photo-layer-controls select { width: auto; flex: 1; min-width: 0; height: 22px; padding: 0 4px; }
+.xd-photo .xd-ps-group-layers .xd-photo-layer-controls label { width: auto; gap: 4px; color: var(--xd-text-2); }
+.xd-photo .xd-ps-group-layers .xd-photo-layer-controls input[type=number] { height: 22px; padding: 0 4px; }
+.xd-ps-lock-row { display: flex; align-items: center; gap: 2px; padding: 0 8px 6px; border-bottom: 1px solid var(--xd-border); color: var(--xd-text-2); flex: none; }
+.xd-ps-lock-row > span:first-child { margin-right: 4px; }
+.xd-photo .xd-ps-lock { width: 20px; height: 20px; padding: 0; color: var(--xd-text-2); border-radius: 2px; }
+.xd-photo .xd-ps-lock[aria-pressed=true] { color: var(--xd-text); background: var(--bg-3); }
+.xd-ps-lock-row label { display: flex; align-items: center; gap: 4px; }
+.xd-photo .xd-ps-lock-row input[type=number] { width: 50px; height: 22px; padding: 0 4px; }
+.xd-photo .xd-ps-group-layers .xd-photo-layer-list { padding: 0; }
+.xd-photo .xd-ps-group-layers .xd-photo-layer { min-height: 40px; gap: 4px; border-bottom: 1px solid var(--xd-border); }
+.xd-photo .xd-ps-group-layers .xd-photo-layer.selected, .xd-photo .xd-ps-group-layers .xd-photo-channel-row.selected, .xd-photo .xd-ps-group-layers .xd-photo-path.selected { background: var(--bg-3); }
+.xd-photo .xd-ps-group-layers .xd-photo-layer-thumb { width: 32px; height: 32px; }
+.xd-photo .xd-ps-layer-actions { justify-content: flex-end; gap: 0; padding: 3px 6px; }
+.xd-photo .xd-ps-layer-actions button { width: 24px; height: 22px; padding: 0; color: var(--xd-text-2); }
+.xd-ps-fx { font-size: 11px; font-style: italic; font-weight: 700; }
+.xd-ps-layer-filter { display: flex; align-items: center; gap: 2px; padding: 6px 8px 0; color: var(--xd-text-2); flex: none; }
+.xd-photo .xd-ps-layer-filter select { height: 22px; padding: 0 4px; max-width: 96px; }
+.xd-photo .xd-ps-layer-filter input { flex: 1; min-width: 0; height: 22px; padding: 0 4px; }
+.xd-photo .xd-ps-layer-filter .xd-ps-lock:disabled { opacity: .4; }
+.xd-photo .xd-ps-filter-switch { position: relative; width: 10px; height: 18px; padding: 0; margin-left: 4px; border: 1px solid var(--xd-border); border-radius: 5px; background: var(--xd-raised); }
+.xd-photo .xd-ps-filter-switch > span { position: absolute; left: 1px; bottom: 1px; width: 6px; height: 6px; border-radius: 50%; background: var(--xd-text-3); }
+.xd-photo .xd-ps-filter-switch[aria-checked=true] > span { top: 1px; bottom: auto; background: var(--neon-magenta); }
+.xd-photo .xd-ps-group-layers .xd-photo-layer-thumb-button { flex: none; width: 36px; height: 36px; padding: 1px; border: 1px solid transparent; border-radius: 0; }
+.xd-photo .xd-ps-group-layers .xd-photo-layer-thumb-button.targeted, .xd-photo .xd-ps-group-layers .xd-photo-mask-indicator.targeted { border-color: var(--xd-text); }
+.xd-photo .xd-ps-group-layers .xd-photo-layer.group { min-height: 26px; }
+.xd-photo .xd-ps-group-layers .xd-photo-layer-disclosure { flex: none; width: 14px; height: 20px; padding: 0; color: var(--xd-text-2); background: transparent; }
+.xd-photo .xd-ps-group-layers .xd-photo-layer-thumb-button.group { width: 20px; height: 22px; padding: 0; border-color: transparent; }
+.xd-photo .xd-ps-group-layers .xd-photo-mask-link { flex: none; width: 10px; height: 20px; padding: 0; color: var(--xd-text-2); background: transparent; }
+.xd-photo .xd-ps-group-layers .xd-photo-mask-indicator { width: 36px; height: 36px; padding: 1px; margin: 0; border-color: transparent; border-radius: 0; }
+.xd-photo .xd-ps-group-layers .xd-photo-mask-indicator.disabled-mask { position: relative; }
+.xd-photo .xd-ps-group-layers .xd-photo-mask-indicator.disabled-mask::after { content: ""; position: absolute; inset: 4px; background: linear-gradient(45deg, transparent calc(50% - 1px), var(--neon-magenta) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)), linear-gradient(-45deg, transparent calc(50% - 1px), var(--neon-magenta) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)); }
+.xd-photo .xd-ps-group-layers .xd-photo-layer-fx { flex: none; display: inline-flex; align-items: center; gap: 1px; height: 20px; padding: 0 2px; color: var(--xd-text-2); }
+.xd-photo .xd-ps-group-layers .xd-photo-layer-fx[aria-expanded=false] svg { transform: rotate(-90deg); }
+.xd-photo .xd-ps-group-layers .xd-photo-effect-row { display: flex; align-items: center; gap: 4px; min-height: 22px; padding-left: 8px; border-bottom: 1px solid var(--xd-border); color: var(--xd-text-2); font-size: 11px; }
+.xd-photo .xd-ps-group-layers .xd-photo-effect-row > span { padding-left: 40px; }
+.xd-photo .xd-ps-group-layers .xd-photo-effect-row.nested > span { padding-left: 52px; }
+
+/* Status bar */
+.xd-photo .xd-ps-status { gap: 6px; min-height: 22px; padding: 0 8px; background: var(--xd-panel); border-top: 1px solid var(--xd-border); font-size: 11px; }
+.xd-photo .xd-ps-status > button { height: 18px; padding: 0 5px; border-radius: 2px; color: var(--xd-text-2); }
+.xd-photo .xd-ps-status > span:not(.xd-ps-status-text):not(.xd-ps-doc-info) { min-width: 40px; text-align: center; color: var(--xd-text); }
+.xd-photo .xd-ps-status .xd-ps-doc-info { flex: none; padding: 0 10px; border-left: 1px solid var(--xd-border); border-right: 1px solid var(--xd-border); color: var(--xd-text-2); }
+.xd-photo .xd-ps-status > .xd-ps-status-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--xd-text-3); }
+
+/* Photoshop order: zoom, document size, then messages. DOM keeps the zoom readout last. */
+.xd-photo .xd-ps-status > * { order: 0; }
+.xd-photo .xd-ps-status > .xd-ps-doc-info { order: 1; }
+.xd-photo .xd-ps-status > .xd-ps-status-text { order: 2; }
+.xd-photo .xd-ps-status > button[aria-label^="Finish"], .xd-photo .xd-ps-status > button[aria-label^="Cancel"] { order: 3; }
+
+/* Narrow windows: the dock overlays the pasteboard. */
+.xd-ps-body[data-overlay=true] > .xd-ps-dock { position: absolute; top: 0; bottom: 0; right: 0; z-index: 20; box-shadow: var(--shadow-window); }
+@container xd-studio (max-width: 640px) {
+  .xd-ps-doctabs { padding-left: 4px; }
+  .xd-photo .xd-ps-status .xd-ps-doc-info { display: none; }
+}
+
+/* Menus list one command per line, like Photoshop's Filter menu. */
+
+/* Photoshop's Adjustments panel: a caption naming the hovered adjustment over rows of icon buttons. */
+.xd-photo .xd-photo-adjustments > p { margin: 0 0 6px; color: var(--xd-text-2); }
+.xd-photo .xd-photo-adjustments > div { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 4px; }
+.xd-photo .xd-photo-adjustments button { width: 28px; height: 28px; padding: 0; }
+
+/* Photoshop's Properties clusters: Transform fields in W/H, X/Y and angle rows, and the Align and Distribute icon rows. */
+.xd-photo .xd-photo-transform > div, .xd-photo .xd-photo-align > div { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+.xd-photo .xd-photo-transform label { flex: 1; display: flex; align-items: center; gap: 4px; min-width: 0; font-size: 11px; color: var(--xd-text-2); }
+.xd-photo .xd-photo-transform input[type=number] { flex: 1; width: 0; height: 22px; padding: 0 4px; font-size: 11px; background: var(--xd-raised); border: 1px solid var(--xd-border); border-radius: 2px; }
+.xd-photo .xd-photo-transform button, .xd-photo .xd-photo-transform > div > span { flex: none; width: 24px; height: 24px; padding: 0; }
+.xd-photo .xd-photo-align button { width: 26px; height: 24px; padding: 0; }
+.xd-photo .xd-photo-align label { margin-left: auto; display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--xd-text-2); }
+.xd-photo .xd-photo-align select { height: 22px; padding: 0 4px; font-size: 11px; background: var(--xd-raised); border: 1px solid var(--xd-border); border-radius: 2px; }
+/* Double-clicking a layer name edits it in place, as in Photoshop's Layers panel. */
+.xd-photo .xd-photo-layer-name.renaming { flex: none; }
+.xd-photo .xd-photo-layer-rename { flex: 1; min-width: 0; height: 20px; padding: 0 4px; font: inherit; font-size: 11px; color: var(--xd-text); background: var(--xd-raised); border: 1px solid var(--xd-border); border-radius: 2px; }

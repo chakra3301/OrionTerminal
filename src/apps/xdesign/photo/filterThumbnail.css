@@ -1,0 +1,8 @@
+.xd-photo .xd-photo-filter-thumbnail { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 8px; }
+.xd-photo .xd-photo-filter-thumbnail-frame { position: relative; width: 128px; height: 128px; overflow: hidden; cursor: grab; touch-action: none; background: var(--xd-bg); border: 1px solid var(--xd-border); border-radius: var(--r-sm); }
+.xd-photo .xd-photo-filter-thumbnail-frame:active { cursor: grabbing; }
+.xd-photo .xd-photo-filter-thumbnail-frame img { position: absolute; top: 0; left: 0; max-width: none; user-select: none; pointer-events: none; image-rendering: auto; }
+.xd-photo .xd-photo-filter-thumbnail-zoom { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--xd-text-2); }
+.xd-photo .xd-photo-filter-thumbnail-zoom button { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; color: var(--xd-text-2); background: var(--xd-raised); border: 1px solid var(--xd-border); border-radius: var(--r-sm); }
+.xd-photo .xd-photo-filter-thumbnail-zoom button:disabled { opacity: .4; }
+.xd-photo .xd-photo-filter-thumbnail-zoom span { min-width: 40px; text-align: center; }

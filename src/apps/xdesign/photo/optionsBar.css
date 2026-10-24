@@ -1,0 +1,41 @@
+.xd-ps-icon-cluster { display: inline-flex; gap: 1px; align-items: center; }
+.xd-ps-icon-cluster > button, .xd-ps-chevron, .xd-ps-brush-trigger { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; color: var(--xd-text-2); font: inherit; cursor: default; }
+.xd-ps-icon-cluster > button { width: 24px; height: 24px; }
+.xd-ps-icon-cluster > button:hover:not(:disabled), .xd-ps-chevron:hover:not(:disabled), .xd-ps-brush-trigger:hover:not(:disabled) { background: var(--xd-hover); color: var(--xd-text); }
+.xd-ps-icon-cluster > button[aria-pressed="true"] { background: var(--bg-3); color: var(--xd-text); }
+.xd-ps-icon-cluster > button:disabled, .xd-ps-chevron:disabled, .xd-ps-brush-trigger:disabled { color: var(--xd-text-3); }
+
+.xd-ps-popup-slider, .xd-ps-brush-picker { position: relative; display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--xd-text-2); }
+.xd-ps-scrub { cursor: ew-resize; user-select: none; touch-action: none; }
+.xd-ps-unit { color: var(--xd-text-2); }
+.xd-ps-number { box-sizing: border-box; width: 44px; height: 20px; padding: 0 4px; border: 1px solid var(--xd-border); border-radius: var(--r-sm); background: var(--xd-raised); color: var(--xd-text); font: inherit; font-size: 11px; }
+.xd-ps-chevron { width: 16px; height: 20px; }
+.xd-ps-chevron[aria-expanded="true"], .xd-ps-brush-trigger[aria-expanded="true"] { background: var(--xd-hover); color: var(--xd-text); }
+
+.xd-ps-popover { position: fixed; z-index: 60; box-sizing: border-box; padding: 6px; background: var(--xd-panel); border: 1px solid var(--xd-border); border-radius: var(--r-sm); box-shadow: var(--shadow-window); color: var(--xd-text); font-size: 11px; white-space: nowrap; }
+.xd-ps-popover input[type="range"] { accent-color: var(--xd-accent); width: 140px; }
+
+.xd-ps-brush-trigger { flex-direction: column; width: 34px; height: 26px; gap: 0; color: var(--xd-text); }
+.xd-ps-brush-tip { display: block; flex: none; border-radius: 50%; }
+.xd-ps-brush-size { font-size: 9px; line-height: 1; color: var(--xd-text-2); }
+.xd-ps-brush-popover { display: grid; gap: 6px; width: 260px; white-space: normal; }
+.xd-ps-brush-popover > .xd-ps-row { display: grid; grid-template-columns: 54px 1fr 52px 16px; align-items: center; gap: 4px; }
+.xd-ps-brush-popover > .xd-ps-row input[type="range"] { width: 100%; min-width: 0; }
+.xd-ps-brush-presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 4px; max-height: 240px; overflow-y: auto; }
+.xd-ps-brush-presets > button { display: grid; justify-items: center; gap: 2px; padding: 3px; border: 1px solid transparent; border-radius: var(--r-sm); background: var(--xd-raised); color: var(--xd-text); font: inherit; cursor: default; }
+.xd-ps-brush-presets > button:hover { background: var(--xd-hover); }
+.xd-ps-brush-presets > button:focus-visible { border-color: var(--xd-accent); outline: none; }
+.xd-ps-brush-presets small { font-size: 9px; color: var(--xd-text-2); }
+
+.xd-ps-label { font-size: 11px; color: var(--xd-text-2); margin-right: 3px; }
+.xd-ps-segmented { gap: 1px; }
+.xd-ps-segmented > button { width: auto; padding: 0 7px; font-size: 11px; }
+.xd-ps-more { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 1px solid transparent; background: transparent; color: var(--xd-text-2); }
+.xd-ps-gradient-pick { display: inline-flex; align-items: center; gap: 3px; }
+.xd-ps-gradient-swatch { width: 48px; height: 18px; border: 1px solid var(--xd-border); border-radius: var(--r-sm); }
+
+.xd-ps-toggle { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; color: var(--xd-text-2); cursor: default; }
+.xd-ps-toggle:hover:not(:disabled) { background: var(--xd-hover); color: var(--xd-text); }
+.xd-ps-toggle[aria-pressed="true"] { background: var(--bg-3); color: var(--xd-text); }
+
+.xd-photo-sampling-ring { position: fixed; z-index: 70; width: 76px; height: 76px; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; background: linear-gradient(to bottom, var(--ring-new) 50%, var(--ring-old) 50%); -webkit-mask: radial-gradient(circle, transparent 28px, #000 29px); mask: radial-gradient(circle, transparent 28px, #000 29px); box-shadow: 0 0 0 1px rgba(0, 0, 0, .6); }

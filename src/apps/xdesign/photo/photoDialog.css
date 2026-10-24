@@ -1,0 +1,116 @@
+/* Photoshop's modal dialog: flat pane with a title bar to drag it by and OK/Cancel stacked on the right.
+   Owner D3: the document stays in view, so the scrim catches clicks without dimming, and dialogs that preview on the
+   document open beside it (.is-beside). Pane, control and button fills are the closest --xd-* tokens (gaps listed for
+   Hermes in PROGRESS.md). Rules sit under .xd-photo to outrank its generic button and field styles in photo.css. */
+.xd-photo-dialog-scrim.xd-ps-dialog-scrim,.xd-ps-dialog-scrim { position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;overflow:hidden;background:transparent; }
+.xd-ps-dialog-scrim.is-beside { align-items:flex-start;justify-content:flex-end;padding:56px 16px 16px; }
+.xd-photo .xd-ps-dialog { display:flex;flex-direction:column;width:auto;max-width:100%;max-height:100%;overflow:auto;box-sizing:border-box;padding:0 16px 16px;background:var(--xd-panel);border:1px solid var(--xd-border);border-radius:var(--r-sm);box-shadow:var(--shadow-window);color:var(--xd-text);font-size:12px; }
+.xd-photo .xd-ps-dialog > header { margin:0 -16px 12px;padding:6px 16px;border-bottom:1px solid var(--xd-border);user-select:none;touch-action:none;cursor:default; }
+.xd-photo .xd-ps-dialog > header h3 { margin:0;padding:0;font-size:12px;font-weight:500;color:var(--xd-text); }
+.xd-photo .xd-ps-dialog-body { display:flex;gap:16px;align-items:flex-start;min-height:0; }
+.xd-photo .xd-ps-dialog-main { flex:1;min-width:220px; }
+.xd-photo .xd-ps-dialog-main > :last-child { margin-bottom:0; }
+.xd-photo .xd-ps-dialog-buttons { display:flex;flex-direction:column;gap:6px;min-width:96px;flex:none; }
+.xd-photo .xd-ps-dialog-buttons > button { display:block; }
+.xd-photo .xd-ps-dialog button { padding:4px 12px;border:1px solid var(--xd-border);border-radius:var(--r-sm);background:var(--xd-raised);color:inherit;font:inherit; }
+.xd-photo .xd-ps-dialog button:hover:not(:disabled) { background:var(--xd-hover); }
+.xd-photo .xd-ps-dialog button:disabled { opacity:1;color:var(--xd-text-3); }
+.xd-photo .xd-ps-dialog button[type=submit] { border-color:var(--xd-accent);background:rgba(var(--xd-accent-rgb),.25); }
+.xd-photo .xd-ps-dialog :focus-visible { outline:2px solid var(--xd-accent);outline-offset:1px; }
+.xd-photo .xd-ps-dialog :is(select,input[type=number],input[type=text],input:not([type]),textarea) { box-sizing:border-box;padding:2px 4px;border:1px solid var(--xd-border);border-radius:var(--r-sm);background:var(--xd-bg);color:var(--xd-text);font:inherit; }
+.xd-photo .xd-ps-dialog input[type=number] { text-align:right;font-variant-numeric:tabular-nums; }
+.xd-photo .xd-ps-dialog :is(input,select,textarea):disabled { color:var(--xd-text-3); }
+.xd-photo .xd-ps-dialog input[type=range] { display:block;width:100%;margin:4px 0 0;accent-color:var(--xd-accent); }
+.xd-photo .xd-ps-dialog :is(input[type=checkbox],input[type=radio]) { margin:0;accent-color:var(--xd-accent); }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-check { display:flex;align-items:center;gap:6px;margin:0; }
+.xd-photo .xd-ps-dialog-buttons .xd-ps-dialog-check { margin-top:10px; }
+/* Photoshop's render indicator: a line that blinks under Preview while the filter catches up. */
+.xd-ps-dialog-progress { display:block;height:2px;margin:-2px 0 0 19px;background:var(--xd-accent);animation:xd-ps-dialog-progress 1s steps(2,jump-none) infinite; }
+@keyframes xd-ps-dialog-progress { to { opacity:.2; } }
+@media (prefers-reduced-motion:reduce) { .xd-ps-dialog-progress { animation:none; } }
+.xd-photo .xd-ps-dialog :is([role=alert],[role=status]) { margin:0;color:var(--xd-text-2);font-size:11px; }
+/* Generic dialog content: Photoshop's "Label: [field]" rows. */
+.xd-photo .xd-ps-dialog-main > p { margin:0 0 12px;color:var(--xd-text-2);font-size:11px; }
+.xd-photo .xd-ps-dialog-main label { gap:6px 8px;margin-bottom:8px;color:var(--xd-text); }
+.xd-photo .xd-ps-dialog-main :is([role=alert],[role=status]) { margin-top:8px; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-readout { margin:0 0 4px;color:var(--xd-text);font-size:12px; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-readout + :not(.xd-ps-dialog-readout) { margin-top:12px; }
+/* Rows share one grid per block so labels right-align on a common edge: label | field | unit or popup. */
+.xd-photo .xd-ps-dialog .xd-ps-dialog-grid { display:grid;grid-template-columns:auto 80px auto;gap:8px 6px;align-items:center;justify-items:start;margin:0 0 12px; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-grid.has-sliders { grid-template-columns:1fr 64px auto;row-gap:4px; }
+.xd-photo .xd-ps-dialog :is(.xd-ps-dialog-row,.xd-ps-dialog-field) { display:contents; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-field > span:first-child,.xd-photo .xd-ps-dialog .xd-ps-dialog-label { grid-column:1;justify-self:end;white-space:nowrap; }
+.xd-photo .xd-ps-dialog .has-sliders .xd-ps-dialog-field > span:first-child { justify-self:start; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-field > :is(input[type=number],input[type=text],output) { width:100%; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-field > output { text-align:right;font-variant-numeric:tabular-nums; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-field > :is(select,input:not([type])) { grid-column:2/-1;min-width:140px; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-unit { color:var(--xd-text-2); }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-grid input[type=range] { grid-column:1/-1;margin:0 0 6px; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-row > .xd-ps-dialog-check { grid-column:1/-1; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-row > button { grid-column:2/-1;justify-self:start; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-row > .xd-ps-dialog-check.xd-ps-dialog-indent { grid-column:2/-1; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-row > .xd-ps-dialog-check.is-label { grid-column:1;justify-self:end; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-row > .is-label + select,.xd-photo .xd-ps-dialog .xd-ps-dialog-label + * { grid-column:2/-1; }
+/* Photoshop's titled group boxes (Blending, Shadows, New Size). */
+.xd-photo .xd-ps-dialog .xd-ps-dialog-group { margin:0 0 12px;padding:8px 10px 10px;border:1px solid var(--xd-border);border-radius:var(--r-sm);min-width:0; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-group > legend { padding:0 4px;color:var(--xd-text-2);font-size:11px; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-group > .xd-ps-dialog-grid { margin:0; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-grid > .xd-photo-section-help { grid-column:1/-1; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-radios { display:flex;gap:16px; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-radios > label { margin:0; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-radios.is-column { flex-direction:column;gap:6px; }
+/* Trim Away: Top and Bottom stacked in the first column, Left and Right in the second, as Photoshop lays them out. */
+.xd-photo .xd-ps-dialog .xd-ps-dialog-checks { display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:column;grid-template-rows:auto auto;gap:6px 24px; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-checks > label { margin:0; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-text { display:block;margin:0 0 12px; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-text textarea { display:block;box-sizing:border-box;width:100%;min-height:96px;margin-top:4px;resize:vertical; }
+.xd-photo .xd-ps-dialog input[type=color] { width:48px;height:22px;padding:0 2px;border:1px solid var(--xd-border);border-radius:var(--r-sm);background:var(--xd-bg); }
+/* Image Size: the chain link brackets Width and Height on the left. */
+.xd-photo .xd-ps-dialog .xd-ps-dialog-size { display:flex;align-items:center;gap:6px;margin:0 0 12px; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-size > .xd-ps-dialog-grid { margin:0; }
+.xd-photo .xd-ps-dialog button.xd-ps-dialog-link { display:grid;place-items:center;width:22px;height:44px;padding:0;border-color:transparent;background:transparent;color:var(--xd-text-2); }
+.xd-photo .xd-ps-dialog button.xd-ps-dialog-link[aria-pressed=true] { color:var(--xd-text); }
+.xd-photo .xd-ps-dialog-anchors { display:grid;grid-template-columns:repeat(3,22px);grid-auto-rows:22px;gap:1px; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-anchors button { display:grid;place-items:center;padding:0;border-radius:0;color:var(--xd-text-2); }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-anchors button[aria-pressed=true] { background:var(--xd-hover); }
+.xd-ps-dialog-anchor-mark { width:10px;height:10px;background:var(--xd-text); }
+/* Filter and adjustment dialogs: plain controls beside the image, or the preview-led layout for geometry filters. */
+.xd-photo .xd-ps-dialog.xd-photo-special-dialog { width:min(1000px,94%); }
+.xd-photo .xd-ps-dialog .xd-photo-action-controls { width:340px;max-height:70vh;overflow:auto; }
+.xd-photo .xd-ps-dialog .xd-photo-action-grid > * { grid-column:1/-1; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-field > button { grid-column:2/-1;justify-self:start; }
+/* Color Picker: the current swatch and the web-color warning are not push buttons, whichever stylesheet loads last. */
+.xd-photo .xd-ps-dialog .xd-color-dialog button.xd-color-current { padding:0;border-radius:0; }
+.xd-photo .xd-ps-dialog .xd-color-dialog button.xd-color-warn { padding:0 2px;border-color:transparent;border-radius:0;background:transparent; }
+.xd-photo .xd-ps-dialog .xd-color-webonly { margin-top:12px; }
+
+.xd-photo-color-range-controls { display:flex;flex-direction:column;gap:10px;width:228px; }
+.xd-photo-color-range-row { display:flex;align-items:center;gap:6px; }
+.xd-photo-color-range-row > select { flex:1;min-width:0; }
+.xd-photo-color-range-field > div { display:flex;align-items:center;gap:6px; }
+.xd-photo-color-range-field > div > span:first-child { flex:1; }
+.xd-photo .xd-photo-color-range-field input[type=number] { width:7ch; }
+.xd-photo-color-range-field.is-disabled { color:var(--xd-text-3); }
+.xd-photo-color-range-thumb { width:228px;height:228px;border:1px solid var(--xd-border);background:var(--xd-bg);box-sizing:border-box; }
+.xd-photo-color-range-thumb img { display:block;width:100%;height:100%;object-fit:contain;user-select:none; }
+.xd-photo-color-range-views { display:flex;justify-content:center;gap:16px; }
+.xd-photo-color-range-tools { display:flex;gap:4px;margin-top:10px; }
+.xd-photo .xd-ps-dialog .xd-photo-color-range-tools button { position:relative;display:grid;place-items:center;width:28px;height:24px;padding:0; }
+.xd-photo .xd-ps-dialog .xd-photo-color-range-tools button[aria-pressed=true] { border-color:var(--xd-accent);background:var(--xd-hover); }
+.xd-photo-color-range-tools b { position:absolute;right:2px;bottom:0;font-size:10px;font-weight:600;line-height:1; }
+/* Color Settings checkbox pairs sit on one line after their heading (Profile Mismatches: Ask When Opening / Ask When Pasting). */
+.xd-photo .xd-ps-dialog .xd-ps-dialog-checks.is-inline { grid-column:2/-1;display:flex;flex-wrap:wrap;gap:6px 16px; }
+
+/* Image command dialogs: the body scrolls under a fixed title bar when the window is short. */
+.xd-photo .xd-ps-dialog.is-scroll { overflow:hidden; }
+.xd-photo .xd-ps-dialog.is-scroll > .xd-ps-dialog-body { flex:1;overflow:auto;padding-bottom:2px; }
+.xd-photo .xd-ps-dialog-thumb { display:grid;place-items:center;max-width:228px;min-height:60px;margin:6px 0;border:1px solid var(--xd-border);background:var(--xd-bg);box-sizing:border-box; }
+.xd-photo .xd-ps-dialog-thumb img { display:block;max-width:100%;max-height:228px;object-fit:contain;user-select:none; }
+.xd-photo .xd-ps-dialog-thumb.is-size img { object-fit:fill; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-tool { display:grid;place-items:center;width:28px;height:24px;padding:0; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-tool[aria-pressed=true] { border-color:var(--xd-accent);background:var(--xd-hover); }
+.xd-photo .xd-ps-dialog .xd-ps-swatches { display:grid;grid-template-columns:repeat(16,14px);gap:1px;margin:0 0 8px;padding:1px;border:1px solid var(--xd-border);background:var(--xd-border);max-height:228px;overflow:auto;width:max-content;max-width:100%; }
+.xd-photo .xd-ps-dialog .xd-ps-swatches > button { width:14px;height:14px;padding:0;border:0;border-radius:0; }
+.xd-photo .xd-ps-dialog .xd-ps-swatches > button[aria-pressed=true] { outline:2px solid var(--xd-accent);outline-offset:-2px;position:relative; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-ink { display:grid;grid-template-columns:auto 28px 1fr;gap:6px;align-items:center;margin:0 0 6px; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-ink > input[type=color] { width:28px;height:22px;padding:0; }

@@ -1,0 +1,8 @@
+.xd-info-panel { display:grid;grid-template-columns:1fr 1fr;color:var(--xd-text);font-size:11px;user-select:none; }
+.xd-info-cell { position:relative;display:flex;flex-direction:column;gap:2px;min-width:0;padding:6px 8px 6px 24px;box-sizing:border-box;border-bottom:1px solid var(--xd-border); }
+.xd-info-cell:nth-child(odd) { border-right:1px solid var(--xd-border); }
+.xd-info-cell > svg { position:absolute;left:7px;top:7px;color:var(--xd-text-2); }
+.xd-info-row { display:flex;justify-content:space-between;gap:6px; }
+.xd-info-row span { color:var(--xd-text-2); }
+.xd-info-row output { min-width:4ch;text-align:right;font-variant-numeric:tabular-nums; }
+.xd-info-doc { grid-column:1 / -1;padding:6px 8px;color:var(--xd-text-3);font-variant-numeric:tabular-nums; }

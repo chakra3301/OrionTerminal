@@ -1,0 +1,174 @@
+.xd-photo .xd-ps-dialog-subhead, .xd-photo .xd-photo-adjustment-editor .xd-ps-dialog-subhead { grid-column: 1 / -1; margin: 6px 0 0; font-size: 11px; font-weight: 600; color: var(--xd-text-2); }
+/* Properties shares the dialog's control grid: label | field | unit, with sliders spanning the row. */
+.xd-photo .xd-photo-adjustment-editor .xd-ps-dialog-grid.has-sliders { display:grid;grid-template-columns:1fr 64px auto;gap:4px 6px;align-items:center;justify-items:start; }
+.xd-photo .xd-photo-adjustment-editor :is(.xd-ps-dialog-row,.xd-ps-dialog-field) { display:contents; }
+.xd-photo .xd-photo-adjustment-editor .xd-photo-action-grid > * { grid-column:1/-1; }
+.xd-photo .xd-photo-adjustment-editor .xd-ps-dialog-field > span:first-child { grid-column:1;white-space:nowrap;font-size:11px; }
+.xd-photo .xd-photo-adjustment-editor .xd-ps-dialog-field > input[type=number] { width:100%;box-sizing:border-box;text-align:right; }
+.xd-photo .xd-photo-adjustment-editor .xd-ps-dialog-field > :is(select,input:not([type])) { grid-column:2/-1;width:100%; }
+.xd-photo .xd-photo-adjustment-editor .xd-ps-dialog-grid input[type=range] { grid-column:1/-1;width:100%;margin:0 0 6px; }
+.xd-photo .xd-photo-adjustment-editor .xd-ps-dialog-row > .xd-ps-dialog-check { grid-column:1/-1;display:flex;align-items:center;gap:6px; }
+.xd-photo .xd-photo-adjustment-editor .xd-ps-dialog-group { margin:0;padding:6px 8px 8px;border:1px solid var(--xd-border);border-radius:var(--r-sm);min-width:0; }
+.xd-photo .xd-photo-adjustment-editor .xd-ps-dialog-group > legend { padding:0 4px;color:var(--xd-text-2);font-size:11px; }
+.xd-photo .xd-photo-adjustment-editor .xd-ps-dialog-radios { display:flex;flex-wrap:wrap;gap:4px 12px; }
+
+/* Levels, Threshold and Curves: Photoshop's histogram boxes, gradient bars and triangle sliders. */
+.xd-photo .xd-photo-tone-head { display:flex;align-items:center;gap:6px;width:100%; }
+.xd-photo .xd-photo-tone-head select { flex:1;min-width:0; }
+.xd-photo .xd-photo-tone { display:flex;flex-direction:column;gap:6px;width:100%;min-width:0; }
+.xd-photo .xd-photo-tone-body { display:flex;align-items:flex-start;gap:6px;width:100%;min-width:0; }
+.xd-photo .xd-photo-tone-body > :last-child { flex:1;min-width:0; }
+.xd-photo .xd-photo-tone-tools, .xd-photo .xd-photo-tone-slot { display:flex;flex-direction:column;gap:6px; }
+.xd-photo .xd-photo-tone-slot > button { display:block; }
+.xd-photo .xd-photo-tone-eyedroppers { display:flex;flex-direction:column;gap:2px;flex:none; }
+.xd-photo .xd-photo-tone-slot .xd-photo-tone-eyedroppers { flex-direction:row;justify-content:center;gap:4px;margin-top:6px; }
+.xd-photo :is(.xd-photo-tone-eyedroppers button,button.xd-photo-on-image) { display:grid;place-items:center;width:26px;height:22px;padding:0; }
+.xd-photo :is(.xd-photo-tone-eyedroppers button,button.xd-photo-on-image)[aria-pressed=true] { border-color:var(--xd-accent);background:var(--xd-hover); }
+.xd-photo .xd-photo-tone-column, .xd-photo .xd-photo-curve-tools { display:flex;flex-direction:column;gap:6px;flex:none; }
+.xd-photo .xd-photo-curve-tools { gap:2px; }
+.xd-photo :is(.xd-photo-curve-tools,.xd-photo-curve-grids) button { display:grid;place-items:center;width:26px;height:22px;padding:0; }
+.xd-photo :is(.xd-photo-curve-tools button[aria-pressed=true],.xd-photo-curve-grids button[aria-checked=true]) { border-color:var(--xd-accent);background:var(--xd-hover); }
+.xd-photo .xd-photo-curve-under { display:flex;align-items:flex-end;justify-content:space-between;gap:12px; }
+.xd-photo .xd-photo-curve-aside { display:flex;flex-direction:column;align-items:flex-start;gap:6px; }
+.xd-photo .xd-photo-curve-aside-row { display:flex;align-items:center;gap:4px; }
+.xd-photo .xd-photo-curve-aside-row > .xd-photo-tone-eyedroppers { flex-direction:row;gap:4px; }
+.xd-photo .xd-photo-curve-aside > .xd-ps-dialog-check { margin:0; }
+.xd-photo .xd-photo-clipping { z-index:6; }
+.xd-photo .xd-photo-curve-display { width:100%;font-size:11px; }
+.xd-photo .xd-photo-curve-display > summary { padding:4px 0;cursor:default; }
+.xd-photo .xd-photo-curve-display-row { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;margin:4px 0 0 14px; }
+.xd-photo .xd-photo-curve-display-row .xd-ps-dialog-check { margin:0; }
+.xd-photo .xd-photo-curve-grids { display:flex;gap:2px; }
+/* The eyedroppers' ink is the tone each one sets, like the triangles below. */
+.xd-photo .xd-photo-eyedropper-ink.is-black { fill:#000; }
+.xd-photo .xd-photo-eyedropper-ink.is-gray { fill:#808080; }
+.xd-photo .xd-photo-eyedropper-ink.is-white { fill:#fff; }
+.xd-photo .xd-photo-auto-targets > div { display:flex;align-items:center;gap:12px;margin:4px 0; }
+.xd-photo .xd-photo-auto-targets .xd-ps-dialog-field > span:first-child { min-width:64px; }
+.xd-photo .xd-photo-auto-targets input[type=number] { width:52px;text-align:right; }
+/* Photoshop's number fields have no spin buttons; arrow keys and the sliders still step them. */
+.xd-photo :is(.xd-ps-dialog,.xd-photo-adjustment-editor) input[type=number] { -moz-appearance:textfield;appearance:textfield; }
+.xd-photo :is(.xd-ps-dialog,.xd-photo-adjustment-editor) input[type=number]::-webkit-inner-spin-button,
+.xd-photo :is(.xd-ps-dialog,.xd-photo-adjustment-editor) input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none;margin:0; }
+.xd-photo .xd-photo-levels { display:flex;flex-direction:column;gap:3px;width:100%;min-width:0; }
+.xd-photo .xd-photo-levels > .xd-ps-dialog-subhead { margin:6px 0 2px;font-weight:400;color:var(--xd-text); }
+.xd-photo .xd-photo-levels-histogram { height:110px;margin:0 6px;border:1px solid var(--xd-border);background:var(--xd-bg);color:var(--xd-text-2); }
+.xd-photo .xd-photo-levels-histogram.is-threshold { height:90px; }
+.xd-photo .xd-photo-histogram { display:block;width:100%;height:100%; }
+.xd-photo .xd-photo-threshold-line { stroke:var(--xd-accent);stroke-width:1; }
+.xd-photo .xd-photo-tone-bar { height:10px;margin:0 6px;border:1px solid var(--xd-border);box-sizing:border-box; }
+.xd-photo .xd-photo-tone-strip { position:relative;height:14px;margin:0 6px;touch-action:none; }
+.xd-photo .xd-photo-tone-handle { position:absolute;top:1px;width:11px;height:9px;margin-left:-5.5px;cursor:ew-resize; }
+.xd-photo .xd-photo-tone-handle svg { display:block;width:11px;height:9px;overflow:visible; }
+.xd-photo .xd-photo-tone-handle path { stroke:var(--xd-text-2);stroke-width:1; }
+.xd-photo .xd-photo-tone-handle.is-black path { fill:#000; }
+.xd-photo .xd-photo-tone-handle.is-gray path { fill:#808080; }
+.xd-photo .xd-photo-tone-handle.is-white path { fill:#fff; }
+.xd-photo .xd-photo-tone-handle[aria-disabled=true] { cursor:default;opacity:.5; }
+.xd-photo .xd-photo-levels-fields { display:flex;justify-content:space-between;gap:6px; }
+.xd-photo .xd-photo-levels :is(.xd-photo-levels-fields,.xd-photo-levels-row) input { width:56px;box-sizing:border-box;text-align:right; }
+.xd-photo .xd-photo-levels-row { display:flex;align-items:center;gap:6px;margin:0 0 4px; }
+.xd-photo .xd-photo-curves { width:100%;max-width:300px; }
+.xd-photo .xd-photo-curve-plot { position:relative;margin-left:14px; }
+.xd-photo .xd-photo-curve-plot > svg { display:block;width:100%;aspect-ratio:1;cursor:crosshair;touch-action:none;color:var(--xd-text-2); }
+.xd-photo .xd-photo-curve-vbar { position:absolute;left:-12px;top:1.887%;bottom:1.887%;width:8px;border:1px solid var(--xd-border);box-sizing:border-box; }
+.xd-photo .xd-photo-curve-field { fill:var(--xd-bg);stroke:var(--xd-border); }
+.xd-photo .xd-photo-curve-histogram { opacity:.3; }
+.xd-photo .xd-photo-curve-grid { fill:none;stroke:var(--xd-text-3);stroke-width:1;opacity:.6; }
+.xd-photo .xd-photo-curve-intersection { fill:none;stroke:var(--xd-text-2);stroke-width:1;stroke-dasharray:3 3; }
+.xd-photo .xd-photo-curve-point { fill:var(--xd-bg);stroke:var(--xd-text);stroke-width:1;cursor:move; }
+.xd-photo .xd-photo-curve-point[aria-pressed=true] { fill:var(--xd-text);stroke:#000; }
+.xd-photo .xd-photo-curve-point:focus-visible { outline:none;stroke:var(--xd-accent);stroke-width:2; }
+/* The bar and black/white triangles line up with the 0–255 graph inside the SVG's 5-unit padding. */
+.xd-photo .xd-photo-curve-axis { margin:2px 0 0 14px;padding:0 calc((100% - 14px) * 5 / 265); }
+.xd-photo .xd-photo-curve-axis > * { margin:0; }
+.xd-photo .xd-photo-curve-axis > .xd-photo-tone-bar { height:8px; }
+.xd-photo .xd-photo-curve-fields { display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:6px 0 0 14px; }
+.xd-photo .xd-photo-curve-fields label { display:flex;align-items:center;gap:6px;margin:0; }
+.xd-photo .xd-photo-curve-fields span { min-width:48px;text-align:right; }
+.xd-photo .xd-photo-curve-fields input { width:64px;box-sizing:border-box;text-align:right; }
+
+/* Photoshop's sliders: a thin line, or a gradient bar for colour sliders, with a triangle under it. */
+.xd-photo :is(.xd-ps-dialog,.xd-photo-adjustment-editor) input[type=range] { -webkit-appearance:none;appearance:none;height:16px;background:none;accent-color:auto; }
+.xd-photo :is(.xd-ps-dialog,.xd-photo-adjustment-editor) input[type=range]::-webkit-slider-runnable-track { height:2px;background:var(--xd-text-3);border:0; }
+.xd-photo :is(.xd-ps-dialog,.xd-photo-adjustment-editor) input[type=range].has-track::-webkit-slider-runnable-track { height:6px;background:var(--xd-photo-track);border:1px solid var(--xd-border); }
+.xd-photo :is(.xd-ps-dialog,.xd-photo-adjustment-editor) input[type=range]::-webkit-slider-thumb { -webkit-appearance:none;appearance:none;width:11px;height:9px;margin-top:1px;border:0;background:var(--xd-text);clip-path:polygon(50% 0,100% 100%,0 100%); }
+.xd-photo :is(.xd-ps-dialog,.xd-photo-adjustment-editor) input[type=range].has-track::-webkit-slider-thumb { margin-top:5px; }
+.xd-photo :is(.xd-ps-dialog,.xd-photo-adjustment-editor) input[type=range]:disabled::-webkit-slider-thumb { background:var(--xd-text-3); }
+.xd-photo :is(.xd-ps-dialog,.xd-photo-adjustment-editor) input[type=range]::-moz-range-track { height:2px;background:var(--xd-text-3);border:0; }
+.xd-photo :is(.xd-ps-dialog,.xd-photo-adjustment-editor) input[type=range].has-track::-moz-range-track { height:6px;background:var(--xd-photo-track);border:1px solid var(--xd-border); }
+.xd-photo :is(.xd-ps-dialog,.xd-photo-adjustment-editor) input[type=range]::-moz-range-thumb { width:11px;height:9px;border:0;border-radius:0;background:var(--xd-text);clip-path:polygon(50% 0,100% 100%,0 100%);transform:translateY(5px); }
+
+/* Color Balance: the two colours at the ends of each slider, with the value box after them. */
+.xd-photo .xd-photo-balance-row { display:grid;grid-template-columns:1fr auto 52px;gap:0 8px;align-items:center;width:100%; }
+.xd-photo .xd-photo-balance-row > span:nth-child(2) { justify-self:end; }
+.xd-photo .xd-photo-balance-row > input[type=number] { width:100%;box-sizing:border-box;text-align:right; }
+.xd-photo .xd-photo-balance-row > input[type=range] { grid-column:1/-1;width:100%; }
+.xd-photo .xd-photo-mixer-total { display:flex;align-items:center;gap:6px;margin:0 0 6px; }
+.xd-photo .xd-photo-mixer-total output { font-variant-numeric:tabular-nums; }
+.xd-photo .xd-photo-mixer-warning { color:var(--xd-accent);cursor:help; }
+
+/* Hue/Saturation colour bars and the range slider between them. */
+.xd-photo .xd-photo-hue-bars { display:flex;flex-direction:column;gap:2px;width:100%;margin-top:6px; }
+.xd-photo .xd-photo-hue-spectrum { height:10px;border:1px solid var(--xd-border);box-sizing:border-box; }
+.xd-photo .xd-photo-hue-range { position:relative; }
+.xd-photo .xd-photo-hue-range > .xd-photo-tone-strip { margin:0; }
+.xd-photo .xd-photo-hue-range-fade,.xd-photo .xd-photo-hue-range-full { position:absolute;top:0;height:6px;pointer-events:none; }
+.xd-photo .xd-photo-hue-range-fade { background:var(--xd-text-3); }
+.xd-photo .xd-photo-hue-range-full { background:var(--xd-text-2); }
+.xd-photo .xd-photo-hue-range-fields { display:flex;justify-content:space-between;gap:4px;margin-top:4px;color:var(--xd-text-2); }
+.xd-photo .xd-photo-hue-readout { display:flex;align-items:center;gap:2px; }
+.xd-photo .xd-photo-hue-range-fields label { display:flex;align-items:center;gap:2px;margin:0; }
+.xd-photo .xd-photo-hue-range-fields input { width:48px;box-sizing:border-box;text-align:right; }
+.xd-photo :is(.xd-photo-hue-swatches,.xd-photo-hue-tools) { display:flex;align-items:center;gap:8px; }
+.xd-photo .xd-photo-hue-tools > .xd-ps-dialog-row { margin:0;margin-right:auto; }
+.xd-photo .xd-photo-hue-tools > .xd-photo-tone-eyedroppers { flex-direction:row;gap:4px; }
+.xd-photo .xd-photo-hue-before-after { margin-top:6px;color:var(--xd-text-2); }
+.xd-photo .xd-photo-bw-row { display:flex;align-items:center;gap:8px; }
+.xd-photo .xd-photo-bw-row > .xd-ps-dialog-row { margin:0; }
+.xd-photo .xd-photo-bw-row > button:last-child:not(.xd-photo-on-image) { margin-left:auto; }
+.xd-photo .xd-photo-bw-row input[type=color] { width:36px;height:20px;padding:0; }
+.xd-photo .xd-photo-bw-tint { min-width:0;margin:0;padding:0;border:0; }
+.xd-photo .xd-photo-bw-tint:disabled { opacity:.5; }
+
+/* Gradient Map: the Gradient Editor's bar, colour stops under it and the selected stop's settings. */
+.xd-photo .xd-photo-gradient-editor { display:flex;flex-direction:column;width:100%; }
+.xd-photo .xd-photo-gradient-editor > .xd-photo-adjustment-gradient { margin:0 6px; }
+.xd-photo .xd-photo-gradient-stops { position:relative;height:16px;margin:0 6px 6px;cursor:copy;touch-action:none; }
+.xd-photo .xd-photo-gradient-stop { position:absolute;top:1px;width:11px;height:14px;margin-left:-5.5px;cursor:ew-resize; }
+.xd-photo .xd-photo-gradient-stop svg { display:block;width:11px;height:14px; }
+.xd-photo .xd-photo-gradient-stop path { fill:var(--xd-panel);stroke:var(--xd-text-2);stroke-width:1; }
+.xd-photo .xd-photo-gradient-stop[aria-pressed=true] path { fill:var(--xd-text);stroke:var(--xd-text); }
+.xd-photo .xd-photo-gradient-stop.is-leaving { opacity:.3; }
+.xd-photo .xd-photo-gradient-stop:focus-visible { outline:none; }
+.xd-photo .xd-photo-gradient-stop:focus-visible path { stroke:var(--xd-accent);stroke-width:2; }
+.xd-photo .xd-photo-gradient-stop-fields { display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px; }
+.xd-photo .xd-photo-gradient-stop-fields label { display:flex;align-items:center;gap:4px;margin:0; }
+.xd-photo .xd-photo-gradient-stop-fields input[type=number] { width:56px;box-sizing:border-box;text-align:right; }
+.xd-photo .xd-photo-gradient-stop-fields button { margin-left:auto; }
+
+/* Photo Filter's Use group: each choice with its control beside it. */
+.xd-photo .xd-photo-filter-use [role=radiogroup] { display:grid;grid-template-columns:auto 1fr;gap:6px 8px;align-items:center; }
+.xd-photo .xd-photo-filter-use select { min-width:0;width:100%; }
+
+/* Photoshop 2026 sliders: a round thumb, and a bipolar slider fills from its centre. */
+.xd-photo .xd-ps-dialog input[type=range].is-ps::-webkit-slider-runnable-track { background:linear-gradient(90deg,var(--xd-text-3) var(--xd-ps-from,0%),var(--xd-text-2) var(--xd-ps-from,0%) var(--xd-ps-to,0%),var(--xd-text-3) var(--xd-ps-to,0%)); }
+.xd-photo .xd-ps-dialog input[type=range].is-ps.has-track::-webkit-slider-runnable-track { background:var(--xd-photo-track); }
+.xd-photo .xd-ps-dialog input[type=range].is-ps::-webkit-slider-thumb { width:12px;height:12px;margin-top:-5px;border:1px solid var(--xd-text);border-radius:50%;background:var(--xd-panel);clip-path:none; }
+.xd-photo .xd-ps-dialog input[type=range].is-ps.has-track::-webkit-slider-thumb { margin-top:-4px; }
+.xd-photo .xd-ps-dialog input[type=range].is-ps:disabled::-webkit-slider-thumb { background:var(--xd-panel);border-color:var(--xd-text-3); }
+.xd-photo .xd-ps-dialog input[type=range].is-ps::-moz-range-track { background:linear-gradient(90deg,var(--xd-text-3) var(--xd-ps-from,0%),var(--xd-text-2) var(--xd-ps-from,0%) var(--xd-ps-to,0%),var(--xd-text-3) var(--xd-ps-to,0%)); }
+.xd-photo .xd-ps-dialog input[type=range].is-ps.has-track::-moz-range-track { background:var(--xd-photo-track); }
+.xd-photo .xd-ps-dialog input[type=range].is-ps::-moz-range-thumb { width:10px;height:10px;border:1px solid var(--xd-text);border-radius:50%;background:var(--xd-panel);clip-path:none;transform:none; }
+
+/* Output Channel and Colors: one coloured circle per choice. */
+.xd-photo .xd-photo-swatch-row { grid-column:1/-1;display:flex;flex-direction:column;gap:6px; }
+.xd-photo .xd-photo-swatches { display:flex;flex-wrap:wrap;gap:6px; }
+.xd-photo .xd-photo-swatches button { width:18px;height:18px;padding:0;border:1px solid var(--xd-border);border-radius:50%;background:var(--xd-photo-swatch); }
+.xd-photo .xd-photo-swatches button[aria-checked=true] { outline:2px solid var(--xd-accent);outline-offset:1px; }
+.xd-photo .xd-photo-swatches button:disabled { opacity:.5; }
+
+.xd-photo .xd-photo-unit-aside { display:flex;align-items:center;gap:6px; }
+.xd-photo .xd-photo-lookup { display:contents; }
+.xd-photo .xd-photo-lookup .xd-ps-dialog-row { grid-column:1/-1;display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center; }
+.xd-photo .xd-photo-lookup select { min-width:0;width:100%; }
