@@ -78,6 +78,10 @@ export function AgentForge() {
     setSaving(true);
     try {
       if (!draft.name.trim() || !owningProvider(providers, draft.brainModel) || (draft.actionModel && !owningProvider(providers, draft.actionModel))) throw new Error("Choose available models and give the agent a name.");
+      if (draft.skillIds.filter((id) => id.startsWith("imported:")).length > 4) throw new Error("Attach at most four imported skills to an agent.");
+      for (const id of draft.skillIds.filter((id) => id.startsWith("imported:"))) {
+        if (!useSkillsStore.getState().loaded || !useSkillsStore.getState().get(id)?.imported?.enabled) throw new Error("Enable or detach unavailable imported skills before saving this agent.");
+      }
       await save({ ...draft, name: draft.name.trim() });
       setDraft((current) => current === submitted ? blank() : current);
     } catch (e) { toast.error("Agent was not saved", { body: String(e) }); }
@@ -104,6 +108,7 @@ export function AgentForge() {
           <div className="forge-slot brain">
             <div className="forge-slot-label"><Brain size={13} strokeWidth={2} /> Brain · thinks</div>
             <select aria-label="Agent planning model" value={selectedModelValue(providers, draft.brainModel)} onChange={(e) => setDraft({ ...draft, brainModel: e.target.value })}>
+              {runnableModels.length === 0 && <option value="">No AI connected · add one in Providers</option>}
               {runnableModels.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
             </select>
           </div>
@@ -128,10 +133,11 @@ export function AgentForge() {
 
         <div className="forge-inv">
           <div className="cp-eyebrow">Skill Inventory <span className="cp-count">{skills.length}</span></div>
-          <p style={{ fontSize: 11, color: "var(--t-secondary)", margin: "8px 0" }}>Skills grant tool access. No grants means chat-only. Shell access can modify files and run programs.</p>
+          <p style={{ fontSize: 11, color: "var(--t-secondary)", margin: "8px 0" }}>Equip skills to shape what this agent knows. Built-in skills can grant tools; imported skills are text-only guidance and never get shell access.</p>
+          {draft.skillIds.filter((id) => id.startsWith("imported:") && !skills.some((s) => s.id === id)).map((id) => <p key={id} role="alert">Missing imported skill · {id} <button className="cp-link-danger" onClick={() => toggleSkill(id)}>Detach missing skill</button></p>)}
           <div className="cp-skill-grid">
             {skills.map((s) => (
-              <SkillTile key={s.id} skill={s} equipped={equipped.has(s.id)} onClick={() => toggleSkill(s.id)} title={equipped.has(s.id) ? "Unequip" : "Equip"} />
+              <SkillTile key={s.id} skill={s} equipped={equipped.has(s.id)} disabled={!!s.imported && !s.imported.enabled && !equipped.has(s.id)} onClick={() => toggleSkill(s.id)} title={equipped.has(s.id) ? "Unequip" : s.imported && !s.imported.enabled ? "Enable in Skill Codex first" : "Equip"} />
             ))}
           </div>
         </div>

@@ -1,0 +1,8 @@
+import type { Fill } from "@open-pencil/scene-graph";
+import { NumericValue } from "./AppearancePanel";
+import { CUSTOM_PAINTS } from "./proceduralPaints";
+
+export function TextureFillControls({fill,index,change}:{fill:Fill;index:number;change:(patch:Partial<Fill>)=>void}) {
+  const noise=fill.type==="NOISE",prefix=`${noise?"Noise":"Texture"} ${index+1}`;
+  return <>{noise?<><label>Noise type<select aria-label={`${prefix} type`} value={fill.noiseType??"MONOTONE"} onChange={event=>change({noiseType:event.target.value as Fill["noiseType"]})}>{["MONOTONE","DUOTONE","MULTITONE"].map(type=><option key={type}>{type}</option>)}</select></label><NumericValue label={`${prefix} density %`} value={(fill.density??.5)*100} max={100} onCommit={density=>change({density:density/100})}/><div className="xd-pencil-grid">{(["x","y"] as const).map(axis=><NumericValue key={axis} label={`${prefix} cell ${axis}`} value={fill.noiseSize?.[axis]??1} min={.1} max={4096} onCommit={value=>change({noiseSize:{x:fill.noiseSize?.x??1,y:fill.noiseSize?.y??1,[axis]:value}})}/>)}</div></>:<><label>Texture<select aria-label={`${prefix} preset`} value={fill.customEffectId??""} onChange={event=>change({customEffectId:event.target.value})}><option value="">Choose texture</option>{fill.customEffectId&&!CUSTOM_PAINTS.some(paint=>paint.id===fill.customEffectId)&&<option value={fill.customEffectId}>Imported effect · unavailable renderer</option>}{CUSTOM_PAINTS.map(paint=><option key={paint.id} value={paint.id}>{paint.label}</option>)}</select></label><NumericValue label={`${prefix} scale %`} value={(fill.scale??1)*100} min={1} max={10000} onCommit={scale=>change({scale:scale/100})}/></>}</>;
+}

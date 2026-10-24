@@ -1,0 +1,387 @@
+{
+  "schemaVersion": 1,
+  "kind": "source-inspection-receipt",
+  "observedAt": "2026-09-16T18:40:36.118444+00:00",
+  "sourceUrl": "https://github.com/Leonxlnx/taste-skill",
+  "revision": "e79ca9ec7e071eb3a3b623c4fb752e853fc3ed58",
+  "treeGitSha1": "cf2fe7019288b74f6c0d78feee6b61a188159793",
+  "treeTruncated": false,
+  "treeEntryCount": 91,
+  "blobCount": 65,
+  "declaredBlobBytes": 3118209,
+  "fetchedFileCount": 37,
+  "fetchedBytes": 380947,
+  "files": [
+    {
+      "path": ".claude-plugin/marketplace.json",
+      "bytes": 501,
+      "gitBlobSha1": "f47a6ac716aadb9a59f51247de5620e514a36e01",
+      "sha256": "669b9a23f5b46326946465198829ff6d35a9b7fd36abc6b4a2ef652f02e615e2"
+    },
+    {
+      "path": ".claude-plugin/plugin.json",
+      "bytes": 447,
+      "gitBlobSha1": "846009b299d5d95d4658dd4a4f19921f3695fdf3",
+      "sha256": "bc9ddf22f1025944447bf56197e35a65aef0f8921fc7e68c616d4599d3d8bbf4"
+    },
+    {
+      "path": ".github/copilot-instructions.md",
+      "bytes": 959,
+      "gitBlobSha1": "c9ca993e9d93dfb759361158b2c41516f48e6378",
+      "sha256": "bb3a5ee79ef5a6d292b0298d7bba686200fad1bd6e1f71a7091fadf26a64ff63"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 8272,
+      "gitBlobSha1": "f0ef4d4aac258b9605ac8c3d1432ef782e10127a",
+      "sha256": "55a81cbf8d45c5ca064b21d4ce61792e8d973c525cf2a65ee3e2c65f28b16f3b"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1065,
+      "gitBlobSha1": "48a2f6640b81ff8eca9ce7f6a96337692713ef5b",
+      "sha256": "4575a543ab88dad12ccea7d97e563d0bce5b448b06072e65d3264497dad326df"
+    },
+    {
+      "path": "README.md",
+      "bytes": 16952,
+      "gitBlobSha1": "4eab1835e0d8bc98d9a1b2ff1b6b26bbf4b772f4",
+      "sha256": "e5daf710317f92da5c56bd77b80276b25db01892d0b19a9ba25a576f963c09d3"
+    },
+    {
+      "path": "research/README.md",
+      "bytes": 368,
+      "gitBlobSha1": "3436417bae2f0dab79119411e56b758f95603b3c",
+      "sha256": "6af3f83631c2fcb740df05ba5b1bad447745f5ee8677a12dbe41b5cdae765d62"
+    },
+    {
+      "path": "research/laziness/README.md",
+      "bytes": 1870,
+      "gitBlobSha1": "bfea0a5aa09b3ac8591c22eff8ec06c912ad7701",
+      "sha256": "baec2b1cf754ce8c772cc169d9ab98c8440c314f47b126f39356df6aafc34a75"
+    },
+    {
+      "path": "research/laziness/findings/empirical-results.md",
+      "bytes": 2820,
+      "gitBlobSha1": "5023f3edea9465553b68d7a15472177fc912104e",
+      "sha256": "e48786188084a861079de1eb4f24a9896aed7318fb8a9254efc06c8e04ec36c3"
+    },
+    {
+      "path": "research/laziness/findings/references.md",
+      "bytes": 1512,
+      "gitBlobSha1": "fe0f291fce8a157d6de8a8ea2d2788d3ba1338e2",
+      "sha256": "e2b1192c22274062b3beea8539024604df82fab5c009983f2bfa98a9d933b6c7"
+    },
+    {
+      "path": "research/laziness/remediation/architectural-patterns.md",
+      "bytes": 3142,
+      "gitBlobSha1": "eb58186c981b657601e13e5c389e25f755f11562",
+      "sha256": "d4503aee332ac71be509908a5c0455642af86b8c6aca2be561c6b7ab017fdade"
+    },
+    {
+      "path": "research/laziness/remediation/parameter-tuning.md",
+      "bytes": 2856,
+      "gitBlobSha1": "5bf2a25d48d672e0037d446cb5056bf21cd68fb1",
+      "sha256": "efa8888a0849947be26d7b7185f1ec689f56da7400d415943e5b53ceb67d881c"
+    },
+    {
+      "path": "research/laziness/remediation/prompt-engineering.md",
+      "bytes": 3261,
+      "gitBlobSha1": "9f3704bdd601e9cc4fa0b1021b298e9bdd05bc9f",
+      "sha256": "d702f06f68ccb367958e79b05093dc9dd5e6d37995569e89c8fb68fa720300d9"
+    },
+    {
+      "path": "research/laziness/remediation/reference-prompts.md",
+      "bytes": 2363,
+      "gitBlobSha1": "185ad869b2ceae7dcfee3dcd6adcba22f6394c79",
+      "sha256": "b39dd6724397684081bdb41a8a407b60853d5152522fc4c1e305984cdb03fe0d"
+    },
+    {
+      "path": "research/laziness/root-causes/cognitive-shortcuts.md",
+      "bytes": 2124,
+      "gitBlobSha1": "ad67fa113edd92ddec40f41ee7213742c52045a4",
+      "sha256": "d0400b85c5f4f63904eab21689c00c218b227bb474d9a7b3c24607f21a6071f7"
+    },
+    {
+      "path": "research/laziness/root-causes/output-limits.md",
+      "bytes": 2568,
+      "gitBlobSha1": "3d346ef074d816e0c1819aa83b97ae369b952718",
+      "sha256": "acd1cbf44e931409343dc588cac5b4d7254bc40040889b70be1ca1fb745dda85"
+    },
+    {
+      "path": "research/laziness/root-causes/rlhf-and-compute.md",
+      "bytes": 2165,
+      "gitBlobSha1": "5ef6783d4f958b76d8fc88e713aeb076b974e62c",
+      "sha256": "c0563aaf6fd9cfc68f765ed0a0d12344d27bfc03a8706ff8791bf10327d2f981"
+    },
+    {
+      "path": "research/laziness/root-causes/training-data-bias.md",
+      "bytes": 1666,
+      "gitBlobSha1": "1aa2c7a7f10b91803c5dbb85a5fba39f6ded5ed6",
+      "sha256": "433b4fbec70c06aa710bc69492c58f9013360cb3ef63dddb485148359005cfdd"
+    },
+    {
+      "path": "scripts/build-emil-sponsor-row.mjs",
+      "bytes": 1112,
+      "gitBlobSha1": "d2e8277eb6f5765f2077693150624001b1449312",
+      "sha256": "4e48beb43439e2f1136d36c1c1a00554bd6136700812b7f7d4890d5f4972ed18"
+    },
+    {
+      "path": "scripts/convert-readme-assets-webp.mjs",
+      "bytes": 4228,
+      "gitBlobSha1": "8ab1baa20750803a8d1e94c5ed853e5c5163bad7",
+      "sha256": "e3439bbef12845b07bb0475a34a9f4b8695a9db8d9621c40aebecb9d1dce9edd"
+    },
+    {
+      "path": "scripts/process-readme-buttons.mjs",
+      "bytes": 3010,
+      "gitBlobSha1": "c73e53037e98146004039d15f134cb3b24e823da",
+      "sha256": "10090fe18260cea2b99306ad7b27e3ccfa7b907e6a25fe26960d988de0a38802"
+    },
+    {
+      "path": "scripts/process-sponsor-badge.mjs",
+      "bytes": 2396,
+      "gitBlobSha1": "515558bf9e6cb316fcf63734c93c75ad2a87bc6f",
+      "sha256": "31fe1016f562ab736ff7240d054ccb81592b23942e33f0885ca57c3d5c143996"
+    },
+    {
+      "path": "skill.sh",
+      "bytes": 897,
+      "gitBlobSha1": "7f19ae7b92ed36a38645431638feaaee3e80b420",
+      "sha256": "adfa39e7ef08dc030500de961cf40b4089463c7f4c302ad29bf20b21ae0fc53d"
+    },
+    {
+      "path": "skills/brandkit/SKILL.md",
+      "bytes": 15992,
+      "gitBlobSha1": "d76399f666af97ac8c142928e02602d9732e78aa",
+      "sha256": "b0c4837e1bd140ca816ae54948754ddd2ac1e2a4d3619363777a80caf00b2ede"
+    },
+    {
+      "path": "skills/brutalist-skill/SKILL.md",
+      "bytes": 8456,
+      "gitBlobSha1": "f5375b908340e1376ed391232a31c5d82d5babfb",
+      "sha256": "fffbaac8597f07679e9d87145533567658aedba3b5eca6f16a7075a333048caa"
+    },
+    {
+      "path": "skills/gpt-tasteskill/SKILL.md",
+      "bytes": 7857,
+      "gitBlobSha1": "03ed209b8fdc0a3cd6bccf8a5b3bfffe56aa4558",
+      "sha256": "2e64c269953f2656c21bf5a0fa6b4568e82fe0c72b36e8f84758e090349966a5"
+    },
+    {
+      "path": "skills/image-to-code-skill/SKILL.md",
+      "bytes": 36442,
+      "gitBlobSha1": "d19f8de112252ea88724c540647cad85b7653d46",
+      "sha256": "4c060a8064a8b13380bc2ef3d6e6a1d0b1e316aa093cd9807d0ce9e4eeb037fa"
+    },
+    {
+      "path": "skills/imagegen-frontend-mobile/SKILL.md",
+      "bytes": 40326,
+      "gitBlobSha1": "9d8d55f3ca7a77e18329922ea8a67694dee52ebb",
+      "sha256": "8a33389979f3074fa0926678e266ad2eb9234624472254469fc1ad916b9caa24"
+    },
+    {
+      "path": "skills/imagegen-frontend-web/SKILL.md",
+      "bytes": 36854,
+      "gitBlobSha1": "26b293b8d0088631c41ebefde4a650768d01cf22",
+      "sha256": "6b5c2256522fdba1e3313eafa3d743b960a7b13ec029d3e6586e04b23327c1f8"
+    },
+    {
+      "path": "skills/minimalist-skill/SKILL.md",
+      "bytes": 7901,
+      "gitBlobSha1": "44ead27ef04ffe79ade0c6df7fd696dbcf7b246b",
+      "sha256": "36bc7328f085405f43b476938e62460fa573bf7e984e949e072bcf014831a44c"
+    },
+    {
+      "path": "skills/output-skill/SKILL.md",
+      "bytes": 2592,
+      "gitBlobSha1": "d983bbcf040b6f433c624ce2212a2c044ad2da3c",
+      "sha256": "e5bf48b1ae561511439cf71672209a10a88cee0968cc925909ff861dfa0a96a7"
+    },
+    {
+      "path": "skills/redesign-skill/SKILL.md",
+      "bytes": 15060,
+      "gitBlobSha1": "c8304f0c9301385e3641b052d6b25b8af11cb6c1",
+      "sha256": "98ad3e5b051bfb71b2795f7e8a6aa0d32b51ee095606c098a4b2822ac07926c9"
+    },
+    {
+      "path": "skills/soft-skill/SKILL.md",
+      "bytes": 10561,
+      "gitBlobSha1": "4038f41ec0137ec92e98ed0151fe3b7038b9329e",
+      "sha256": "e1e32f5e2d420872c6c7332b53d5ff7721946766b78c4822b424c2d512c8fdbc"
+    },
+    {
+      "path": "skills/stitch-skill/DESIGN.md",
+      "bytes": 12053,
+      "gitBlobSha1": "ef78a972599e7b1791580a5bcd6cf0242abac65b",
+      "sha256": "0ab6740c4ebb1966dbceddb823a66d4bf027e960efbd73faca56cbf8370ae2ad"
+    },
+    {
+      "path": "skills/stitch-skill/SKILL.md",
+      "bytes": 11851,
+      "gitBlobSha1": "19d958cdb5f83d14e4021fac942c1bcf8395c042",
+      "sha256": "46bdb08fee2dded38b6ba0a051230a502d6ac6e4044afd47592cb40c256028b5"
+    },
+    {
+      "path": "skills/taste-skill-v1/SKILL.md",
+      "bytes": 21195,
+      "gitBlobSha1": "4054982cd292c7fe6d01170c2372e986a427d776",
+      "sha256": "033d45af1ed23832730642f95f40ab49db7fb5222848489a6c5656144bfc6dae"
+    },
+    {
+      "path": "skills/taste-skill/SKILL.md",
+      "bytes": 87253,
+      "gitBlobSha1": "b72132fcd466da605623ffe96e370b3991fc5285",
+      "sha256": "aa194351b246b8b4799099d4ed7b033d29eab6e6e3d58d8d2172978be7b3ec89"
+    }
+  ],
+  "notFetched": [
+    {
+      "path": ".github/FUNDING.yml",
+      "bytes": 17,
+      "gitBlobSha1": "53f942c49a08e18756e181d69632741cee570077"
+    },
+    {
+      "path": "assets/.gitkeep",
+      "bytes": 0,
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "assets/readme-banner.webp",
+      "bytes": 99902,
+      "gitBlobSha1": "983cdce1b604f294c5b0f277ca8327555eaaf3bc"
+    },
+    {
+      "path": "assets/readme-buttons/btn-agent-skills.webp",
+      "bytes": 17150,
+      "gitBlobSha1": "c7eb5a5628f74a13a85626b55367fe7483d38129"
+    },
+    {
+      "path": "assets/readme-buttons/btn-changelog.webp",
+      "bytes": 15476,
+      "gitBlobSha1": "19341b7b952ba85ae2836c0fab85d3c1bfac3f14"
+    },
+    {
+      "path": "assets/readme-buttons/btn-mit.webp",
+      "bytes": 12962,
+      "gitBlobSha1": "12c0c9fd53b0b31f1f77a00bd3a46525f831f635"
+    },
+    {
+      "path": "assets/readme-buttons/btn-site.webp",
+      "bytes": 19080,
+      "gitBlobSha1": "43b4c28c8ebb5b2e0fb4a95e67d9663234f96964"
+    },
+    {
+      "path": "assets/readme-buttons/btn-tools.webp",
+      "bytes": 19698,
+      "gitBlobSha1": "9b3fd23e3b6f946ad343764ddd9c3f4ed69e0f32"
+    },
+    {
+      "path": "assets/readme-cta-tasteskill.svg",
+      "bytes": 4864,
+      "gitBlobSha1": "c4499f62691db13fb206d13442d2026f35ee4933"
+    },
+    {
+      "path": "assets/sponsors/animations-dev.webp",
+      "bytes": 16024,
+      "gitBlobSha1": "c101842c7cd64964d8c22ca92f5b5f0ae181d2a8"
+    },
+    {
+      "path": "assets/sponsors/emil-animations-dev.webp",
+      "bytes": 39216,
+      "gitBlobSha1": "9ce57f969a1fc9b3004589d8de884b388c278ec8"
+    },
+    {
+      "path": "assets/sponsors/fluxion-ai.png",
+      "bytes": 1363728,
+      "gitBlobSha1": "990fafe5b0df2ed31ca2501a854de4f8d7ea2797"
+    },
+    {
+      "path": "assets/sponsors/imgly-logo.svg",
+      "bytes": 1174,
+      "gitBlobSha1": "5ec885f784404d664377f61a274c499738190f73"
+    },
+    {
+      "path": "assets/sponsors/interfaces-dev-icon.webp",
+      "bytes": 1924,
+      "gitBlobSha1": "3c898598a6c6ff34f76957314a5ad247ab3f7be5"
+    },
+    {
+      "path": "assets/sponsors/kimi-icon.png",
+      "bytes": 11486,
+      "gitBlobSha1": "033c0f4fb2e28a9daeca0205812d15bf3e547893"
+    },
+    {
+      "path": "assets/sponsors/reactbits-icon-dark.svg",
+      "bytes": 3939,
+      "gitBlobSha1": "8aeca3812e914fd112a041c21736acacb394d2c1"
+    },
+    {
+      "path": "assets/sponsors/reactbits-icon-light.svg",
+      "bytes": 3937,
+      "gitBlobSha1": "d6ba3062d24da4fdf2e4bdc01f49cec55c9d67f0"
+    },
+    {
+      "path": "assets/sponsors/reactbits-logo-dark.svg",
+      "bytes": 12502,
+      "gitBlobSha1": "9d6bc8aaeadd8e56d58f4780e0e1f7daed56ae6a"
+    },
+    {
+      "path": "assets/sponsors/reactbits-logo-light.svg",
+      "bytes": 12536,
+      "gitBlobSha1": "bf6b0c18e342b83eb8977ac24d6f40277faaf523"
+    },
+    {
+      "path": "assets/sponsors/sentdm.png",
+      "bytes": 4382,
+      "gitBlobSha1": "f93b23958966bb3eb90880b7f984773feadd02a7"
+    },
+    {
+      "path": "assets/sponsors/vercel-logo.svg",
+      "bytes": 242,
+      "gitBlobSha1": "34e3e5ec4ef089630d748f69b47674b3bec7edcc"
+    },
+    {
+      "path": "assets/taste-skill-logo.png",
+      "bytes": 17279,
+      "gitBlobSha1": "c5e8bd8130ed4abb4f0af104d182bd4bcf36993d"
+    },
+    {
+      "path": "assets/taste-skill-logo.webp",
+      "bytes": 3280,
+      "gitBlobSha1": "f1eb55cf7953abdabf9c412ef6f4b2e1f1b4a483"
+    },
+    {
+      "path": "assets/vercel-oss-program-badge.svg",
+      "bytes": 13296,
+      "gitBlobSha1": "bd2bd2533b920ad1b945b74f7c182fe51aee192d"
+    },
+    {
+      "path": "examples/floria-bottom.webp",
+      "bytes": 170130,
+      "gitBlobSha1": "03df81069eef559c86446118db97a6fb23c487ee"
+    },
+    {
+      "path": "examples/floria-full.webp",
+      "bytes": 568180,
+      "gitBlobSha1": "633c8df081b053e200cae73828a69a6f8015bd10"
+    },
+    {
+      "path": "examples/floria-top.webp",
+      "bytes": 303012,
+      "gitBlobSha1": "ae133b51315b632ea796dea0714802019b1de8a6"
+    },
+    {
+      "path": "skills/llms.txt",
+      "bytes": 1846,
+      "gitBlobSha1": "74a7527f7822497812e5cc192149085616a33948"
+    }
+  ],
+  "limitations": [
+    "Selected text/source bytes only; binary/assets not fetched or decoded.",
+    "Git object hashes checked against the API tree, not publisher signature verification.",
+    "No automated secret scanner, advisory lookup, dependency install, repository code execution, provider inference, or functional test.",
+    "This is inspection evidence, not an installable SourceSnapshot or security clearance."
+  ],
+  "treeResponseSha256": "735ea2643fcc319f83c0d31b5eb4eaaeed331bc4078997c3da3f4344955b0c7c"
+}

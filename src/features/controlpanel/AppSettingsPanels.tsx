@@ -224,9 +224,10 @@ function AppEditor({ app, surface }: { app: AppId; surface: ModelSurface }) {
               <input
                 type="checkbox"
                 checked={cfg.skillIds.includes(s.id)}
+                disabled={s.id.startsWith("imported:") && !cfg.skillIds.includes(s.id)}
                 onChange={() => toggleSkill(s.id)}
               />
-              {s.name}
+              {s.name}{s.id.startsWith("imported:") ? " · select per turn in Orion or attach in Agent Forge" : ""}
             </label>
           ))}
         </div>

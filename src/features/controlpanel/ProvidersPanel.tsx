@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ulid } from "ulid";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { RefreshCw, CheckCircle2, LogIn, ImageIcon } from "lucide-react";
+import { RefreshCw, CheckCircle2, LogIn, ChevronRight, Plus } from "lucide-react";
 import { CliEngineStatus } from "./CliEngineStatus";
 import { BackgroundAiSettings } from "./BackgroundAiSettings";
 import { ProviderConnectionToggle } from "./ProviderConnectionToggle";
@@ -29,12 +29,37 @@ const KINDS: ProviderKind[] = ["openai", "google", "openai_compat", "custom"];
 export function ProvidersPanel() {
   const providers = useProvidersStore((s) => s.providers);
   const save = useProvidersStore((s) => s.save);
-  const remove = useProvidersStore((s) => s.remove);
   const [adding, setAdding] = useState(false);
-  const [removing, setRemoving] = useState<string | null>(null);
-  const removeProvider = async (p: Provider) => {
+
+  return (
+    <div className="cp-prov">
+      <div className="cp-prov-default">
+        <span>Default AI</span>
+        <ModelSelect surface="default" />
+      </div>
+      <ul className="cp-prov-list" aria-label="Providers">
+        {providers.map((p) => <ProviderRow key={p.id} provider={p} onSave={save} />)}
+      </ul>
+      {adding
+        ? <AddProvider onDone={() => setAdding(false)} onSave={save} />
+        : <button className="cp-btn ghost cp-prov-add" onClick={() => setAdding(true)}><Plus size={13} /> Add provider</button>}
+      <BackgroundAiSettings />
+    </div>
+  );
+}
+
+/** One provider: its name and a toggle. Connection details (sign-in, keys, image model,
+ *  removal) stay folded away until asked for, or until the provider needs a key to work. */
+function ProviderRow({ provider: p, onSave }: { provider: Provider; onSave: (p: Provider) => Promise<void> }) {
+  const remove = useProvidersStore((s) => s.remove);
+  const isCli = p.kind === "codex_cli" || p.kind === "gemini_cli";
+  const isCursor = p.kind === "cursor_sdk";
+  const isApi = !p.builtin && !isCli && !isCursor && p.kind !== "nous_oauth";
+  const [open, setOpen] = useState(() => p.enabled && isApi && !p.keyRef && !isLocalProvider(p));
+  const [removing, setRemoving] = useState(false);
+  const removeProvider = async () => {
     if (!await confirmAction({ title: `Remove ${p.name}?`, body: "Chats are kept. Selections using this provider will need a new model. Its unshared saved credential will be removed.", confirmLabel: "Remove", danger: true })) return;
-    setRemoving(p.id);
+    setRemoving(true);
     try {
       await remove(p.id);
       if (p.keyRef && !useProvidersStore.getState().providers.some((other) => other.keyRef === p.keyRef)) {
@@ -42,55 +67,34 @@ export function ProvidersPanel() {
         else await ipc.providerKeyClear(p.keyRef);
       }
     } catch (e) { toast.error("Provider removal failed", { body: String(e) }); }
-    finally { setRemoving(null); }
+    finally { setRemoving(false); }
   };
-
   return (
-    <div>
-      <div className="cp-card">
-        <div className="cp-card-main"><div className="cp-card-title">Default AI</div><div className="cp-card-sub">Used by assistants without their own model choice. Connection status is not a live model-access test.</div></div>
-        <ModelSelect surface="default" />
+    <li className={`cp-prov-row${p.enabled ? "" : " off"}${open ? " open" : ""}`}>
+      <div className="cp-prov-head">
+        <button type="button" className="cp-prov-name" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          <ChevronRight size={13} className="cp-prov-chev" aria-hidden />
+          {p.name}
+        </button>
+        <ProviderConnectionToggle provider={p} />
       </div>
-      <p className="cp-card-sub" style={{ margin: "8px 0 14px" }}>Claude, ChatGPT/Codex and Gemini CLI use their subscription/login accounts. Cursor SDK and API providers use separate credentials/billing; a chat subscription does not automatically cover them.</p>
-      <div className="cp-list">
-        {providers.map((p) => {
-          const isCli = p.kind === "codex_cli" || p.kind === "gemini_cli";
-          const isCursor = p.kind === "cursor_sdk";
-          return (
-            <div key={p.id} className="cp-card">
-              <div className="cp-card-main">
-                <div className="cp-card-title">{p.name}</div>
-                <div className="cp-card-sub">{p.kind}{p.models.length ? ` · ${p.models.length} models` : ""}</div>
-                {p.enabled ? <>
-                {p.kind === "anthropic" && <CliEngineStatus engine="claude" />}
-                {isCli && <CliEngineStatus engine={p.kind as "codex_cli" | "gemini_cli"} />}
-                {isCursor && <CursorProviderStatus />}
-                {p.kind === "nous_oauth" && <NousProviderStatus keyRef={p.keyRef} />}
-                {!p.builtin && !isCli && !isCursor && p.kind !== "nous_oauth" && (
-                  <ApiProviderStatus provider={p} onSave={save} />
-                )}
-                {isImageProvider(p) && <ImageModelField provider={p} />}
-                </> : <div className="cp-card-sub" style={{ marginTop: 8 }}><span className="cp-badge wait">Disconnected from Orion</span> Credentials retained. Enable to manage or reuse the account.</div>}
-                <ProviderConnectionToggle provider={p} />
-              </div>
-              {p.enabled && isImageProvider(p) && (
-                <span className="cp-badge live" title="Usable by XDesign 🖼️ Generate image">
-                  <ImageIcon size={12} /> image
-                </span>
-              )}
-              {isCli || isCursor || p.kind === "nous_oauth" || !p.builtin
-                ? null
-                : <span className="cp-badge live">built-in</span>}
-              {!p.builtin && <button className="cp-link-danger" disabled={removing !== null} onClick={() => void removeProvider(p)}>Remove</button>}
-            </div>
-          );
-        })}
-      </div>
-      <BackgroundAiSettings />
-      {adding
-        ? <AddProvider onDone={() => setAdding(false)} onSave={save} />
-        : <button className="cp-btn" onClick={() => setAdding(true)}>+ Add provider</button>}
-    </div>
+      {open && (
+        <div className="cp-prov-details">
+          {p.enabled ? <>
+            {p.kind === "anthropic" && <CliEngineStatus engine="claude" />}
+            {isCli && <CliEngineStatus engine={p.kind as "codex_cli" | "gemini_cli"} />}
+            {isCursor && <CursorProviderStatus />}
+            {p.kind === "nous_oauth" && <NousProviderStatus keyRef={p.keyRef} />}
+            {isApi && <ApiProviderStatus provider={p} onSave={onSave} />}
+            {isImageProvider(p) && <ImageModelField provider={p} />}
+          </> : <div className="cp-card-sub">Off in Orion. Credentials are kept.</div>}
+          <div className="cp-prov-meta">
+            <span>{p.kind === "anthropic" || isCli ? "Uses your subscription login" : p.kind === "nous_oauth" ? "Nous Portal account" : "Billed to its own API key"}</span>
+            {!p.builtin && <button className="cp-link-danger" disabled={removing} onClick={() => void removeProvider()}>Remove</button>}
+          </div>
+        </div>
+      )}
+    </li>
   );
 }
 

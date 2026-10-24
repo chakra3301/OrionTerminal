@@ -6,7 +6,9 @@
     "license": "MIT",
     "notice": "THIRD_PARTY_LICENSES/LobeIcons-MIT.txt",
     "noticeSha256": "add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a",
-    "scope": ["src/shell/notch/logos/"],
+    "scope": [
+      "src/shell/notch/logos/"
+    ],
     "originalPortRevisionKnown": true,
     "additionalUpstream": "@lobehub/icons-static-svg@1.95.0 (Nous Research); per-file provenance and hashes in src/shell/notch/logos/sources.json"
   },
@@ -17,7 +19,12 @@
     "license": "MIT",
     "notice": "THIRD_PARTY_LICENSES/Codenotch-MIT.txt",
     "noticeSha256": "2868a2239cb49e84eae28db7a9069c6c04f8f9d4623aa360fd69feefa96edc63",
-    "scope": ["src/shell/notch/", "src/shell/monitorNotch.css", "src-tauri/src/subscription_quota.rs", "src-tauri/src/quota_keychain.rs"],
+    "scope": [
+      "src/shell/notch/",
+      "src/shell/monitorNotch.css",
+      "src-tauri/src/subscription_quota.rs",
+      "src-tauri/src/quota_keychain.rs"
+    ],
     "originalPortRevisionKnown": true
   },
   {
@@ -28,7 +35,8 @@
     "notice": "THIRD_PARTY_LICENSES/RepoLens-MIT.txt",
     "noticeSha256": "41797d46a3e8c02be8920a26d53e81b04f762f3ed4fe323cfd5425b384180a58",
     "scope": [
-      "src/apps/archives/repolens/"
+      "src/apps/archives/repolens/",
+      "src/features/repoAnalysis/sourceText.ts"
     ],
     "originalPortRevisionKnown": false
   },
@@ -80,5 +88,133 @@
       "src/apps/xdesign/model3d/"
     ],
     "originalPortRevisionKnown": false
+  },
+  {
+    "name": "2048 pinned recipe and inert source fixture",
+    "repository": "https://github.com/gabrielecirulli/2048",
+    "inspectedRevision": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+    "license": "MIT",
+    "notice": "THIRD_PARTY_LICENSES/2048-MIT.txt",
+    "noticeSha256": "57e12c39a6ad9d98b2e451065bfdfbd15fc9e0c2ed3bf4dc1d09acab41ff02fc",
+    "scope": [
+      "src/features/staticApps/"
+    ],
+    "originalPortRevisionKnown": true,
+    "additionalUpstream": "Golden fixture is byte data only; preparation tests never evaluate upstream JavaScript. Generated candidates retain exact source and notices."
+  },
+  {
+    "name": "Clear Sans inert font fixture and candidate notice",
+    "repository": "https://github.com/intel/clear-sans",
+    "inspectedRevision": "1993725b24a36af21e7ebaa8977103983b608572",
+    "license": "Apache-2.0",
+    "notice": "THIRD_PARTY_LICENSES/ClearSans-Apache-2.0.txt",
+    "noticeSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "scope": [
+      "src/features/staticApps/__fixtures__/source2048.json"
+    ],
+    "originalPortRevisionKnown": false,
+    "additionalUpstream": "Unchanged WOFF bytes from the pinned 2048 source; full Intel notices retained. Font conversion/metadata identity is not certified."
+  },
+  {
+    "name": "Sassy Math conservative recipe attribution",
+    "repository": "https://github.com/at-import/Sassy-math",
+    "inspectedRevision": "60d130108bcd20c5cd5aa50b52505afab9a40519",
+    "license": "MIT",
+    "notice": "THIRD_PARTY_LICENSES/SassyMath-MIT.txt",
+    "noticeSha256": "bf404329ac2bec2579c272d347ecf56f1ee873e5e7a2431199af6f4fee2043a3",
+    "scope": [
+      "src/features/staticApps/__fixtures__/source2048.json"
+    ],
+    "originalPortRevisionKnown": false,
+    "additionalUpstream": "Observed source/readme retained for helper attribution; original copied-helper revision remains unknown."
+  },
+  {
+    "name": "OpenPencil pattern tile rendering",
+    "repository": "https://github.com/open-pencil/open-pencil",
+    "inspectedRevision": "b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d",
+    "license": "MIT",
+    "notice": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+    "noticeSha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+    "scope": [
+      "src/apps/xdesign/pencil/proceduralPaints.ts"
+    ],
+    "originalPortRevisionKnown": false,
+    "additionalUpstream": "Adapted tile layout from published @open-pencil/core@0.15.1 src/canvas/fills.ts; repository inspection is separate from the npm artifact identity."
+  },
+  {
+    "name": "OpenPencil component slot semantics and Figma slot protocol",
+    "repository": "https://github.com/open-pencil/open-pencil",
+    "inspectedRevision": "b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d",
+    "license": "MIT",
+    "notice": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+    "noticeSha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+    "scope": [
+      "src/apps/xdesign/pencil/slots.ts",
+      "src/apps/xdesign/pencil/figSlots.ts"
+    ],
+    "originalPortRevisionKnown": false,
+    "additionalUpstream": "Adapted from packages/scene-graph/src/slots and packages/fig/src/node-change/export/slots.ts at the inspected MIT-licensed repository revision; integrated through Orion graph and archive adapters."
+  },
+  {
+    "name": "OpenPencil interactive behavior contracts and binding helpers",
+    "repository": "https://github.com/open-pencil/open-pencil",
+    "inspectedRevision": "b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d",
+    "license": "MIT",
+    "notice": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+    "noticeSha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+    "scope": [
+      "src/apps/xdesign/pencil/behaviour/kinds.ts",
+      "src/apps/xdesign/pencil/behaviour/schema.ts",
+      "src/apps/xdesign/pencil/behaviour/model.ts",
+      "src/apps/xdesign/pencil/behaviour/spec.ts",
+      "src/apps/xdesign/pencil/behaviour/pluginData.ts"
+    ],
+    "originalPortRevisionKnown": false,
+    "additionalUpstream": "Adapted from packages/scene-graph/src/behaviours and plugin-data/field.ts at the inspected MIT-licensed repository revision; preview uses Orion native React controls and an isolated CanvasKit graph."
+  },
+  {
+    "name": "PhotoCraft continuous retouch feedback formulas",
+    "repository": "https://github.com/storytold/photocraft",
+    "inspectedRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+    "license": "MIT OR Apache-2.0",
+    "notice": "THIRD_PARTY_LICENSES/native/photocraft-engine-0.3.0.md",
+    "noticeSha256": "5a40b41af4dda51455b05679fbddfaeeaacdcdd7bd2a794075c39b30ae5b9096",
+    "scope": [
+      "src-tauri/src/xdesign_photo_retouch.rs",
+      "src-tauri/src/xdesign_photo_retouch_dabs.rs",
+      "src-tauri/src/xdesign_photo_smudge.rs",
+      "src-tauri/src/xdesign_photo_history.rs",
+      "src-tauri/src/xdesign_photo_prepared.rs",
+      "src-tauri/src/xdesign_photo_retouch_admission.rs",
+      "src-tauri/src/xdesign_photo_retouch_sparse.rs",
+      "src-tauri/src/xdesign_photo_retouch_working.rs",
+      "src-tauri/src/xdesign_photo_float_tiles.rs",
+      "src-tauri/src/xdesign_photo_smudge_boundary.rs",
+      "src-tauri/src/xdesign_photo_smudge_retention.rs",
+      "src-tauri/src/xdesign_photo_healing_coverage.rs",
+      "src-tauri/src/xdesign_photo_healing_publish.rs",
+      "src-tauri/src/xdesign_photo_spot_inpaint.rs",
+      "src-tauri/src/xdesign_photo_healing_solve.rs",
+      "src-tauri/src/xdesign_photo_healing_sources.rs",
+      "src-tauri/src/xdesign_photo_brush_feedback.rs",
+      "src-tauri/src/xdesign_photo_history_persistence.rs",
+      "src-tauri/src/xdesign_photo_bundle_compaction.rs",
+      "src-tauri/src/xdesign_photo_maintenance.rs"
+    ],
+    "originalPortRevisionKnown": true,
+    "additionalUpstream": "Adapted clone sampling/composition, Poisson healing, coverage padding, spot-healing and tone/focus formulas from crates/engine/src/retouch_cmds.rs; sequential mixer/replacement paint from crates/paint/src/mixer.rs and replace.rs; nonseparable color helpers from crates/color/src/blend.rs, all at the pinned revision. Uses public paint renderers/dynamics and algorithm crates; streamed sample ownership, float working/carry state, provisional tails, resource budgets and cancellable leases are Orion adapters. Boundary-sensitive Smudge feedback uses the public Smudge API in crates/paint/src/retouch.rs; native source/composite sampling and stroke mixing are retained, with owned float tile checkpoints, dependency windows and bounded rewind/eviction. History Brush coverage/source-target lookup follows the pinned engine's retouch_cmds.rs and channel_cmds.rs; snapshot identifiers, weak source registry and trim/eviction validation are Orion-owned adapters over public native history APIs. Prepared retouch completion uses the public engine jobs API (crates/engine/src/jobs.rs) and native edit/history rules (lib.rs), clone response fields (retouch_cmds.rs), and final mixer carry conversion (crates/paint/src/mixer.rs). The guarded transfer, coalesced-history adapter and event draining are Orion-owned; the pinned engine and dependencies remain unchanged. Cooperative cancellation uses the pinned public raster Interrupt, algorithm inpaint::complete_with and poisson::membrane_fill_with APIs. The seamless clone adapter retains the native dst-minus-src boundary data and exact final mixing without an engine fork. Pre-raster primary/dual/tail geometry admission, transformed source bounds and shared dab budgets are Orion-owned. Sparse Clone/History Brush feedback uses the pinned public render::COV_TILE, StrokeRenderer::coverage_at and tail_preview APIs. Dirty primary/dual/tail patch ownership and restoration are Orion-owned; native source sampling/blending are retained through existing adapters. Sequential retouch working/visible state now uses Orion-owned 64-pixel copy-on-write float tiles, exact native per-dab/finite-halo regions, dirty opacity publication and immutable-source composition caching. Native tone/focus/mixer/replacement formulas remain in the existing adapted module; no intermediate integer quantization or engine fork. Smudge working/visible pixels and checkpoints now share the same Orion-owned 64-pixel float tiles with exact local carry windows clipped to full-prefix bounds. Dirty publication includes required native bounds strips to retain transparent-float opacity rounding; read-only publication does not retain untouched source tiles. Native Smudge carry/pickup formulas remain unchanged. Smudge carry-window summary indexing and incremental checkpoint pointer/reference accounting are Orion-owned metadata adapters. They retain the exact native clipping predicate, rewind eligibility and additional-payload eviction semantics, hold no extra float Arcs and cooperatively interrupt metadata scans. Healing/Spot Healing global coverage staging uses the same pinned public tail_preview and coverage_at APIs. Orion-owned region staging avoids full-renderer cloning and duplicate dense coverage buffers while preserving the complete native padded/context solve domain. Coverage rows observe cancellation; final publication installs document and damage together only after the last check. Native source/composite/solver formulas and the engine remain unchanged. Healing/Spot Healing publication uses the unchanged public paint::retouch::apply_coverage API on bounded 64-pixel patches; coverage extraction and restricted-channel restoration are Orion-owned cancellable adapters. Proximity search, deterministic SplitMix64, integral/hole geometry and texture synthesis are adapted from the same revision's crates/algo/src/inpaint.rs with unchanged candidate order, scoring, tie behavior and float math. Row/candidate/score/block/copy checks add cancellation; empty-source synthesis uses the public interruptible Poisson API. The full native solve domain and pinned engine remain unchanged. Healing solve staging in xdesign_photo_healing_solve.rs retains the pinned retouch_cmds.rs mask bounding/inflate/clamp and public interruptible Poisson semantics. Orion-owned strided difference/mask construction removes copied cropped source/destination regions, borrows the original destination instead of cloning full solved paint, and lazily overlays the exact corrected region in bounded publication patches. Mask/staging/mix/overlay rows observe cancellation; source and mask buffers are released before publication. The solve domain and native engine remain unchanged. Healing/Spot Healing source staging in xdesign_photo_healing_sources.rs preserves native current/below/all-layer visibility and the complete native compose/source regions. Orion-owned bounded reads, color encoding and destination resampling batches poll cancellation; affine batches call the unchanged public clone_source::resample against the complete sampled source. Chunk endpoint math is safe at integer limits. Composition and allocator calls remain individually uninterruptible; no source-domain cropping or engine fork. Ordinary Brush/Pencil/Eraser feedback in xdesign_photo_brush_feedback.rs uses the unchanged public engine LiveStroke API. Implicit mask/alpha/Quick Mask routing and single-color-channel restoration follow the pinned crates/engine/src/channel_cmds.rs; restoration uses bounded 64-pixel patches while retaining native changed-tile selection and pruning. Tool/target/symmetry/source guards and prepared transfer are Orion-owned; native brush math and the engine remain unchanged. Native image history persistence in xdesign_photo_history_persistence.rs uses the pinned public History APIs (crates/ops/src/lib.rs), format loaders/writers and raster Surface::put_tiles. Versioned snapshot references, weak source-ID/file bindings, metadata validation, public undo/redo reconstruction and exact-byte tile re-sharing are Orion-owned. Immutable publication, project undo/reopen, source choice persistence, portable export and startup reference protection retain native history semantics without an engine fork; no total native resource or device guarantee. Native image storage compaction uses public format ZIP/directory APIs from the same pinned revision. Startup scheduling, byte-for-byte entry manifests, original-ZIP recovery intents, guarded file-to-directory replacement, equal-object hardlink replacement, preflight and maintenance reporting are Orion-owned adapters. All version/source IDs and view metadata remain unchanged; native previews and opaque entries are preserved within the supported bundle layout. No engine fork, history deletion or total-resource guarantee."
+  },
+  {
+    "name": "OpenPencil fractional sibling ordering",
+    "repository": "https://github.com/open-pencil/open-pencil",
+    "inspectedRevision": "b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d",
+    "license": "MIT",
+    "notice": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+    "noticeSha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+    "scope": [
+      "src/apps/xdesign/pencil/sharedOrder.ts"
+    ],
+    "originalPortRevisionKnown": true,
+    "additionalUpstream": "Fractional sibling ordering from packages/scene-graph/src/order-keys.ts at the inspected revision. Shared graph/value/tree/comment adapters are Orion-owned host code using the unchanged published engine and existing installed Yjs, not an engine fork."
   }
 ]

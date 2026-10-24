@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f2f8fc">
+  <meta name="description" content="A home for your ideas, code and design. Meet Archives 47, Orion and XDesign: three connected creative spaces in one personal Mac workstation.">
+  <meta property="og:title" content="Orion Terminal | Think. Make. Connect.">
+  <meta property="og:description" content="One workspace for your notes, code and design. Your next idea starts here.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="assets/social.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>Orion Terminal | Think. Make. Connect.</title>
+  <link rel="icon" href="assets/orion-mark.webp" type="image/webp">
+  <link rel="preload" href="assets/fonts/tektur.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="assets/fonts/space-regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/hero-art.webp" as="image" fetchpriority="high">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="sharp.css">
+  <link rel="stylesheet" href="motion.css">
+  <script src="site.js" defer></script>
+  <script src="motion.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner wrap">
+      <a class="brand" href="#" aria-label="Orion Terminal home">
+        <img src="assets/orion-mark.webp" width="44" height="44" alt="">
+        <span>ORION TERMINAL</span>
+      </a>
+      <nav class="desktop-nav" aria-label="Main navigation">
+        <a href="#product">Product</a>
+        <a href="#apps">Apps</a>
+        <a href="https://github.com/chakra3301/OrionTerminal/releases" target="_blank" rel="noopener noreferrer">Changelog <span class="sr-only">(opens in a new tab)</span></a>
+      </nav>
+      <button class="button button-small header-download" data-download>Download alpha <svg class="icon" aria-hidden="true"><use href="assets/icons.svg#arrow-up-right"></use></svg></button>
+      <button class="menu-toggle icon-button" aria-label="Open navigation" aria-expanded="false" aria-controls="mobile-nav"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#menu"></use></svg></button>
+    </div>
+    <nav id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation" hidden>
+      <a href="#product">Product</a>
+      <a href="#apps">Apps</a>
+      <a href="https://github.com/chakra3301/OrionTerminal/releases" target="_blank" rel="noopener noreferrer">Changelog ↗</a>
+      <button class="button" data-download>Download alpha <svg class="icon" aria-hidden="true"><use href="assets/icons.svg#arrow-right"></use></svg></button>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="product" aria-labelledby="hero-title">
+      <div class="hero-world" aria-hidden="true"><img class="hero-art" src="assets/hero-art.webp" width="1672" height="941" alt="" fetchpriority="high"></div>
+      <div class="hero-inner wrap">
+        <div class="hero-copy">
+          <h1 id="hero-title"><span>THINK.</span><span>MAKE.</span><span>CONNECT.</span></h1>
+          <p class="hero-description">One workspace for your<br>notes, code and design.</p>
+          <button class="button hero-cta" data-download>Download alpha <svg class="icon" aria-hidden="true"><use href="assets/icons.svg#arrow-right"></use></svg></button>
+          <p class="platform-note">Public alpha <span aria-hidden="true">·</span> macOS Apple Silicon</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="apps-section wrap" id="apps" aria-labelledby="apps-title">
+      <div class="section-heading reveal">
+        <h2 id="apps-title">Start anywhere.</h2>
+        <p>Three powerful spaces. <br>Fully connected.</p>
+      </div>
+      <div class="app-list">
+        <article class="app-row app-archives reveal" id="archives">
+          <button class="app-visual" data-app="archives" aria-label="Explore Archives 47">
+            <img src="assets/archives-capture.webp" width="2048" height="1170" loading="lazy" decoding="async" alt="Actual Archives 47 app capture showing notes, journal, collections and recent threads.">
+            <span class="visual-action" aria-hidden="true"><svg class="icon"><use href="assets/icons.svg#arrow-up-right"></use></svg></span>
+          </button>
+          <div class="app-copy">
+            <div class="app-name"><img src="assets/archives-mark.webp" width="37" height="45" alt=""><h3>Archives 47</h3></div>
+            <div class="app-rule" aria-hidden="true"></div>
+            <p class="app-tagline">Keep what matters.</p>
+            <p class="app-description">Notes and knowledge, organized<br class="desktop-break"> around the way you think.</p>
+            <button class="text-button" data-app="archives">Explore Archives 47 <svg class="icon" aria-hidden="true"><use href="assets/icons.svg#arrow-right"></use></svg></button>
+          </div>
+        </article>
+        <article class="app-row app-orion reveal" id="orion">
+          <button class="app-visual" data-app="orion" aria-label="Explore Orion">
+            <img src="assets/orion-capture.webp" width="2048" height="914" loading="lazy" decoding="async" alt="Actual Orion app capture showing its coding workspace and AI conversation.">
+            <span class="visual-action" aria-hidden="true"><svg class="icon"><use href="assets/icons.svg#arrow-up-right"></use></svg></span>
+          </button>
+          <div class="app-copy">
+            <div class="app-name"><img src="assets/editor-mark.webp" width="40" height="44" alt=""><h3>Orion</h3></div>
+            <div class="app-rule" aria-hidden="true"></div>
+            <p class="app-tagline">Build what comes next.</p>
+            <p class="app-description">Coding with AI, from idea<br class="desktop-break"> to working prototype.</p>
+            <button class="text-button" data-app="orion">Explore Orion <svg class="icon" aria-hidden="true"><use href="assets/icons.svg#arrow-right"></use></svg></button>
+          </div>
+        </article>
+        <article class="app-row app-xdesign reveal" id="xdesign">
+          <button class="app-visual" data-app="xdesign" aria-label="Explore XDesign">
+            <img src="assets/xdesign-capture.webp" width="2048" height="1170" loading="lazy" decoding="async" alt="Actual XDesign app capture showing the canvas, layers and design tools.">
+            <span class="visual-action" aria-hidden="true"><svg class="icon"><use href="assets/icons.svg#arrow-up-right"></use></svg></span>
+          </button>
+          <div class="app-copy">
+            <div class="app-name"><img src="assets/xdesign-mark.webp" width="40" height="41" alt=""><h3>XDesign</h3></div>
+            <div class="app-rule" aria-hidden="true"></div>
+            <p class="app-tagline">Give ideas their shape.</p>
+            <p class="app-description">Design and prototypes,<br class="desktop-break"> with AI at your side.</p>
+            <button class="text-button" data-app="xdesign">Explore XDesign <svg class="icon" aria-hidden="true"><use href="assets/icons.svg#arrow-right"></use></svg></button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="flow-section" aria-labelledby="flow-title">
+      <div class="flow-inner wrap">
+        <div class="flow-copy reveal">
+          <h2 id="flow-title">Different tools.<br>One flow.</h2>
+          <p>Move from a thought to code to a design,<br class="desktop-break"> without leaving your workspace.</p>
+          <div class="flow-colors" aria-hidden="true"><span></span><span></span><span></span></div>
+        </div>
+        <div class="flow-scenes" aria-label="Archives 47, Orion and XDesign connected in one workspace">
+          <svg class="flow-ribbon" viewBox="0 0 1000 340" aria-hidden="true"><defs><linearGradient id="ribbon" x1="0" x2="1"><stop stop-color="#00ec86"/><stop offset=".5" stop-color="#00d0ff"/><stop offset="1" stop-color="#ff26b0"/></linearGradient></defs><path d="M0 225 C180 220 170 120 320 165 S490 295 620 175 S810 60 1000 145"/><path class="flow-signal" pathLength="100" d="M0 225 C180 220 170 120 320 165 S490 295 620 175 S810 60 1000 145"/></svg>
+          <div class="flow-screen flow-archives"><span>01 / ARCHIVES 47</span><img src="assets/archives-capture.webp" width="2048" height="1170" alt="" loading="lazy"></div>
+          <div class="flow-screen flow-orion"><span>02 / ORION</span><img src="assets/orion-capture.webp" width="2048" height="914" alt="" loading="lazy"></div>
+          <div class="flow-screen flow-xdesign"><span>03 / XDESIGN</span><img src="assets/xdesign-capture.webp" width="2048" height="1170" alt="" loading="lazy"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing-section" aria-labelledby="closing-title">
+      <img class="closing-art" src="assets/closing-art.webp" width="2120" height="742" alt="" loading="lazy" decoding="async">
+      <div class="closing-inner wrap">
+        <div class="closing-copy reveal">
+          <h2 id="closing-title">Make space<br>for what’s next.</h2>
+          <button class="button" data-download>Download alpha <svg class="icon" aria-hidden="true"><use href="assets/icons.svg#arrow-right"></use></svg></button>
+          <p class="platform-note">Public alpha <span aria-hidden="true">·</span> macOS Apple Silicon</p>
+        </div>
+        <p class="closing-manifesto" aria-hidden="true">IDEAS<br>CODE<br>DESIGN<br>CONNECTED.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer wrap">
+    <div class="footer-main">
+      <a class="brand" href="#" aria-label="Orion Terminal home"><img src="assets/orion-mark.webp" width="40" height="40" alt=""><span>ORION TERMINAL</span></a>
+      <nav aria-label="Footer navigation"><a href="#product">Product</a><a href="#apps">Apps</a><a href="https://github.com/chakra3301/OrionTerminal/releases" target="_blank" rel="noopener noreferrer">Changelog ↗</a><a class="icon-button github-link" href="https://github.com/chakra3301/OrionTerminal" target="_blank" rel="noopener noreferrer" aria-label="Orion Terminal on GitHub (opens in a new tab)"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#github"></use></svg></a></nav>
+    </div>
+    <div class="footer-meta"><p>Made for curious minds. Built in the open.</p><div><a href="https://github.com/chakra3301/OrionTerminal/blob/v0.1.0-alpha.1/BETA.md" target="_blank" rel="noopener noreferrer">Alpha guide ↗</a><button class="theme-toggle" aria-label="Switch to night mode"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#moon"></use></svg><span>Night mode</span></button></div></div>
+    <div class="concept-meta"><p class="concept-note">Actual app captures shown. The public alpha’s interface and feature set may differ from current development.</p><button class="motion-toggle" aria-pressed="false">Reduce motion</button></div>
+  </footer>
+
+  <dialog class="download-dialog" id="download-dialog" aria-labelledby="download-title">
+    <button class="dialog-close icon-button" data-close aria-label="Close download details"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#x"></use></svg></button>
+    <div class="download-header"><img src="assets/orion-mark.webp" width="64" height="64" alt=""><p class="dialog-eyebrow">YOUR NEXT WORKSPACE</p></div>
+    <h2 id="download-title">A little space.<br>A lot of possibility.</h2>
+    <p>Orion Terminal public alpha for Apple Silicon Mac.</p>
+    <a class="button download-file" href="https://github.com/chakra3301/OrionTerminal/releases/download/v0.1.0-alpha.1/Orion-Terminal_aarch64.dmg">Download alpha <svg class="icon" aria-hidden="true"><use href="assets/icons.svg#download"></use></svg></a>
+    <p class="download-version">v0.1.0-alpha.1 <span aria-hidden="true">·</span> 55.8 MB DMG</p>
+    <div class="install-note"><strong>Before you install</strong><p>This is an early release, ad-hoc signed and not notarized. Back up important work. Use macOS’s app-specific Open Anyway controls only for a download you trust; never disable Gatekeeper.</p></div>
+    <div class="download-links"><a href="https://github.com/chakra3301/OrionTerminal/blob/v0.1.0-alpha.1/BETA.md" target="_blank" rel="noopener noreferrer">Installation guide ↗</a><a href="https://github.com/chakra3301/OrionTerminal/releases/tag/v0.1.0-alpha.1" target="_blank" rel="noopener noreferrer">Release notes & checksums ↗</a></div>
+    <p class="download-footnote">AI is optional. Provider subscriptions and API usage are separate.</p>
+  </dialog>
+
+  <dialog class="app-dialog" id="app-dialog" aria-labelledby="app-dialog-title">
+    <button class="dialog-close icon-button" data-close aria-label="Close app details"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#x"></use></svg></button>
+    <img class="app-dialog-image" id="app-dialog-image" src="assets/archives-capture.webp" width="2048" height="1170" alt="">
+    <div class="app-dialog-body"><div class="app-dialog-name"><img id="app-dialog-mark" src="assets/archives-mark.webp" width="36" height="40" alt=""><h2 id="app-dialog-title">Archives 47</h2></div><p id="app-dialog-description"></p><ul id="app-dialog-features"></ul><p class="app-dialog-note">Included in Orion Terminal. Actual app capture shown; see release notes for public alpha availability.</p><button class="button" data-download>Download alpha <svg class="icon" aria-hidden="true"><use href="assets/icons.svg#arrow-right"></use></svg></button></div>
+  </dialog>
+</body>
+</html>

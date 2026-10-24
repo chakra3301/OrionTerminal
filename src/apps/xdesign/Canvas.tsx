@@ -26,6 +26,9 @@ import { computeAutoLayout, type LayoutOverrides } from "@/apps/xdesign/autoLayo
 import { reflowConstraints, type Box } from "@/apps/xdesign/constraints";
 import { setExportSvgRef } from "@/apps/xdesign/exportXD";
 import type { Asset } from "@/store/assetsStore";
+import { isDesignDialogOpen } from "./useDesignDialog";
+import { editImage, usePhotoWorkspace } from "./photo/runtime";
+import { toast } from "@/store/toastStore";
 
 /** Image source resolver: data: URLs (AI-authored SVG illustrations) pass
  * through untouched; real file paths go through Tauri's asset protocol. */
@@ -218,7 +221,10 @@ function computeSnap(
 }
 
 export function XDesignCanvas() {
-  const shapes = useXDesign((s) => s.shapes);
+  const storedShapes = useXDesign((s) => s.shapes);
+  const photoDocuments = useXDesign((s) => s.photoDocuments);
+  const shapes = useMemo(() => storedShapes.map(shape => shape.kind === "image" && shape.photoDocumentId && photoDocuments[shape.photoDocumentId]
+    ? { ...shape, filePath: photoDocuments[shape.photoDocumentId]!.previewPath } : shape), [storedShapes, photoDocuments]);
   const selection = useXDesign((s) => s.selection);
   const tool = useXDesign((s) => s.tool);
   const viewport = useXDesign((s) => s.viewport);
@@ -449,7 +455,7 @@ export function XDesignCanvas() {
       return tag === "input" || tag === "textarea" || node.isContentEditable;
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isEditing(e.target)) return;
+      if (isDesignDialogOpen() || isEditing(e.target)) return;
       // Undo / Redo
       if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
@@ -1213,15 +1219,24 @@ export function XDesignCanvas() {
   };
 
   const onShapeMouseDown = (e: RMouseEvent, shape: Shape) => {
-    if (tool !== "select") return;
+    if (tool !== "select" || isDesignDialogOpen() || usePhotoWorkspace.getState().busy) return;
     // Locked or hidden shapes are pass-through: the click reaches the
     // canvas background (marquee/deselect) instead of selecting them.
     if (shape.locked || shape.hidden) return;
     e.stopPropagation();
     const deep = e.metaKey || e.ctrlKey || e.detail >= 2;
     const targetId = resolveSelectTarget(shape, deep);
-    // Double-click a path → enter anchor-edit mode instead of deep-select.
     const targetShape = shapes.find((s) => s.id === targetId);
+    // Linked PSDs reopen their layered document instead of the canvas preview.
+    if (e.button === 0 && e.detail >= 2 && targetShape?.kind === "image") {
+      e.preventDefault();
+      select(targetId);
+      setEditPathId(null);
+      setDrag(null);
+      void editImage(targetId).catch(error => toast.error(String(error)));
+      return;
+    }
+    // Double-click a path → enter anchor-edit mode instead of deep-select.
     if (e.detail >= 2 && targetShape?.kind === "path") {
       select(targetId);
       setEditPathId(targetId);
@@ -2208,6 +2223,7 @@ function ShapeNode({
         opacity={opacityAttr}
       >
         <image
+          data-photo-document={shape.photoDocumentId}
           href={imgHref(shape.filePath)}
           x={shape.x}
           y={shape.y}

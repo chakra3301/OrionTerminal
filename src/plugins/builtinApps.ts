@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Archive, Code2, Palette, Radar, Workflow } from "lucide-react";
+import { Archive, Code2, FlaskConical, Palette, Radar, Workflow } from "lucide-react";
 import { registry, type Command } from "@/commands/registry";
 import { useShell } from "@/shell/store/useShell";
 import { appRegistry, type AppDescriptor } from "@/plugins/appRegistry";
@@ -16,9 +16,30 @@ export const BUILTIN_APP_PLUGIN_IDS = {
   xdesign: "@orion/xdesign",
   command: "@orion/command-center",
   hermes: "@orion/hermes",
+  incubator: "@orion/incubator",
 } as const;
 
 export const BUILTIN_APP_DESCRIPTORS: readonly AppDescriptor[] = [
+  {
+    id: "incubator",
+    name: "Incubator",
+    order: 60,
+    renderer: {
+      kind: "trusted-react",
+      component: lazy(() => import("@/apps/incubator/IncubatorApp").then((module) => ({ default: module.IncubatorApp }))),
+    },
+    window: { title: "INCUBATOR", subtitle: "bring something in", defaultSize: { w: 1020, h: 780 } },
+    dock: {
+      Icon: FlaskConical,
+      background: "linear-gradient(135deg, rgba(177,76,255,0.4), rgba(177,76,255,0.05))",
+      glow: "0 0 14px -2px rgba(177,76,255,0.4)",
+      foreground: "#180825",
+    },
+    spotlight: { description: "bring repositories and skills into Orion Terminal" },
+    accent: "var(--neon-violet)",
+    menuNames: ["File", "Edit", "View", "Window"],
+    openCommand: { id: "app.openIncubator", label: "Open Incubator", keywords: ["incubator", "intake", "import", "repository", "skills", "plugins"] },
+  },
   {
     id: "archives",
     name: "Archives 47",
@@ -93,7 +114,7 @@ export const BUILTIN_APP_DESCRIPTORS: readonly AppDescriptor[] = [
     },
     window: {
       title: "XDESIGN",
-      subtitle: "untitled frame",
+      subtitle: "studio",
       defaultSize: { w: 1180, h: 760 },
     },
     dock: {
@@ -186,6 +207,14 @@ export type BuiltinAppPluginInfo = {
 };
 
 export const BUILTIN_APP_PLUGIN_CATALOG: readonly BuiltinAppPluginInfo[] = [
+  {
+    pluginId: BUILTIN_APP_PLUGIN_IDS.incubator,
+    appId: "incubator",
+    version: "1.0.0",
+    description: "A home for what you bring into Orion Terminal. Inspect repositories and stage skills for review; no automatic execution or installation.",
+    capabilities: ["Intake", "Repository inspection", "Skill staging"],
+    disableable: true,
+  },
   {
     pluginId: BUILTIN_APP_PLUGIN_IDS.archives,
     appId: "archives",

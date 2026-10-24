@@ -60,12 +60,13 @@
 :root body .ar-journal-rail-item .title { font-weight: 500; }
 :root body .ar-db-th-btn { font-family: var(--f-display); font-size: 12px; letter-spacing: 0; text-transform: none; }
 :root body .ar-db-viewtab.active { color: var(--t-primary); background: var(--work-selected); }
-:root body .ar-empty-state .title { font-size: 18px; font-weight: 500; letter-spacing: -.02em; }
-:root body .ar-empty-state .hint { color: var(--work-muted); font-size: 12px; line-height: 1.7; }
+:root body :is(.ar-empty-state, .ar-brain-empty, .ar-chats-empty) .title { margin-top: 4px; font-family: var(--f-display); font-size: 15px; font-weight: 500; letter-spacing: -.01em; text-transform: none; color: var(--t-primary); }
+:root body :is(.ar-empty-state, .ar-brain-empty, .ar-chats-empty) > svg { stroke: var(--t-tertiary); }
+:root body :is(.ar-empty-state, .ar-brain-empty, .ar-chats-empty) .hint { max-width: 400px; color: var(--work-muted); font-size: 12px; line-height: 1.65; }
 
 :root body .ot-panel-tabs { height: 36px; }
 :root body .ot-panel-tab { font-family: var(--f-display); font-size: 12px; letter-spacing: 0; border-right-color: transparent; }
-:root body .ot-panel-tab.active { background: var(--work-hover); box-shadow: inset 0 -1px 0 var(--neon-cyan); }
+:root body .ot-panel-tab.active { background: var(--work-hover); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--t-primary) 55%, transparent); }
 :root body .ot-panel-tab.dirty .label { color: var(--neon-yellow); }
 :root body .or-statusbar { border-top-color: var(--work-line); }
 
@@ -138,7 +139,38 @@
 :root body .learn-empty-heading { font-family: var(--f-display); font-weight: 500; letter-spacing: -.025em; }
 :root body .learn-empty-sub { color: var(--t-secondary); line-height: 1.7; }
 :root body .rl-tab { font-family: var(--f-display); font-size: 12px; letter-spacing: 0; text-transform: none; }
+:root body .skill-intake { font-family: var(--f-display); }
+:root body .skill-intake :is(.cp-btn, .cp-input, .cp-link-danger),
+:root body .skill-intake-tabs button {
+  font: 500 12px/1.4 var(--f-display);
+  letter-spacing: 0;
+  text-transform: none;
+  box-shadow: none;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+:root body .skill-intake .cp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 34px; padding: 8px 12px; border: 1px solid transparent;
+  border-radius: var(--r-md); background: var(--work-text); color: var(--t-on-accent);
+  cursor: pointer;
+}
+:root body .skill-intake .cp-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--work-text) 89%, var(--work-panel)); filter: none; }
+:root body .skill-intake .cp-btn.ghost { background: transparent; border-color: var(--work-line-strong); color: var(--t-secondary); }
+:root body .skill-intake .cp-btn.ghost:hover:not(:disabled) { background: var(--work-hover); color: var(--t-primary); }
+:root body .skill-intake .cp-input { padding: 8px 12px; border: 1px solid var(--work-line-strong); border-radius: var(--r-md); background: var(--work-hover); color: var(--t-primary); }
+:root body .skill-intake .cp-input::placeholder { color: var(--work-muted); }
+:root body .skill-intake .cp-input:focus { border-color: var(--t-secondary); box-shadow: none; }
+:root body .skill-intake .cp-link-danger { color: var(--neon-magenta); }
+:root body .skill-intake-tabs button { background: transparent; color: var(--t-secondary); }
+:root body .skill-intake-tabs button:hover { background: var(--work-hover); color: var(--t-primary); }
+:root body .skill-intake-tabs button[aria-selected="true"] { background: var(--work-selected); border-color: var(--work-line); color: var(--t-primary); }
+:root body .skill-intake :is(.skill-intake-preview, .skill-intake-selection) { background: var(--work-hover); }
+:root body .skill-intake .skill-analysis { border-color: var(--work-line); }
+:root body .skill-intake .skill-intake-row { border-color: var(--work-line); }
+:root body .skill-intake .skill-intake-title { color: var(--work-muted); }
+:root body .incubator-header button { transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; }
 @media (prefers-reduced-motion: reduce) {
+  :root body .skill-intake :is(button, input, select, textarea), :root body .incubator-header button { transition: none; }
   :root body :is(.ar-note-card, .or-home-btn, .xd-home-new, .ar-new-btn, .ar-db-newrow,
     .hm-btn, .rl-btn, .ot-prompt-btn, .or-home-card-preview, .xd-home-card-preview,
     .xd-home-start-card) { transition: none; }

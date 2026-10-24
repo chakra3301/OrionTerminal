@@ -1,0 +1,18 @@
+.xd-menu-root { display: contents; }
+.xd-menubar { display: flex; align-items: center; min-width: 0; }
+.xd-menubar > button { height: 22px; padding: 0 8px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--xd-text); font: inherit; font-size: 13px; white-space: nowrap; cursor: default; }
+.xd-menubar > button:hover, .xd-menubar > button[aria-expanded="true"] { background: var(--xd-hover); }
+.xd-menubar > button:focus-visible { outline: 2px solid var(--xd-accent); outline-offset: -2px; }
+
+.xd-menu { position: fixed; z-index: 60; box-sizing: border-box; width: max-content; min-width: 200px; overflow-y: auto; padding: 4px; background: var(--xd-panel); border: 1px solid var(--xd-border); border-radius: var(--r-sm); box-shadow: var(--shadow-window); white-space: nowrap; outline: none; }
+.xd-menu > [role="separator"] { height: 0; margin: 5px 4px; border-top: 1px solid var(--xd-border); }
+.xd-menu > .xd-menu-item { display: grid; grid-template-columns: 14px 1fr auto; align-items: center; width: 100%; height: 22px; padding: 0 10px 0 4px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--xd-text); font: inherit; font-size: 13px; text-align: left; cursor: default; outline: none; }
+.xd-menu > .xd-menu-item::before { content: ""; text-align: center; }
+.xd-menu > .xd-menu-item.with-icon { grid-template-columns: 14px 22px 1fr auto; height: 26px; }
+.xd-menu > .xd-menu-item[aria-checked="true"]::before { content: "✓"; }
+.xd-menu > .xd-menu-item::after { content: attr(data-shortcut); margin-left: 24px; color: var(--xd-text-2); text-align: right; }
+.xd-menu > .xd-menu-item[aria-haspopup]::after { content: "▸"; }
+.xd-menu > .xd-menu-item:focus:not(:disabled), .xd-menu > .xd-menu-item[aria-expanded="true"]:not(:disabled) { background: var(--xd-accent); color: var(--t-on-accent); }
+.xd-menu > .xd-menu-item:focus:not(:disabled)::after, .xd-menu > .xd-menu-item[aria-expanded="true"]:not(:disabled)::after { color: inherit; }
+.xd-menu > .xd-menu-item:disabled { color: var(--xd-text-3); }
+.xd-menu > .xd-menu-item:disabled::after { color: inherit; }

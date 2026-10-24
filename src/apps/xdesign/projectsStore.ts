@@ -1,4 +1,9 @@
+import { livePencilSnapshot, validatePencilDocument, type PencilDocument } from "./pencil/document";
+import { readRoomImageBindings } from './pencil/roomImageBindings';
+import { initializeImageStorage } from "./projectStorage";
 import { create } from "zustand";
+import { validatePhotoDocuments, type PhotoDocument } from "./photo/types";
+import { validatePhotoDrafts, type PhotoDraft } from "./photo/drafts";
 import { ulid } from "ulid";
 import { getAppState, setAppState, setXDesignStateAtomic } from "@/lib/db";
 import { serialQueue } from "@/lib/serialQueue";
@@ -20,10 +25,15 @@ import { useModelAssist } from "./model3d/modelAssist";
 import { useFxAssist } from "./fx/fxAssist";
 import { fxEffect } from "./fx/fxRegistry";
 import { discardProjectSaveState, projectSaveStarted, projectSaveFinished } from "./saveState";
+import { ProjectAssetImport, projectImportControl, type ProjectImportReceipt, type ProjectImportResult } from './projectAssetImport';
 
 /** A persisted XDesign document — the same shape `useXDesign.hydrate` accepts
  * and `useXDesignPersistence` writes. One per project. */
 export type XDDoc = {
+  formatVersion?: 2;
+  photoDocuments?: Record<string, PhotoDocument>;
+  photoDrafts?: PhotoDraft[];
+  pencilDocument?: PencilDocument | null;
   pages: Page[];
   activePageId: string;
   variables?: Variable[];
@@ -107,6 +117,10 @@ export function snapshotActiveDoc(): XDDoc {
     future: [],
   }));
   return {
+    formatVersion: 2,
+    photoDocuments: s.photoDocuments,
+    photoDrafts: s.photoDrafts,
+    pencilDocument: livePencilSnapshot(s.pencilDocument),
     pages,
     activePageId: s.activePageId,
     variables: s.variables,
@@ -116,7 +130,7 @@ export function snapshotActiveDoc(): XDDoc {
   };
 }
 
-function validateDesignDoc(doc: XDDoc): void {
+export function validateDesignDoc(doc: XDDoc): void {
   const ids = new Set<string>();
   if (!doc || !Array.isArray(doc.pages) || !doc.pages.length || doc.pages.some((p) => {
     if (!p || typeof p.id !== "string" || ids.has(p.id) || typeof p.name !== "string" || !Array.isArray(p.shapes)) return true;
@@ -128,6 +142,17 @@ function validateDesignDoc(doc: XDDoc): void {
     (doc.variables !== undefined && !Array.isArray(doc.variables)) ||
     (doc.modes !== undefined && !Array.isArray(doc.modes))) {
     throw new Error("Design project data is invalid or unsupported. Restore a backup; it has not been overwritten.");
+  }
+  if (doc.formatVersion !== undefined && doc.formatVersion !== 2) throw new Error("This XDesign document needs a newer application version");
+  if (doc.photoDocuments !== undefined) validatePhotoDocuments(doc.photoDocuments);
+  if (doc.photoDrafts !== undefined) validatePhotoDrafts(doc.photoDrafts, doc.photoDocuments ?? {});
+  if (doc.pencilDocument) {
+    validatePencilDocument(doc.pencilDocument);
+    for (const id of Object.values(doc.pencilDocument.photoLinks)) if (!doc.photoDocuments?.[id]) throw new Error("A linked photo document is missing");
+    for (const binding of readRoomImageBindings(doc.pencilDocument.roomImages).bindings) if (!doc.photoDocuments?.[binding.photo.id]) throw new Error("A local shared image document is missing");
+  }
+  for (const page of doc.pages) for (const shape of page.shapes) {
+    if (shape.kind === "image" && shape.photoDocumentId && !doc.photoDocuments?.[shape.photoDocumentId]) throw new Error("An image document is missing; restore a project backup");
   }
   if (doc.htmlArtifact !== undefined && doc.htmlArtifact !== null) validateHtmlArtifact(doc.htmlArtifact);
 }
@@ -249,6 +274,9 @@ type XDProjectsState = {
    * doc slot). */
   ensureActive: () => Promise<string>;
   newProject: (name?: string, kind?: XDProjectKind) => Promise<string>;
+  importDesignProject: (read: (id: string, assets: ProjectAssetImport) => Promise<{ name: string; document: XDDoc; roomGrantState?: unknown }>) => Promise<string>;
+  recoverDesignImport: (receipt: ProjectImportReceipt) => Promise<string>;
+  removeInterruptedImport: (receipt: ProjectImportReceipt) => Promise<'removed' | 'kept'>;
   openProject: (id: string) => Promise<void>;
   switchTo: (id: string) => Promise<void>;
   closeTab: (id: string) => Promise<void>;
@@ -279,12 +307,21 @@ async function updateRegistry(update: (registry: XDProjectMeta[]) => XDProjectMe
     }));
 }
 
-async function commitProjectState(registry: XDProjectMeta[], writes: Parameters<typeof setXDesignStateAtomic>[0]): Promise<void> {
+async function commitProjectState(registry: XDProjectMeta[], writes: Parameters<typeof setXDesignStateAtomic>[0], receipt?: ProjectImportReceipt): Promise<void> {
   await trackXDesignActivity("project-registry-save", "Wait for the XDesign project transaction before disabling the plugin.",
     () => persistInOrder(async () => {
-      await saveInOrder(() => setXDesignStateAtomic([...writes, { key: "xdesign.projects", value: { registry } }]));
+      const transaction = [...writes, { key: "xdesign.projects" as const, value: { registry } }];
+      await saveInOrder(() => receipt ? setXDesignStateAtomic(transaction, receipt) : setXDesignStateAtomic(transaction));
       useXDProjects.setState({ registry });
     }));
+}
+
+function registeredImport(result: ProjectImportResult, id: string): { registry: XDProjectMeta[]; document: XDDoc } {
+  if (result.phase !== 'committed' || !result.imported || !result.registry) throw new Error('Recovered project registration is unavailable');
+  validateDesignDoc(result.imported.document);
+  const registry = readRegistry({ registry: result.registry });
+  if (!registry.some(meta => meta.id === id && projectKind(meta) === 'design')) throw new Error('Recovered project metadata is unavailable');
+  return { registry, document: result.imported.document };
 }
 
 /** Flush the live doc to the active project's slot + bump its updatedAt.
@@ -359,6 +396,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
         }
       }
       useHtmlArtifact.getState().setProject(null);
+      await initializeImageStorage();
       set({ registry, openTabs: [], activeId: null, ready: true });
     }).catch((error) => {
       set({ loadError: String(error) });
@@ -405,6 +443,77 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
     }));
     return id;
   }),
+
+  importDesignProject: (read) => projectChange(async () => {
+    await flushActive();
+    const id = ulid();
+    const assets = new ProjectAssetImport(id);
+    return trackXDesignActivity("project-import", "Wait for the project file to finish opening before disabling XDesign.", async () => {
+      let document: XDDoc;
+      try {
+        const imported = await read(id, assets);
+        validateDesignDoc(imported.document);
+        const now = Date.now();
+        const meta: XDProjectMeta = { id, name: uniqueName(get().registry, imported.name.trim() || "Imported design"), createdAt: now, updatedAt: now };
+        await commitProjectState([meta, ...get().registry], [{ key: docKey(id), value: imported.document }, ...(imported.roomGrantState === undefined ? [] : [{ key: `xdesign.roomGrants.${id}` as const, value: imported.roomGrantState }])], assets.used ? assets.receipt : undefined);
+        document = imported.document;
+      } catch (error) {
+        const recovered = await assets.afterFailure(error);
+        if (!recovered) throw error;
+        const saved = registeredImport(recovered, id);
+        set({ registry: saved.registry }); document = saved.document;
+      }
+      useXDesign.getState().hydrate(document);
+      useHtmlArtifact.getState().setProject(id, document.htmlArtifact);
+      useModelAssist.getState().clear(); useFxAssist.getState().clear();
+      set(s => ({ openTabs: s.openTabs.includes(id) ? s.openTabs : [...s.openTabs, id], activeId: id }));
+      return id;
+    });
+  }),
+
+  recoverDesignImport: (receipt) => projectChange(() => trackXDesignActivity('project-import-recovery', 'Wait for the recovered copy to open before disabling XDesign.', async () => {
+    if (get().activeId) throw new Error('Return to the XDesign start screen before opening an interrupted copy.');
+    let recovered = await projectImportControl(receipt, 'status');
+    let document: XDDoc;
+    const id = receipt.projectId;
+    if (recovered.phase === 'staged' && recovered.imported) {
+      validateDesignDoc(recovered.imported.document);
+      const stored = await getAppState<unknown>('xdesign.projects', true);
+      const registry = stored === null ? [] : readRegistry(stored);
+      const now = Date.now();
+      const meta: XDProjectMeta = { id, name: uniqueName(registry, recovered.imported.name.trim() || 'Recovered design'), createdAt: now, updatedAt: now };
+      try {
+        await commitProjectState([meta, ...registry], [{ key: docKey(id), value: recovered.imported.document }], receipt);
+        document = recovered.imported.document;
+      } catch (error) {
+        try { recovered = await projectImportControl(receipt, 'status'); }
+        catch (readError) { throw new Error(`${String(error)}. The recovered copy is retained: ${String(readError)}`, { cause: error }); }
+        if (recovered.phase !== 'committed') throw error;
+        const saved = registeredImport(recovered, id);
+        set({ registry: saved.registry }); document = saved.document;
+      }
+    } else {
+      if (recovered.phase === 'preparing') throw new Error('This copy stopped before its artwork finished saving. Remove the unused copy or retry opening the original file.');
+      if (recovered.phase === 'discarded') throw new Error('Removal has already started for this copy. Finish removing the unused copy.');
+      const saved = registeredImport(recovered, id);
+      set({ registry: saved.registry }); document = saved.document;
+    }
+    useXDesign.getState().hydrate(document);
+    useHtmlArtifact.getState().setProject(id, document.htmlArtifact);
+    useModelAssist.getState().clear(); useFxAssist.getState().clear();
+    set(s => ({ openTabs: s.openTabs.includes(id) ? s.openTabs : [...s.openTabs, id], activeId: id }));
+    return id;
+  })),
+
+  removeInterruptedImport: (receipt) => projectChange(() => trackXDesignActivity('project-import-recovery', 'Wait for the unused copy to be removed before disabling XDesign.', async () => {
+    if (get().activeId) throw new Error('Return to the XDesign start screen before removing an interrupted copy.');
+    const recovered = await projectImportControl(receipt, 'discard');
+    if (recovered.phase === 'discarded') return 'removed';
+    if (recovered.phase !== 'committed') throw new Error('The unused copy could not be removed. Refresh and try again.');
+    const saved = registeredImport(recovered, receipt.projectId);
+    set({ registry: saved.registry });
+    return 'kept';
+  })),
 
   openProject: (id) => projectChange(async () => {
     if (get().activeId === id) return;

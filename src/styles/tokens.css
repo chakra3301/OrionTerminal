@@ -77,6 +77,20 @@
   /* type */
   --f-display: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono:    "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+  /* Aliases used by Incubator, Skill intake and Archives; undefined, they voided whole `font:` shorthands. */
+  --f-ui:   var(--f-display);
+  --f-sans: var(--f-display);
+  /* Aliases for names the XDesign photo/pencil/project-file styles use. They map onto
+     the existing canon (DESIGN.md spacing scale 4/8/12/18, glass border, the two faces). */
+  --font-ui:   var(--f-display);
+  --font-mono: var(--f-mono);
+  --border:        var(--glass-border);
+  --border-1:      var(--glass-border);
+  --border-subtle: var(--glass-border);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 18px;
 }
 
 /* ============================================================
@@ -1089,8 +1103,7 @@ summary:focus-visible,
   max-height: 200px;
 }
 .ot-rosie-input textarea:focus {
-  border-color: rgba(var(--neon-cyan-rgb), 0.5);
-  background: rgba(var(--neon-cyan-rgb), 0.04);
+  border-color: color-mix(in srgb, var(--t-primary) 34%, transparent);
 }
 .ot-rosie-input textarea::placeholder { color: var(--t-tertiary); }
 .ot-rosie-input .send {
@@ -2008,8 +2021,8 @@ summary:focus-visible,
   outline: 0;
 }
 .ot-claude-input textarea:focus {
-  border-color: rgba(var(--neon-green-rgb),0.3);
-  box-shadow: 0 0 0 3px rgba(var(--neon-green-rgb),0.08);
+  border-color: color-mix(in srgb, var(--t-primary) 34%, transparent);
+  box-shadow: none;
 }
 .ot-claude-input textarea::placeholder { color: var(--t-tertiary); }
 .ot-claude-input button.send {
@@ -2968,8 +2981,8 @@ summary:focus-visible,
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 .or-search-input:focus {
-  border-color: rgba(var(--neon-cyan-rgb), 0.4);
-  box-shadow: var(--shadow-glow-cyan);
+  border-color: color-mix(in srgb, var(--t-primary) 34%, transparent);
+  box-shadow: none;
 }
 .or-search-toggle {
   display: flex;
@@ -4385,8 +4398,8 @@ summary:focus-visible,
   padding: 6px 10px;
 }
 .ot-settings-input:focus-within {
-  border-color: rgba(var(--neon-cyan-rgb), 0.4);
-  box-shadow: 0 0 0 3px rgba(var(--neon-cyan-rgb), 0.08);
+  border-color: color-mix(in srgb, var(--t-primary) 34%, transparent);
+  box-shadow: none;
 }
 .ot-settings-input input {
   flex: 1;
@@ -4630,7 +4643,7 @@ summary:focus-visible,
   font-size: 13px;
   outline: none;
 }
-.ot-mcp-input:focus { border-color: rgba(var(--neon-cyan-rgb), 0.4); }
+.ot-mcp-input:focus { border-color: color-mix(in srgb, var(--t-primary) 34%, transparent); }
 .ot-mcp-input.mono { font-family: var(--f-mono); font-size: 12px; }
 .ot-mcp-header-row {
   display: grid;
@@ -4867,36 +4880,7 @@ summary:focus-visible,
   );
   pointer-events: none;
 }
-/* Character picker */
-.ot-char-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
-  margin-top: 18px;
-}
-.ot-char-card {
-  --char-accent: var(--neon-cyan);
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  border-radius: var(--r-md);
-  background: linear-gradient(180deg, #060a0f 0%, #0a1015 100%);
-  border: 1px solid rgba(255,255,255,0.06);
-  cursor: pointer;
-  color: inherit;
-  font: inherit;
-  overflow: hidden;
-  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-}
-.ot-char-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--char-accent);
-}
-.ot-char-card.active {
-  border-color: var(--char-accent);
-  box-shadow: 0 0 0 1px var(--char-accent) inset, 0 0 22px -6px var(--char-accent);
-}
+/* Character preview canvas (shared by the picker stage and other previews) */
 .ot-char-canvas {
   width: 100%;
   height: 170px;
@@ -4907,15 +4891,13 @@ summary:focus-visible,
   position: absolute;
   inset: 0;
   z-index: 0;
-  background:
-    linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.06) 50%, transparent 70%),
-    radial-gradient(60% 60% at 50% 45%, rgba(0,224,255,0.06), transparent 70%);
-  background-size: 220% 100%, 100% 100%;
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.06) 50%, transparent 70%);
+  background-size: 220% 100%;
   animation: ot-char-shimmer 1.2s ease-in-out infinite;
 }
 @keyframes ot-char-shimmer {
-  0% { background-position: 120% 0, 0 0; }
-  100% { background-position: -120% 0, 0 0; }
+  0% { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
 }
 .ot-char-canvas-err {
   display: flex;
@@ -4926,68 +4908,115 @@ summary:focus-visible,
   font-size: 11px;
   color: var(--t-tertiary);
 }
-.ot-char-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px 10px;
-  text-align: left;
+
+/* Companion picker: the site's card art (orion-site /companions/cards), live
+   type-in reveal over the clean plate, plus one live 3D stage. */
+.ot-companions { --char-accent: var(--neon-cyan); max-width: 980px; }
+.ot-companions-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 18px;
+  align-items: start;
+  margin-top: 14px;
 }
-.ot-char-name {
-  font-size: 12px;
-  color: var(--t-primary);
+@container (max-width: 640px) { .ot-companions-layout { grid-template-columns: 1fr; } }
+.ot-ccard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
-.ot-char-blurb {
-  font-size: 10px;
-  color: var(--t-tertiary);
-  line-height: 1.3;
-}
-.ot-char-check {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--char-accent);
-  color: #03060a;
-}
-.ot-char-remove {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--r-sm);
-  background: rgba(3,6,10,0.6);
-  color: var(--t-secondary);
+.ot-ccard-pick {
+  --char-accent: var(--neon-cyan);
+  position: relative;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+  background: transparent;
   cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
-.ot-char-remove:hover { color: var(--neon-magenta); }
-.ot-char-upload {
-  align-items: center;
-  justify-content: center;
-  min-height: 220px;
-  border-style: dashed;
+.ot-ccard-pick .ot-ccard { filter: saturate(0.55) brightness(0.74); opacity: 0.86; transition: filter 0.3s ease, opacity 0.3s ease; }
+.ot-ccard-pick:hover { transform: translateY(-2px); }
+.ot-ccard-pick:hover .ot-ccard { filter: saturate(0.85) brightness(0.92); opacity: 1; }
+.ot-ccard-pick.active {
+  border-color: color-mix(in srgb, var(--char-accent) 38%, transparent);
+  background: color-mix(in srgb, var(--char-accent) 5%, transparent);
 }
-.ot-char-upload-inner {
+.ot-ccard-pick.active .ot-ccard {
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--char-accent) 32%, transparent));
+  opacity: 1;
+}
+.ot-ccard-pick:focus-visible { outline: 1px solid color-mix(in srgb, var(--t-primary) 55%, transparent); outline-offset: 2px; }
+.ot-ccard { position: relative; width: 100%; }
+.ot-ccard-art { position: absolute; inset: 0; animation: ot-ccard-in 520ms steps(1) both; }
+.ot-ccard-art.is-still { animation: none; }
+.ot-ccard-base { position: absolute; inset: 0; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
+.ot-ccard-txt { position: absolute; display: block; background-repeat: no-repeat; }
+.ot-ccard-txt.is-type { clip-path: inset(0 100% 0 0); animation: ot-ccard-type var(--t) steps(var(--n), end) var(--d) forwards; }
+.ot-ccard-txt.is-wipe { clip-path: inset(0 100% 0 0); animation: ot-ccard-type var(--t) cubic-bezier(0.6, 0, 0.2, 1) var(--d) forwards; }
+.ot-ccard-txt.is-flick { opacity: 0; animation: ot-ccard-flick 620ms steps(1) var(--d) forwards; }
+.ot-ccard-led {
+  position: absolute; width: 3.6%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); mix-blend-mode: screen;
+  background: radial-gradient(circle, color-mix(in srgb, white 60%, var(--char-accent)) 0 18%, var(--char-accent) 34%, transparent 70%);
+  animation: ot-ccard-led 2.4s ease-in-out infinite;
+}
+.ot-ccard-led + .ot-ccard-led { animation-delay: 0.6s; }
+@keyframes ot-ccard-type { to { clip-path: inset(0 0 0 0); } }
+@keyframes ot-ccard-flick { 0% { opacity: 0.9; } 8% { opacity: 0; } 18% { opacity: 1; } 26% { opacity: 0.15; } 40% { opacity: 1; } 52% { opacity: 0.4; } 60%, 100% { opacity: 1; } }
+@keyframes ot-ccard-in { 0% { opacity: 0; transform: translateY(6px); } 12% { opacity: 1; transform: translate(-4px, 3px); } 22% { opacity: 0.4; transform: none; } 34%, 100% { opacity: 1; transform: none; } }
+@keyframes ot-ccard-led { 50% { opacity: 0.35; } }
+
+.ot-companion-stage {
+  position: sticky;
+  top: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  color: var(--t-secondary);
-  font-size: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  background:
+    radial-gradient(70% 55% at 50% 38%, color-mix(in srgb, var(--char-accent) 14%, transparent), transparent 72%),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-2) 70%, transparent), color-mix(in srgb, var(--bg-0) 80%, transparent));
+  overflow: hidden;
 }
-.ot-char-upload-hint {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  color: var(--t-tertiary);
+.ot-companion-stage-canvas { position: relative; width: 100%; aspect-ratio: 3 / 4; }
+.ot-companion-stage-canvas canvas { display: block; position: relative; z-index: 1; }
+.ot-companion-stage-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--glass-border);
+}
+.ot-companion-stage-code {
+  font: 10px/1 var(--f-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--char-accent);
+}
+.ot-companion-stage-name { font-size: 15px; font-weight: 500; letter-spacing: 0.04em; color: var(--t-primary); }
+.ot-companion-stage-blurb { font-size: 12px; line-height: 1.5; color: var(--t-secondary); }
+
+.ot-companions-custom { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--glass-border); max-width: 640px; }
+.ot-companions-custom-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ot-companions-label { font: 10px/1 var(--f-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--t-tertiary); }
+.ot-companions-custom-head .ot-prompt-btn { display: inline-flex; align-items: center; gap: 6px; }
+.ot-companions-custom-list { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.ot-companions-custom-row { display: flex; align-items: center; gap: 4px; border-radius: var(--r-md); }
+.ot-companions-custom-row.active { background: color-mix(in srgb, var(--t-primary) 6%, transparent); }
+.ot-companions-custom-pick {
+  flex: 1; display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px;
+  border: 0; background: transparent; color: var(--t-secondary); font: inherit; font-size: 12px; text-align: left; cursor: pointer; border-radius: var(--r-md);
+}
+.ot-companions-custom-row.active .ot-companions-custom-pick { color: var(--t-primary); }
+.ot-companions-custom-pick:hover { color: var(--t-primary); }
+.ot-companions-custom-remove {
+  display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--t-tertiary); cursor: pointer;
+}
+.ot-companions-custom-remove:hover { color: var(--neon-magenta); background: color-mix(in srgb, var(--neon-magenta) 8%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+  .ot-ccard-art, .ot-ccard-led, .ot-ccard-txt { animation: none !important; clip-path: none !important; opacity: 1 !important; }
+  .ot-ccard-pick { transition: none; }
 }
 
 .ot-wp-color-preview {
@@ -5734,6 +5763,7 @@ summary:focus-visible,
   display: flex;
   align-items: center;
   gap: 12px;
+  container: ar-media-toolbar / inline-size;
 }
 .ar-media-tabs {
   display: flex;
@@ -5769,11 +5799,11 @@ summary:focus-visible,
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--f-mono);
   font-size: 11px;
-  letter-spacing: 0.06em;
+  white-space: nowrap;
   color: var(--t-tertiary);
 }
+@container ar-media-toolbar (max-width: 940px) { .ar-media-hint { display: none; } }
 
 .ar-media-grid {
   display: grid;
@@ -7553,6 +7583,18 @@ summary:focus-visible,
 }
 .xd-home-start-card svg { color: var(--xd-accent); }
 .xd-home-start-label { font-size: 13.5px; font-weight: 600; }
+.xd-home-beta {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--t-tertiary) 60%, transparent);
+  border-radius: var(--r-sm);
+  font: 500 9px/1.4 var(--f-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t-tertiary);
+  vertical-align: 2px;
+}
 .xd-home-start-desc { font-size: 11.5px; color: var(--t-secondary); }
 
 .xd-toolrail {
@@ -7665,6 +7707,29 @@ summary:focus-visible,
   min-width: 0;
 }
 
+/* The explorer anchors the row at a fixed width; everything else resizes beside it. */
+.ot-anchored-row {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.ot-explorer-anchor {
+  flex: none;
+  width: 240px;
+  min-height: 0;
+  display: flex;
+  border-right: 1px solid var(--work-line);
+}
+.ot-explorer-anchor > .ot-panel { flex: 1; min-width: 0; }
+.ot-anchored-rest {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
 .ot-resize-handle {
   position: relative;
   z-index: 3;
@@ -7723,7 +7788,7 @@ body.ot-panel-resizing {
   outline: none;
 }
 .ot-panel.focused .ot-panel-tabs {
-  box-shadow: inset 0 -1px 0 rgba(var(--neon-cyan-rgb), 0.16);
+  box-shadow: inset 0 -1px 0 var(--work-line-strong);
 }
 
 .ot-panel-tabs {
@@ -10946,8 +11011,8 @@ dialog.ot-prompt-overlay::backdrop { background: transparent; }
   margin-bottom: 16px;
 }
 .ot-prompt-input:focus {
-  border-color: var(--neon-green);
-  box-shadow: var(--shadow-glow-green);
+  border-color: color-mix(in srgb, var(--t-primary) 34%, transparent);
+  box-shadow: none;
 }
 .ot-prompt-actions {
   display: flex;
@@ -11390,10 +11455,11 @@ dialog.ot-prompt-overlay::backdrop { background: transparent; }
   word-break: break-word;
 }
 
+/* Top-right under the menubar: bottom-right sat on the companion and beside the dock. */
 .ot-toasts {
   position: fixed;
   right: 16px;
-  bottom: 16px;
+  top: 44px;
   z-index: 6200; /* above settings (6000), below confirmations (6500) */
   display: flex;
   flex-direction: column;
@@ -11407,16 +11473,18 @@ dialog.ot-prompt-overlay::backdrop { background: transparent; }
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: var(--bg-2);
+  background: color-mix(in srgb, var(--bg-2) 92%, transparent);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-left: 2px solid var(--neon-cyan);
+  border-left: 2px solid color-mix(in srgb, var(--neon-cyan) 70%, var(--t-tertiary));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-radius: var(--r-md);
   padding: 11px 12px;
   box-shadow: var(--shadow-window);
   animation: ot-toast-in 180ms cubic-bezier(0.2, 0.9, 0.3, 1);
 }
-.ot-toast.success { border-left-color: var(--neon-green); }
-.ot-toast.warning { border-left-color: var(--neon-yellow); }
+.ot-toast.success { border-left-color: color-mix(in srgb, var(--neon-green) 70%, var(--t-tertiary)); }
+.ot-toast.warning { border-left-color: color-mix(in srgb, var(--neon-yellow) 75%, var(--t-tertiary)); }
 .ot-toast.error   { border-left-color: var(--neon-magenta); }
 .ot-toast-main {
   flex: 1;
@@ -11472,7 +11540,7 @@ dialog.ot-prompt-overlay::backdrop { background: transparent; }
   color: var(--t-primary);
 }
 @keyframes ot-toast-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -12644,7 +12712,7 @@ html.ot-reduce-glass .note-page .note-editor-body {
   resize: none;
   outline: none;
 }
-.or-git-commitbox textarea:focus { border-color: rgba(var(--neon-cyan-rgb), 0.5); }
+.or-git-commitbox textarea:focus { border-color: color-mix(in srgb, var(--t-primary) 34%, transparent); }
 .or-git-commitrow {
   display: flex;
   gap: 6px;
@@ -17484,3 +17552,7 @@ html.ot-reduce-glass .note-page .note-editor-body {
   color: var(--xd-text-3);
   padding: 2px 2px 6px;
 }
+
+/* While the notification center is open it already lists every toast; hide the live stack. */
+body:has(.ot-notif-panel) .ot-toasts { opacity: 0; pointer-events: none; }
+.ot-toasts { transition: opacity 140ms ease; }

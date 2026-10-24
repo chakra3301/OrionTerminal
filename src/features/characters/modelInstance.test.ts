@@ -5,7 +5,7 @@ import { AuthoredBonePose } from "./modelInstance";
 import { versionedCharacterUrl } from "./catalog";
 
 it("loads built-in models with a version key while leaving custom asset URLs intact", () => {
-  expect(versionedCharacterUrl("/characters/anthropomorphic-fox.glb")).toMatch(/^\/characters\/anthropomorphic-fox\.glb\?v=[a-f0-9]{12}$/);
+  expect(versionedCharacterUrl("/characters/rosie.glb")).toMatch(/^\/characters\/rosie\.glb\?v=[a-f0-9]{12}$/);
   const custom = "asset://localhost/my-character.glb";
   expect(versionedCharacterUrl(custom)).toBe(custom);
 });

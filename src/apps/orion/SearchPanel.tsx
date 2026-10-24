@@ -5,6 +5,8 @@ import { useProjectStore } from "@/store/projectStore";
 import { useWorkspace } from "@/components/workspace/workspaceStore";
 import { useEditorNavStore } from "@/store/editorNavStore";
 import { log } from "@/lib/log";
+import { useOrionSidebar } from "@/apps/orion/store/sidebarStore";
+import { FileTypeIcon } from "@/lib/fileIcon";
 
 function basename(p: string): string {
   return p.split(/[\\/]/).pop() || p;
@@ -24,9 +26,11 @@ export function OrionSearchPanel() {
   const inputRef = useRef<HTMLInputElement>(null);
   const reqId = useRef(0);
 
+  const focusSeq = useOrionSidebar((s) => s.focusSeq);
   useEffect(() => {
     inputRef.current?.focus();
-  }, []);
+    inputRef.current?.select();
+  }, [focusSeq]);
 
   useEffect(() => {
     const root = project?.root_path;
@@ -68,7 +72,7 @@ export function OrionSearchPanel() {
           ref={inputRef}
           className="or-search-input"
           value={query}
-          placeholder="Search in files…"
+          placeholder="Search"
           spellCheck={false}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -104,6 +108,7 @@ export function OrionSearchPanel() {
                 )
               }
             >
+              <FileTypeIcon path={f.path} />
               <span className="or-search-name">{basename(f.path)}</span>
               <span className="or-search-dir">
                 {relativeTo(project?.root_path ?? "", f.path)

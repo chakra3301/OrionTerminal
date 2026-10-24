@@ -18,6 +18,13 @@ export type CommunityPluginInspection = {
   totalBytes: number;
 };
 
+export type PreparedInstallSelection = {
+  id: string;
+  outputHash: string;
+  captureHash: string;
+  inspection: CommunityPluginInspection;
+};
+
 export type CommunityPluginEntrypoint = {
   kind: "ui" | "background";
   content: string;

@@ -1,0 +1,15 @@
+import type { SceneNode, LayoutGrid } from "@open-pencil/scene-graph";
+import { usePencilWorkspace } from "./runtime";
+import { NumericValue } from "./AppearancePanel";
+
+export function GuidesPanel({node}:{node?:SceneNode}) {
+  const editor=usePencilWorkspace(s=>s.editor)!;
+  const owner=node&&["FRAME","COMPONENT","CANVAS"].includes(node.type)?node:editor.graph.getNode(editor.state.currentPageId)!;
+  const updateGrid=(index:number,patch:Partial<LayoutGrid>)=>editor.updateNodeWithUndo(owner.id,{layoutGrids:owner.layoutGrids.map((grid,i)=>i===index?{...grid,...patch}:grid)},"Edit layout grid");
+  return <details className="xd-pencil-property-card"><summary>Guides, grids & snapping</summary>
+    {(["geometry","objects","pixelGrid"] as const).map(key=><label key={key}>{key==="geometry"?"Snap to geometry":key==="objects"?"Snap to objects":"Snap to pixels"}<input type="checkbox" checked={editor.state.snappingPreferences[key]} onChange={e=>{editor.state.snappingPreferences={...editor.state.snappingPreferences,[key]:e.target.checked};editor.requestRender();}}/></label>)}
+    <div className="xd-pencil-buttons"><button onClick={()=>editor.addGuide(owner.id,"x",100)}>Vertical guide</button><button onClick={()=>editor.addGuide(owner.id,"y",100)}>Horizontal guide</button></div>
+    {owner.guides.map(guide=><div key={guide.id} className="xd-pencil-guide-row"><NumericValue label={`${guide.axis.toUpperCase()} guide`} min={-100000} value={guide.position} onCommit={position=>editor.moveGuide(owner.id,guide.id,position)}/><button aria-label="Delete guide" onClick={()=>editor.removeGuide(owner.id,guide.id)}>×</button></div>)}
+    {owner.type!=="CANVAS"&&<><button onClick={()=>editor.updateNodeWithUndo(owner.id,{layoutGrids:[...owner.layoutGrids,{pattern:"COLUMNS",alignment:"STRETCH",count:12,gutterSize:20,offset:24,color:{r:1,g:0,b:.5,a:.1},visible:true}]},"Add layout grid")}>Add layout grid</button>{owner.layoutGrids.map((grid,i)=><div className="xd-pencil-property-card" key={i}><label>Pattern<select value={grid.pattern??"GRID"} onChange={e=>updateGrid(i,{pattern:e.target.value as LayoutGrid["pattern"]})}>{["GRID","COLUMNS","ROWS"].map(v=><option key={v}>{v}</option>)}</select></label><NumericValue label={grid.pattern==="GRID"?"Grid size":"Count"} min={1} value={grid.pattern==="GRID"?grid.sectionSize??8:grid.count??12} onCommit={value=>updateGrid(i,grid.pattern==="GRID"?{sectionSize:value}:{count:Math.round(value)})}/>{grid.pattern!=="GRID"&&<><NumericValue label="Gutter" value={grid.gutterSize??0} onCommit={gutterSize=>updateGrid(i,{gutterSize})}/><NumericValue label="Margin" value={grid.offset??0} onCommit={offset=>updateGrid(i,{offset})}/></>}<div className="xd-pencil-buttons"><button onClick={()=>updateGrid(i,{visible:grid.visible===false})}>{grid.visible===false?"Show":"Hide"}</button><button onClick={()=>editor.updateNodeWithUndo(owner.id,{layoutGrids:owner.layoutGrids.filter((_,j)=>i!==j)},"Remove layout grid")}>Remove</button></div></div>)}</>}
+  </details>;
+}

@@ -87,7 +87,8 @@ The original port commit remains undocumented, rather than reconstructed by infe
 
 ## RepoLens adaptations
 
-The repository analysis modules under `src/apps/archives/repolens/` include
+The repository analysis modules under `src/apps/archives/repolens/` and the
+shared source-framing helper `src/features/repoAnalysis/sourceText.ts` include
 modified TypeScript ports of New1Direction's RepoLens extension (URL detection,
 ranking, prompts, verdicts, lenses and graph/layout logic). Copyright (c) 2026
 New1Direction, MIT. The full grant is retained in
@@ -181,6 +182,94 @@ from Microsoft/onnxruntime revision `b7804b056c`, are retained as
 Model weights (`Xenova/all-MiniLM-L6-v2`, `Xenova/whisper-tiny.en`) download from
 Hugging Face on first use and retain their respective upstream terms; they are
 not relicensed by Orion's root license or bundled in the application.
+
+## Pinned 2048 preparation recipe
+
+`src/features/staticApps/` contains an owned deterministic preparation layer and an inert base64 golden fixture from gabrielecirulli/2048 at `478b6ec346e3787f589e4af751378d06ded4cbbc`. Upstream engine bytes are never evaluated by preparation tests. The core MIT grant is retained in `THIRD_PARTY_LICENSES/2048-MIT.txt`; generated candidates carry exact source and attribution.
+
+The test fixture's unchanged Clear Sans WOFF bytes originate from that pinned 2048 source. Full Intel Apache-2.0 notice and README at `1993725b24a36af21e7ebaa8977103983b608572` are retained in the fixture; license copy: `THIRD_PARTY_LICENSES/ClearSans-Apache-2.0.txt`. Font conversion/metadata identity remains uncertified. These fixture fonts are not imported into the host UI.
+
+Sassy Math readme/helper at observed `60d130108bcd20c5cd5aa50b52505afab9a40519` retain MIT2012 Sam Richard, Mario Valencia and Scott Kellum attribution in `THIRD_PARTY_LICENSES/SassyMath-MIT.txt`. Original copied-helper revision is not known. Preparation supplies these notices to candidates; matching hashes are not legal/security clearance or permission to execute/install.
+
+## XDesign design and image engines
+
+XDesign uses OpenPencil 0.15.1 under MIT, including locally adapted component slot
+semantics, Figma slot protocol, interactive behavior contracts/binding helpers and
+pattern tile rendering and fractional sibling ordering. Adaptations from the inspected repository revision are
+recorded in `resources/adapted-license-upstreams.json`. The complete grant is retained in
+`THIRD_PARTY_LICENSES/OpenPencil-MIT.txt`; bundled Inter retains its OFL grant.
+PhotoCraft native crates are pinned to
+`47f9306fd06d5dee11acb84b108606f4c867222a` and retain their MIT/Apache grants
+and identified dependency notices under `THIRD_PARTY_LICENSES/native/`.
+The acceptance checksum manifest comes from that PhotoCraft revision.
+The continuous retouch adapters in `src-tauri/src/xdesign_photo_retouch.rs`
+and `src-tauri/src/xdesign_photo_retouch_dabs.rs` adapt native coverage, clone
+sampling, healing/inpainting and tone/focus formulas from that revision's
+`crates/engine/src/retouch_cmds.rs`; mixer/replacement paint from
+`crates/paint/src/mixer.rs` and `replace.rs`; and nonseparable color helpers
+from `crates/color/src/blend.rs`. Copyright (c) 2026 ArtCraft Team and the
+PhotoCraft contributors; MIT OR Apache-2.0. Full grants and NOTICE are retained
+in `THIRD_PARTY_LICENSES/native/photocraft-engine-0.3.0.md`; scope/provenance is
+in `resources/adapted-license-upstreams.json`.
+`src-tauri/src/xdesign_photo_retouch_admission.rs` adds Orion-owned dab/geometry
+admission before native allocations. Retouch cancellation uses the pinned public
+raster Interrupt and inpaint/Poisson APIs; interruptible seamless cloning retains
+native boundary data and final mixing without an engine fork.
+`src-tauri/src/xdesign_photo_retouch_sparse.rs` uses the pinned public native
+coverage lookup and tail-preview APIs for Clone/History Brush feedback, retaining
+native sampling/blending with Orion-owned dirty patch restoration.
+`src-tauri/src/xdesign_photo_retouch_working.rs` provides Orion-owned float tile
+working/source caches and native dab/halo neighborhoods; sequential publication
+retains the pinned tone/focus/mixer/replacement formulas and exact float carry.
+`src-tauri/src/xdesign_photo_smudge.rs` uses the same revision's public Smudge
+API and retains native source/composite sampling and final stroke mixing,
+with Orion-owned boundary dependencies and float tile checkpoints.
+History Brush coverage and source-target lookup in the retouch/history adapters
+follow the pinned native formulas; snapshot identity and retention validation
+use an Orion-owned weak registry over public history APIs.
+Prepared retouch completion uses the public native jobs API and retained native
+edit/history, clone-result and final mixer-carry semantics, with an Orion-owned
+guarded transfer/coalescing adapter and terminal-event cleanup.
+
+`src-tauri/src/xdesign_photo_healing_publish.rs` uses the public native coverage
+application API in bounded patches, with Orion-owned coverage staging and channel
+restoration. `src-tauri/src/xdesign_photo_spot_inpaint.rs` adapts deterministic
+proximity search, texture synthesis, SplitMix64 and hole/integral geometry from
+that revision's `crates/algo/src/inpaint.rs`, adding cooperative cancellation
+without changing search order, float math or the complete solve domain. The
+empty-source fallback uses the public interruptible Poisson API. The same
+PhotoCraft copyright and full MIT/Apache-2.0 grants above apply.
+
+`src-tauri/src/xdesign_photo_healing_solve.rs` retains the pinned healing
+mask-bounds, clamp and public Poisson semantics with Orion-owned strided staging
+and borrowed/lazy paint publication. It removes full destination and cropped
+input copies while retaining the complete solve region and native float output.
+The same PhotoCraft copyright and retained grants above apply.
+
+`src-tauri/src/xdesign_photo_healing_sources.rs` retains native current/below/all
+source visibility and complete composition/source regions. Bounded reads,
+conversion and affine batches use public native APIs with Orion-owned staging
+and cancellation; source interpolation and premultiplied-alpha math are unchanged.
+The same PhotoCraft copyright and retained grants above apply.
+
+`src-tauri/src/xdesign_photo_brush_feedback.rs` uses the pinned public native
+LiveStroke API for Brush/Pencil/Eraser previews and prepared completion. Implicit
+mask/channel/Quick Mask routing and single-color-channel restoration follow
+`crates/engine/src/channel_cmds.rs`, with bounded restoration patches and
+Orion-owned source/tool/target/symmetry guards. Native paint math is unchanged.
+The same PhotoCraft copyright and retained grants above apply.
+
+Image storage compaction in `src-tauri/src/xdesign_photo_bundle_compaction.rs`
+and `src-tauri/src/xdesign_photo_maintenance.rs` uses the same public format
+ZIP/directory APIs. Byte-preserving conversion, recovery intents, equal-object
+sharing, startup scheduling and reporting are Orion-owned; version and source
+identities are retained without modifying the native engine.
+
+`src-tauri/src/xdesign_photo_history_persistence.rs` uses pinned public native
+History, format and raster tile APIs. Snapshot references, weak source identities,
+native history reconstruction and exact-byte tile re-sharing are Orion-owned
+adapters. Native labels, layer targets, past/redo and source pixels are retained.
+The same PhotoCraft copyright and retained grants above apply.
 
 ## Scope and provenance limits
 

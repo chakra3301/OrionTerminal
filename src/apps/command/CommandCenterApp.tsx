@@ -549,9 +549,8 @@ export function CommandCenterApp() {
             <div className="cc-empty">
               <div className="big">No transmissions yet</div>
               <div className="small">
-                Select an agent and send a directive to begin. Delegation,
-                reports, and live activity appear here. Configure pi credentials
-                for the provider selected in the agent's brain model.
+                Pick an agent and send a directive to begin. Delegation,
+                reports and live activity appear here.
               </div>
             </div>
           ) : (

@@ -14,8 +14,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-it("migrates retired selections to Fox without deleting uploads or writing during hydration", () => {
-  for (const selectedId of ["rosie", "azure-rebellion", "unknown"]) {
+it("migrates retired selections to R.O.S.I.E without deleting uploads or writing during hydration", () => {
+  for (const selectedId of ["anthropomorphic-fox", "horned-demon", "azure-rebellion", "unknown"]) {
     useCharacterStore.getState().hydrate({ selectedId, custom: [custom] });
     expect(useCharacterStore.getState().selected()?.id).toBe(DEFAULT_CHARACTER_ID);
     expect(useCharacterStore.getState().custom).toEqual([custom]);
@@ -32,11 +32,18 @@ it("restores each new companion and saved custom selections", () => {
   expect(useCharacterStore.getState().selected()?.id).toBe(custom.id);
 });
 
-it("falls back to Fox when removing the selected upload and persists subsequent selections", async () => {
+it("maps the previous Rosie, Mushroom and Angel to their successors", () => {
+  for (const [saved, next] of [["rosie-stylized", "rosie"], ["rosie-cybernetic", "rosie"], ["mushroom-character", "mxshy"], ["angelic-winged-figure", "ang3l"]]) {
+    useCharacterStore.getState().hydrate({ selectedId: saved, custom: [] });
+    expect(useCharacterStore.getState().selected()?.id).toBe(next);
+  }
+});
+
+it("falls back to R.O.S.I.E when removing the selected upload and persists subsequent selections", async () => {
   useCharacterStore.getState().hydrate({ selectedId: custom.id, custom: [custom] });
   await useCharacterStore.getState().removeCustom(custom.id);
   expect(ipc.characterClearFile).toHaveBeenCalledWith(custom.filePath);
   expect(setAppState).toHaveBeenLastCalledWith("characters", { selectedId: DEFAULT_CHARACTER_ID, custom: [] });
-  useCharacterStore.getState().setSelected("angelic-winged-figure");
-  expect(setAppState).toHaveBeenLastCalledWith("characters", { selectedId: "angelic-winged-figure", custom: [] });
+  useCharacterStore.getState().setSelected("suki");
+  expect(setAppState).toHaveBeenLastCalledWith("characters", { selectedId: "suki", custom: [] });
 });

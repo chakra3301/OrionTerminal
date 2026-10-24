@@ -31,23 +31,24 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); });
 
 describe("provider connection controls", () => {
-  it("disconnects routing only after confirmation, without touching account credentials", async () => {
+  it("switches a provider off in one click, without touching account credentials", async () => {
     await act(async () => root.render(<ProviderConnectionToggle provider={CODEX_CLI_PROVIDER} />));
-    vi.mocked(confirmAction).mockResolvedValueOnce(false);
-    await act(async () => button("Disconnect").click());
-    expect(mocks.setEnabled).not.toHaveBeenCalled();
-    await act(async () => button("Disconnect").click());
+    const sw = host.querySelector<HTMLButtonElement>('[role="switch"]')!;
+    expect(sw.getAttribute("aria-checked")).toBe("true");
+    await act(async () => sw.click());
+    expect(confirmAction).not.toHaveBeenCalled();
     expect(mocks.setEnabled).toHaveBeenCalledWith(CODEX_CLI_PROVIDER.id, false);
     expect(ipc.cliLogout).not.toHaveBeenCalled();
     expect(mocks.invalidate).toHaveBeenCalled();
   });
-  it("enables disconnected definitions and surfaces save failures", async () => {
+  it("switches disconnected definitions on and surfaces save failures", async () => {
     mocks.setEnabled.mockRejectedValueOnce(new Error("disk full"));
     await act(async () => root.render(<ProviderConnectionToggle provider={{ ...CODEX_CLI_PROVIDER, enabled: false }} />));
-    await act(async () => button("Enable").click());
-    expect(confirmAction).not.toHaveBeenCalled();
+    const sw = host.querySelector<HTMLButtonElement>('[role="switch"]')!;
+    expect(sw.getAttribute("aria-checked")).toBe("false");
+    await act(async () => sw.click());
     expect(host.querySelector('[role="alert"]')?.textContent).toContain("disk full");
-    await act(async () => button("Enable").click());
+    await act(async () => sw.click());
     expect(mocks.setEnabled).toHaveBeenLastCalledWith(CODEX_CLI_PROVIDER.id, true);
   });
   it("confirms the actual profile before CLI logout, then offers a fresh login", async () => {

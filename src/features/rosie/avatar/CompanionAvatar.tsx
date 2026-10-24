@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { useDraggable } from "@/shell/useDraggable";
 import { useRosie } from "@/features/rosie/rosieStore";
 import { CompanionScene } from "./CompanionScene";
+import { useCompanionOnScreen } from "./companionPresence";
 import { useCompanionProactive } from "./companionProactiveStore";
 import { dragState } from "./dragState";
 import { clamp } from "@/lib/time";
@@ -19,7 +20,8 @@ const defaultPos = () => ({
 
 /**
  * The floating ROSIE companion: a draggable, transparent widget hosting her 3D
- * avatar over the shell. Always visible by default. Drag to reposition; a
+ * avatar over the shell. Shown on the bare desktop by default; inside open apps
+ * only with Settings → Characters → "Show in apps". Drag to reposition; a
  * click (no drag) toggles the ROSIE chat panel; flinging her off-screen (or
  * dragging her mostly off an edge) dismisses her until she's summoned again
  * (Spotlight → "Summon ROSIE", or ⌥R). Otherwise she snaps back on-screen.
@@ -27,6 +29,7 @@ const defaultPos = () => ({
 export function CompanionAvatar() {
   const container = useRef<HTMLDivElement>(null!);
   const visible = useRosie((s) => s.companionVisible);
+  const shown = useCompanionOnScreen();
   const togglePanel = useRosie((s) => s.togglePanel);
   const openPanel = useRosie((s) => s.openPanel);
   const dismissCompanion = useRosie((s) => s.dismissCompanion);
@@ -50,22 +53,31 @@ export function CompanionAvatar() {
     vy: 0,
   });
 
-  useEffect(() => { boxRef.current = box; }, [box]);
+  useEffect(() => {
+    boxRef.current = box;
+    dragState.screenX = box.left;
+    dragState.screenY = box.top;
+  }, [box]);
 
   // Keep her on-screen when the OS window is resized.
   useEffect(() => {
-    const onResize = () =>
+    const onResize = () => {
+      dragState.resetVersion++;
       setBox((b) => ({
         left: clamp(b.left, 8, window.innerWidth - W - 8),
         top: clamp(b.top, 36, window.innerHeight - H - 8),
       }));
+    };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
   // Park the render loop while the window is hidden/minimized.
   useEffect(() => {
-    const onVis = () => setDocHidden(document.hidden);
+    const onVis = () => {
+      dragState.resetVersion++;
+      setDocHidden(document.hidden);
+    };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
@@ -74,6 +86,7 @@ export function CompanionAvatar() {
   // off-screen). The Canvas itself never unmounts — we only hide it — so there's
   // exactly one WebGL context for the app's lifetime (no context churn/leak).
   useEffect(() => {
+    if (visible !== wasVisible.current) dragState.resetVersion++;
     if (visible && !wasVisible.current) setBox(defaultPos());
     wasVisible.current = visible;
   }, [visible]);
@@ -115,6 +128,8 @@ export function CompanionAvatar() {
       // No clamp during the drag — she's allowed off-screen so she can be thrown.
       const next = { left: drag.current.left + dx, top: drag.current.top + dy };
       boxRef.current = next;
+      dragState.screenX = next.left;
+      dragState.screenY = next.top;
       if (container.current) {
         container.current.style.left = `${next.left}px`;
         container.current.style.top = `${next.top}px`;
@@ -145,7 +160,7 @@ export function CompanionAvatar() {
     <div
       ref={container}
       className={`ot-companion${dragging ? " dragging" : ""}${
-        visible ? "" : " hidden"
+        shown ? "" : " hidden"
       }`}
       style={{ left: box.left, top: box.top, width: W, height: H }}
       onMouseDown={onMouseDown}
@@ -154,7 +169,7 @@ export function CompanionAvatar() {
       }}
       title="R.O.S.I.E — drag to move · fling off-screen to dismiss · click to talk"
     >
-      {visible && (
+      {shown && (
         <button
           type="button"
           className="ot-companion-hide"
@@ -170,7 +185,7 @@ export function CompanionAvatar() {
           <X size={14} />
         </button>
       )}
-      {visible && proactivePrompt && (
+      {shown && proactivePrompt && (
         <div
           className="ot-companion-bubble"
           data-no-drag
@@ -197,7 +212,7 @@ export function CompanionAvatar() {
           <span className="bubble-text">{proactivePrompt}</span>
         </div>
       )}
-      <CompanionScene eventSource={container} dragging={dragging} frameloop={visible && !docHidden ? "demand" : "never"} />
+      <CompanionScene eventSource={container} dragging={dragging} frameloop={shown && !docHidden ? "demand" : "never"} />
       <div className="ot-companion-base" aria-hidden />
     </div>
   );

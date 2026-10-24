@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "kind": "orion.xdesign.image",
+  "imageId": "image_document_0001",
+  "revisionId": "7d962fa6bb54763aadf70f2bc3c942a2a033e6b4e8784080560b8930b49e6cd5",
+  "previousRevisionId": null,
+  "name": "Image   🙂 / \"name\"",
+  "width": 24,
+  "height": 24,
+  "previewWidth": 24,
+  "previewHeight": 24,
+  "archiveBytes": 1,
+  "archiveDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "previewDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "chunkDigests": [
+    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  ]
+}

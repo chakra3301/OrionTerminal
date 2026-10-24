@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { preparePluginDocuments } from "./pluginDocument";
 import {
   PLUGIN_RPC_CHANNEL,
   PLUGIN_RPC_VERSION,
   PLUGIN_SANDBOX,
-  buildPluginDocument,
   isPluginGesture,
   isPluginRequest,
 } from "@/plugins/SandboxPluginFrame";
@@ -17,9 +17,10 @@ describe("community plugin sandbox", () => {
   });
 
   it("builds a network-denied document and strips nested browsing surfaces", () => {
-    const document = buildPluginDocument(
+    const { content: document } = preparePluginDocuments(
       '<meta http-equiv="refresh" content="0;url=https://attacker.test"><link rel="stylesheet" href="https://attacker.test/x.css"><iframe src="https://attacker.test"></iframe><script src="https://attacker.test/x.js"></script><main>safe</main><script>window.loaded=true</script>',
       "ui",
+      "/* trusted bridge */",
       "session-1",
     );
     expect(document).toContain("connect-src 'none'");

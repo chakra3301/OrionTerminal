@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
 import type { Provider } from "@/features/agents/agentTypes";
 import { useProvidersStore } from "@/store/providersStore";
-import { confirmAction } from "@/components/ConfirmModal";
 import { invalidateCodexImageStatus } from "@/apps/xdesign/imageProviderRuntime";
 
+/** On/off for a provider in Orion's model selection. Turning it off keeps chats, settings and
+ *  credentials and never signs out of CLI accounts, so it is reversible and needs no confirm. */
 export function ProviderConnectionToggle({ provider }: { provider: Provider }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -13,20 +14,14 @@ export function ProviderConnectionToggle({ provider }: { provider: Provider }) {
     inFlight.current = true;
     setBusy(true); setError("");
     try {
-      if (provider.enabled && !await confirmAction({
-        title: `Disconnect ${provider.name} from Orion?`,
-        body: "Disables this provider in Orion model selection and automatic image-provider selection. Chats, settings and credentials are kept. Existing requests may finish. This does not sign out other apps or separate specialist CLI tools; use the account sign-out control to remove a shared CLI session.",
-        confirmLabel: "Disconnect", danger: true,
-      })) return;
       await useProvidersStore.getState().setEnabled(provider.id, !provider.enabled);
       invalidateCodexImageStatus();
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { inFlight.current = false; setBusy(false); }
   };
-  return <div style={{ marginTop: 8 }}>
-    <button type="button" className={provider.enabled ? "cp-link-danger" : "cp-btn"} disabled={busy} onClick={() => void toggle()}>
-      {busy ? "Updating…" : provider.enabled ? "Disconnect from Orion" : "Enable provider"}
-    </button>
-    {error && <div role="alert" className="cp-form-error">{error}</div>}
-  </div>;
+  return <>
+    <button type="button" className={`ot-switch${provider.enabled ? " on" : ""}`} role="switch" aria-checked={provider.enabled}
+      aria-label={`${provider.name} in Orion`} disabled={busy} onClick={() => void toggle()} />
+    {error && <div role="alert" className="cp-form-error cp-prov-error">{error}</div>}
+  </>;
 }

@@ -44,6 +44,7 @@ import { useMcpServers } from "@/store/mcpServersStore";
 import { registry, type Command } from "@/commands/registry";
 import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
+import { version as APP_VERSION } from "../../../package.json";
 
 type Section =
   | "plugins"
@@ -199,10 +200,9 @@ export function APIKeySection() {
     <>
       <h2 className="ot-settings-h2">Anthropic API key</h2>
       <p className="ot-settings-p">
-        Stored in your OS keychain. Used by the inline-edit DiffEditor (⌘K with
-        a selection), Tab completion, and direct Messages-API flows. Chats,
-        Learn, and FX use the AI selected in Control Panel → Providers or
-        their model picker; subscription connectors do not use this key.
+        Used for inline edits (⌘K with a selection), Tab completion and other
+        direct Anthropic API features. Chats, Learn and FX use the AI chosen in
+        Providers or each app's model picker; subscriptions don't use this key.
       </p>
       <div className="ot-settings-status">
         <span
@@ -270,8 +270,7 @@ export function APIKeySection() {
         >
           console.anthropic.com <ExternalLink size={10} />
         </a>
-        . The key never leaves your machine — Tauri's `keyring` v3 plugin uses
-        the platform keychain (Keychain Access on macOS).
+        . It's stored in your macOS Keychain and never leaves this Mac.
       </p>
 
       <GithubTokenField />
@@ -725,11 +724,10 @@ export function McpSection() {
     <>
       <h2 className="ot-settings-h2">MCP servers</h2>
       <p className="ot-settings-p">
-        Extra Model Context Protocol servers R.O.S.I.E can call — Linear,
-        GitHub, Sentry, anything MCP-compatible. These merge with Orion's
-        built-in tools and your globally-configured claude servers, and apply
-        across R.O.S.I.E, the per-app rails, and the Claude Code tab. Changes
-        take effect on the next R.O.S.I.E turn (a fresh subprocess).
+        Extra Model Context Protocol servers your companion and app assistants
+        can call: Linear, GitHub, Sentry or anything MCP-compatible. They join
+        Orion's built-in tools and your global Claude servers. Changes apply
+        from the next message.
       </p>
 
       <div className="ot-mcp-list">
@@ -916,9 +914,8 @@ export function ShortcutsSection() {
     <>
       <h2 className="ot-settings-h2">Keyboard shortcuts</h2>
       <p className="ot-settings-p">
-        Generated live from the command registry. Read-only for now — rebinding
-        UI lands later. Press <span className="kbd">⌘K</span> for full
-        Spotlight.
+        Every command with a shortcut. Press <span className="kbd">⌘K</span>{" "}
+        to search all commands in Spotlight.
       </p>
       <div className="ot-settings-shortcuts">
         {grouped.map(([group, cmds]) => (
@@ -965,13 +962,14 @@ function formatHotkey(hk: string): string {
 export function AboutSection() {
   return (
     <>
-      <h2 className="ot-settings-h2">About</h2>
+      <h2 className="ot-settings-h2">Orion Terminal</h2>
       <p className="ot-settings-p">
-        Orion Terminal — personal workstation. Tauri 2 + React 19 + Vite +
-        SQLite. Three apps share one shell: Orion (code), Archives 47
-        (knowledge), XDesign (design).
+        A personal workstation: Orion for code, Archives 47 for knowledge and
+        XDesign for visuals, with an AI collaborator inside each.
       </p>
       <dl className="ot-settings-meta">
+        <dt>Version</dt>
+        <dd>{APP_VERSION} · Alpha test</dd>
         <dt>Bundle</dt>
         <dd>com.lucaorion.orion-terminal</dd>
         <dt>Data dir</dt>
@@ -982,13 +980,12 @@ export function AboutSection() {
         <dd className="mono">↳ /orion.db</dd>
       </dl>
       <p className="ot-settings-help">
-        Stack is locked per the master brief: Tauri 2, React 19, Monaco,
-        BlockNote, xterm.js, Zustand. Migrations are append-only — never edit
-        a prior one.
+        This is an alpha test build. Expect rough edges, and keep backups of
+        anything important.
       </p>
       <p className="ot-settings-help">
-        Website Ripper scaffold © JCodesMore (MIT) —
-        github.com/JCodesMore/ai-website-cloner-template
+        Includes the Website Ripper scaffold © JCodesMore, MIT license
+        (github.com/JCodesMore/ai-website-cloner-template).
       </p>
     </>
   );

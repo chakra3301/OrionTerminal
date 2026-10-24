@@ -1,0 +1,53 @@
+/* Artwork moves; type stays on the pixel grid. Everything is visible without JS. */
+.concept-meta{display:flex;align-items:baseline;justify-content:space-between;gap:20px}.motion-toggle{flex-shrink:0;border:0;background:none;padding:4px 0;font-size:11px;color:var(--muted);cursor:pointer}.motion-toggle:hover{color:var(--ink)}.motion-toggle:disabled{cursor:default}@media(max-width:760px){.concept-meta{flex-direction:column;gap:0}}
+.hero-world{background:#eaf6ff}
+.hero-world::before{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(112deg,transparent 38%,rgb(255 255 255 / .15) 48%,transparent 58%);opacity:0}
+.motion-enabled .hero-world{transform:translate3d(var(--hero-x,0px),var(--hero-y,0px),0);will-change:transform}
+.motion-enabled .hero-art{animation:ice-drift 7s ease-in-out infinite alternate;animation-play-state:paused;will-change:translate}
+.motion-enabled .hero-world.is-in-view .hero-art{animation-play-state:running}
+.motion-enabled .hero-world.is-in-view::before{animation:ice-sheen 12s ease-in-out infinite;animation-play-state:running}
+.motion-enabled .site-header .brand img{animation:orb-float 5.5s ease-in-out infinite;will-change:translate}
+.motion-enabled .app-visual.reveal-pending{opacity:.2;translate:0 24px}
+.motion-enabled .app-visual{transition:opacity .8s var(--ease),translate .8s var(--ease),box-shadow .3s,border-color .3s;transition-delay:var(--reveal-delay,0ms),var(--reveal-delay,0ms),0ms,0ms}
+.motion-enabled .app-visual.is-revealed{opacity:1;translate:0 0}
+.app-visual::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:0;background:linear-gradient(112deg,transparent 42%,rgb(255 255 255 / .1) 49%,transparent 56%)}
+.motion-enabled .app-visual.is-revealed::after{animation:preview-sheen 1.3s var(--ease) both;animation-delay:var(--reveal-delay,0ms)}
+.app-visual:hover,.app-visual:focus-visible{box-shadow:0 14px 36px -18px color-mix(in srgb,var(--app-accent),#07111c 60%);border-color:var(--app-accent)}
+.app-visual:hover .visual-action,.app-visual:focus-visible .visual-action{opacity:1;translate:0 -2px}
+.visual-action{transition:opacity .2s,translate .25s}
+.text-button .icon{transition:translate .25s var(--ease)}
+.text-button:hover .icon,.text-button:focus-visible .icon{translate:4px 0}
+.button{position:relative;isolation:isolate;overflow:hidden;transition:background .25s,color .25s,box-shadow .25s}
+.button::before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(110deg,transparent 20%,rgb(255 255 255 / .12) 50%,transparent 80%);translate:-110% 0;transition:translate .55s var(--ease)}
+.button:hover::before,.button:focus-visible::before{translate:110% 0}
+.button:focus-visible{box-shadow:0 6px 24px rgb(25 52 72 / .15)}
+.flow-signal{stroke:#eafcff!important;stroke-width:3!important;stroke-linecap:round;stroke-dasharray:4 96;stroke-dashoffset:100;opacity:.85}
+.motion-enabled .flow-signal{animation:signal-travel 4.8s linear infinite;animation-play-state:paused}
+.motion-enabled .flow-scenes.is-in-view .flow-signal{animation-play-state:running}
+.motion-enabled .flow-screen{animation:window-float 6s ease-in-out infinite alternate;animation-play-state:paused;will-change:translate}
+.motion-enabled .flow-orion{animation-delay:-2s}.motion-enabled .flow-xdesign{animation-delay:-4s}
+.motion-enabled .flow-scenes.is-in-view .flow-screen{animation-play-state:running}
+.motion-enabled .closing-art{animation:ice-drift 8s ease-in-out infinite alternate;animation-play-state:paused}
+.motion-enabled .closing-art.is-in-view{animation-play-state:running}
+html[data-motion-paused=true] .hero-art,html[data-motion-paused=true] .hero-world::before,html[data-motion-paused=true] .brand img,html[data-motion-paused=true] .flow-signal,html[data-motion-paused=true] .flow-screen,html[data-motion-paused=true] .closing-art,html[data-motion-paused=true] .app-visual::after{animation-play-state:paused!important}
+@keyframes ice-drift{from{translate:0 0}to{translate:0 -5px}}
+@keyframes orb-float{0%,100%{translate:0 0;rotate:0deg}50%{translate:0 -2px;rotate:3deg}}
+@keyframes ice-sheen{0%,8%{translate:-100% 0;opacity:0}12%{opacity:.7}33%{translate:100% 0;opacity:0}100%{translate:100% 0;opacity:0}}
+@keyframes preview-sheen{0%{translate:-100% 0;opacity:0}30%{opacity:1}100%{translate:100% 0;opacity:0}}
+@keyframes signal-travel{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+@keyframes window-float{from{translate:0 0}to{translate:0 -6px}}
+@media(max-width:760px){.motion-enabled .app-visual.reveal-pending{translate:0 16px}.motion-enabled .hero-art{animation-duration:6s}.motion-enabled .flow-screen{animation-duration:5s}.flow-signal{stroke-width:2!important}}
+@media(prefers-reduced-motion:reduce){
+ html{scroll-behavior:auto}
+ .hero-world,.app-visual,.hero-art,.closing-art,.flow-screen,.site-header .brand img{animation:none!important;translate:none!important;will-change:auto!important}
+ .hero-world{transform:none!important}
+ .app-visual{opacity:1!important;transition:none!important}
+ .hero-world::before,.app-visual::after,.button::before,.flow-signal{display:none!important;animation:none!important}
+ .button,.text-button .icon,.visual-action{transition:none!important;translate:none!important}
+}
+html[data-reduced-motion=true]{scroll-behavior:auto}
+html[data-reduced-motion=true] *,html[data-reduced-motion=true] *::before,html[data-reduced-motion=true] *::after{animation:none!important;transition:none!important;will-change:auto!important}
+html[data-reduced-motion=true] .hero-world{transform:none!important}
+html[data-reduced-motion=true] .hero-art,html[data-reduced-motion=true] .closing-art,html[data-reduced-motion=true] .app-visual,html[data-reduced-motion=true] .flow-screen,html[data-reduced-motion=true] .brand img,html[data-reduced-motion=true] .visual-action,html[data-reduced-motion=true] .text-button .icon{translate:none!important;rotate:none!important}
+html[data-reduced-motion=true] .app-visual{opacity:1!important}
+html[data-reduced-motion=true] .hero-world::before,html[data-reduced-motion=true] .app-visual::after,html[data-reduced-motion=true] .button::before,html[data-reduced-motion=true] .flow-signal{display:none!important}

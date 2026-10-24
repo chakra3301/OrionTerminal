@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "01M3R357PETNKJ71CQ5M5F0B2X",
+  "recipeId": "2048-classic-v1",
+  "sourceHash": "dd5eff24339e8a5da8ec4a6ae15c0a21a4be1197e4986b26df83a7799948244c",
+  "captureHash": "e134ed3f1e27d9ff1f1f94a2c5e438700096b68aa9f8b1e82fb8ffb26d699557",
+  "totalBytes": 172077,
+  "fileCount": 24,
+  "createdAt": 1720000000000,
+  "origins": [
+    {
+      "url": "https://github.com/at-import/Sassy-math",
+      "requestedRef": "60d130108bcd20c5cd5aa50b52505afab9a40519",
+      "commit": "60d130108bcd20c5cd5aa50b52505afab9a40519",
+      "tree": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "url": "https://github.com/gabrielecirulli/2048",
+      "requestedRef": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "tree": "693fbb47db2d71aa65cc0e566a288473970233e6"
+    },
+    {
+      "url": "https://github.com/intel/clear-sans",
+      "requestedRef": "1993725b24a36af21e7ebaa8977103983b608572",
+      "commit": "1993725b24a36af21e7ebaa8977103983b608572",
+      "tree": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}

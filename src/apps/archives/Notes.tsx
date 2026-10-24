@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, Search, ArrowLeft, Trash2, Star } from "lucide-react";
+import { Plus, Search, ArrowLeft, Trash2, Star, StickyNote } from "lucide-react";
 import { useNotesStore, type Note } from "@/store/notesStore";
 import { useArchives } from "@/apps/archives/useArchives";
 import { NoteEditor } from "@/features/notes/NoteEditor";
@@ -136,8 +136,9 @@ export function ArchivesNotes() {
 
       {filtered.length === 0 ? (
         <div className="ar-empty-state">
-          <div className="title">No notes yet.</div>
-          <div className="hint">⌘N to create your first one.</div>
+          <StickyNote size={20} />
+          <div className="title">{notes.size === 0 ? "No notes yet" : "No matches"}</div>
+          <div className="hint">{notes.size === 0 ? "Press ⌘N to write your first one." : "Try a different filter."}</div>
         </div>
       ) : (
         <div className="ar-notes-grid">

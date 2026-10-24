@@ -207,6 +207,16 @@ function archiveCommands(): Command[] {
       },
     },
     {
+      id: "archives.downloads",
+      label: "Download Video or Audio",
+      keywords: ["download", "video", "audio", "link", "stacher", "archive"],
+      group: "Media",
+      run: () => {
+        useShell.getState().openApp("archives");
+        useArchives.getState().setView("downloads");
+      },
+    },
+    {
       id: "archives.brain",
       label: "Open Brain Graph",
       keywords: ["brain", "graph", "knowledge", "links", "obsidian", "map", "archive"],

@@ -27,6 +27,7 @@ export type Skill = {
   instructions: string;
   tools: ToolGrant[];
   builtin: boolean;
+  imported?: { versionId: string; artifactHash: string; enabled: boolean };
 };
 
 export type Agent = {

@@ -985,7 +985,7 @@ export function BrainView() {
               <ExternalLink size={11} /> Open
             </button>
             <button type="button" className="ask" onClick={() => askClaude(selected)}>
-              <Sparkles size={11} /> Ask Claude
+              <Sparkles size={11} /> Ask AI
             </button>
           </div>
           {selectedNeighbors.length > 0 && (

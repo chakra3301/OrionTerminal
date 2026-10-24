@@ -45,6 +45,11 @@ beforeEach(async () => {
 });
 
 describe("dispatchSend routing", () => {
+  it("carries reviewed HTTP recipient binding without granting tools", async () => {
+    const identity = providerSessionIdentity(openai);
+    await dispatchResolved("reviewed-http", { model: "provider:p1/gpt-4o", actionModel: null, systemAppend: "analysis", allowedTools: [] }, "reviewed payload", [], { reviewedProviderIdentity: identity });
+    expect(ipc.runtimeSend).toHaveBeenCalledWith("reviewed-http", "p1", "gpt-4o", "analysis", [{ role: "user", content: "reviewed payload" }], [], identity);
+  });
   it("forwards empty CLI grants and starts restricted Codex turns fresh with history", async () => {
     await dispatchResolved("restricted-codex", { model: "gpt-5.6-sol", actionModel: null, systemAppend: null, allowedTools: [] },
       "continue", [{ role: "assistant", content: "saved restricted context" }], { sessionId: "t1" });

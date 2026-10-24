@@ -232,5 +232,134 @@
       "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/8a6ce83063d90b91ae2ce59eddb803edd393fca9/LICENSE-MIT",
       "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
     }
+  ],
+  "pulp-wasm-simd-flag@0.1.1": [
+    {
+      "name": "LICENSE",
+      "file": "THIRD_PARTY_LICENSES/pulp-MIT.txt",
+      "origin": "https://raw.githubusercontent.com/sarah-quinones/pulp/5eb07fd7b68edf0a5e19f71737d315f72a510295/LICENSE",
+      "sha256": "d64f878c89bd5f1e5ada7e4aad57690b122727cf5229b7b87ea1980c188da1d9"
+    }
+  ],
+  "wasmi@2.0.0": [
+    {
+      "name": "LICENSE-MIT",
+      "file": "THIRD_PARTY_LICENSES/wasmi-LICENSE-MIT.txt",
+      "origin": "https://raw.githubusercontent.com/wasmi-labs/wasmi/2970aa871cc1001b57b267ccecdcd1e42306199e/LICENSE-MIT",
+      "sha256": "172bc1497507c1c363496bc23b0f16de8fa8e94befa85db6c8d9fa790e0a8657"
+    },
+    {
+      "name": "LICENSE-APACHE",
+      "file": "THIRD_PARTY_LICENSES/wasmi-LICENSE-APACHE.txt",
+      "origin": "https://raw.githubusercontent.com/wasmi-labs/wasmi/2970aa871cc1001b57b267ccecdcd1e42306199e/LICENSE-APACHE",
+      "sha256": "f031c1608e4a19e8cbcc3394cdba838067e79189610227459e8ffcd669e6f52d"
+    }
+  ],
+  "wasmi_collections@2.0.0": [
+    {
+      "name": "LICENSE-MIT",
+      "file": "THIRD_PARTY_LICENSES/wasmi-LICENSE-MIT.txt",
+      "origin": "https://raw.githubusercontent.com/wasmi-labs/wasmi/2970aa871cc1001b57b267ccecdcd1e42306199e/LICENSE-MIT",
+      "sha256": "172bc1497507c1c363496bc23b0f16de8fa8e94befa85db6c8d9fa790e0a8657"
+    },
+    {
+      "name": "LICENSE-APACHE",
+      "file": "THIRD_PARTY_LICENSES/wasmi-LICENSE-APACHE.txt",
+      "origin": "https://raw.githubusercontent.com/wasmi-labs/wasmi/2970aa871cc1001b57b267ccecdcd1e42306199e/LICENSE-APACHE",
+      "sha256": "f031c1608e4a19e8cbcc3394cdba838067e79189610227459e8ffcd669e6f52d"
+    }
+  ],
+  "wasmi_core@2.0.0": [
+    {
+      "name": "LICENSE-MIT",
+      "file": "THIRD_PARTY_LICENSES/wasmi-LICENSE-MIT.txt",
+      "origin": "https://raw.githubusercontent.com/wasmi-labs/wasmi/2970aa871cc1001b57b267ccecdcd1e42306199e/LICENSE-MIT",
+      "sha256": "172bc1497507c1c363496bc23b0f16de8fa8e94befa85db6c8d9fa790e0a8657"
+    },
+    {
+      "name": "LICENSE-APACHE",
+      "file": "THIRD_PARTY_LICENSES/wasmi-LICENSE-APACHE.txt",
+      "origin": "https://raw.githubusercontent.com/wasmi-labs/wasmi/2970aa871cc1001b57b267ccecdcd1e42306199e/LICENSE-APACHE",
+      "sha256": "f031c1608e4a19e8cbcc3394cdba838067e79189610227459e8ffcd669e6f52d"
+    }
+  ],
+  "wasmi_ir@2.0.0": [
+    {
+      "name": "LICENSE-MIT",
+      "file": "THIRD_PARTY_LICENSES/wasmi-LICENSE-MIT.txt",
+      "origin": "https://raw.githubusercontent.com/wasmi-labs/wasmi/2970aa871cc1001b57b267ccecdcd1e42306199e/LICENSE-MIT",
+      "sha256": "172bc1497507c1c363496bc23b0f16de8fa8e94befa85db6c8d9fa790e0a8657"
+    },
+    {
+      "name": "LICENSE-APACHE",
+      "file": "THIRD_PARTY_LICENSES/wasmi-LICENSE-APACHE.txt",
+      "origin": "https://raw.githubusercontent.com/wasmi-labs/wasmi/2970aa871cc1001b57b267ccecdcd1e42306199e/LICENSE-APACHE",
+      "sha256": "f031c1608e4a19e8cbcc3394cdba838067e79189610227459e8ffcd669e6f52d"
+    }
+  ],
+  "wasmparser@0.228.0": [
+    {
+      "name": "LICENSE-APACHE",
+      "file": "THIRD_PARTY_LICENSES/wasm-tools-LICENSE-APACHE.txt",
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+      "origin": "https://raw.githubusercontent.com/bytecodealliance/wasm-tools/e66235859a6ec0502bf6f9dcc358953eda4cafcc/LICENSE-APACHE"
+    },
+    {
+      "name": "LICENSE-Apache-2.0_WITH_LLVM-exception",
+      "file": "THIRD_PARTY_LICENSES/wasm-tools-LICENSE-Apache-2.0_WITH_LLVM-exception.txt",
+      "sha256": "268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5",
+      "origin": "https://raw.githubusercontent.com/bytecodealliance/wasm-tools/e66235859a6ec0502bf6f9dcc358953eda4cafcc/LICENSE-Apache-2.0_WITH_LLVM-exception"
+    },
+    {
+      "name": "LICENSE-MIT",
+      "file": "THIRD_PARTY_LICENSES/wasm-tools-LICENSE-MIT.txt",
+      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+      "origin": "https://raw.githubusercontent.com/bytecodealliance/wasm-tools/e66235859a6ec0502bf6f9dcc358953eda4cafcc/LICENSE-MIT"
+    }
+  ],
+  "zune-inflate@0.2.54": [
+    {
+      "name": "LICENSE.md",
+      "file": "THIRD_PARTY_LICENSES/zune-image-MIT.txt",
+      "origin": "https://raw.githubusercontent.com/etemesi254/zune-image/69502ce83fdfecdd0beefd677e2abb3781b29d98/LICENSE.md",
+      "sha256": "e870d7fd7819a9f0453c62798cb52ae95d148a8c91dc2de1d983f997143c72de"
+    },
+    {
+      "name": "LICENSE-ZLIB",
+      "file": "THIRD_PARTY_LICENSES/zune-image-Zlib.txt",
+      "origin": "https://raw.githubusercontent.com/etemesi254/zune-image/69502ce83fdfecdd0beefd677e2abb3781b29d98/LICENSE-ZLIB",
+      "sha256": "7fa429541e55b1509909e058f2d21a37467e4958ec713b357f6e0cf9dc4ee352"
+    }
+  ],
+  "profiling@1.0.18": [
+    {
+      "name": "LICENSE-MIT",
+      "url": "https://raw.githubusercontent.com/aclysma/profiling/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-MIT",
+      "sha256": "c8167fdeeed46d3f244d3f85c5bf998ce889343691c32be2c61a8bc4b5c08333"
+    },
+    {
+      "name": "LICENSE-APACHE",
+      "url": "https://raw.githubusercontent.com/aclysma/profiling/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-APACHE",
+      "sha256": "10d30a673cd5e9349bdc02aeb48f14b3386d27d0da32df8f0a555d4aa16aa551"
+    }
+  ],
+  "profiling-procmacros@1.0.18": [
+    {
+      "name": "LICENSE-MIT",
+      "url": "https://raw.githubusercontent.com/aclysma/profiling/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-MIT",
+      "sha256": "c8167fdeeed46d3f244d3f85c5bf998ce889343691c32be2c61a8bc4b5c08333"
+    },
+    {
+      "name": "LICENSE-APACHE",
+      "url": "https://raw.githubusercontent.com/aclysma/profiling/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-APACHE",
+      "sha256": "10d30a673cd5e9349bdc02aeb48f14b3386d27d0da32df8f0a555d4aa16aa551"
+    }
+  ],
+  "simd_helpers@0.1.0": [
+    {
+      "name": "LICENSE (added upstream after the 0.1.0 release commit; same declared MIT license)",
+      "url": "https://raw.githubusercontent.com/lu-zero/simd_helpers/82040194cd05affb060bf94d6f19f82a771d07fb/LICENSE",
+      "sha256": "d69f24ad84ec2ade64c0b68bdb31b41170e997b158370342056918329cc9af1e"
+    }
   ]
 }

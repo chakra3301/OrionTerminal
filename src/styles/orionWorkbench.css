@@ -1,0 +1,804 @@
+/* ============================================================
+   Orion workbench: Cursor's layout and behavior (owner, 2026-10-21:
+   "the 3 tabs have a look at cursor we basically want to copy the way
+   their frontend works exactly"). Structure, density and interaction
+   follow Cursor's editor view (sidebar · editor group · agent pane);
+   every color comes from the active theme's tokens. Loaded last so it
+   wins over the older Orion rules without editing them.
+   ============================================================ */
+
+.or-app {
+  --wb-bg: var(--work-panel, var(--bg-1));
+  --wb-line: var(--work-line, rgba(255, 255, 255, 0.08));
+  --wb-line-strong: var(--work-line-strong, rgba(255, 255, 255, 0.16));
+  --wb-hover: var(--work-hover, rgba(255, 255, 255, 0.05));
+  --wb-selected: var(--work-selected, rgba(255, 255, 255, 0.08));
+  --wb-text: var(--t-primary);
+  --wb-muted: var(--t-secondary);
+  --wb-faint: var(--t-tertiary);
+  font-family: var(--f-display);
+}
+
+/* One continuous surface, hairline dividers — no stepped chrome bands. */
+:root body .or-app :is(.ot-panel, .ot-panel-body, .or-files-panel, .or-search, .or-changes, .ot-claude-rail) {
+  background: var(--wb-bg);
+}
+:root body .or-app .ot-explorer-anchor { width: 248px; border-right-color: var(--wb-line); }
+:root body .or-app .ot-resize-handle { background: var(--wb-line); }
+
+/* ── Tab strips (editor group, terminal dock) ─────────────────────────── */
+:root body .or-app .ot-panel-tabs {
+  height: 35px;
+  background: var(--wb-bg);
+  border-bottom: 1px solid var(--wb-line);
+  box-shadow: none;
+}
+:root body .or-app .ot-panel.focused .ot-panel-tabs { box-shadow: none; }
+:root body .or-app .ot-panel-tab {
+  gap: 6px;
+  padding: 0 6px 0 12px;
+  min-width: 0;
+  font-family: var(--f-display);
+  font-size: 13px;
+  letter-spacing: 0;
+  color: var(--wb-muted);
+  border-right: 1px solid var(--wb-line);
+  background: transparent;
+  box-shadow: none;
+}
+:root body .or-app .ot-panel-tab > svg { color: var(--wb-faint); }
+:root body .or-app .ot-panel-tab:hover { color: var(--wb-text); background: var(--wb-hover); }
+:root body .or-app .ot-panel-tab.active {
+  color: var(--wb-text);
+  background: var(--wb-bg);
+  /* Cursor marks the active tab with a hairline on top that merges into the editor. */
+  box-shadow: inset 0 1px 0 var(--wb-text), 0 1px 0 var(--wb-bg);
+}
+:root body .or-app .ot-panel:not(.focused) .ot-panel-tab.active { box-shadow: inset 0 1px 0 var(--wb-line-strong), 0 1px 0 var(--wb-bg); }
+:root body .or-app .ot-panel-tab.active > svg { color: var(--wb-muted); }
+:root body .or-app .ot-panel-tab.preview .label { font-style: italic; }
+:root body .or-app .ot-panel-tab.dirty .label { color: inherit; }
+:root body .or-app .ot-panel-tab .label { max-width: 220px; }
+
+/* Close button: hidden until hover/active; an unsaved tab shows a dot that turns into × on hover. */
+:root body .or-app .ot-panel-tab .x {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-sm);
+  color: var(--wb-muted);
+  opacity: 0;
+}
+:root body .or-app .ot-panel-tab:hover .x,
+:root body .or-app .ot-panel-tab.active .x,
+:root body .or-app .ot-panel-tab.dirty .x { opacity: 1; }
+:root body .or-app .ot-panel-tab .x:hover { background: var(--wb-hover); color: var(--wb-text); }
+:root body .or-app .ot-panel-tab .x .dot {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--wb-muted);
+}
+:root body .or-app .ot-panel-tab.dirty .x .x-icon { opacity: 0; }
+:root body .or-app .ot-panel-tab.dirty .x:hover .dot { opacity: 0; }
+:root body .or-app .ot-panel-tab.dirty .x:hover .x-icon { opacity: 1; }
+
+.ot-panel-tabs-fill { flex: 1; }
+:root body .or-app .ot-panel-tab-add {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+  color: var(--wb-faint);
+}
+:root body .or-app .ot-panel-tab-add:hover,
+:root body .or-app .ot-panel-tab-add.open { color: var(--wb-text); background: var(--wb-hover); }
+:root body .or-app .ot-panel-tabs.drag-over { background: var(--wb-hover); }
+:root body .or-app .ot-drop-zone {
+  background: color-mix(in srgb, var(--wb-text) 7%, transparent);
+  border: 1px solid var(--wb-line-strong);
+  box-shadow: none;
+}
+:root body .or-app .ot-panel-add-item { font-family: var(--f-display); font-size: 13px; }
+
+/* The explorer and agent panes carry their own headers; their single-tab strips go. */
+:root body .or-app .ot-panel:is([data-role="explorer"], [data-role="claude"][data-tabs="1"]) > .ot-panel-tabs { display: none; }
+:root body .or-app .ot-panel[data-role="claude"] { border-left: 0; }
+
+/* Breadcrumbs under the tab strip, Cursor's quiet path trail. */
+:root body .or-app .or-bc {
+  height: 22px;
+  padding: 0 14px;
+  border-bottom: 0;
+  font-family: var(--f-display);
+  font-size: 12px;
+}
+:root body .or-app .or-bc-seg { color: var(--wb-faint); }
+:root body .or-app .or-bc-seg.last { color: var(--wb-muted); }
+:root body .or-app .or-bc-symbol { color: var(--wb-muted); font-family: var(--f-display); font-size: 12px; }
+
+/* ── Empty editor group ───────────────────────────────────────────── */
+.or-empty-editor {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  background: var(--wb-bg);
+}
+.or-empty-editor-list { display: grid; gap: 2px; min-width: 260px; }
+.or-empty-editor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--wb-faint);
+  font: 13px/1.4 var(--f-display);
+  cursor: pointer;
+}
+.or-empty-editor-row:hover { background: var(--wb-hover); color: var(--wb-muted); }
+.or-empty-editor-row .k { display: inline-flex; gap: 4px; }
+.or-empty-editor-row kbd {
+  min-width: 20px;
+  padding: 1px 5px;
+  border: 1px solid var(--wb-line-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--r-sm);
+  font: 11px/1.4 var(--f-display);
+  text-align: center;
+  color: var(--wb-muted);
+  background: transparent;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────── */
+.or-sidebar { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--wb-bg); }
+.or-sidebar-views {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 35px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--wb-line);
+}
+.or-sidebar-view {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--wb-faint);
+  cursor: pointer;
+}
+.or-sidebar-view:hover { color: var(--wb-text); background: var(--wb-hover); }
+.or-sidebar-view.active { color: var(--wb-text); background: var(--wb-selected); }
+.or-sidebar-badge {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: var(--r-pill);
+  background: var(--wb-text);
+  color: var(--t-on-accent);
+  font: 600 9px/14px var(--f-display);
+  text-align: center;
+}
+.or-sidebar-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.or-sidebar-body > * { flex: 1; min-height: 0; }
+
+:root body .or-app .or-files-panel { background: var(--wb-bg); }
+:root body .or-app .or-files-header {
+  height: 30px;
+  padding: 0 6px 0 14px;
+  border-bottom: 0;
+  font: 600 11px/1 var(--f-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--wb-muted);
+}
+.or-files-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.or-files-actions { display: flex; gap: 0; opacity: 0; transition: opacity 120ms ease; }
+.or-files-panel:is(:hover, :focus-within) .or-files-actions { opacity: 1; }
+:root body .or-app .or-files-hbtn {
+  width: 22px;
+  height: 22px;
+  color: var(--wb-muted);
+  border-radius: var(--r-sm);
+}
+:root body .or-app .or-files-hbtn:hover:not(:disabled) { color: var(--wb-text); background: var(--wb-hover); }
+.or-files-empty { padding: 10px 14px; font: 13px/1.6 var(--f-display); color: var(--wb-muted); }
+.or-files-empty p { margin: 0 0 12px; }
+.or-files-open {
+  width: 100%;
+  height: 28px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--wb-text);
+  color: var(--t-on-accent);
+  font: 500 13px var(--f-display);
+  cursor: pointer;
+}
+
+/* Tree rows: 22px, sans, chevron-only folders, full-width selection. */
+:root body .or-app .or-tree { font-family: var(--f-display); font-size: 13px; padding: 0 0 12px; }
+:root body .or-app .or-tree-item {
+  height: 22px;
+  gap: 6px;
+  padding-right: 10px;
+  line-height: 22px;
+  color: var(--wb-muted);
+  box-shadow: none;
+  background: transparent;
+}
+:root body .or-app .or-tree-item:hover { background: var(--wb-hover); color: var(--wb-text); }
+:root body .or-app .or-tree-item.active { background: var(--wb-selected); color: var(--wb-text); box-shadow: none; }
+.or-tree-chev, .or-tree-glyph { flex: none; color: var(--wb-faint); }
+.or-tree-item.active .or-tree-glyph { color: var(--wb-muted); }
+:root body .or-app .or-tree-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.or-tree-dirty { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--wb-muted); }
+:root body .or-app .or-tree-git { margin-left: 0; width: 12px; text-align: right; font: 600 11px var(--f-display); }
+/* Git tint stays semantic but softened, like Cursor's decorations. */
+:root body .or-app .or-tree-item.git-modified > .or-tree-label { color: color-mix(in srgb, var(--neon-yellow) 70%, var(--wb-muted)); }
+:root body .or-app .or-tree-item.git-modified .or-tree-git { color: color-mix(in srgb, var(--neon-yellow) 70%, var(--wb-muted)); }
+:root body .or-app .or-tree-item.git-added > .or-tree-label,
+:root body .or-app .or-tree-item.git-added .or-tree-git { color: color-mix(in srgb, var(--neon-green) 70%, var(--wb-muted)); }
+:root body .or-app .or-tree-item.git-deleted > .or-tree-label,
+:root body .or-app .or-tree-item.git-deleted .or-tree-git { color: color-mix(in srgb, var(--neon-magenta) 70%, var(--wb-muted)); }
+
+/* Search + Source Control inside the sidebar: same type scale as the tree. */
+:root body .or-app .or-sidebar :is(.or-search, .or-changes) { font-family: var(--f-display); }
+:root body .or-app .or-sidebar .or-search-bar { padding: 8px 10px; border-bottom: 0; }
+:root body .or-app .or-sidebar .or-search-bar > svg:first-child { display: none; }
+:root body .or-app .or-sidebar .or-search-input {
+  height: 26px;
+  padding: 0 8px;
+  background: var(--wb-hover);
+  border-color: var(--wb-line);
+  font: 13px var(--f-display);
+}
+:root body .or-app .or-sidebar .or-search-toggle.active {
+  color: var(--wb-text);
+  border-color: var(--wb-line-strong);
+  background: var(--wb-selected);
+}
+:root body .or-app .or-sidebar :is(.or-search-file, .or-search-row) { font-family: var(--f-display); }
+:root body .or-app .or-sidebar .or-search-name { font-size: 13px; }
+:root body .or-app .or-sidebar :is(.or-search-file, .or-search-row):hover { background: var(--wb-hover); }
+:root body .or-app .or-sidebar .or-changes-head { border-bottom-color: var(--wb-line); }
+
+/* ── Status bar ──────────────────────────────────────────────────────── */
+:root body .or-app .or-statusbar {
+  height: 22px;
+  gap: 2px;
+  padding: 0 6px;
+  background: var(--wb-bg);
+  border-top: 1px solid var(--wb-line);
+  font: 12px var(--f-display);
+  letter-spacing: 0;
+  color: var(--wb-muted);
+}
+:root body .or-app .or-statusbar :is(.item, .branch) {
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 0;
+  color: var(--wb-muted) !important;
+}
+:root body .or-app .or-status-btn {
+  height: 22px;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+:root body .or-app .or-status-btn:hover { background: var(--wb-hover); }
+:root body .or-app .or-status-btn:hover .item { color: var(--wb-text) !important; }
+
+/* ── Agent pane ──────────────────────────────────────────────────────── */
+.ot-claude-rail.agent { font-family: var(--f-display); background: var(--wb-bg, var(--work-panel)); }
+.ot-agent-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 35px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid var(--wb-line, var(--work-line));
+}
+.ot-agent-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t-primary);
+}
+.ot-agent-actions { display: flex; align-items: center; gap: 1px; }
+.ot-agent-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--t-secondary);
+  cursor: pointer;
+}
+.ot-agent-icon:hover:not(:disabled) { color: var(--t-primary); background: var(--work-hover); }
+.ot-agent-icon:disabled { opacity: 0.4; cursor: default; }
+
+.ot-agent-start {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 10px 16px;
+  gap: 10px;
+}
+.ot-agent-start .skill-turn-picker { margin: 0; }
+.ot-agent-intro { padding: 4px 4px 0; font-size: 13px; line-height: 1.6; color: var(--t-tertiary); }
+.ot-agent-dock { flex: none; padding: 8px 10px 10px; }
+.ot-claude-rail.agent > .skill-turn-picker { margin: 0 10px 8px; }
+
+/* The composer is one box: chips + textarea on top, the @ / model / send row inside it. */
+:root body .ot-claude-input.ot-agent-composer {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--work-line-strong);
+  border-radius: var(--r-md);
+  background: var(--work-hover);
+  transition: border-color 140ms ease;
+}
+:root body .ot-claude-input.ot-agent-composer:focus-within { border-color: color-mix(in srgb, var(--t-primary) 34%, transparent); }
+:root body .ot-claude-input.ot-agent-composer.drag-over { border-color: var(--t-secondary); box-shadow: none; background: var(--work-selected); }
+:root body .ot-claude-input.ot-agent-composer textarea {
+  min-height: 40px;
+  max-height: 220px;
+  padding: 10px 12px 4px;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  line-height: 1.5;
+}
+:root body .ot-claude-input.ot-agent-composer textarea:focus { border: 0; box-shadow: none; }
+:root body .ot-claude-input.ot-agent-composer .ot-ctxchips { padding: 8px 10px 0; }
+:root body .ot-claude-input.ot-agent-composer .ot-ctxchip {
+  border-color: var(--work-line-strong);
+  background: transparent;
+  color: var(--t-secondary);
+}
+.ot-agent-composer-foot { display: flex; align-items: center; gap: 4px; padding: 4px 6px 6px 8px; }
+.ot-agent-composer-fill { flex: 1; }
+.ot-agent-at {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--t-tertiary);
+  cursor: pointer;
+}
+.ot-agent-at:hover:not(:disabled) { color: var(--t-primary); background: var(--work-hover); }
+:root body .ot-agent-composer .ot-model-select {
+  max-width: 170px;
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--t-secondary);
+  font: 12px var(--f-display);
+}
+:root body .ot-agent-composer .ot-model-select:hover { color: var(--t-primary); background: var(--work-hover); }
+:root body .ot-claude-input.ot-agent-composer button.send {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--t-primary);
+  color: var(--t-on-accent);
+}
+:root body .ot-claude-input.ot-agent-composer button.send:disabled { opacity: 0.3; }
+:root body .ot-claude-input.ot-agent-composer button.send.stop { background: var(--t-secondary); }
+
+.ot-agent-notice { padding: 0 4px; font-size: 12px; color: var(--t-secondary); overflow-wrap: anywhere; }
+.ot-agent-notice.error { color: var(--neon-magenta); }
+.ot-claude-rail.agent > .ot-agent-notice { padding: 0 14px 6px; }
+
+.ot-claude-rail.agent .ot-claude-suggest { padding: 0; }
+.ot-claude-rail.agent > .ot-claude-suggest { padding: 0 10px 8px; }
+.ot-claude-rail.agent .ot-claude-suggest .chip { font-size: 12px; }
+
+.ot-agent-past { display: grid; gap: 1px; margin-top: 6px; }
+.ot-agent-past-head { padding: 4px 4px 6px; font-size: 12px; color: var(--t-tertiary); }
+.ot-agent-past-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--t-secondary);
+  font: 13px var(--f-display);
+  text-align: left;
+  cursor: pointer;
+}
+.ot-agent-past-row:hover:not(:disabled) { background: var(--work-hover); color: var(--t-primary); }
+.ot-agent-past-row > svg { flex: none; color: var(--t-tertiary); }
+.ot-agent-past-row .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ot-agent-past-row .d { flex: none; font-size: 12px; color: var(--t-tertiary); }
+
+/* Thread: the user's turn is a quiet bordered box, the agent's reply is plain text. */
+:root body .ot-claude-rail.agent .ot-claude-messages { padding: 12px 14px; gap: 14px; }
+:root body .ot-claude-rail.agent .ot-msg { max-width: 100%; font-size: 13px; line-height: 1.6; }
+:root body .ot-claude-rail.agent .ot-msg.user {
+  align-self: stretch;
+  padding: 8px 10px;
+  border: 1px solid var(--work-line-strong);
+  border-radius: var(--r-md);
+  background: var(--work-hover);
+  white-space: pre-wrap;
+}
+:root body .ot-claude-rail.agent .ot-msg.assistant { padding: 0; }
+:root body .ot-claude-rail.agent .ot-msg.assistant :is(p, ul, ol, pre) { margin: 0 0 8px; }
+:root body .ot-claude-rail.agent .ot-msg.assistant :is(p, ul, ol, pre):last-child { margin-bottom: 0; }
+:root body .ot-claude-rail.agent .ot-msg code { font-size: 12px; }
+:root body .ot-claude-rail.agent .ot-msg pre {
+  padding: 10px 12px;
+  border: 1px solid var(--work-line);
+  border-radius: var(--r-md);
+  background: var(--bg-0);
+  overflow-x: auto;
+}
+:root body .ot-claude-rail.agent .ot-msg :not(pre) > code {
+  padding: 1px 5px;
+  border-radius: var(--r-sm);
+  background: var(--work-selected);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .or-files-actions, .ot-claude-input.ot-agent-composer { transition: none; }
+}
+
+/* Markdown replies: normal whitespace (pre-wrap doubled every gap) and visible list markers. */
+:root body .ot-claude-rail.agent .ot-msg.assistant { white-space: normal; }
+:root body .ot-claude-rail.agent .ot-msg.assistant :is(ul, ol) { padding-left: 20px; }
+:root body .ot-claude-rail.agent .ot-msg.assistant ul { list-style: disc; }
+:root body .ot-claude-rail.agent .ot-msg.assistant ol { list-style: decimal; }
+:root body .ot-claude-rail.agent .ot-msg.assistant li + li { margin-top: 2px; }
+:root body .ot-claude-rail.agent .ot-msg.assistant pre { white-space: pre; }
+
+/* Themed control fills (materials.css) must not box the composer's inline model picker. */
+:root:is([data-theme], [data-color-mode], [data-custom-surface]) body .ot-agent-composer .ot-model-select {
+  border: 0;
+  background: transparent;
+}
+:root:is([data-theme], [data-color-mode], [data-custom-surface]) body .ot-agent-composer .ot-model-select:hover { background: var(--work-hover); }
+
+/* ── Agent CLI tabs (Claude Code, Codex, Pi, Hermes): Chat | Terminal ───── */
+.or-agent-panel { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--wb-bg, var(--work-panel)); font-family: var(--f-display); }
+.or-agent-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 35px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid var(--wb-line, var(--work-line));
+}
+.or-agent-name { font-size: 13px; font-weight: 500; color: var(--t-primary); white-space: nowrap; }
+.or-agent-fill { flex: 1; }
+.or-agent-viewswitch {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--work-line);
+  border-radius: var(--r-md);
+}
+.or-agent-viewswitch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--t-tertiary);
+  font: 12px var(--f-display);
+  cursor: pointer;
+}
+.or-agent-viewswitch button:hover { color: var(--t-primary); }
+.or-agent-viewswitch button.active { background: var(--work-selected); color: var(--t-primary); }
+.or-agent-body { position: relative; flex: 1; min-height: 0; }
+.or-agent-pane { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.or-agent-pane[hidden] { display: none; }
+.or-agent-pane > .or-terminal-panel { flex: 1; min-height: 0; }
+.or-agent-term { width: 100%; height: 100%; padding: 8px; }
+.or-agent-empty { height: 100%; display: grid; place-items: center; font-size: 12px; color: var(--t-tertiary); }
+.or-agent-chat { flex: 1; min-height: 0; width: 100%; border: 0; }
+.or-agent-hint { padding-left: 4px; font-size: 11px; color: var(--t-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.or-agent-intro code, .or-agent-chat .ot-agent-intro code { font-family: var(--f-mono); font-size: 12px; }
+
+.or-agent-turn { display: flex; flex-direction: column; gap: 6px; }
+.or-agent-working { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--t-tertiary); }
+.or-agent-notice { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; color: var(--t-secondary); overflow-wrap: anywhere; }
+.or-agent-notice > svg { flex: none; margin-top: 2px; }
+.or-agent-notice.error { color: var(--neon-magenta); }
+
+/* Tool steps: one quiet row each, expandable to the raw output. */
+.or-agent-step { border: 1px solid var(--work-line); border-radius: var(--r-md); overflow: hidden; }
+.or-agent-step-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--t-secondary);
+  font: 12px var(--f-display);
+  text-align: left;
+  cursor: pointer;
+}
+.or-agent-step-row:disabled { cursor: default; }
+.or-agent-step-row:hover:not(:disabled) { background: var(--work-hover); color: var(--t-primary); }
+.or-agent-step-row .st { flex: none; display: grid; place-items: center; color: var(--t-tertiary); }
+.or-agent-step.error .or-agent-step-row .st { color: var(--neon-magenta); }
+.or-agent-step-row .nm { flex: none; font-weight: 500; color: var(--t-primary); }
+.or-agent-step-row .sm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--f-mono); font-size: 11px; color: var(--t-tertiary); }
+.or-agent-step-row .cv { flex: none; margin-left: auto; color: var(--t-tertiary); transition: transform 120ms ease; }
+.or-agent-step-row .cv.open { transform: rotate(90deg); }
+.or-agent-step-out {
+  max-height: 240px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-top: 1px solid var(--work-line);
+  background: var(--bg-0);
+  color: var(--t-secondary);
+  font: 11px/1.5 var(--f-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) { .or-agent-step-row .cv { transition: none; } }
+
+/* Source Control in the sidebar: one scrolling column (lists size to content),
+   a full-width Commit like Cursor's, Pull/Push beside it on one line. */
+:root body .or-app .or-sidebar .or-changes { overflow-y: auto; font-family: var(--f-display); }
+:root body .or-app .or-sidebar .or-changes-list { flex: none; overflow: visible; padding-bottom: 4px; }
+:root body .or-app .or-sidebar .or-git-commitbox { border-bottom: 0; }
+:root body .or-app .or-sidebar .or-git-commitbox textarea { font-family: var(--f-display); font-size: 13px; resize: none; }
+:root body .or-app .or-sidebar .or-git-commitbox textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root body .or-app .or-sidebar .or-git-commitrow { flex-wrap: wrap; justify-content: stretch; }
+:root body .or-app .or-sidebar .or-git-commitrow .or-diff-btn { flex: 1 1 0; min-width: 0; white-space: nowrap; justify-content: center; }
+:root body .or-app .or-sidebar .or-git-commitrow .or-diff-btn.accept { order: -1; flex-basis: 100%; height: 28px; }
+:root body .or-app .or-sidebar .or-git-subhead { padding: 10px 14px 4px; font-family: var(--f-display); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--t-tertiary); }
+:root body .or-app .or-sidebar .or-changes-row { height: 22px; padding: 0 10px 0 14px; font-family: var(--f-display); font-size: 13px; }
+:root body .or-app .or-sidebar .or-changes-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root body .or-app .or-sidebar .or-changes-dir { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+
+/* ── Agent Chat: empty state shows the CLI's own start-screen mark, centered,
+   with the composer under it (Cursor's empty agent). ─────────────────────── */
+.or-agent-empty-stage {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 24px 16px 18vh;
+}
+.or-agent-empty-composer { width: 100%; max-width: 640px; }
+.or-agent-welcome { display: flex; flex-direction: column; align-items: center; gap: 18px; max-width: 100%; }
+.or-agent-mark-row { display: flex; align-items: center; gap: 14px; }
+.or-agent-mark-col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.or-agent-mark-art {
+  margin: 0;
+  font-family: "JetBrains Mono", Menlo, monospace;
+  font-size: 15px;
+  line-height: 1.1;
+  white-space: pre;
+  color: var(--t-primary);
+  user-select: none;
+}
+.or-agent-mark-art.knot { font-family: Menlo, "JetBrains Mono", monospace; font-size: 7px; line-height: 1.12; color: var(--t-secondary); }
+.or-agent-mark-art.caduceus { font-family: Menlo, "JetBrains Mono", monospace; font-size: 9px; line-height: 1.12; }
+.or-agent-mark-text { font-family: var(--f-mono); font-size: 12.5px; line-height: 1.6; color: var(--t-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.or-agent-mark-text.center { text-align: center; }
+.or-agent-mark-text b { font-weight: 700; }
+.or-agent-mark-text .dim, .or-agent-mark-text.dim { color: var(--t-tertiary); }
+:root[data-color-mode="light"] body .or-agent-welcome[data-agent="hermes"] :is(.or-agent-mark-art, .hermes-name) { filter: brightness(0.72) saturate(1.3); }
+
+.or-agent-install { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12.5px; color: var(--t-secondary); text-align: center; }
+.or-agent-install-cmd {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--work-line-strong);
+  border-radius: var(--r-md);
+  background: var(--work-hover);
+  color: var(--t-primary);
+  cursor: pointer;
+}
+.or-agent-install-cmd code { font: 12px var(--f-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.or-agent-install-cmd:hover { border-color: var(--t-tertiary); }
+
+/* Header brand mark next to the agent name. */
+.or-agent-brand { display: inline-grid; place-items: center; width: 16px; height: 16px; flex: none; }
+:root body .or-agent-brand .ot-notch-provider-logo { width: 14px; height: 14px; filter: none; opacity: 0.9; }
+:root body .or-agent-brand.claude .ot-notch-provider-logo { filter: brightness(0) saturate(100%) invert(56%) sepia(38%) saturate(820%) hue-rotate(330deg) brightness(95%); opacity: 1; }
+:root:not([data-color-mode="light"]) body .or-agent-brand:is(.codex, .hermes) .ot-notch-provider-logo { filter: brightness(0) invert(1); }
+:root[data-color-mode="light"] body .or-agent-brand:is(.codex, .hermes) .ot-notch-provider-logo { filter: brightness(0); }
+.or-agent-brand pre { margin: 0; font: 6px/1 Menlo, monospace; white-space: pre; }
+.or-agent-brand.claude pre { font-size: 4px; }
+
+/* Model / effort / mode pills inside the composer foot. */
+.or-agent-pickers { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.or-agent-picker { position: relative; min-width: 0; }
+.or-agent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 190px;
+  height: 24px;
+  padding: 0 6px 0 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--t-secondary);
+  font: 12px var(--f-display);
+  cursor: pointer;
+}
+.or-agent-pill > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.or-agent-pill > svg { flex: none; color: var(--t-tertiary); }
+.or-agent-pill:hover, .or-agent-pill.open { color: var(--t-primary); background: var(--work-hover); }
+.or-agent-pickers[aria-disabled] { opacity: 0.5; pointer-events: none; }
+.or-agent-menu {
+  position: fixed;
+  z-index: 7000;
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  max-height: 340px;
+  padding: 4px;
+  border: 1px solid var(--work-line-strong);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  box-shadow: var(--shadow-window);
+}
+.or-agent-menu-search {
+  flex: none;
+  height: 28px;
+  margin: 2px 2px 4px;
+  padding: 0 8px;
+  border: 1px solid var(--work-line);
+  border-radius: var(--r-sm);
+  background: var(--work-hover);
+  color: var(--t-primary);
+  font: 12px var(--f-display);
+  outline: none;
+}
+.or-agent-menu-search:focus { border-color: var(--work-line-strong); }
+.or-agent-menu-list { flex: 1; min-height: 0; overflow-y: auto; }
+.or-agent-menu-group { padding: 8px 8px 3px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--t-tertiary); }
+.or-agent-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 26px;
+  padding: 3px 8px 3px 4px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--t-primary);
+  font: 12.5px var(--f-display);
+  text-align: left;
+  cursor: pointer;
+}
+.or-agent-menu-item:hover { background: var(--work-hover); }
+.or-agent-menu-item .ck { flex: none; display: grid; place-items: center; width: 16px; color: var(--t-secondary); }
+.or-agent-menu-item .lb { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.or-agent-menu-item .ht { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font-size: 11px; color: var(--t-tertiary); }
+.or-agent-menu-empty { padding: 8px; font-size: 12px; color: var(--t-tertiary); }
+.or-agent-menu-foot { flex: none; padding: 6px 8px 4px; border-top: 1px solid var(--work-line); margin-top: 4px; font-size: 11px; color: var(--t-tertiary); }
+.or-agent-menu-foot code { font: 11px var(--f-mono); color: var(--t-secondary); }
+
+/* ── Agent tabs fit whatever width their pane has ─────────────────────────
+   The panel is a size container; marks scale with it, facts wrap between
+   items (never mid-path), pickers shrink, then the header drops labels. */
+.or-agent-panel { container: or-agent / inline-size; }
+.or-agent-head { min-width: 0; }
+.or-agent-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.or-agent-viewswitch { flex: none; }
+.or-agent-empty-stage { padding: 20px clamp(10px, 4cqi, 16px) 12vh; gap: clamp(16px, 5cqi, 28px); }
+.or-agent-welcome { width: 100%; min-width: 0; }
+.or-agent-mark-row { max-width: 100%; min-width: 0; }
+.or-agent-mark-row > .or-agent-mark-text { min-width: 0; flex: 1 1 auto; }
+.or-agent-mark-text { white-space: normal; overflow: visible; font-size: clamp(11px, 2.4cqi, 12.5px); }
+.or-agent-facts { display: flex; flex-wrap: wrap; column-gap: 0; row-gap: 0; min-width: 0; }
+.or-agent-mark-text.center .or-agent-facts { justify-content: center; }
+.or-agent-facts .seg { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.or-agent-facts .sep { padding: 0 0.6ch; }
+.or-agent-facts.dim { color: var(--t-tertiary); }
+.or-agent-facts.title .seg:first-child { font-weight: 700; color: var(--t-primary); }
+.or-agent-facts.title .seg + .seg { color: var(--t-tertiary); }
+.or-agent-facts.title .seg + .seg .sep { display: none; }
+.or-agent-facts.title .seg + .seg::before { content: " "; white-space: pre; }
+.or-agent-welcome[data-agent="hermes"] .or-agent-facts.title .seg:first-child { color: #ffd700; }
+
+/* Art scales down with the pane (it never clips). */
+.or-agent-mark-art { font-size: clamp(10px, 2.6cqi, 15px); }
+.or-agent-mark-art.knot { font-size: clamp(3px, 1.25cqi, 7px); }
+.or-agent-mark-art.caduceus { font-size: clamp(4px, 1.6cqi, 9px); }
+
+/* Composer foot: pills shrink and ellipsize; send stays put. */
+.ot-agent-composer-foot { min-width: 0; }
+.or-agent-pickers { flex: 1 1 auto; min-width: 0; }
+.or-agent-picker { flex: 0 1 auto; }
+.or-agent-pill { max-width: min(190px, 40cqi); }
+
+@container or-agent (max-width: 520px) {
+  .or-agent-mark-row { flex-direction: column; gap: 10px; text-align: center; }
+  .or-agent-mark-row .or-agent-facts { justify-content: center; }
+  .or-agent-empty-stage { justify-content: flex-start; padding-top: 28px; }
+}
+@container or-agent (max-width: 380px) {
+  .or-agent-viewswitch .lbl { display: none; }
+  .or-agent-viewswitch button { padding: 0 6px; }
+  .or-agent-pill { padding: 0 4px 0 6px; }
+  .or-agent-pill > svg { display: none; }
+}
+@container or-agent (max-width: 220px) {
+  .or-agent-mark-art.knot, .or-agent-mark-art.caduceus { display: none; }
+}
+
+/* Header lines never overflow the pane: blocks fill the width, facts wrap
+   between items, and a single long fact breaks rather than clipping. */
+.or-agent-mark-col, .or-agent-mark-row { width: 100%; max-width: 100%; min-width: 0; }
+.or-agent-mark-row { justify-content: center; }
+.or-agent-mark-row > .or-agent-mark-text { flex: 0 1 auto; }
+.or-agent-mark-col > .or-agent-mark-text { width: 100%; }
+.or-agent-facts .seg { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+.or-agent-pickers { overflow: hidden; padding: 0; }
+.or-agent-picker { min-width: 0; }
+
+/* Seti file icons (Cursor's default icon theme) in the tree, tabs, search,
+   source control and quick open. Colors are the icon's own. */
+:root body .or-app .or-tree-glyph.ot-file-icon { color: var(--fi-dark); }
+:root[data-color-mode="light"] body .or-app .or-tree-glyph.ot-file-icon,
+:root[data-color-mode="light"] body .or-app .ot-file-icon { color: var(--fi-light); }
+:root body .or-app .or-tree-item .ot-file-icon { margin-right: 2px; }
+:root body .or-app .ot-panel-tab .ot-file-icon { width: 16px; }
+.or-changes-row .ot-file-icon, .or-search-file .ot-file-icon, .or-qo-row .ot-file-icon { margin-right: 2px; }
+.or-changes-row > .or-git-letter { margin-left: auto; width: 14px; text-align: center; flex: none; }
+.or-changes-row > .or-changes-rowact + .or-git-letter { margin-left: 4px; }
+/* Like Cursor: the file name keeps its width, the folder path gives way first. */
+:root body .or-app .or-changes-row .or-changes-name { flex: 0 1 auto; min-width: 2ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root body .or-app .or-changes-row .or-changes-dir { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

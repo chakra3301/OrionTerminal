@@ -120,8 +120,8 @@ export function ArchivesProjects() {
   if (total === 0) {
     return (
       <div className="ar-empty-state ar-journal-empty">
-        <FolderKanban size={22} color="var(--neon-cyan)" />
-        <div className="title">No projects yet.</div>
+        <FolderKanban size={20} />
+        <div className="title">No projects yet</div>
         <div className="hint">
           Start one per idea or initiative. Nest subpages inside like in Notion.
         </div>
@@ -226,7 +226,7 @@ export function ArchivesProjects() {
           </>
         ) : (
           <div className="ar-empty-state" style={{ flex: 1 }}>
-            <div className="title">No page selected.</div>
+            <div className="title">No page selected</div>
           </div>
         )}
       </div>

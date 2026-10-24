@@ -1,7 +1,7 @@
 import { Component, Suspense, useCallback, useState, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
 import { CharacterModel } from "./CharacterModel";
-import { WireframeCore } from "./WireframeCore";
+import type { CompanionId } from "./companionProfiles";
 
 class GLBoundary extends Component<
   { children: ReactNode; fallback?: ReactNode },
@@ -20,13 +20,15 @@ class GLBoundary extends Component<
 
 export function CharacterCanvas({
   url,
-  color,
+  companion,
   selectSignal = 0,
   turntable = true,
   className,
 }: {
   url: string;
-  color: string;
+  companion?: CompanionId;
+  /** The character's accent; kept for callers, no longer drawn (the orbs are gone). */
+  color?: string;
   selectSignal?: number;
   turntable?: boolean;
   className?: string;
@@ -49,10 +51,10 @@ export function CharacterCanvas({
           <ambientLight intensity={0.9} />
           <directionalLight position={[2, 4, 3]} intensity={1.5} />
           <directionalLight position={[-3, 2, -2]} intensity={0.6} color="#88c0ff" />
-          <WireframeCore color={color} />
           <Suspense fallback={null}>
             <CharacterModel
               url={url}
+              companion={companion}
               selectSignal={selectSignal}
               turntable={turntable}
               fitHeight={1.5}

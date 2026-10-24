@@ -4,6 +4,7 @@ import {
   clearXDesignActivities,
   trackXDesignActivity,
   xdesignActivityReason,
+  xdesignProjectChangeReason,
 } from "./runtimeActivity";
 
 afterEach(clearXDesignActivities);
@@ -26,5 +27,9 @@ describe("XDesign runtime activity", () => {
       }),
     ).rejects.toThrow("failed");
     expect(xdesignActivityReason()).toBeNull();
+  });
+  it("prevents project changes until a library operation finishes",()=>{
+    const end=beginXDesignActivity("component-library","Wait for library publishing before switching projects.");
+    expect(xdesignProjectChangeReason()).toContain("library publishing");end();expect(xdesignProjectChangeReason()).toBeNull();
   });
 });

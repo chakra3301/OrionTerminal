@@ -35,9 +35,13 @@ type WorkspaceState = {
   // tab operations
   openTab: (
     descriptor: TabDescriptor,
-    opts?: { label?: string; panelId?: string; preferRole?: PanelRole },
+    opts?: { label?: string; panelId?: string; preferRole?: PanelRole; preview?: boolean },
   ) => string;
   closeTab: (tabId: string) => void;
+  /** Turn a preview tab into a regular one (double-click on the tab). */
+  pinTab: (tabId: string) => void;
+  /** Pin the preview tab showing this file, if any (first edit pins, like Cursor). */
+  pinFile: (path: string) => void;
   setActiveTab: (panelId: string, tabId: string) => void;
   cycleActive: (panelId: string, dir: 1 | -1) => void;
   setLabel: (tabId: string, label: string) => void;
@@ -148,21 +152,48 @@ function findPanelByRole(node: LayoutNode, role: PanelRole): LayoutPanel | null 
  * end up with a single child). Called after hydrate to heal legacy layouts
  * that started with an empty editor panel.
  */
-function pruneEmptyPanels(node: LayoutNode): LayoutNode | null {
-  if (isPanel(node)) return node.tabs.length === 0 ? null : node;
-  const kept: LayoutNode[] = [];
-  const sizes: number[] = [];
+/** The explorer is the layout's fixed anchor: never closed, hidden or moved. */
+export function isAnchorPanel(n: LayoutNode | undefined): boolean {
+  return !!n && n.kind === "panel" && n.role === "explorer";
+}
+
+/**
+ * Sizes after some children of `node` are dropped (`kept` = surviving indices). Each
+ * removed child's share goes to its nearest surviving neighbour that isn't the anchor,
+ * so the panes the user didn't touch keep their size instead of all re-flowing.
+ */
+function absorbRemoved(node: LayoutSplit, kept: number[]): number[] {
+  const sizes = kept.map((i) => node.sizes[i] ?? 0);
+  node.children.forEach((_, i) => {
+    if (kept.includes(i)) return;
+    let target = -1;
+    for (let d = 1; d < node.children.length && target < 0; d++) {
+      for (const j of [i - d, i + d]) {
+        const k = kept.indexOf(j);
+        if (k >= 0 && !isAnchorPanel(node.children[j])) { target = k; break; }
+      }
+    }
+    if (target < 0) target = kept.length - 1;
+    if (target >= 0) sizes[target]! += node.sizes[i] ?? 0;
+  });
+  const total = sizes.reduce((a, b) => a + b, 0) || 1;
+  return sizes.map((v) => (v / total) * 100);
+}
+
+function pruneEmptyPanels(node: LayoutNode, keepEditor = true): LayoutNode | null {
+  if (isPanel(node)) return node.tabs.length === 0 && !(keepEditor && node.role === "editor") ? null : node;
+  const kids: LayoutNode[] = [];
+  const kept: number[] = [];
   node.children.forEach((c, i) => {
     const r = pruneEmptyPanels(c);
     if (r) {
-      kept.push(r);
-      sizes.push(node.sizes[i] ?? 50);
+      kids.push(r);
+      kept.push(i);
     }
   });
-  if (kept.length === 0) return null;
-  if (kept.length === 1) return kept[0]!;
-  const total = sizes.reduce((a, b) => a + b, 0) || 1;
-  return { ...node, sizes: sizes.map((s) => (s / total) * 100), children: kept };
+  if (kids.length === 0) return null;
+  if (kids.length === 1) return kids[0]!;
+  return { ...node, sizes: absorbRemoved(node, kept), children: kids };
 }
 
 function newTab(descriptor: TabDescriptor, label?: string): Tab {
@@ -237,6 +268,23 @@ function findPanelByDescriptor(
   return null;
 }
 
+/** First panel that can host files: not the explorer, AI rail or terminal dock. */
+function editorPanelCount(node: LayoutNode): number {
+  if (isPanel(node)) return firstEditorLike(node) ? 1 : 0;
+  return node.children.reduce((n, c) => n + editorPanelCount(c), 0);
+}
+
+function firstEditorLike(node: LayoutNode): LayoutPanel | null {
+  if (isPanel(node)) {
+    return node.role === "explorer" || node.role === "claude" || node.role === "terminal" ? null : node;
+  }
+  for (const c of node.children) {
+    const hit = firstEditorLike(c);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 function firstPanel(node: LayoutNode): LayoutPanel | null {
   if (isPanel(node)) return node;
   for (const c of node.children) {
@@ -276,10 +324,7 @@ function removePanel(node: LayoutNode, panelId: string): LayoutNode | null {
   });
   if (kids.length === 0) return null;
   if (kids.length === 1) return kids[0]!;
-  const sizes = kept.map((i) => node.sizes[i] ?? 50);
-  const total = sizes.reduce((a, b) => a + b, 0) || 1;
-  const normalized = sizes.map((s) => (s / total) * 100);
-  return { ...node, sizes: normalized, children: kids };
+  return { ...node, sizes: absorbRemoved(node, kept), children: kids };
 }
 
 /**
@@ -308,22 +353,28 @@ function extractTab(
       return { ...n, tabs: nextTabs, activeTabId: nextActive };
     }
     const newKids: LayoutNode[] = [];
-    const newSizes: number[] = [];
+    const kept: number[] = [];
     n.children.forEach((c, i) => {
       const r = recur(c);
       if (r) {
         newKids.push(r);
-        newSizes.push(n.sizes[i] ?? 50);
+        kept.push(i);
       }
     });
     if (newKids.length === 0) return null;
     if (newKids.length === 1) return newKids[0]!;
-    const total = newSizes.reduce((a, b) => a + b, 0) || 1;
-    return { ...n, sizes: newSizes.map((s) => (s / total) * 100), children: newKids };
+    return { ...n, sizes: absorbRemoved(n, kept), children: newKids };
   }
 
   const next = recur(node);
   return { tree: next, tab: extracted, panelId: sourcePanelId };
+}
+
+/** True when a tab move would take the explorer's tree out of its panel, or put
+ *  another tab into the explorer: the anchor holds just its tree. */
+function anchorBlocksMove(root: LayoutNode, tabId: string, targetPanelId: string): boolean {
+  if (findTabIn(root, tabId)?.tab.descriptor.kind === "files-tree") return true;
+  return isAnchorPanel(findPanelIn(root, targetPanelId) ?? undefined);
 }
 
 /** Insert a tab into an existing panel at the end and activate it. */
@@ -430,6 +481,30 @@ function dockTabAtBottom(
     activeTabId: tab.id,
     role,
   };
+  // Cursor's panel sits under the editor area only: the sidebar and the agent
+  // pane keep their full height beside it.
+  if (root.kind === "split" && root.direction === "horizontal") {
+    const side = (c: LayoutNode | undefined, r: PanelRole) => !!c && c.kind === "panel" && c.role === r;
+    const lead = side(root.children[0], "explorer") ? 1 : 0;
+    const trail = root.children.length - lead > 1 && side(root.children[root.children.length - 1], "claude") ? 1 : 0;
+    const mid = root.children.slice(lead, root.children.length - trail);
+    if (lead + trail > 0 && mid.length > 0) {
+      const midSizes = root.sizes.slice(lead, root.children.length - trail);
+      const midTotal = midSizes.reduce((a, b) => a + b, 0) || 1;
+      const area: LayoutNode = mid.length === 1
+        ? mid[0]!
+        : { kind: "split", id: ulid(), direction: "horizontal", sizes: midSizes.map((v) => (v / midTotal) * 100), children: mid };
+      const docked = dockTabAtBottom(area, tab, role, fraction);
+      return {
+        tree: {
+          ...root,
+          sizes: [...root.sizes.slice(0, lead), midTotal, ...root.sizes.slice(root.children.length - trail)],
+          children: [...root.children.slice(0, lead), docked.tree, ...root.children.slice(root.children.length - trail)],
+        },
+        newPanelId: docked.newPanelId,
+      };
+    }
+  }
   if (root.kind === "split" && root.direction === "vertical") {
     const total = root.sizes.reduce((a, b) => a + b, 0) || 1;
     const keep = 100 - fraction;
@@ -502,11 +577,10 @@ function defaultTabForRole(role: PanelRole): TabDescriptor {
 // ============================================================
 
 export function defaultOrionLayout(): LayoutNode {
-  // Three-column layout. The middle "editor" panel hosts file tabs and the
-  // preview tab side-by-side — files open here by default via the `editor`
-  // role. Terminal isn't part of the default layout; ⌘` opens it on demand.
+  // Cursor's workbench: sidebar, one editor group (empty until a file opens,
+  // showing the shortcut screen), agent pane. Terminal and Preview open on demand.
   const filesPanel = newPanel([newTab({ kind: "files-tree" })], "explorer");
-  const editorPanel = newPanel([newTab({ kind: "preview" })], "editor");
+  const editorPanel = newPanel([], "editor");
   const claudePanel = newPanel([newTab({ kind: "claude" })], "claude");
 
   return {
@@ -565,11 +639,15 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     const key = descriptorKey(descriptor);
     const root = get().root;
 
-    // Already open → activate it.
+    // Already open → activate it. An explicit (non-preview) open pins it.
     const existing = findPanelByDescriptor(root, key);
     if (existing) {
+      const pin = existing.tab.preview && !opts?.preview;
       const nextRoot = patchPanel(root, existing.panel.id, {
         activeTabId: existing.tab.id,
+        ...(pin
+          ? { tabs: existing.panel.tabs.map((t) => (t.id === existing.tab.id ? { ...t, preview: false } : t)) }
+          : {}),
       });
       const nextLastFile =
         descriptor.kind === "file"
@@ -609,44 +687,53 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       return tab.id;
     }
 
-    // Files (and notes/assets) each get their own panel, fanning out to the
-    // right of the most recent file panel (or the editor anchor).
+    // Files (and notes/assets) open as tabs in one editor group, like Cursor:
+    // the group last used for a file, else the editor panel. Splitting is
+    // explicit (⌘\ or dragging a tab to an edge). A preview open replaces the
+    // group's current preview tab instead of adding another.
     if (
       descriptor.kind === "file" ||
       descriptor.kind === "note" ||
       descriptor.kind === "asset-detail"
     ) {
+      if (opts?.preview) tab.preview = true;
       const lastId = get().lastFilePanelId;
       const lastPanel = lastId ? findPanelIn(root, lastId) : null;
-      const editorPanel = findPanelByRole(root, "editor");
-      const anchor =
-        opts?.panelId
-          ? findPanelIn(root, opts.panelId)
-          : lastPanel ?? editorPanel ?? firstPanel(root);
+      const requested = opts?.panelId ? findPanelIn(root, opts.panelId) : null;
+      const usable = (p: LayoutPanel | null) =>
+        p && !isAnchorPanel(p) && p.role !== "claude" && p.role !== "terminal" ? p : null;
+      const target =
+        usable(requested) ??
+        usable(lastPanel) ??
+        findPanelByRole(root, "editor") ??
+        firstEditorLike(root);
 
-      if (!anchor) {
+      if (!target) {
+        // No editor group left (its last tab was dragged away): recreate one
+        // beside the AI rail, where the editor area normally sits.
+        const rail = findPanelByRole(root, "claude");
+        if (rail) {
+          const { tree, newPanelId } = splitPanelWithTab(root, rail.id, tab, "left", "editor");
+          set({ root: tree, focusedPanelId: newPanelId, lastFilePanelId: newPanelId });
+          persistLayout(tree, newPanelId);
+          return tab.id;
+        }
         const fresh = newPanel([tab], "editor");
-        set({
-          root: fresh,
-          focusedPanelId: fresh.id,
-          lastFilePanelId: fresh.id,
-        });
-        persistLayout(fresh, fresh.id);
+        const nextRoot = insertPanelAtEdge(root, fresh, "right", 60);
+        set({ root: nextRoot, focusedPanelId: fresh.id, lastFilePanelId: fresh.id });
+        persistLayout(nextRoot, fresh.id);
         return tab.id;
       }
 
-      const { tree: nextRoot, newPanelId } = splitPanelWithTab(
-        root,
-        anchor.id,
-        tab,
-        "right",
-      );
-      set({
-        root: nextRoot,
-        focusedPanelId: newPanelId,
-        lastFilePanelId: newPanelId,
-      });
-      persistLayout(nextRoot, newPanelId);
+      const replace = tab.preview ? target.tabs.find((t) => t.preview) : undefined;
+      const nextRoot = replace
+        ? patchPanel(root, target.id, {
+            tabs: target.tabs.map((t) => (t.id === replace.id ? tab : t)),
+            activeTabId: tab.id,
+          })
+        : insertTabIntoPanel(root, target.id, tab);
+      set({ root: nextRoot, focusedPanelId: target.id, lastFilePanelId: target.id });
+      persistLayout(nextRoot, target.id);
       return tab.id;
     }
 
@@ -674,6 +761,17 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 
   closeTab: (tabId) => {
+    const hit = findTabIn(get().root, tabId);
+    if (hit?.tab.descriptor.kind === "files-tree") return; // the anchor stays
+    // Like Cursor, the editor area stays put when its last tab closes; it shows
+    // the empty-editor screen instead of collapsing into its neighbours.
+    const host = hit ? findPanelIn(get().root, hit.panelId) : null;
+    if (host?.role === "editor" && host.tabs.length === 1 && editorPanelCount(get().root) === 1) {
+      const nextRoot = patchPanel(get().root, host.id, { tabs: [], activeTabId: null });
+      set({ root: nextRoot, focusedPanelId: host.id, lastFilePanelId: host.id });
+      persistLayout(nextRoot, host.id);
+      return;
+    }
     const { tree } = extractTab(get().root, tabId);
     if (!tree) {
       const fresh = defaultOrionLayout();
@@ -695,6 +793,22 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       lastFilePanelId: lastStillValid ? lastId : null,
     });
     persistLayout(tree, nextFocus);
+  },
+
+  pinTab: (tabId) => {
+    const hit = findTabIn(get().root, tabId);
+    if (!hit?.tab.preview) return;
+    const panel = findPanelIn(get().root, hit.panelId)!;
+    const nextRoot = patchPanel(get().root, hit.panelId, {
+      tabs: panel.tabs.map((t) => (t.id === tabId ? { ...t, preview: false } : t)),
+    });
+    set({ root: nextRoot });
+    persistLayout(nextRoot, get().focusedPanelId);
+  },
+
+  pinFile: (path) => {
+    const hit = findPanelByDescriptor(get().root, `file:${path}`);
+    if (hit?.tab.preview) get().pinTab(hit.tab.id);
   },
 
   setActiveTab: (panelId, tabId) => {
@@ -749,6 +863,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 
   moveTabToPanel: (tabId, targetPanelId) => {
+    if (anchorBlocksMove(get().root, tabId, targetPanelId)) return;
     const { tree, tab } = extractTab(get().root, tabId);
     if (!tab) return;
     // If the extraction left no panels, create a fresh tree with the moved tab.
@@ -768,6 +883,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 
   dropTabOnPanel: (tabId, targetPanelId, zone) => {
+    if (anchorBlocksMove(get().root, tabId, targetPanelId)) return;
     if (zone === "tabs") {
       get().moveTabToPanel(tabId, targetPanelId);
       return;
@@ -802,6 +918,11 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   togglePanelByRole: (role) => {
     const root = get().root;
     const existing = findPanelByRole(root, role);
+    if (existing && role === "explorer") {
+      // The explorer can't be hidden: ⌘B just brings focus back to it.
+      set({ focusedPanelId: existing.id });
+      return;
+    }
     if (existing) {
       const next = removePanel(root, existing.id);
       if (!next) return; // never hide the last surviving panel
@@ -830,6 +951,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 
   closePanel: (panelId) => {
+    if (isAnchorPanel(findPanelIn(get().root, panelId) ?? undefined)) return;
     const next = removePanel(get().root, panelId);
     if (!next) {
       const fresh = defaultOrionLayout();
@@ -876,7 +998,11 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     // based on tab content so route-by-role works for layouts persisted
     // before the role field existed.
     const pruned = pruneEmptyPanels(root);
-    const withRoles = pruned ? assignInferredRoles(pruned) : null;
+    const inferred = pruned ? assignInferredRoles(pruned) : null;
+    // Layouts saved while the explorer could still be hidden get it back on the left.
+    const withRoles = inferred && !findPanelByRole(inferred, "explorer")
+      ? insertPanelAtEdge(inferred, newPanel([newTab({ kind: "files-tree" })], "explorer"), "left", PREFERRED_SIZE.explorer!)
+      : inferred;
     const effective = withRoles ?? defaultOrionLayout();
     const focus =
       focusedPanelId && findPanelIn(effective, focusedPanelId)

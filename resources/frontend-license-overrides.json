@@ -120,5 +120,121 @@
         "origin": "https://raw.githubusercontent.com/w8r/splay-tree/0f3602340f9d7eec6c4af846126ed72249d2b0d4/Readme.md"
       }
     ]
+  },
+  "@open-pencil/core@0.15.1": {
+    "license": "MIT",
+    "reason": "Published npm package omits license text; preserve the inspected upstream repository grant.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+        "sha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+        "origin": "https://github.com/open-pencil/open-pencil/blob/b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d/LICENSE"
+      },
+      {
+        "file": "THIRD_PARTY_LICENSES/OpenPencil-Inter-OFL.txt",
+        "sha256": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a",
+        "origin": "Inter font OFL grant from the pinned OpenPencil repository; applies to bundled Inter TTF assets"
+      }
+    ]
+  },
+  "@open-pencil/scene-graph@0.15.1": {
+    "license": "MIT",
+    "reason": "Published npm package omits license text; preserve the inspected upstream repository grant.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+        "sha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+        "origin": "https://github.com/open-pencil/open-pencil/blob/b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d/LICENSE"
+      }
+    ]
+  },
+  "@open-pencil/vue@0.15.1": {
+    "license": "MIT",
+    "reason": "Published npm package omits license text; preserve the inspected upstream repository grant.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+        "sha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+        "origin": "https://github.com/open-pencil/open-pencil/blob/b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d/LICENSE"
+      }
+    ]
+  },
+  "@open-pencil/fig@0.15.1": {
+    "license": "MIT",
+    "reason": "Published npm package omits license text; preserve the inspected upstream repository grant.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+        "sha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+        "origin": "https://github.com/open-pencil/open-pencil/blob/b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d/LICENSE"
+      }
+    ]
+  },
+  "@open-pencil/kiwi@0.15.1": {
+    "license": "MIT",
+    "reason": "Published npm package omits license text; preserve the inspected upstream repository grant.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+        "sha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+        "origin": "https://github.com/open-pencil/open-pencil/blob/b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d/LICENSE"
+      }
+    ]
+  },
+  "@open-pencil/pen@0.15.1": {
+    "license": "MIT",
+    "reason": "Published npm package omits license text; preserve the inspected upstream repository grant.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+        "sha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+        "origin": "https://github.com/open-pencil/open-pencil/blob/b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d/LICENSE"
+      }
+    ]
+  },
+  "@open-pencil/dom-css@0.15.1": {
+    "license": "MIT",
+    "reason": "Published npm package omits license text; preserve the inspected upstream repository grant.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+        "sha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+        "origin": "https://github.com/open-pencil/open-pencil/blob/b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d/LICENSE"
+      }
+    ]
+  },
+  "dompurify@3.4.15": {
+    "license": "(MPL-2.0 OR Apache-2.0)",
+    "selectedLicense": "Apache-2.0",
+    "reason": "Select the Apache-2.0 alternative explicitly offered by DOMPurify 3.4.15. The published package contains the complete Apache LICENSE and alternative LICENSE-MPL, collected directly without modifying either.",
+    "files": []
+  },
+  "pako@1.0.11": {
+    "license": "(MIT AND Zlib)",
+    "reason": "Pako requires MIT AND Zlib. MIT LICENSE is collected from the published package; the complete additional Zlib notice is retained verbatim from its unmodified lib/zlib/deflate.js source header.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/pako-Zlib.txt",
+        "sha256": "976b1cf2dcf7d71ad4dd7799d30da84d19323983500e4bb123d0d5414db876b3",
+        "origin": "pako@1.0.11/lib/zlib/deflate.js"
+      }
+    ]
+  },
+  "rgbcolor@1.0.1": {
+    "license": "MIT OR SEE LICENSE IN FEEL-FREE.md",
+    "selectedLicense": "MIT",
+    "reason": "Select the MIT alternative explicitly offered by rgbcolor. Complete LICENSE.md is collected from the published package.",
+    "files": []
+  },
+  "@open-pencil/yoga-layout@3.3.0-grid.3": {
+    "license": "MIT",
+    "reason": "Published package declares MIT and omits license text. Preserve the complete Facebook MIT grant inspected in the public OpenPencil Yoga fork. Inspection at main is not represented as the exact npm package source revision.",
+    "files": [
+      {
+        "file": "THIRD_PARTY_LICENSES/OpenPencil-Yoga-MIT.txt",
+        "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+        "origin": "https://raw.githubusercontent.com/open-pencil/yoga/main/LICENSE (inspected 2026-10-07)"
+      }
+    ]
   }
 }

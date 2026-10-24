@@ -193,8 +193,33 @@ pub async fn runtime_send(
     allowed_tools: Vec<String>,
     ui_run_id: Option<String>,
 ) -> Result<(), String> {
+    runtime_send_inner(app, chat_id, provider_id, model, system, history, allowed_tools, ui_run_id, None).await
+}
+
+#[tauri::command]
+pub async fn runtime_send_reviewed(
+    app: AppHandle,
+    chat_id: String,
+    provider_id: String,
+    model: String,
+    system: String,
+    history: Vec<Msg>,
+    allowed_tools: Vec<String>,
+    ui_run_id: Option<String>,
+    reviewed_provider_identity: String,
+) -> Result<(), String> {
+    runtime_send_inner(app, chat_id, provider_id, model, system, history, allowed_tools, ui_run_id, Some(reviewed_provider_identity)).await
+}
+
+async fn runtime_send_inner(
+    app: AppHandle, chat_id: String, provider_id: String, model: String, system: String,
+    history: Vec<Msg>, allowed_tools: Vec<String>, ui_run_id: Option<String>, reviewed_identity: Option<String>,
+) -> Result<(), String> {
     crate::ui_bridge::validate_run_id(ui_run_id.as_deref())?;
     let config = policy::load(&app, &provider_id, &model)?;
+    if let Some(identity) = reviewed_identity {
+        policy::verify_reviewed_identity(&config, &provider_id, &model, &identity, &allowed_tools)?;
+    }
     let run = RunGuard::start(&chat_id)?;
     let cancel = run.signal.clone();
     let provider_kind = config.kind.as_str();

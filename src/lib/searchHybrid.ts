@@ -113,6 +113,10 @@ async function enrichSemanticHits(
   return out;
 }
 
+export const isArchiveHitVisible = (hit: SearchHit) =>
+  (hit.chatOrigin !== "orion" || appRegistry.has("orion")) &&
+  (hit.chatOrigin !== "xdesign" || appRegistry.has("xdesign"));
+
 /** Run keyword (FTS5) + semantic searches in parallel, then merge: FTS hits
  * come first (keyword precision wins for exact-name queries), then any
  * semantic-only candidates that cleared the score floor. Caps at `limit`. */
@@ -128,15 +132,12 @@ export async function searchHybrid(
     semanticSearch(trimmed, limit, SEMANTIC_FLOOR),
   ]);
 
-  const visible = (hit: SearchHit) =>
-    (hit.chatOrigin !== "orion" || appRegistry.has("orion")) &&
-    (hit.chatOrigin !== "xdesign" || appRegistry.has("xdesign"));
   const seen = new Set<string>();
   const merged: SearchHit[] = [];
   for (const h of ftsHits) {
     const key = `${h.entityType}:${h.entityId}`;
     seen.add(key);
-    if (visible(h)) merged.push(h);
+    if (isArchiveHitVisible(h)) merged.push(h);
   }
   if (merged.length >= limit) return merged.slice(0, limit);
 
@@ -160,7 +161,7 @@ export async function searchHybrid(
       noteKind: e.note_kind,
       chatOrigin: e.chat_origin,
     };
-    if (visible(hit)) merged.push(hit);
+    if (isArchiveHitVisible(hit)) merged.push(hit);
   }
   return merged;
 }

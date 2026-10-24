@@ -21,4 +21,4 @@
 .ot-custom-theme-row { display: flex; align-items: center; gap: 10px; }
 .ot-custom-theme-row .ot-theme-card { flex: 1; min-width: 0; }
 .ot-custom-theme-row .ot-theme-name, .ot-custom-theme-row .ot-theme-blurb { overflow-wrap: anywhere; }
-.ot-custom-themes :is(button, summary):focus-visible { outline: 2px solid var(--neon-cyan); outline-offset: 3px; }
+.ot-custom-themes :is(button, summary):focus-visible { outline: 1px solid color-mix(in srgb, var(--t-primary) 55%, transparent); outline-offset: 3px; }

@@ -36,33 +36,25 @@ describe("terminal docks at the bottom (Cursor-style)", () => {
     useWorkspace.getState().resetLayout(defaultOrionLayout);
   });
 
-  it("wraps the workspace in a vertical split with the terminal full-width at the bottom", () => {
+  it("docks under the editor area, Cursor-style, leaving the sidebar and agent full height", () => {
     const id = useWorkspace.getState().openTab({ kind: "terminal" });
     const root = asSplit(useWorkspace.getState().root);
 
-    expect(root.direction).toBe("vertical");
-    expect(root.children).toHaveLength(2);
+    expect(root.direction).toBe("horizontal");
+    expect(root.children.map((c) => (c.kind === "panel" ? c.role : "split"))).toEqual(["explorer", "split", "claude"]);
 
-    // Bottom child is the terminal panel, full width (a direct child of the
-    // top-level vertical split spans the whole workspace width).
-    const bottom = lastChild(root);
+    const middle = asSplit(root.children[1]!);
+    expect(middle.direction).toBe("vertical");
+    const top = middle.children[0]!;
+    expect(top.kind === "panel" && top.role).toBe("editor");
+    const bottom = lastChild(middle);
     expect(bottom.kind).toBe("panel");
     if (bottom.kind === "panel") {
       expect(bottom.role).toBe("terminal");
       expect(bottom.tabs).toHaveLength(1);
       expect(bottom.tabs[0]!.id).toBe(id);
-      expect(bottom.tabs[0]!.descriptor.kind).toBe("terminal");
     }
-
-    // Top child is the original 3-column horizontal split, untouched.
-    const top = root.children[0]!;
-    expect(top.kind).toBe("split");
-    if (top.kind === "split") {
-      expect(top.direction).toBe("horizontal");
-      expect(top.children).toHaveLength(3);
-    }
-
-    // The terminal panel is focused after opening.
+    expect(middle.sizes).toEqual([70, 30]);
     expect(useWorkspace.getState().focusedPanelId).toBe(bottom.kind === "panel" ? bottom.id : null);
   });
 
@@ -74,8 +66,7 @@ describe("terminal docks at the bottom (Cursor-style)", () => {
     useWorkspace.getState().openTab({ kind: "terminal" }, { panelId: editorId });
     const root = asSplit(useWorkspace.getState().root);
 
-    expect(root.direction).toBe("vertical");
-    const bottom = lastChild(root);
+    const bottom = lastChild(asSplit(root.children[1]!));
     expect(bottom.kind === "panel" && bottom.role).toBe("terminal");
 
     // The editor panel did NOT receive the terminal tab.
@@ -92,8 +83,7 @@ describe("terminal docks at the bottom (Cursor-style)", () => {
     expect(id2).toBe(id1);
 
     const root = asSplit(useWorkspace.getState().root);
-    expect(root.direction).toBe("vertical");
-    expect(root.children).toHaveLength(2);
+    expect(asSplit(root.children[1]!).children).toHaveLength(2);
     const terminals = collectPanels(root).filter((p) =>
       p.tabs.some((t) => t.descriptor.kind === "terminal"),
     );
@@ -252,27 +242,16 @@ describe("togglePanelByRole (⌘B sidebar / ⌘J right rail)", () => {
     useWorkspace.getState().resetLayout(defaultOrionLayout);
   });
 
-  it("hides the explorer (sidebar) and restores it on the left", () => {
+  it("never hides the explorer: ⌘B only focuses it", () => {
     const before = collectPanels(useWorkspace.getState().root);
-    const explorerBefore = before.find((p) => p.role === "explorer")!;
-    expect(explorerBefore).toBeTruthy();
+    const explorer = before.find((p) => p.role === "explorer")!;
+    expect(explorer).toBeTruthy();
 
     useWorkspace.getState().togglePanelByRole("explorer");
-    let panels = collectPanels(useWorkspace.getState().root);
-    expect(panels.some((p) => p.role === "explorer")).toBe(false);
-    expect(panels).toHaveLength(before.length - 1);
-
-    useWorkspace.getState().togglePanelByRole("explorer");
-    panels = collectPanels(useWorkspace.getState().root);
-    const explorerAfter = panels.find((p) => p.role === "explorer")!;
-    expect(explorerAfter).toBeTruthy();
-    // Restored on the far left and preserving its files-tree tab.
-    const root = asSplit(useWorkspace.getState().root);
-    const first = root.children[0]!;
-    expect(first.kind === "panel" && first.role).toBe("explorer");
-    expect(
-      explorerAfter.tabs.some((t) => t.descriptor.kind === "files-tree"),
-    ).toBe(true);
+    const panels = collectPanels(useWorkspace.getState().root);
+    expect(panels).toHaveLength(before.length);
+    expect(panels.some((p) => p.id === explorer.id)).toBe(true);
+    expect(useWorkspace.getState().focusedPanelId).toBe(explorer.id);
   });
 
   it("hides the claude rail and restores it on the right", () => {
@@ -368,7 +347,123 @@ describe("divider resizing", () => {
     const root = asSplit(useWorkspace.getState().root);
     expect(preferredSizes(root)).toEqual([16, 60, 24]);
     useWorkspace.getState().openTab({ kind: "terminal" });
-    const vertical = asSplit(useWorkspace.getState().root);
+    const vertical = asSplit(asSplit(useWorkspace.getState().root).children[1]!);
     expect(preferredSizes(vertical)).toEqual([70, 30]);
+  });
+});
+
+describe("the explorer anchor", () => {
+  beforeEach(() => {
+    useWorkspace.getState().resetLayout(defaultOrionLayout);
+  });
+
+  const explorerOf = () => collectPanels(useWorkspace.getState().root).find((p) => p.role === "explorer")!;
+
+  it("can't be closed, as a tab or as a panel", () => {
+    const explorer = explorerOf();
+    useWorkspace.getState().closeTab(explorer.tabs[0]!.id);
+    useWorkspace.getState().closePanel(explorer.id);
+    expect(explorerOf().id).toBe(explorer.id);
+    expect(explorerOf().tabs).toHaveLength(1);
+  });
+
+  it("keeps its tree and takes no other tabs", () => {
+    const explorer = explorerOf();
+    useWorkspace.getState().openTab({ kind: "file", path: "/p/a.ts" }, { label: "a.ts" });
+    const editor = collectPanels(useWorkspace.getState().root).find((p) => p.role === "editor")!;
+    useWorkspace.getState().dropTabOnPanel(explorer.tabs[0]!.id, editor.id, "right");
+    useWorkspace.getState().moveTabToPanel(editor.tabs[0]!.id, explorer.id);
+    expect(explorerOf().tabs.map((t) => t.descriptor.kind)).toEqual(["files-tree"]);
+    expect(collectPanels(useWorkspace.getState().root).find((p) => p.id === editor.id)!.tabs).toHaveLength(editor.tabs.length);
+  });
+
+  it("gives a closed pane's share to its neighbour, leaving the explorer as it was", () => {
+    const claude = collectPanels(useWorkspace.getState().root).find((p) => p.role === "claude")!;
+    useWorkspace.getState().closeTab(claude.tabs[0]!.id);
+    const root = asSplit(useWorkspace.getState().root);
+    expect(root.children.map((c) => (c.kind === "panel" ? c.role : "split"))).toEqual(["explorer", "editor"]);
+    expect(root.sizes[0]).toBeCloseTo(16, 5);
+    expect(root.sizes[1]).toBeCloseTo(84, 5);
+  });
+
+  it("is restored on the left of a saved layout that lost it", () => {
+    const legacy: LayoutNode = {
+      kind: "split",
+      id: "h",
+      direction: "horizontal",
+      sizes: [70, 30],
+      children: [
+        { kind: "panel", id: "p-ed", role: "editor", activeTabId: "t-prev", tabs: [{ id: "t-prev", descriptor: { kind: "preview" }, label: "Preview" }] },
+        { kind: "panel", id: "p-cl", role: "claude", activeTabId: "t-cl", tabs: [{ id: "t-cl", descriptor: { kind: "claude" }, label: "Orix47" }] },
+      ],
+    };
+    useWorkspace.getState().hydrate(legacy, null);
+    const first = asSplit(useWorkspace.getState().root).children[0]!;
+    expect(first.kind === "panel" && first.role).toBe("explorer");
+  });
+});
+
+describe("Cursor-style editor group", () => {
+  beforeEach(() => {
+    useWorkspace.getState().resetLayout(defaultOrionLayout);
+  });
+
+  const editorOf = () => collectPanels(useWorkspace.getState().root).find((p) => p.role === "editor")!;
+
+  it("starts with an empty editor group between the sidebar and the agent", () => {
+    const root = asSplit(useWorkspace.getState().root);
+    expect(root.children.map((c) => (c.kind === "panel" ? c.role : "split"))).toEqual(["explorer", "editor", "claude"]);
+    expect(editorOf().tabs).toHaveLength(0);
+  });
+
+  it("opens files as tabs in one group instead of new panes", () => {
+    const ws = useWorkspace.getState();
+    ws.openTab({ kind: "file", path: "/p/a.ts" }, { label: "a.ts" });
+    ws.openTab({ kind: "file", path: "/p/b.ts" }, { label: "b.ts" });
+    expect(collectPanels(useWorkspace.getState().root)).toHaveLength(3);
+    expect(editorOf().tabs.map((t) => t.label)).toEqual(["a.ts", "b.ts"]);
+    expect(editorOf().activeTabId).toBe(editorOf().tabs[1]!.id);
+  });
+
+  it("replaces the preview tab on the next single-click open", () => {
+    const ws = useWorkspace.getState();
+    ws.openTab({ kind: "file", path: "/p/a.ts" }, { label: "a.ts", preview: true });
+    ws.openTab({ kind: "file", path: "/p/b.ts" }, { label: "b.ts", preview: true });
+    expect(editorOf().tabs.map((t) => [t.label, !!t.preview])).toEqual([["b.ts", true]]);
+  });
+
+  it("keeps a pinned tab and pins a preview opened explicitly", () => {
+    const ws = useWorkspace.getState();
+    ws.openTab({ kind: "file", path: "/p/a.ts" }, { label: "a.ts" });
+    ws.openTab({ kind: "file", path: "/p/b.ts" }, { label: "b.ts", preview: true });
+    ws.openTab({ kind: "file", path: "/p/b.ts" }, { label: "b.ts" });
+    ws.openTab({ kind: "file", path: "/p/c.ts" }, { label: "c.ts", preview: true });
+    expect(editorOf().tabs.map((t) => [t.label, !!t.preview])).toEqual([["a.ts", false], ["b.ts", false], ["c.ts", true]]);
+  });
+
+  it("pins a preview tab when its file is edited or the tab is double-clicked", () => {
+    const ws = useWorkspace.getState();
+    ws.openTab({ kind: "file", path: "/p/a.ts" }, { label: "a.ts", preview: true });
+    useWorkspace.getState().pinFile("/p/a.ts");
+    expect(editorOf().tabs[0]!.preview).toBe(false);
+    ws.openTab({ kind: "file", path: "/p/b.ts" }, { label: "b.ts", preview: true });
+    useWorkspace.getState().pinTab(editorOf().tabs[1]!.id);
+    expect(editorOf().tabs.map((t) => !!t.preview)).toEqual([false, false]);
+  });
+
+  it("keeps the editor group in place when its last tab closes", () => {
+    const id = useWorkspace.getState().openTab({ kind: "file", path: "/p/a.ts" }, { label: "a.ts" });
+    useWorkspace.getState().closeTab(id);
+    const root = asSplit(useWorkspace.getState().root);
+    expect(root.children.map((c) => (c.kind === "panel" ? c.role : "split"))).toEqual(["explorer", "editor", "claude"]);
+    expect(editorOf().tabs).toHaveLength(0);
+  });
+
+  it("collapses a split editor group when its last tab closes", () => {
+    useWorkspace.getState().openTab({ kind: "file", path: "/p/a.ts" }, { label: "a.ts" });
+    useWorkspace.getState().splitFocusedPanel();
+    const dup = useWorkspace.getState().findPanel(useWorkspace.getState().focusedPanelId!)!;
+    useWorkspace.getState().closeTab(dup.tabs[0]!.id);
+    expect(collectPanels(useWorkspace.getState().root)).toHaveLength(3);
   });
 });

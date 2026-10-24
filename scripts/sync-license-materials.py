@@ -37,6 +37,20 @@ def fetch(url):
     if len(data) > 32 * 1024 * 1024: raise ValueError('Source download exceeds 32MiB')
     return data
 
+def retained_notice(path, extra):
+    """Reuse already retained upstream text only when its original pin matches."""
+    if not path.is_file(): return None
+    marker = f"## {extra['name']}\n\nSource: {extra['url']}\n\n"
+    contents = path.read_text()
+    if marker not in contents: return None
+    tail = contents.split(marker, 1)[1]
+    ends = [len(tail), *[match.start() for match in re.finditer(r'\n## ', tail)]]
+    for end in ends:
+        for newlines in range(4):
+            candidate = tail[:end-newlines if newlines else end].encode()
+            if digest(candidate) == extra['sha256']: return candidate
+    return None
+
 def verify_source(data, root, prefix, required_src=False):
     count = 0
     total = 0
@@ -72,11 +86,29 @@ def prepare():
     output = ROOT/'THIRD_PARTY_LICENSES/native'
     sources = ROOT/'THIRD_PARTY_SOURCES'
     manifest = {'target': TARGET, 'scope': 'Selected native normal/build graph; build-only crates conservatively included', 'cargoLockSha256': digest((ROOT/'src-tauri/Cargo.lock').read_bytes()), 'cargoManifestSha256': digest((ROOT/'src-tauri/Cargo.toml').read_bytes()), 'npmLockSha256': digest((ROOT/'package-lock.json').read_bytes()), 'native': [], 'sources': []}
+    photocraft_source = "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a"
     for package in packages:
         name, version = package['name'], package['version']
         root = Path(package['manifest_path']).parent
         key = f'{name}@{version}'
         texts = []
+        source_identity = {}
+        if package["source"] is None and root == ROOT/"src-tauri/vendor/photocraft/crates/format":
+            # Orion's patched copy of the pinned crate (src-tauri/vendor/photocraft/ORION_CHANGES.md).
+            commit = photocraft_source.split("#")[1]
+            for filename in ["LICENSE-MIT", "LICENSE-APACHE", "NOTICE"]:
+                texts.append((filename, (root.parents[1]/filename).read_text(), f"https://github.com/storytold/photocraft/blob/{commit}/{filename}"))
+            source_identity = {"vendoredFrom": photocraft_source, "sourceRevision": commit, "localChanges": "src-tauri/vendor/photocraft/ORION_CHANGES.md"}
+        elif package["source"].startswith("git+"):
+            if package["source"] != photocraft_source or not name.startswith("photocraft-"): raise ValueError(f"Unreviewed git dependency: {key}")
+            commit = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], timeout=10).decode().strip()
+            if commit != photocraft_source.split("#")[1]: raise ValueError("Git dependency revision differs from Cargo.lock")
+            repository_root = Path(subprocess.check_output(["git", "-C", str(root), "rev-parse", "--show-toplevel"], timeout=10).decode().strip())
+            for filename in ["LICENSE-MIT", "LICENSE-APACHE", "NOTICE"]:
+                original = subprocess.check_output(["git", "-C", str(repository_root), "show", f"{commit}:{filename}"], timeout=10)
+                if (repository_root/filename).read_bytes() != original: raise ValueError("Git dependency license changed")
+                texts.append((filename, original.decode(), f"https://github.com/storytold/photocraft/blob/{commit}/{filename}"))
+            source_identity = {"lockedSource": package["source"], "sourceRevision": commit}
         for file in sorted(root.rglob('*')):
             if file.is_file() and not file.is_symlink() and (TEXT.match(file.name) or 'licenses' in [p.lower() for p in file.relative_to(root).parts[:-1]]):
                 if file.stat().st_size > 2 * 1024 * 1024: raise ValueError('Unexpected license text size')
@@ -87,7 +119,8 @@ def prepare():
                 if not file.is_relative_to(ROOT/'THIRD_PARTY_LICENSES'): raise ValueError('Invalid local license path')
                 data = file.read_bytes()
             else:
-                data = fetch(extra['url'])
+                data = retained_notice(output/f'{name}-{version}.md', extra)
+                if data is None: data = fetch(extra['url'])
             if digest(data) != extra['sha256']: raise ValueError('Pinned upstream notice changed')
             texts.append((extra['name'], data.decode(), extra.get('url', extra.get('origin'))))
         if not texts or not package['license']: raise ValueError(f'Missing native notice: {key}')
@@ -96,8 +129,8 @@ def prepare():
         relative = f'THIRD_PARTY_LICENSES/native/{name}-{version}.md'
         write(ROOT/relative, notice)
         checksum = checksums[(name, version, package['source'])]
-        if not checksum: raise ValueError(f'No locked registry checksum: {key}')
-        manifest['native'].append({'name': name, 'version': version, 'license': package['license'], 'crateSha256': checksum, 'notice': relative, 'noticeSha256': digest(notice.encode())})
+        if not checksum and not source_identity: raise ValueError(f'No locked source identity: {key}')
+        manifest['native'].append({'name': name, 'version': version, 'license': package['license'], **(source_identity or {'crateSha256': checksum}), 'notice': relative, 'noticeSha256': digest(notice.encode())})
         if package['license'] == 'MPL-2.0':
             archive = root.parent.parent.parent/'cache'/root.parent.name/f'{root.name}.crate'
             data = archive.read_bytes()

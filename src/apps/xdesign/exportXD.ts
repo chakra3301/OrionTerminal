@@ -9,6 +9,7 @@
 // coordinates.
 
 import type { Shape } from "@/apps/xdesign/store";
+import { resolvePhotoExportImages } from "./photo/exportResources";
 import { embedRasterResources } from "./rasterResources";
 import { isTauri } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -94,17 +95,19 @@ export function downloadFile(filename: string, blob: Blob): void {
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-async function saveExport(filename: string, blob: Blob): Promise<void> {
-  if (!isTauri()) { downloadFile(filename, blob); return; }
+export async function saveExport(filename: string, blob: Blob): Promise<boolean> {
+  if (!isTauri()) { downloadFile(filename, blob); return true; }
   const extension = filename.split(".").at(-1) || "png";
   const path = await save({ defaultPath: filename, filters: [{ name: extension.toUpperCase(), extensions: [extension] }] });
-  if (path) await ipc.xdesignSaveBytes(path, Array.from(new Uint8Array(await blob.arrayBuffer())));
+  if (!path) return false;
+  await ipc.xdesignSaveBytes(path, Array.from(new Uint8Array(await blob.arrayBuffer())));
+  return true;
 }
 
 export async function exportSVG(bounds: ExportBounds, filename = "xdesign.svg"): Promise<void> {
   const svg = buildExportSVG(bounds);
   if (!svg) throw new Error("No canvas is available for export.");
-  const blob = new Blob([await embedRasterResources(svg)], { type: "image/svg+xml;charset=utf-8" });
+  const blob = new Blob([await embedRasterResources(await resolvePhotoExportImages(svg))], { type: "image/svg+xml;charset=utf-8" });
   await saveExport(filename, blob);
 }
 
@@ -118,7 +121,7 @@ async function rasterizePNG(
 ): Promise<Blob | null> {
   const svg = buildExportSVG(bounds);
   if (!svg) return null;
-  const svgBlob = new Blob([await embedRasterResources(svg)], { type: "image/svg+xml;charset=utf-8" });
+  const svgBlob = new Blob([await embedRasterResources(await resolvePhotoExportImages(svg))], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(svgBlob);
   try {
     const img = new Image();

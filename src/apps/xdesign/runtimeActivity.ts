@@ -53,7 +53,7 @@ export function xdesignActivityReason(): string | null {
 }
 
 export function xdesignProjectChangeReason(): string | null {
-  for (const id of ["ui-tool", "model-assist", "fx-assist", "html-generation", "image-generation", "shader-generation", "brand-extraction", "canvas-recording", "canvas-image-import", "canvas-export"]) {
+  for (const id of ["photo-operation", "ui-tool", "component-library", "model-assist", "fx-assist", "html-generation", "image-generation", "shader-generation", "brand-extraction", "canvas-recording", "canvas-image-import", "room-image", "canvas-export", "interactive-preview", "page-preview"]) {
     const active = activities.get(id);
     if (active) return active.reason.replace("before disabling the plugin", "before switching projects");
   }

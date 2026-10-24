@@ -1,0 +1,212 @@
+/* Aliases resolve at the theme root, before XDesign's document-local remaps. */
+:root {
+  --material-shell: var(--work-panel);
+  --material-navigation: var(--work-panel);
+  --material-chrome: var(--work-hover);
+  --material-reading: var(--work-panel);
+  --material-raised: var(--work-raised);
+  --material-transient: var(--work-raised);
+  --material-control: var(--work-hover);
+  --material-backdrop: none;
+  --material-popup-backdrop: none;
+  --material-rim: var(--glass-border);
+  --material-edge: inset 0 1px 0 var(--glass-highlight);
+}
+
+:root[data-color-mode="light"] {
+  --material-shell: var(--light-glass-surface, var(--bg-1));
+  --material-navigation: var(--light-glass-rail, var(--bg-0));
+  --material-chrome: var(--light-glass-chrome, var(--bg-1));
+  --material-reading: var(--bg-1);
+  --material-transient: var(--light-glass-popover, var(--bg-2));
+  --material-control: var(--light-glass-control, var(--bg-2));
+  --material-backdrop: var(--light-glass-backdrop, none);
+  --material-popup-backdrop: var(--light-glass-backdrop, none);
+  --material-rim: var(--light-glass-rim, var(--glass-border));
+  --material-edge: var(--light-glass-edge, inset 0 1px 0 var(--glass-highlight));
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root[data-theme="liquid"]:not(.ot-reduce-glass) {
+    /* Preserve the original clear Liquid recipe; refinement must not mattify it. */
+    --glass-bg: rgba(120, 180, 230, 0.015);
+    --glass-bg-strong: rgba(90, 155, 210, 0.025);
+    --glass-bg-deep: rgba(60, 120, 175, 0.05);
+    --material-shell: var(--glass-bg-strong);
+    --material-navigation: rgba(0, 0, 0, 0.12);
+    --material-chrome: color-mix(in srgb, var(--work-text) 3%, transparent);
+    --material-reading: rgba(120, 180, 230, 0.02);
+    --material-raised: rgba(40, 70, 100, 0.14);
+    --material-transient: color-mix(in srgb, var(--work-raised) 90%, transparent);
+    --material-control: rgba(140, 195, 235, 0.07);
+    --material-backdrop: blur(11px) saturate(1.5) brightness(1.04);
+    --material-popup-backdrop: blur(12px) saturate(1.08);
+    --material-rim: color-mix(in srgb, var(--work-text) 18%, transparent);
+  }
+  :root[data-custom-surface="glass"][data-color-mode="dark"]:not(.ot-reduce-glass) {
+    --material-shell: var(--custom-glass-fill, var(--bg-1));
+    --material-transient: var(--bg-2);
+    --material-backdrop: var(--custom-glass-backdrop, none);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    :root {
+      --material-shell: var(--work-panel);
+      --material-navigation: var(--work-panel);
+      --material-chrome: var(--work-hover);
+      --material-reading: var(--work-panel);
+      --material-raised: var(--work-raised);
+      --material-transient: var(--work-raised);
+      --material-control: var(--work-hover);
+      --material-backdrop: none;
+      --material-popup-backdrop: none;
+      --material-rim: var(--glass-border);
+    }
+    :root[data-theme="liquid"]:not(.ot-reduce-glass) {
+      --glass-bg: var(--work-panel);
+      --glass-bg-strong: var(--work-panel);
+      --glass-bg-deep: var(--work-panel);
+      --material-shell: var(--work-panel);
+      --material-navigation: var(--work-panel);
+      --material-chrome: var(--work-hover);
+      --material-reading: var(--work-panel);
+      --material-control: var(--work-hover);
+      --material-raised: var(--work-raised);
+      --material-transient: var(--work-raised);
+      --material-backdrop: none;
+      --material-popup-backdrop: none;
+    }
+  }
+}
+
+:root.ot-reduce-glass {
+  --material-shell: var(--work-panel);
+  --material-navigation: var(--work-panel);
+  --material-chrome: var(--work-hover);
+  --material-reading: var(--work-panel);
+  --material-raised: var(--work-raised);
+  --material-transient: var(--work-raised);
+  --material-control: var(--work-hover);
+  --material-backdrop: none;
+  --material-popup-backdrop: none;
+  --material-rim: var(--glass-border);
+}
+
+/* These are chrome adapters, not class-name patterns or descendant injections. */
+:root:is([data-theme="liquid"], [data-color-mode="light"], [data-custom-surface]) body :is(
+  .ot-window, .ot-menubar, .ot-dock, .cp-surface, .ot-welcome-card, .ot-rosie-panel
+) {
+  background: var(--material-shell);
+  backdrop-filter: var(--material-backdrop);
+  -webkit-backdrop-filter: var(--material-backdrop);
+}
+:root:is([data-theme="liquid"], [data-color-mode="light"], [data-custom-surface]) body :is(
+  .ot-window, .ot-dock, .cp-surface, .ot-welcome-card, .ot-rosie-panel,
+  .ot-spotlight, .ot-prompt-card
+):not(:has(> .ot-themed-border)) {
+  border-color: var(--material-rim);
+  box-shadow: var(--material-edge), var(--shadow-window);
+}
+:root body :is(.ot-window, .ot-dock, .cp-surface, .ot-spotlight, .ot-prompt-card):has(> .ot-themed-border) {
+  border-color: transparent;
+  box-shadow: var(--shadow-window);
+}
+
+:root[data-theme="liquid"] body .ot-window.unfocused {
+  opacity: 1;
+  filter: none;
+  box-shadow: 0 14px 40px -16px #0008;
+}
+:root[data-theme="liquid"] body .ot-window.unfocused .ot-titlebar {
+  color: var(--t-secondary);
+  background: transparent;
+}
+
+:root:is([data-theme="liquid"], [data-color-mode="light"], [data-custom-surface]) body :is(
+  .ar-sidebar, .ar-journal-rail, .ar-projects-rail, .or-files-panel:not(.drop-over),
+  .xd-toolrail, .xd-layers, .xd-inspector, .cp-rail
+) {
+  background: var(--material-navigation);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: var(--work-line);
+}
+:root[data-theme="liquid"] body .skill-intake[data-presentation="workspace"] .skill-intake-navigation {
+  background: var(--material-navigation);
+}
+:root:is([data-theme="liquid"], [data-color-mode="light"], [data-custom-surface]) body :is(
+  .ot-titlebar, .ot-panel-tabs, .or-statusbar, .xd-tabs, .ar-toolbar,
+  .ar-notes-detail-bar, .ar-db-bar, .ot-claude-header, .cp-main-head, .incubator-header
+) {
+  background: var(--material-chrome);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: var(--work-line);
+}
+
+:root[data-theme="liquid"] body :is(
+  .ot-window-body, .or-app, .or-home, .or-preview-empty, .or-preview-md,
+  .ot-panel, .ot-panel-empty, .ar-main, .ar-today, .ar-notes, .ar-journal-editor,
+  .ar-projects-editor, .note-page, .xd-root, .xd-root-home, .cp-main, .incubator-app
+) { background: transparent; }
+:root[data-theme="liquid"] body :is(.cp-main-body, .ot-claude-rail) {
+  background: var(--material-reading);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme="liquid"] body :is(.ar-card, .ar-note-card, .ar-db-card, .cp-form, .skill-intake-resource-preview),
+:root[data-theme="liquid"] body .note-page .note-editor-body {
+  background: var(--material-reading);
+  border-color: var(--work-line);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+:root:is([data-theme="liquid"], [data-color-mode="light"], [data-custom-surface]) body :is(
+  .ot-spotlight, .ot-prompt-card, .ot-ctx-menu, .ot-ctxpick,
+  .or-home-menu, .xd-home-menu, .xd-home-start-menu, .ot-menu-popover, .incubator-guide
+) {
+  background: var(--material-transient);
+  color: var(--work-text);
+  backdrop-filter: var(--material-popup-backdrop);
+  -webkit-backdrop-filter: var(--material-popup-backdrop);
+  border-color: var(--work-line-strong);
+}
+:root[data-theme="liquid"] body :is(.cp-overlay, .ot-spotlight-overlay, .ot-prompt-overlay) {
+  background: #02060c66;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root body:has(.cp-overlay) .ot-welcome { visibility: hidden; }
+
+:root:is([data-theme="liquid"], [data-color-mode="light"], [data-custom-surface]) body :is(
+  .cp-input, .ot-model-select, .ot-settings-input, .ot-mcp-input, .ot-prompt-input,
+  .ar-search, .ar-notes-search, .xd-num
+),
+:root:is([data-theme="liquid"], [data-color-mode="light"], [data-custom-surface]) body :is(.ot-claude-input, .ot-rosie-input) textarea {
+  background: var(--material-control);
+  color: var(--work-text);
+  border-color: var(--work-line-strong);
+}
+
+:root body :is(.ot-menubar, .ot-dock, .ot-titlebar, .cp-surface, .incubator-header) :is(button, summary):focus-visible {
+  outline: 2px solid var(--work-text);
+  outline-offset: 3px;
+}
+:root body :is(.or-home-btn, .xd-home-new, .ar-new-btn, .rl-btn, .ot-prompt-btn, .cp-surface .cp-btn):active:not(:disabled) {
+  filter: brightness(.94);
+}
+:root body :is(.ot-model-select, .cp-input, .ot-settings-input, .ot-prompt-input):disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+:root body :is(.ot-model-select, .cp-input) option {
+  background: var(--work-raised);
+  color: var(--work-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root body :is(.ot-menubar, .ot-titlebar, .cp-surface, .incubator-header) :is(button, input, select, summary) {
+    transition: none;
+  }
+}

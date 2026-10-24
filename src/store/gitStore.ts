@@ -21,6 +21,8 @@ type GitState = {
   branch: string;
   ahead: number;
   behind: number;
+  upstream: boolean;
+  hasRemote: boolean;
   /** project-relative path → status letters */
   files: Map<string, GitFileState>;
   refresh: () => void;
@@ -34,7 +36,7 @@ let generation = 0;
 async function load(): Promise<void> {
   const project = useProjectStore.getState().active;
   if (!project) {
-    useGit.setState({ isRepo: false, branch: "", ahead: 0, behind: 0, files: new Map() });
+    useGit.setState({ isRepo: false, branch: "", ahead: 0, behind: 0, upstream: false, hasRemote: false, files: new Map() });
     return;
   }
   if (inFlight) {
@@ -57,6 +59,8 @@ async function load(): Promise<void> {
           branch: status.branch,
           ahead: status.ahead,
           behind: status.behind,
+          upstream: !!status.upstream,
+          hasRemote: !!status.has_remote,
           files,
         });
       },
@@ -77,6 +81,8 @@ export const useGit = create<GitState>(() => ({
   branch: "",
   ahead: 0,
   behind: 0,
+  upstream: false,
+  hasRemote: false,
   files: new Map(),
   refresh: () => {
     if (timer) clearTimeout(timer);

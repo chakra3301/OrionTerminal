@@ -12,7 +12,7 @@ use tokio::sync::Notify;
 /// The Opus model every subscription Claude surface runs on (chat rails,
 /// R.O.S.I.E, XDesign, the Claude Code tab, and the Messages-API default).
 /// Single source of truth so a model bump is a one-line change.
-pub const OPUS_MODEL: &str = "claude-opus-4-8";
+pub const OPUS_MODEL: &str = "claude-opus-5-5";
 
 static CHILDREN: Lazy<Mutex<HashMap<String, Arc<Notify>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -451,21 +451,64 @@ pub fn claude_cancel(chat_id: String) -> Result<(), String> {
 /// Build a PATH that is likely to contain `claude` regardless of how the
 /// Tauri app was launched. macOS launchd hands packaged apps a stripped
 /// PATH that omits the dirs where most package managers install binaries.
-/// We prepend common ones; existing PATH wins thereafter so user-managed
-/// paths are not shadowed.
+/// Append fallbacks so explicit launch paths can select a pinned CLI without
+/// replacing a shared installation.
 pub(crate) fn augmented_path() -> String {
-    let extras = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"];
-    let home_bins = std::env::var("HOME")
-        .ok()
-        .map(|h| vec![format!("{}/.local/bin", h), format!("{}/.cargo/bin", h), format!("{}/.claude/local", h)])
-        .unwrap_or_default();
-    let existing = std::env::var("PATH").unwrap_or_default();
-    let mut parts: Vec<String> = extras.iter().map(|s| s.to_string()).collect();
-    for p in home_bins {
-        parts.push(p);
-    }
-    if !existing.is_empty() {
-        parts.push(existing);
+    augmented_path_from(
+        &std::env::var("PATH").unwrap_or_default(),
+        std::env::var("HOME").ok().as_deref(),
+    )
+}
+
+fn augmented_path_from(existing: &str, home: Option<&str>) -> String {
+    let mut parts: Vec<String> = existing.split(':')
+        .filter(|part| !part.is_empty())
+        .map(str::to_string)
+        .collect();
+    parts.extend(["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"].map(str::to_string));
+    if let Some(home) = home.filter(|home| !home.is_empty()) {
+        parts.extend([format!("{home}/.local/bin"), format!("{home}/.cargo/bin"), format!("{home}/.claude/local")]);
     }
     parts.join(":")
+}
+
+#[cfg(test)]
+mod augmented_path_tests {
+    use super::augmented_path_from;
+
+    #[test]
+    fn explicit_launch_paths_precede_shared_cli_fallbacks() {
+        let path = augmented_path_from("/private/pinned cli/bin:/custom/bin", Some("/home/test"));
+        assert!(path.starts_with("/private/pinned cli/bin:/custom/bin:/opt/homebrew/bin:"));
+        assert!(path.ends_with("/home/test/.local/bin:/home/test/.cargo/bin:/home/test/.claude/local"));
+    }
+
+    #[test]
+    fn stripped_launch_paths_keep_fallbacks_without_implicit_cwd_lookup() {
+        let expected = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin";
+        assert_eq!(augmented_path_from("", None), expected);
+        assert_eq!(augmented_path_from("::", Some("")), expected);
+        assert!(augmented_path_from(":/custom/bin:", None).starts_with("/custom/bin:/opt/homebrew/bin:"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn child_lookup_runs_the_private_cli_before_a_shared_candidate() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("orion-cli-path-{}", ulid::Ulid::new()));
+        let private = root.join("private bin");
+        let shared = root.join("shared bin");
+        for (directory, marker) in [(&private, "private"), (&shared, "shared")] {
+            std::fs::create_dir_all(directory).unwrap();
+            let executable = directory.join("orion-path-proof");
+            std::fs::write(&executable, format!("#!/bin/sh\nprintf '%s' '{marker}'\n")).unwrap();
+            std::fs::set_permissions(executable, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let output = std::process::Command::new("orion-path-proof")
+            .env("PATH", augmented_path_from(&format!("{}:{}", private.display(), shared.display()), None))
+            .output().unwrap();
+        std::fs::remove_dir_all(root).unwrap();
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"private");
+    }
 }

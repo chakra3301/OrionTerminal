@@ -1,0 +1,22 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { prototypeSnapshot, restorePrototypeSnapshot } from './prototypeMotion';
+import { checkCompositeSnapshotBudget } from './prototypeCompositeSnapshot';
+import type { DesignMotion } from './reactExportRuntime';
+afterEach(() => { document.body.innerHTML = ''; vi.restoreAllMocks(); });
+const motion: DesignMotion = { version: 1, root: true, type: 'FRAME', shape: 'box', shadow: false, width: 100, height: 100, local: [1, 0, 0, 1, 0, 0], radii: [0, 0, 0, 0], paints: [] };
+it('freezes an interrupted composition with both paint orders, live matching records and inert media', () => {
+  const surface = document.createElement('div'); surface.innerHTML = '<div data-xdesign-snapshot style="z-index:0;left:12px;top:7px;opacity:0.3;transform:matrix(1,0,0,1,20,0)"><div id="old" data-xdesign-motion="">Before</div></div><div class="xd-prototype-content" style="z-index:1;opacity:0.6;transform:matrix(1,0,0,1,45,0)"><div id="current" data-xdesign-motion="">Current<video poster="data:poster" src="data:movie"></video></div></div><div data-xdesign-snapshot style="z-index:2;opacity:0.2">Foreground</div><div data-xdesign-snapshot style="visibility:hidden">Discard</div>';
+  surface.querySelector('#old')!.setAttribute('data-xdesign-motion', JSON.stringify({ ...motion, name: 'Old' })); surface.querySelector('#current')!.setAttribute('data-xdesign-motion', JSON.stringify({ ...motion, name: 'Current' })); document.body.append(surface); const before = surface.innerHTML;
+  const snapshot = prototypeSnapshot(surface, true), fragments = [...snapshot.querySelectorAll<HTMLElement>('[data-xdesign-frozen-composite]')]; expect(fragments).toHaveLength(2); expect(fragments.map(node => node.getAttribute('data-xdesign-frozen-composite'))).toEqual(['before', 'after']);
+  expect(fragments[0]!.style).toMatchObject({ left: '12px', top: '7px', opacity: '0.3', transform: 'matrix(1,0,0,1,20,0)' }); expect(fragments[0]!.querySelector('[data-xdesign-motion],[data-xdesign-motion-state]')).toBeNull(); expect(snapshot.querySelectorAll('[data-xdesign-motion-state]')).toHaveLength(1);
+  expect(snapshot.textContent).toContain('Before'); expect(snapshot.textContent).toContain('Foreground'); expect(snapshot.textContent).not.toContain('Discard'); expect(snapshot.querySelector('video,[id],[tabindex]')).toBeNull(); expect(snapshot.querySelector('img')?.getAttribute('src')).toBe('data:poster'); expect(surface.innerHTML).toBe(before);
+  expect(JSON.parse(snapshot.querySelector('[data-xdesign-motion-state]')!.getAttribute('data-xdesign-motion-state')!).pose.opacity).toBe(0.6); expect(fragments.every(node => node.hasAttribute('inert') && node.getAttribute('aria-hidden') === 'true')).toBe(true);
+});
+it('retains ancestor transforms, alpha, clipping and outgoing scroll when lifting nested remnants', () => {
+  const surface = document.createElement('div'); surface.innerHTML = '<div class="xd-prototype-content" style="transform:matrix(0.5,0,0,0.5,20,30);opacity:0.7;overflow:hidden;width:200px;height:100px"><div data-xdesign-snapshot data-xdesign-snapshot-scroll style="left:3px;top:4px;opacity:0.4">Nested outgoing</div><div>Current</div></div>'; const old = surface.querySelector<HTMLElement>('[data-xdesign-snapshot]')!; old.scrollLeft = 8; old.scrollTop = 11; document.body.append(surface);
+  const snapshot = prototypeSnapshot(surface, true), fragment = snapshot.querySelector<HTMLElement>('[data-xdesign-frozen-composite]')!; expect(fragment.style).toMatchObject({ transform: 'matrix(0.5,0,0,0.5,20,30)', opacity: '0.7', overflow: 'hidden', width: '200px', height: '100px', backgroundColor: 'transparent' }); const copied = fragment.firstElementChild as HTMLElement; expect(copied.style.left).toBe('3px'); expect(copied.style.opacity).toBe('0.4'); restorePrototypeSnapshot(snapshot); expect([copied.scrollLeft, copied.scrollTop]).toEqual([8, 11]); expect([old.scrollLeft, old.scrollTop]).toEqual([8, 11]);
+});
+it('refuses an excessive element count before cloning the interrupted frame', () => {
+  const surface = document.createElement('div'), clone = vi.spyOn(surface, 'cloneNode'); vi.spyOn(surface, 'querySelectorAll').mockReturnValue(Array(180000).fill(surface) as unknown as NodeListOf<Element>);
+  expect(() => checkCompositeSnapshotBudget(surface)).toThrow('180,000-element'); expect(() => prototypeSnapshot(surface, true)).toThrow('180,000-element'); expect(clone).not.toHaveBeenCalled();
+});

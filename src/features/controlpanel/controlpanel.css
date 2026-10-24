@@ -74,7 +74,7 @@
   background: none; border: 1px solid transparent; color: var(--t-secondary); cursor: pointer; transition: all .14s;
 }
 .cp-close:hover { background: var(--bg-2); border-color: var(--glass-border); color: var(--t-primary); }
-.cp-main-body { flex: 1; min-height: 0; overflow-y: auto; padding: 22px; }
+.cp-main-body { flex: 1; min-height: 0; overflow-y: auto; padding: 22px; container-type: inline-size; }
 .cp-main-body > * { animation: cp-rise .4s cubic-bezier(.2,.7,.2,1) both; }
 
 /* ── Section eyebrow ─────────────────────────────────────────────────────── */
@@ -254,7 +254,7 @@
   border-radius: var(--r-sm); color: var(--t-primary); font: 400 13px var(--f-display); transition: border-color .14s, box-shadow .14s;
 }
 .cp-input::placeholder { color: var(--t-faint); }
-.cp-input:focus { outline: none; border-color: var(--neon-violet); box-shadow: 0 0 0 3px rgba(var(--neon-violet-rgb), 0.15); }
+.cp-input:focus { outline: none; border-color: color-mix(in srgb, var(--t-primary) 34%, transparent); box-shadow: none; }
 textarea.cp-input { resize: vertical; line-height: 1.55; font-family: var(--f-mono); font-size: 12px; }
 
 .cp-btn {
@@ -448,6 +448,13 @@ textarea.cp-input { resize: vertical; line-height: 1.55; font-family: var(--f-mo
 .plugin-frame-shell { width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--bg-0); }
 .plugin-frame-trust { height: 23px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--t-faint); background: var(--bg-1); border-bottom: 1px solid var(--glass-border); font: 8px/1 var(--f-mono); letter-spacing: .11em; text-transform: uppercase; }
 .plugin-ui-frame { display: block; width: 100%; height: 100%; min-height: 0; flex: 1; border: 0; background: var(--bg-0); }
+.plugin-appearance-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 8px 14px; flex: 0 0 auto; color: var(--t-secondary); background: var(--work-panel, var(--bg-1)); border-bottom: 1px solid var(--glass-border); font: 12px/1.5 var(--f-display); }
+.plugin-appearance-controls [role="group"] { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--glass-border); border-radius: var(--r-md); }
+.plugin-appearance-controls button { border: 0; padding: 4px 10px; border-radius: var(--r-sm); font: inherit; color: var(--t-secondary); background: transparent; cursor: pointer; }
+.plugin-appearance-controls button[aria-pressed="true"] { background: var(--work-selected, var(--bg-3)); color: var(--t-primary); }
+.plugin-appearance-controls button:focus-visible { outline: 2px solid var(--t-primary); outline-offset: 2px; }
+.plugin-appearance-controls button:disabled { opacity: .5; cursor: default; }
+.plugin-appearance-error { color: var(--neon-magenta); font-size: 11px; }
 .plugin-frame-state { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--t-tertiary); background: var(--bg-0); font: 10px/1.5 var(--f-mono); }
 .plugin-frame-state.error { color: var(--neon-magenta); }
 .plugin-frame-state.error span { max-width: 480px; color: var(--t-secondary); text-align: center; }
@@ -459,4 +466,50 @@ textarea.cp-input { resize: vertical; line-height: 1.55; font-family: var(--f-mo
   .pm-hero-sigil { width: 52px; height: 52px; }
   .pm-meter { display: none; }
   .pm-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Providers: one quiet row per provider, a toggle, details on request ──── */
+.cp-prov { display: flex; flex-direction: column; gap: 14px; }
+.cp-prov-default {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font: 500 13px var(--f-display); color: var(--t-secondary);
+}
+.cp-prov-list {
+  list-style: none; margin: 0; padding: 0;
+  border: 1px solid var(--glass-border); border-radius: var(--r-lg); background: var(--bg-1); overflow: hidden;
+}
+.cp-prov-row + .cp-prov-row { border-top: 1px solid var(--glass-border); }
+.cp-prov-head { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 14px 0 8px; flex-wrap: wrap; }
+.cp-prov-name {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 4px;
+  background: none; border: 0; cursor: pointer; text-align: left;
+  font: 500 13.5px var(--f-display); color: var(--t-primary);
+}
+.cp-prov-row.off .cp-prov-name { color: var(--t-tertiary); }
+.cp-prov-chev { color: var(--t-faint); transition: transform .15s ease; flex: none; }
+.cp-prov-row.open .cp-prov-chev { transform: rotate(90deg); color: var(--t-tertiary); }
+.cp-prov-name:hover .cp-prov-chev { color: var(--t-secondary); }
+.cp-prov-error { flex-basis: 100%; padding: 0 0 10px 30px; }
+.cp-prov-details { padding: 0 14px 12px 34px; display: flex; flex-direction: column; gap: 6px; }
+.cp-prov-details .cp-cli-status { margin-top: 0; }
+.cp-prov-meta {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font: 11px/1.3 var(--f-mono); color: var(--t-faint); letter-spacing: 0.03em;
+}
+.cp-prov-add { align-self: flex-start; }
+@media (prefers-reduced-motion: reduce) { .cp-prov-chev { transition: none; } }
+
+/* Agent Forge keeps its neon (owner, 2026-10-12): Liquid's softened accents
+   are swapped back to the original vivid Liquid values inside the forge only. */
+:root[data-theme="liquid"] .forge {
+  --neon-green: #4dffa0;
+  --neon-cyan: #5fe8ff;
+  --neon-yellow: #eaff5c;
+  --neon-magenta: #ff5cb8;
+  --neon-violet: #c07bff;
+  --neon-green-rgb: 77, 255, 160;
+  --neon-cyan-rgb: 95, 232, 255;
+  --neon-yellow-rgb: 234, 255, 92;
+  --neon-magenta-rgb: 255, 92, 184;
+  --neon-violet-rgb: 192, 123, 255;
 }

@@ -409,6 +409,16 @@ pub fn save_file_atomic(path: String, contents: String) -> Result<(), String> {
     atomic_write_bytes(&path, contents.as_bytes())
 }
 
+#[tauri::command]
+pub fn write_file_base64(path: String, data: String) -> Result<(), String> {
+    use base64::Engine;
+    if data.len() > 27_000_000 {
+        return Err("TOO_LARGE".into());
+    }
+    let bytes = base64::engine::general_purpose::STANDARD.decode(data.as_bytes()).map_err(|e| e.to_string())?;
+    atomic_write_bytes(&path, &bytes)
+}
+
 pub(crate) fn atomic_write_bytes(path: &str, contents: &[u8]) -> Result<(), String> {
     use std::fs::{rename, OpenOptions};
     use std::io::Write;
@@ -522,6 +532,18 @@ mod save_tests {
         assert_eq!(copy_regular_file(&source, &target, 5).unwrap(), 5);
         assert!(copy_regular_file(&source, &target, 5).is_err());
         assert!(copy_regular_file(&dir, &dir.join("bad"), 100).is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn base64_writes_are_atomic_and_reject_bad_data() {
+        let dir = std::env::temp_dir().join(format!("orion-b64-{}", ulid::Ulid::new()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("preset.alv");
+        write_file_base64(path.to_string_lossy().into_owned(), "AAL/AA==".into()).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), vec![0, 2, 255, 0]);
+        assert!(write_file_base64(path.to_string_lossy().into_owned(), "not base64!".into()).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), vec![0, 2, 255, 0]);
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
         std::fs::remove_dir_all(dir).unwrap();
     }
     #[cfg(unix)]

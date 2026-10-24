@@ -1,3 +1,4 @@
+import type { PencilDocument } from "./pencil/document";
 import { create } from "zustand";
 import { ulid } from "ulid";
 import { booleanShapes, type BoolOp } from "./booleanOps";
@@ -9,6 +10,8 @@ import {
 } from "./overrides";
 import { resolveVariant } from "./variants";
 import type { ProtoLink } from "./prototype";
+import type { PhotoDocument } from "./photo/types";
+import type { PhotoDraft } from "./photo/drafts";
 
 export type ToolId =
   | "select"
@@ -176,6 +179,7 @@ export type TextShape = ShapeBase & {
 };
 export type ImageShape = ShapeBase & {
   kind: "image";
+  photoDocumentId?: string;
   /** Absolute path on disk (so the next session can rebuild the asset URL). */
   filePath: string;
   /** Asset id from useAssetsStore — used to find a fresh path if the asset
@@ -269,6 +273,10 @@ export type Mode = {
 };
 
 type XDesignState = {
+  photoDocuments: Record<string, PhotoDocument>;
+  photoDrafts: PhotoDraft[];
+  pencilDocument: PencilDocument | null;
+  applyPhotoDocument: (document: PhotoDocument, shapeId?: string) => string;
   /** Layer order: index 0 = bottom layer. Render order matches array order;
    * the layers panel displays them top-first (reversed) for the usual UX.
    * Mirrors `pages[active].shapes` — kept top-level for hot-path access. */
@@ -392,6 +400,9 @@ type XDesignState = {
           variables?: Variable[];
           modes?: Mode[];
           activeModeId?: string;
+          photoDocuments?: Record<string, PhotoDocument>;
+          photoDrafts?: PhotoDraft[];
+    pencilDocument?: PencilDocument | null;
         }
       | null,
   ) => void;
@@ -446,6 +457,19 @@ type XDesignState = {
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 8;
 const MAX_HISTORY = 80;
+type PhotoHistory = { id: string; before?: PhotoDocument; after: PhotoDocument };
+const photoHistory = new WeakMap<Shape[], PhotoHistory>();
+function photoHistoryState(documents: Record<string, PhotoDocument>, entry: PhotoHistory | undefined, forward: boolean) {
+  if (!entry) return documents;
+  const expected = forward ? entry.before : entry.after;
+  // Page-local history must not overwrite a later shared-asset edit on another page.
+  if (expected && documents[entry.id]?.version !== expected.version) return documents;
+  const next = { ...documents };
+  const document = forward ? entry.after : entry.before;
+  if (document) next[entry.id] = document;
+  // Retain unused documents: another page may still place this shared asset.
+  return next;
+}
 
 function defaultNameFor(kind: Shape["kind"], idx: number): string {
   const base =
@@ -468,6 +492,29 @@ const DEFAULT_MODE_ID = "mode-default";
 
 export const useXDesign = create<XDesignState>((set, get) => ({
   shapes: [],
+  photoDocuments: {},
+  photoDrafts: [],
+  pencilDocument: null,
+  applyPhotoDocument: (document, shapeId) => {
+    const current = get();
+    const target = shapeId ? current.shapes.find(s => s.id === shapeId && s.kind === "image") : null;
+    if (shapeId && !target) throw new Error("The image placement no longer exists");
+    current.pushHistory();
+    const entry = get().past.at(-1)!;
+    photoHistory.set(entry, { id: document.id, before: current.photoDocuments[document.id], after: document });
+    const placementId = shapeId ?? ulid();
+    set(s => ({
+      photoDocuments: { ...s.photoDocuments, [document.id]: document },
+      shapes: target ? s.shapes.map(shape => shape.id === placementId
+        ? { ...shape, photoDocumentId: document.id, filePath: document.previewPath } as ImageShape : shape)
+        : [...s.shapes, { id: placementId, name: document.name, kind: "image", x: 100, y: 100,
+          w: Math.min(600, document.width), h: Math.min(600, document.width) * document.height / document.width,
+          photoDocumentId: document.id, filePath: document.previewPath, assetId: null,
+          fill: "transparent", stroke: "transparent", strokeWidth: 0 }],
+      selection: new Set([placementId]),
+    }));
+    return placementId;
+  },
   selection: new Set(),
   tool: "select",
   pages: [{ id: DEFAULT_PAGE_ID, name: "Page 1", shapes: [], past: [], future: [] }],
@@ -1108,6 +1155,10 @@ export const useXDesign = create<XDesignState>((set, get) => ({
         past: [],
         future: [],
         coalesce: null,
+        photoDocuments: snapshot.photoDocuments ?? {},
+        photoDrafts: snapshot.photoDrafts ?? [],
+        pencilDocument: snapshot.pencilDocument ?? null,
+        clipboard: [],
         variables: snapshot.variables ?? [],
         modes,
         activeModeId,
@@ -1123,6 +1174,10 @@ export const useXDesign = create<XDesignState>((set, get) => ({
       past: [],
       future: [],
       coalesce: null,
+      photoDocuments: {},
+      photoDrafts: [],
+      pencilDocument: null,
+      clipboard: [],
       variables: [],
       modes: [{ id: DEFAULT_MODE_ID, name: "Default" }],
       activeModeId: DEFAULT_MODE_ID,
@@ -1156,7 +1211,7 @@ export const useXDesign = create<XDesignState>((set, get) => ({
 
   pushHistory: () =>
     set((s) => ({
-      past: [...s.past.slice(-(MAX_HISTORY - 1)), s.shapes],
+      past: [...s.past.slice(-(MAX_HISTORY - 1)), s.shapes.slice()],
       future: [],
     })),
 
@@ -1164,9 +1219,13 @@ export const useXDesign = create<XDesignState>((set, get) => ({
     set((s) => {
       if (s.past.length === 0) return s;
       const prev = s.past[s.past.length - 1]!;
+      const entry = photoHistory.get(prev);
+      const future = s.shapes.slice();
+      if (entry) photoHistory.set(future, entry);
       return {
+        photoDocuments: photoHistoryState(s.photoDocuments, entry, false),
         past: s.past.slice(0, -1),
-        future: [...s.future, s.shapes],
+        future: [...s.future, future],
         shapes: prev,
         selection: new Set(),
       };
@@ -1176,8 +1235,12 @@ export const useXDesign = create<XDesignState>((set, get) => ({
     set((s) => {
       if (s.future.length === 0) return s;
       const nx = s.future[s.future.length - 1]!;
+      const entry = photoHistory.get(nx);
+      const past = s.shapes.slice();
+      if (entry) photoHistory.set(past, entry);
       return {
-        past: [...s.past, s.shapes],
+        photoDocuments: photoHistoryState(s.photoDocuments, entry, true),
+        past: [...s.past, past],
         future: s.future.slice(0, -1),
         shapes: nx,
         selection: new Set(),

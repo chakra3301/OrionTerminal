@@ -13,8 +13,8 @@ import {
   PanelResizeHandle,
   type ImperativePanelGroupHandle,
 } from "react-resizable-panels";
-import { X, Plus } from "lucide-react";
-import { preferredSizes, useWorkspace } from "@/components/workspace/workspaceStore";
+import { X, MoreHorizontal } from "lucide-react";
+import { isAnchorPanel, preferredSizes, useWorkspace } from "@/components/workspace/workspaceStore";
 import type {
   DropZone,
   LayoutNode,
@@ -51,6 +51,12 @@ export type ContentRegistry = {
   label?: (tab: Tab) => string;
   /** Optional: is the tab dirty (e.g. unsaved file). */
   isDirty?: (tab: Tab) => boolean;
+  /** Optional: asked before a tab closes from its strip (unsaved changes). */
+  confirmClose?: (tab: Tab) => Promise<boolean>;
+  /** Optional: buttons on the right of a panel's tab strip (split, more…). */
+  tabActions?: (panel: LayoutPanel) => ReactNode;
+  /** Optional: what an editor group shows with no tabs open. */
+  emptyEditor?: () => ReactNode;
   /**
    * Optional: when true, the tab stays mounted (hidden via CSS) when not
    * active in its panel, so its component state survives tab switches. Used
@@ -82,14 +88,22 @@ function NodeView({
   return <SplitNode split={node} registry={registry} />;
 }
 
-/** Side surfaces snap closed when dragged past their minimum, like VS Code. */
-const SNAP_CLOSED_ROLES = new Set<LayoutPanel["role"]>(["explorer", "claude"]);
+/** The AI rail snaps closed when dragged past its minimum, like VS Code. The explorer
+ *  never does: it is the fixed anchor, drawn outside the resizable group. */
+const SNAP_CLOSED_ROLES = new Set<LayoutPanel["role"]>(["claude"]);
 
 function minSizeFor(node: LayoutNode): number {
   if (node.kind !== "panel") return 12;
   if (node.role === "editor") return 20;
-  if (node.role === "explorer" || node.role === "claude") return 10;
+  if (node.role === "claude") return 10;
   return 8;
+}
+
+/** Sizes for the resizable children only (the anchor dropped), summing to 100. */
+function restSizes(sizes: number[], anchored: boolean): number[] {
+  const rest = anchored ? sizes.slice(1) : sizes;
+  const total = rest.reduce((a, b) => a + b, 0) || 1;
+  return rest.map((v) => (v / total) * 100);
 }
 
 function SplitNode({
@@ -102,6 +116,9 @@ function SplitNode({
   const setSplitSizes = useWorkspace((s) => s.setSplitSizes);
   const togglePanelByRole = useWorkspace((s) => s.togglePanelByRole);
   const groupRef = useRef<ImperativePanelGroupHandle>(null);
+  // The explorer, when it leads a row, sits outside the group at a fixed width.
+  const anchored = split.direction === "horizontal" && isAnchorPanel(split.children[0]);
+  const resizable = anchored ? split.children.slice(1) : split.children;
   // onLayout fires on every pointer move. Committing each frame re-rendered
   // every pane (Monaco, xterm, rails) and wrote SQLite twice per frame, so the
   // live layout stays inside react-resizable-panels until the gesture settles.
@@ -115,10 +132,23 @@ function SplitNode({
     window.clearTimeout(timer.current);
     const sizes = pending.current;
     pending.current = null;
-    if (sizes) setSplitSizes(split.id, sizes);
-  }, [setSplitSizes, split.id]);
+    if (!sizes) return;
+    if (!anchored) { setSplitSizes(split.id, sizes); return; }
+    // keep the anchor's stored share; the group's sizes cover the rest of the row
+    const anchorShare = split.sizes[0] ?? 0;
+    setSplitSizes(split.id, [anchorShare, ...sizes.map((v) => (v / 100) * (100 - anchorShare))]);
+  }, [setSplitSizes, split.id, anchored, split.sizes]);
 
   useEffect(() => () => commit(), [commit]);
+
+  // When a pane opens or closes, lay the group out from the store's sizes, where the
+  // closed pane's share already went to its neighbour. Left alone, the library spreads
+  // the change across every pane.
+  const childKey = resizable.map((c) => c.id).join("|");
+  useLayoutEffect(() => {
+    try { groupRef.current?.setLayout(restSizes(split.sizes, anchored)); } catch { /* panels still registering */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [childKey]);
 
   const onLayout = (sizes: number[]) => {
     pending.current = sizes;
@@ -141,7 +171,7 @@ function SplitNode({
     const now = performance.now();
     if (now - lastDown.current < 320) {
       lastDown.current = 0;
-      const sizes = preferredSizes(split);
+      const sizes = restSizes(preferredSizes(split), anchored);
       groupRef.current?.setLayout(sizes);
       pending.current = sizes;
       return;
@@ -149,21 +179,24 @@ function SplitNode({
     lastDown.current = now;
   };
 
-  return (
+  const group = (
     <PanelGroup
       ref={groupRef}
       direction={split.direction}
       autoSaveId={undefined}
       onLayout={onLayout}
     >
-      {split.children.map((child, i) => {
-        const last = i === split.children.length - 1;
+      {resizable.map((child, i) => {
+        const last = i === resizable.length - 1;
         const role = child.kind === "panel" ? child.role : undefined;
         const snaps = !!role && SNAP_CLOSED_ROLES.has(role) && split.direction === "horizontal";
+        const sizes = restSizes(split.sizes, anchored);
         return (
           <Fragment key={child.id}>
             <Panel
-              defaultSize={split.sizes[i] ?? 100 / split.children.length}
+              id={child.id}
+              order={i}
+              defaultSize={sizes[i] ?? 100 / resizable.length}
               minSize={minSizeFor(child)}
               collapsible={snaps}
               collapsedSize={snaps ? 0 : undefined}
@@ -182,13 +215,22 @@ function SplitNode({
                 hitAreaMargins={{ coarse: 15, fine: 6 }}
                 onDragging={onDragging}
                 onPointerDown={onHandlePointerDown}
-                title="Drag to resize · double-click to reset"
               />
             )}
           </Fragment>
         );
       })}
     </PanelGroup>
+  );
+
+  if (!anchored) return group;
+  return (
+    <div className="ot-anchored-row">
+      <div className="ot-explorer-anchor">
+        <NodeView node={split.children[0]!} registry={registry} />
+      </div>
+      <div className="ot-anchored-rest">{group}</div>
+    </div>
   );
 }
 
@@ -209,17 +251,21 @@ function PanelLeaf({
   const [hoverZone, setHoverZone] = useState<DropZone | null>(null);
   const focused = focusedPanelId === panel.id;
   const activeTab = panel.tabs.find((t) => t.id === panel.activeTabId) ?? null;
+  const anchor = isAnchorPanel(panel);
 
   return (
     <div
-      className={`ot-panel${focused ? " focused" : ""}`}
+      className={`ot-panel${focused ? " focused" : ""}${anchor ? " anchor" : ""}`}
+      data-role={panel.role}
+      data-tabs={panel.tabs.length}
+      data-active-kind={activeTab?.descriptor.kind}
       onMouseDown={() => focusPanel(panel.id)}
     >
       <PanelTabStrip panel={panel} registry={registry} />
       <div
         className="ot-panel-body"
         onDragOver={(e) => {
-          if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+          if (anchor || !e.dataTransfer.types.includes(DRAG_MIME)) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -246,6 +292,8 @@ function PanelLeaf({
       >
         {activeTab ? (
           <PanelTabsLayer panel={panel} registry={registry} activeTab={activeTab} />
+        ) : panel.role === "editor" && registry.emptyEditor ? (
+          registry.emptyEditor()
         ) : (
           <EmptyPanel />
         )}
@@ -312,7 +360,12 @@ function PanelTabStrip({
 }) {
   const setActiveTab = useWorkspace((s) => s.setActiveTab);
   const closeTab = useWorkspace((s) => s.closeTab);
+  const pinTab = useWorkspace((s) => s.pinTab);
   const closeEmptyPanel = useWorkspace((s) => s.closePanel);
+  const requestClose = async (tab: Tab) => {
+    if (registry.confirmClose && !(await registry.confirmClose(tab))) return;
+    closeTab(tab.id);
+  };
   const dropTabOnPanel = useWorkspace((s) => s.dropTabOnPanel);
   const [dragOverTabs, setDragOverTabs] = useState(false);
   const addItems = registry.addMenu?.(panel) ?? [];
@@ -321,7 +374,7 @@ function PanelTabStrip({
     <div
       className={`ot-panel-tabs${dragOverTabs ? " drag-over" : ""}`}
       onDragOver={(e) => {
-        if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+        if (isAnchorPanel(panel) || !e.dataTransfer.types.includes(DRAG_MIME)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
         setDragOverTabs(true);
@@ -335,7 +388,7 @@ function PanelTabStrip({
         setDragOverTabs(false);
       }}
     >
-      {panel.tabs.length === 0 && (
+      {panel.tabs.length === 0 && panel.role !== "editor" && (
         <button
           type="button"
           className="ot-panel-tab empty"
@@ -355,10 +408,12 @@ function PanelTabStrip({
           label={registry.label?.(tab) ?? tab.label}
           dirty={registry.isDirty?.(tab) ?? !!tab.dirty}
           onSelect={() => setActiveTab(panel.id, tab.id)}
-          onClose={() => closeTab(tab.id)}
+          onPin={() => pinTab(tab.id)}
+          onClose={() => void requestClose(tab)}
         />
       ))}
-      <div style={{ flex: 1 }} />
+      <div className="ot-panel-tabs-fill" />
+      {registry.tabActions?.(panel)}
       {addItems.length > 0 && <PanelAddMenu items={addItems} />}
     </div>
   );
@@ -407,8 +462,8 @@ function PanelAddMenu({ items }: { items: AddMenuItem[] }) {
         ref={btnRef}
         type="button"
         className={`ot-panel-tab-add${open ? " open" : ""}`}
-        title="Open a pane"
-        aria-label="Open a pane"
+        title="More actions"
+        aria-label="More actions"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={(e) => {
@@ -416,7 +471,7 @@ function PanelAddMenu({ items }: { items: AddMenuItem[] }) {
           setOpen((v) => !v);
         }}
       >
-        <Plus size={11} />
+        <MoreHorizontal size={14} />
       </button>
       {open &&
         pos &&
@@ -458,6 +513,7 @@ function TabChip({
   label,
   dirty,
   onSelect,
+  onPin,
   onClose,
 }: {
   tab: Tab;
@@ -467,15 +523,23 @@ function TabChip({
   label: string;
   dirty: boolean;
   onSelect: () => void;
+  onPin: () => void;
   onClose: () => void;
 }) {
   // Suppress unused
   void panelId;
+  const fixed = tab.descriptor.kind === "files-tree"; // the explorer's tree: no close, no drag
   return (
     <div
-      className={`ot-panel-tab${active ? " active" : ""}${dirty ? " dirty" : ""}`}
+      className={`ot-panel-tab${active ? " active" : ""}${dirty ? " dirty" : ""}${tab.preview ? " preview" : ""}`}
       onClick={onSelect}
-      draggable
+      onDoubleClick={onPin}
+      onAuxClick={(e) => {
+        if (e.button !== 1 || fixed) return;
+        e.preventDefault();
+        onClose();
+      }}
+      draggable={!fixed}
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG_MIME, tab.id);
         e.dataTransfer.effectAllowed = "move";
@@ -484,19 +548,18 @@ function TabChip({
     >
       {icon}
       <span className="label">{label}</span>
-      {dirty ? (
-        <span className="dot">●</span>
-      ) : (
+      {fixed ? null : (
         <button
           type="button"
           className="x"
-          aria-label="Close tab"
+          aria-label={dirty ? "Close tab (unsaved changes)" : "Close tab"}
           onClick={(e) => {
             e.stopPropagation();
             onClose();
           }}
         >
-          <X size={11} />
+          {dirty && <span className="dot" aria-hidden />}
+          <X size={13} className="x-icon" />
         </button>
       )}
     </div>

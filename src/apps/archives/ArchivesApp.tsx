@@ -17,6 +17,7 @@ import {
   ScanSearch,
   GraduationCap,
   BrainCircuit,
+  ArrowDownToLine,
 } from "lucide-react";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppConfig, resolveConfig, appFirstTurnPreamble, appAllowedTools } from "@/store/appConfigStore";
@@ -31,6 +32,7 @@ import { useAssetsStore } from "@/store/assetsStore";
 import { useMoodBoardsStore } from "@/store/moodBoardsStore";
 import { listAllChats, upsertChat } from "@/lib/db";
 import { scheduleReindex } from "@/lib/embeddingIndexer";
+import { watchArchiveCaptionChanges } from "@/lib/archiveCaptionEvents";
 import { log } from "@/lib/log";
 import { useFileDropZone } from "@/lib/fileDrop";
 import { ArchivesToday } from "@/apps/archives/Today";
@@ -38,6 +40,7 @@ import { ArchivesNotes } from "@/apps/archives/Notes";
 import { ArchivesJournal } from "@/apps/archives/Journal";
 import { ArchivesProjects } from "@/apps/archives/Projects";
 import { ArchivesMedia } from "@/apps/archives/Media";
+import { ArchivesDownloads } from "@/apps/archives/downloads/Downloads";
 import { ArchivesMood } from "@/apps/archives/Mood";
 import { ArchivesChats } from "@/apps/archives/Chats";
 import { ArchivesDatabase } from "@/apps/archives/database/ArchivesDatabase";
@@ -67,6 +70,7 @@ const LIBRARY: NavItem[] = [
   { key: "notes", label: "Notes", Icon: StickyNote },
   { key: "mood", label: "Mood Boards", Icon: Image },
   { key: "media", label: "Media", Icon: Film },
+  { key: "downloads", label: "Downloads", Icon: ArrowDownToLine },
   { key: "favorites", label: "Favorites", Icon: Star },
   { key: "chats", label: "Past chats", Icon: MessageSquare },
 ];
@@ -78,6 +82,7 @@ const LIBRARY: NavItem[] = [
 const knownChatIds = new Set<string>();
 
 export function ArchivesApp() {
+  useEffect(watchArchiveCaptionChanges, []);
   const archivesCfg = useAppConfig((s) => s.configs.archives);
   const acfg = useMemo(() => resolveConfig("archives", archivesCfg), [archivesCfg]);
   const view = useArchives((s) => s.view);
@@ -357,6 +362,7 @@ export function ArchivesApp() {
               {view === "notes" && <ArchivesNotes />}
               {view === "mood" && <ArchivesMood />}
               {view === "media" && <ArchivesMedia />}
+              {view === "downloads" && <ArchivesDownloads />}
               {view === "favorites" && <ArchivesFavorites />}
               {view === "chats" && <ArchivesChats />}
               {view === "database" && <ArchivesDatabase />}

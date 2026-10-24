@@ -26,6 +26,8 @@ import { useRailIntent, type RailIntentMode } from "./railIntentStore";
 import { ProjectThumb } from "./ProjectThumb";
 import { ProjectNameInput } from "./ProjectNameInput";
 import { useXDesignSaveState } from "./saveState";
+import { openProjectFile } from "./projectFiles";
+import { ProjectImportRecovery } from './ProjectImportRecovery';
 
 // Project start types. "Blank canvas" is the default normal project; the rest
 // create a project then arm the matching AI flow in the Claude rail.
@@ -39,19 +41,21 @@ type StartType = {
   name: string;
   /** Project kind — "fx" opens the shader compositor, "model" opens the img2model studio, instead of the canvas. */
   kind?: "fx" | "model";
+  beta?: boolean;
 };
 
 const START_TYPES: StartType[] = [
   { id: "blank", label: "Blank canvas", desc: "Start from an empty board", Icon: LayoutGrid, intent: null, name: "Untitled" },
-  { id: "webpage", label: "Webpage", desc: "Experimental · webpage saved with project", Icon: Globe, intent: "webpage", name: "Webpage" },
+  { id: "webpage", label: "Webpage", desc: "A responsive page, saved with the project", beta: true, Icon: Globe, intent: "webpage", name: "Webpage" },
   { id: "deck", label: "Slide deck", desc: "Build a presentable deck", Icon: Presentation, intent: "deck", name: "Deck" },
-  { id: "motion", label: "Motion", desc: "Experimental · verify playback and export", Icon: Film, intent: "motion", name: "Motion" },
+  { id: "motion", label: "Motion", desc: "Animate frames and export video", beta: true, Icon: Film, intent: "motion", name: "Motion" },
   { id: "image", label: "Image generator", desc: "Generate a raster image", Icon: ImageIcon, intent: "image", name: "Image" },
-  { id: "fx", label: "FX scene", desc: "Basic FX tested · advanced output experimental", Icon: Sparkles, intent: null, name: "FX Scene", kind: "fx" },
-  { id: "model", label: "3D model", desc: "Experimental · reference image to procedural 3D", Icon: Box, intent: null, name: "3D Model", kind: "model" },
+  { id: "fx", label: "FX scene", desc: "Shader and particle scenes", beta: true, Icon: Sparkles, intent: null, name: "FX Scene", kind: "fx" },
+  { id: "model", label: "3D model", desc: "Turn a reference image into a 3D form", beta: true, Icon: Box, intent: null, name: "3D Model", kind: "model" },
 ];
 
 async function startProject(t: StartType): Promise<void> {
+  if(t.id==="blank"){const {newPencilProject}=await import("./pencil/runtime");await newPencilProject();return;}
   await useXDProjects
     .getState()
     .newProject(t.intent || t.kind ? t.name : undefined, t.kind ?? "design");
@@ -196,7 +200,7 @@ function NewProjectMenu() {
               >
                 <t.Icon size={16} />
                 <span className="xd-home-start-text">
-                  <span className="xd-home-start-label">{t.label}</span>
+                  <span className="xd-home-start-label">{t.label}{t.beta && <span className="xd-home-beta">Beta</span>}</span>
                   <span className="xd-home-start-desc">{t.desc}</span>
                 </span>
               </button>
@@ -244,8 +248,10 @@ export function XDesignHome() {
           <h1 className="xd-home-title">XDesign</h1>
           <p className="xd-home-sub">Pick up a project or choose a starting point.</p>
         </div>
-        <NewProjectMenu />
+        <div style={{display:"flex",gap:8}}><button type="button" className="xd-home-new" onClick={()=>{void openProjectFile().catch(error=>toast.error("Project could not be opened",{body:String(error)}));}}>Open project…</button><NewProjectMenu /></div>
       </header>
+
+      <ProjectImportRecovery />
 
       <div className="xd-home-section">
         <h2 className="xd-home-section-title">Start something new</h2>
@@ -258,7 +264,7 @@ export function XDesignHome() {
               onClick={() => void startProject(t).catch(() => {})}
             >
               <t.Icon size={20} />
-              <span className="xd-home-start-label">{t.label}</span>
+              <span className="xd-home-start-label">{t.label}{t.beta && <span className="xd-home-beta">Beta</span>}</span>
               <span className="xd-home-start-desc">{t.desc}</span>
             </button>
           ))}

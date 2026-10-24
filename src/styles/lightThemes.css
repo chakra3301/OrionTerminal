@@ -81,7 +81,7 @@
 :root[data-color-mode="light"] body ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--t-primary) 24%, transparent); }
 :root[data-color-mode="light"] body ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--t-primary) 38%, transparent); }
 :root[data-color-mode="light"] body .ot-traffic .light { --neon-yellow: #d99b27; --neon-green: #48a264; }
-:root[data-color-mode="light"] body :is(.ot-char-check, .ar-media-check, .ot-prompt-btn.danger, .ot-notif-badge, .ot-spotify-play, .ot-spotify-connect-btn, .hm-card-act.go) { color: var(--t-on-accent); }
+:root[data-color-mode="light"] body :is(.ar-media-check, .ot-prompt-btn.danger, .ot-notif-badge, .ot-spotify-play, .ot-spotify-connect-btn, .hm-card-act.go) { color: var(--t-on-accent); }
 :root[data-color-mode="light"] body :is(.ar-drop-card, .ar-brain-search, .ar-brain-detail) { background: var(--bg-2); color: var(--t-primary); border-color: var(--glass-border-bright); }
 :root[data-color-mode="light"] body .note-page .ProseMirror blockquote { color: var(--t-secondary); background: var(--bg-3); border-color: var(--neon-cyan); }
 :root[data-color-mode="light"] body .note-page .ProseMirror pre { background: var(--bg-0); border-color: var(--glass-border); }
@@ -224,3 +224,6 @@
     }
   }
 }
+
+/* Companion picker on light grounds: the accent-colored code line loses contrast; ink it. */
+:root[data-color-mode="light"] .ot-companion-stage-code { color: var(--t-secondary); }

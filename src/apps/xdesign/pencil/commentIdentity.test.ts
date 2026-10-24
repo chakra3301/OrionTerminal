@@ -1,0 +1,5 @@
+import { beforeEach, expect, it } from 'vitest';
+import { commentIdentity, renameCommentIdentity } from './commentIdentity';
+beforeEach(() => localStorage.clear());
+it('retains a profile author ID and snapshots name changes without rewriting earlier authors', () => { const original = commentIdentity(); expect(commentIdentity()).toEqual(original); const next = renameCommentIdentity(original, '  Orion  '); expect(next.id).toBe(original.id); expect(next.name).toBe('Orion'); expect(original.name).toBe('You'); expect(commentIdentity()).toEqual(next); });
+it('preserves corrupt/future identity storage and rejects invalid names or changed author IDs', () => { localStorage.setItem('orion.xdesign.comment-author', '{bad'); expect(commentIdentity).toThrow('could not be read'); expect(localStorage.getItem('orion.xdesign.comment-author')).toBe('{bad'); localStorage.clear(); const author = commentIdentity(); expect(() => renameCommentIdentity(author, '\n')).toThrow('name'); expect(() => renameCommentIdentity({ ...author, id: 'different' }, 'New')).toThrow('changed'); });

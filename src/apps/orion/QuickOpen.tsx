@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { create } from "zustand";
 import Fuse from "fuse.js";
-import { FileText } from "lucide-react";
 import { listProjectFiles } from "@/features/context/contextProviders";
 import { useProjectStore } from "@/store/projectStore";
 import { useWorkspace, allTabs } from "@/components/workspace/workspaceStore";
 import { log } from "@/lib/log";
+import { FileTypeIcon } from "@/lib/fileIcon";
 
 type QuickOpenState = {
   open: boolean;
@@ -169,7 +169,7 @@ export function QuickOpen() {
                   pick(e);
                 }}
               >
-                <FileText size={12} />
+                <FileTypeIcon path={e.path} />
                 <span className="or-qo-base">{base}</span>
                 {dir && <span className="or-qo-dir">{dir}</span>}
                 {openPaths.has(e.path) && <span className="or-qo-open">open</span>}

@@ -154,8 +154,8 @@ export function LearnView() {
             </div>
             <div className="learn-empty-heading">Name something you want to learn</div>
             <div className="learn-empty-sub">
-              Type a topic in the rail — Claude builds a constellation of concepts,
-              ordered by prerequisites, and teaches each one with spaced recall.
+              Type a topic in the rail. Your AI maps it into concepts, orders them
+              by prerequisites and teaches each one with spaced recall.
             </div>
           </div>
         ) : openNodeId ? (

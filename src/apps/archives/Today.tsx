@@ -246,7 +246,7 @@ export function ArchivesToday() {
             )}
             <div className="ar-card-meta">
               {allAssets.length} {allAssets.length === 1 ? "asset" : "assets"} ·
-              drag-drop to capture · auto-tags wire up next
+              drop files to capture
             </div>
           </article>
 

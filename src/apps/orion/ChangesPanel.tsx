@@ -12,6 +12,8 @@ import {
   Wand2,
   GitCommitHorizontal,
   ArrowUp,
+  ArrowDown,
+  CloudUpload,
   Loader2,
   History,
 } from "lucide-react";
@@ -38,6 +40,7 @@ import {
   beginOrionActivity,
   trackOrionActivity,
 } from "@/apps/orion/runtimeActivity";
+import { FileTypeIcon } from "@/lib/fileIcon";
 
 function basename(p: string): string {
   return p.split(/[\\/]/).pop() || p;
@@ -177,7 +180,7 @@ function GitRow({
 
   return (
     <div className="or-changes-row" onClick={openFile}>
-      <span className={`or-git-letter k-${letter}`}>{letter}</span>
+      <FileTypeIcon path={file.path} />
       <span className="or-changes-name">{basename(file.path)}</span>
       <span className="or-changes-dir">{file.path.split("/").slice(0, -1).join("/")}</span>
       <span className="or-changes-rowact">
@@ -225,6 +228,7 @@ function GitRow({
           </>
         )}
       </span>
+      <span className={`or-git-letter k-${letter}`}>{letter}</span>
     </div>
   );
 }
@@ -233,10 +237,14 @@ function GitSection() {
   const isRepo = useGit((s) => s.isRepo);
   const files = useGit((s) => s.files);
   const ahead = useGit((s) => s.ahead);
+  const behind = useGit((s) => s.behind);
+  const upstream = useGit((s) => s.upstream);
+  const hasRemote = useGit((s) => s.hasRemote);
+  const branch = useGit((s) => s.branch);
   const refresh = useGit((s) => s.refresh);
   const project = useProjectStore((s) => s.active);
   const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState<"" | "ai" | "commit" | "push">("");
+  const [busy, setBusy] = useState<"" | "ai" | "commit" | "push" | "pull">("");
 
   if (!project || !isRepo) return null;
   const root = project.root_path;
@@ -271,13 +279,24 @@ function GitSection() {
     }
   };
 
+  // Like Cursor: with nothing staged, Commit offers to stage every change first.
   const commit = async () => {
+    if (staged.length === 0) {
+      if (unstaged.length === 0) return;
+      const ok = await confirmAction({
+        title: "There are no staged changes to commit.",
+        body: `Stage all ${unstaged.length} ${unstaged.length === 1 ? "change" : "changes"} and commit them?`,
+        confirmLabel: "Stage all and commit",
+      });
+      if (!ok) return;
+    }
     setBusy("commit");
     const endActivity = beginOrionActivity(
       "git-commit",
       "Wait for Orion's Git commit to finish before disabling the plugin.",
     );
     try {
+      if (staged.length === 0) await ipc.gitStage(root, unstaged.map((file) => file.path));
       await ipc.gitCommit(root, message.trim());
       setMessage("");
       toast.success("Committed", { body: message.trim().split("\n")[0] });
@@ -308,10 +327,10 @@ function GitSection() {
       "Wait for Orion's Git push to finish before disabling the plugin.",
     );
     try {
-      const out = await ipc.gitPush(root);
-      toast.success("Pushed", { body: out.trim().split("\n")[0] || undefined });
+      await ipc.gitPush(root);
+      toast.success(upstream ? "Pushed" : "Branch published", { body: branch || undefined });
     } catch (e) {
-      toast.error("Push failed", {
+      toast.error(upstream ? "Push failed" : "Publish failed", {
         body: e instanceof Error ? e.message : String(e),
       });
     } finally {
@@ -320,6 +339,25 @@ function GitSection() {
       refresh();
     }
   };
+
+  const pull = async () => {
+    setBusy("pull");
+    const endActivity = beginOrionActivity(
+      "git-pull",
+      "Wait for Orion's Git pull to finish before disabling the plugin.",
+    );
+    try {
+      const out = await ipc.gitPull(root);
+      toast.success("Pulled", { body: out.trim().split("\n").pop() || undefined });
+    } catch (e) {
+      toast.error("Pull failed", { body: e instanceof Error ? e.message : String(e) });
+    } finally {
+      endActivity();
+      setBusy("");
+      refresh();
+    }
+  };
+  const canCommit = busy === "" && !!message.trim() && (staged.length > 0 || unstaged.length > 0);
 
   return (
     <>
@@ -343,9 +381,16 @@ function GitSection() {
         <textarea
           value={message}
           rows={Math.min(4, Math.max(1, message.split("\n").length))}
-          placeholder={`Commit message (${staged.length} staged)`}
+          placeholder={`Message (⌘↵ to commit on ${branch || "HEAD"})`}
+          title="Commit message"
           spellCheck={false}
           onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canCommit) {
+              e.preventDefault();
+              void commit();
+            }
+          }}
         />
         <div className="or-git-commitrow">
           <button
@@ -361,8 +406,8 @@ function GitSection() {
           <button
             type="button"
             className="or-diff-btn accept"
-            disabled={busy !== "" || staged.length === 0 || !message.trim()}
-            title={staged.length === 0 ? "Stage files first" : "Commit staged files"}
+            disabled={!canCommit}
+            title={!message.trim() ? "Write a commit message first" : staged.length === 0 ? "Stage all changes and commit" : `Commit ${staged.length} staged ${staged.length === 1 ? "file" : "files"}`}
             onClick={() => void commit()}
           >
             {busy === "commit" ? (
@@ -372,19 +417,33 @@ function GitSection() {
             )}
             Commit
           </button>
+          {upstream && (
+            <button
+              type="button"
+              className="or-diff-btn"
+              disabled={busy !== ""}
+              title={behind > 0 ? `Pull ${behind} ${behind === 1 ? "commit" : "commits"} (fast-forward only)` : "Pull (fast-forward only)"}
+              onClick={() => void pull()}
+            >
+              {busy === "pull" ? <Loader2 size={12} className="or-ke-spin" /> : <ArrowDown size={12} />}
+              Pull{behind > 0 ? ` ${behind}` : ""}
+            </button>
+          )}
           <button
             type="button"
             className="or-diff-btn"
-            disabled={busy !== ""}
-            title="git push"
+            disabled={busy !== "" || !hasRemote || (upstream && ahead === 0)}
+            title={!hasRemote ? "This repository has no remote" : !upstream ? `Publish ${branch} to the remote` : ahead === 0 ? "Nothing to push" : `Push ${ahead} ${ahead === 1 ? "commit" : "commits"}`}
             onClick={() => void push()}
           >
             {busy === "push" ? (
               <Loader2 size={12} className="or-ke-spin" />
-            ) : (
+            ) : upstream ? (
               <ArrowUp size={12} />
+            ) : (
+              <CloudUpload size={12} />
             )}
-            Push{ahead > 0 ? ` ${ahead}` : ""}
+            {upstream ? `Push${ahead > 0 ? ` ${ahead}` : ""}` : "Publish"}
           </button>
         </div>
       </div>

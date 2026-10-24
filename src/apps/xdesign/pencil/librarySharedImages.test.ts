@@ -1,0 +1,56 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { webcrypto } from 'node:crypto';
+import { SceneGraph, computeImageHash, type Fill } from '@open-pencil/scene-graph';
+import { prepareLibrarySource } from './libraryResources';
+import { createPublicationRevision, materializePublicationAsset } from './libraryDependencies';
+import { serializeGraph } from './document';
+import { roomImagePluginData, type RoomImageReference } from './roomImageReferences';
+import { prepareRoomLibraryBundle } from './roomLibraryProtocol';
+import { imageFixture } from './roomImages.testSupport';
+const fill = (hash: string): Fill => ({ type: 'IMAGE', color: { r: 0, g: 0, b: 0, a: 1 }, opacity: .8, visible: true, imageHash: hash, imageScaleMode: 'FIT' });
+beforeEach(() => vi.stubGlobal('crypto', webcrypto));
+afterEach(() => vi.unstubAllGlobals());
+it('publishes and materializes full-resolution shared image resources without local paths, room dependencies or preview fallback', async () => {
+  const f = await imageFixture(), graph = new SceneGraph(), page = graph.getPages()[0]!.id, bytes = new Uint8Array([137, 80, 78, 71, 24, 32, 48]);
+  graph.images.set(f.reference.previewHash, f.preview);
+  const root = graph.createNode('COMPONENT', page, { name: 'Photo card', x: 50, width: 300, height: 240 });
+  const node = graph.createNode('RECTANGLE', root.id, { x: 19, width: 281, fills: [fill(f.reference.previewHash)], pluginData: [{ pluginId: 'foreign', key: 'attribution', value: 'Original photographer' }, roomImagePluginData(f.reference)] });
+  graph.createNode('RECTANGLE', root.id, { fills: [fill(f.reference.previewHash)], pluginData: [roomImagePluginData(f.reference)] });
+  const before = serializeGraph(graph), load = vi.fn(async () => bytes), source = await prepareLibrarySource(graph, 'shared-photo-library', [root.id], undefined, 'Photo cards', load);
+  expect(load).toHaveBeenCalledExactlyOnceWith(f.reference); expect(serializeGraph(graph)).toBe(before);
+  expect(source.graph.getNode(node.id)).toMatchObject({ x: 19, width: 281, fills: [fill(computeImageHash(bytes))] });
+  expect(source.graph.getNode(node.id)!.pluginData).toContainEqual({ pluginId: 'foreign', key: 'attribution', value: 'Original photographer' });
+  const revision = await createPublicationRevision({ libraryId: 'shared-photo-library', name: 'Photo cards', graph: source.graph, assetNodeIds: [root.id], previousRevisionId: null });
+  expect(serializeGraph(revision.graph)).not.toContain('roomImage'); expect(revision.graph.images.get(computeImageHash(bytes))).toEqual(bytes); expect(revision.graph.images.has(f.reference.previewHash)).toBe(false);
+  const portable = await prepareRoomLibraryBundle(revision); expect(JSON.stringify(portable)).not.toContain(f.source.bundlePath); expect(JSON.stringify(portable)).not.toContain('roomImage');
+  const consumer = new SceneGraph(), materialized = materializePublicationAsset(consumer, revision, revision.manifest.assets[0]!.key);
+  expect(consumer.getNode(materialized.componentId)).not.toBeNull(); expect(consumer.images.get(computeImageHash(bytes))).toEqual(bytes); expect(serializeGraph(consumer)).not.toContain('roomImage');
+  bytes.fill(0); expect(revision.graph.images.get(computeImageHash(new Uint8Array([137, 80, 78, 71, 24, 32, 48])))).toEqual(new Uint8Array([137, 80, 78, 71, 24, 32, 48]));
+});
+it('resolves pinned historic revisions independently and ignores shared images outside the selected component closure', async () => {
+  const f = await imageFixture(), graph = new SceneGraph(), page = graph.getPages()[0]!.id, root = graph.createNode('COMPONENT', page);
+  graph.images.set(f.reference.previewHash, f.preview);
+  const previous = { ...f.reference, revisionId: 'b'.repeat(64) };
+  for (const reference of [f.reference, previous, f.reference]) graph.createNode('RECTANGLE', root.id, { fills: [fill(reference.previewHash)], pluginData: [roomImagePluginData(reference)] });
+  graph.createNode('RECTANGLE', page, { fills: [fill(f.reference.previewHash)], pluginData: [roomImagePluginData({ ...f.reference, revisionId: 'c'.repeat(64) })] });
+  const load = vi.fn(async (reference: RoomImageReference) => new Uint8Array(reference.revisionId === previous.revisionId ? [1, 2] : [3, 4]));
+  const source = await prepareLibrarySource(graph, 'historic-photo-library', [root.id], undefined, 'Historic photos', load);
+  expect(load.mock.calls.map(call => call[0])).toEqual([f.reference, previous]);
+  const revision = await createPublicationRevision({ libraryId: 'historic-photo-library', name: 'Historic photos', graph: source.graph, assetNodeIds: [root.id] }); expect(revision.graph.images.size).toBe(2);
+});
+it('includes shared images from unused preferred component and variant dependencies in the portable library', async () => {
+  const f = await imageFixture(), graph = new SceneGraph(), page = graph.getPages()[0]!.id;
+  const root = graph.createNode('COMPONENT', page, { name: 'Card', componentKey: 'card', componentPropertyDefinitions: [{ id: 'preferred', name: 'Media', type: 'INSTANCE_SWAP', defaultValue: 'photo', preferredValues: ['photo'] }] });
+  const preferred = graph.createNode('COMPONENT', page, { name: 'Photo', componentKey: 'photo' }); graph.images.set(f.reference.previewHash, f.preview);
+  graph.createNode('RECTANGLE', preferred.id, { fills: [fill(f.reference.previewHash)], pluginData: [roomImagePluginData(f.reference)] });
+  const load = vi.fn(async () => new Uint8Array([4, 5, 6])), prepared = await prepareLibrarySource(graph, 'preferred-photo-library', [root.id], undefined, 'Preferred photos', load);
+  expect(load).toHaveBeenCalledOnce(); const revision = await createPublicationRevision({ libraryId: 'preferred-photo-library', name: 'Preferred photos', graph: prepared.graph, assetNodeIds: [root.id] });
+  expect(revision.manifest.assets).toHaveLength(1); expect(revision.graph.images.get(computeImageHash(new Uint8Array([4, 5, 6])))).toEqual(new Uint8Array([4, 5, 6])); expect(serializeGraph(revision.graph)).not.toContain('roomImage');
+});
+it('refuses missing or failed resource readers and empty/oversized bytes while preserving the original graph', async () => {
+  const f = await imageFixture(), graph = new SceneGraph(), root = graph.createNode('COMPONENT', graph.getPages()[0]!.id, { pluginData: [roomImagePluginData(f.reference)], fills: [fill(f.reference.previewHash)] }); graph.images.set(f.reference.previewHash, f.preview);
+  const before = serializeGraph(graph);
+  await expect(prepareLibrarySource(graph, 'refused-photo-library', [root.id])).rejects.toThrow('full resolution');
+  for (const load of [async () => { throw new Error('native render failed'); }, async () => new Uint8Array(), async () => new Uint8Array(48 * 1024 * 1024 + 1)]) await expect(prepareLibrarySource(graph, 'refused-photo-library', [root.id], undefined, 'Photos', load)).rejects.toThrow();
+  expect(serializeGraph(graph)).toBe(before);
+});

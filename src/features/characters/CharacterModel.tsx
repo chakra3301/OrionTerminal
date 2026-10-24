@@ -4,18 +4,22 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { resolveClips, versionedCharacterUrl } from "./catalog";
 import { cloneCharacter, fitCharacter } from "./modelInstance";
+import { prepareCompanion } from "./companionRig";
+import type { CompanionId } from "./companionProfiles";
 
-// One skinned character: clone (so the same cached GLB can render in several
-// canvases), normalize to a unit height standing on the floor, loop its idle,
-// and fire a one-shot "select" clip + spin when `selectSignal` changes.
+// One skinned character for previews: normalized to a unit height, idling,
+// and greeting + a half turn when `selectSignal` changes. Built-in companions
+// use the baked sleeve gestures and live hair/sleeve springs.
 export function CharacterModel({
   url,
+  companion,
   selectSignal = 0,
   turntable = true,
   fitHeight = 1.7,
   onReady,
 }: {
   url: string;
+  companion?: CompanionId;
   selectSignal?: number;
   turntable?: boolean;
   fitHeight?: number;
@@ -23,62 +27,54 @@ export function CharacterModel({
 }) {
   const gltf = useGLTF(versionedCharacterUrl(url));
   const group = useRef<THREE.Group>(null);
-  const spin = useRef(0); // remaining extra spin (radians)
+  const spin = useRef(0);
 
-  // Clone the scene + retarget the skeleton for this instance.
-  const scene = useMemo(() => cloneCharacter(gltf.scene), [gltf.scene]);
+  const rig = useMemo(() => {
+    if (companion) {
+      const prepared = prepareCompanion(gltf, companion);
+      return { scene: prepared.scene, clips: prepared.clips, idle: prepared.roles.idle, select: prepared.roles.greeting, prepared, center: prepared.center, size: prepared.size };
+    }
+    const scene = cloneCharacter(gltf.scene);
+    const roles = resolveClips(gltf.animations.map((clip) => clip.name));
+    const { scale, center } = fitCharacter(scene, 1);
+    return { scene, clips: gltf.animations, idle: roles.idle, select: roles.select, prepared: null, center, size: new THREE.Vector3(1, 1 / scale, 1) };
+  }, [gltf, companion]);
 
-  // Fit to ~1.7 units tall and center the bounding box on the origin, so the
-  // camera (aimed at 0,0,0) frames the whole body and the turntable spins
-  // around the body's center rather than its feet.
   const fit = useMemo(() => {
-    const { scale, center } = fitCharacter(scene, fitHeight);
-    return {
-      scale,
-      x: -center.x * scale,
-      y: -center.y * scale,
-      z: -center.z * scale,
-    };
-  }, [scene, fitHeight]);
+    const scale = fitHeight / (rig.size.y || 1);
+    return { scale, x: -rig.center.x * scale, y: -rig.center.y * scale, z: -rig.center.z * scale };
+  }, [rig, fitHeight]);
 
-  const { actions, names, mixer } = useAnimations(gltf.animations, scene);
-  const clips = useMemo(() => resolveClips(names), [names]);
+  const { actions, mixer } = useAnimations(rig.clips, rig.scene);
+
+  useEffect(() => { onReady?.(); }, [onReady]);
+  useEffect(() => () => rig.prepared?.dispose(), [rig]);
 
   useEffect(() => {
-    onReady?.();
-  }, [onReady]);
+    if (!rig.idle) return;
+    const idle = actions[rig.idle];
+    idle?.reset().setLoop(THREE.LoopRepeat, Infinity).fadeIn(0.3).play();
+    return () => { idle?.fadeOut(0.2); };
+  }, [actions, rig.idle]);
 
-  // Loop idle on mount.
-  useEffect(() => {
-    if (!clips.idle) return;
-    const idle = actions[clips.idle];
-    idle?.reset().fadeIn(0.3).play();
-    return () => {
-      idle?.fadeOut(0.2);
-    };
-  }, [actions, clips.idle]);
-
-  // Fire the select one-shot when the signal bumps (skip initial 0).
   const previousSignal = useRef(selectSignal);
   useEffect(() => {
     if (previousSignal.current === selectSignal) return;
     previousSignal.current = selectSignal;
     spin.current = Math.PI * 2;
-    if (!clips.select || clips.select === clips.idle) return;
-
-    const select = actions[clips.select];
-    const idle = clips.idle ? actions[clips.idle] : null;
+    if (!rig.select || rig.select === rig.idle) return;
+    const select = actions[rig.select];
+    const idle = rig.idle ? actions[rig.idle] : null;
     if (!select) return;
-    select.reset();
-    select.setLoop(THREE.LoopOnce, 1);
+    rig.prepared?.reset();
+    select.reset().setLoop(THREE.LoopOnce, 1);
     select.clampWhenFinished = true;
-    idle?.fadeOut(0.15);
-    select.fadeIn(0.15).play();
-
+    idle?.fadeOut(0.2);
+    select.fadeIn(0.2).play();
     const onFinished = (e: { action: THREE.AnimationAction }) => {
       if (e.action !== select) return;
-      select.fadeOut(0.3);
-      idle?.reset().fadeIn(0.3).play();
+      select.fadeOut(0.35);
+      idle?.reset().fadeIn(0.35).play();
     };
     mixer.addEventListener("finished", onFinished);
     return () => mixer.removeEventListener("finished", onFinished);
@@ -86,21 +82,19 @@ export function CharacterModel({
 
   useFrame((_, dt) => {
     if (!group.current) return;
-    if (turntable) group.current.rotation.y += dt * 0.4;
+    if (turntable) group.current.rotation.y += dt * 0.35;
     if (spin.current > 0) {
-      const step = Math.min(spin.current, dt * 9);
+      const step = Math.min(spin.current, dt * 7);
       group.current.rotation.y += step;
       spin.current -= step;
     }
+    // Drei's useAnimations advances the mixer first; springs read the result.
+    rig.prepared?.updateSprings(dt);
   });
 
   return (
     <group ref={group}>
-      <primitive
-        object={scene}
-        scale={fit.scale}
-        position={[fit.x, fit.y, fit.z]}
-      />
+      <primitive object={rig.scene} scale={fit.scale} position={[fit.x, fit.y, fit.z]} />
     </group>
   );
 }

@@ -9,7 +9,11 @@ use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
+#[cfg(test)]
 use walkdir::WalkDir;
+
+pub mod intake;
+pub mod recovery;
 
 const MANIFEST_FILE: &str = "orion-plugin.json";
 const STATE_FILE: &str = ".orion-state.json";
@@ -197,6 +201,7 @@ struct StartupMarker {
     started_at: u64,
 }
 
+#[cfg(test)]
 #[derive(Debug)]
 struct PackageScan {
     manifest: PluginManifest,
@@ -322,6 +327,7 @@ fn validate_state(state: &InstalledState) -> Result<(), String> {
 }
 
 fn read_state(app: &AppHandle, plugin_id: &str) -> Result<InstalledState, String> {
+    recovery::assert_idle(&packages_root(app)?, plugin_id)?;
     let state: InstalledState = read_json(&state_path(app, plugin_id)?, "plugin state")?;
     if state.manifest.id != plugin_id {
         return Err("plugin state identity mismatch".into());
@@ -689,6 +695,8 @@ fn validate_manifest(manifest: &PluginManifest) -> Result<(), String> {
     Ok(())
 }
 
+// Independent legacy-format reference for snapshot fingerprint regression tests.
+#[cfg(test)]
 fn scan_package(root: &Path) -> Result<PackageScan, String> {
     let root = root
         .canonicalize()
@@ -815,14 +823,27 @@ fn scan_package(root: &Path) -> Result<PackageScan, String> {
 }
 
 #[tauri::command]
-pub fn plugin_inspect_directory(source_path: String) -> Result<PluginInspection, String> {
-    let scan = scan_package(Path::new(&source_path))?;
-    Ok(PluginInspection {
-        manifest: scan.manifest,
-        fingerprint: scan.fingerprint,
-        file_count: scan.files.len(),
-        total_bytes: scan.total_bytes,
-    })
+pub async fn plugin_inspect_directory(source_path: String) -> Result<PluginInspection, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _read = intake::READ_LOCK.try_lock().ok_or("Another package read is in progress")?;
+        Ok(intake::collect_manager(Path::new(&source_path))?.inspection)
+    }).await.map_err(|e| format!("Package inspection worker failed: {e}"))?
+}
+
+fn verify_reviewed_state(existing: Option<&InstalledState>, expected: Option<Option<Value>>) -> Result<(), String> {
+    if let Some(expected) = expected {
+        let actual = existing.cloned().map(InstalledPlugin::from).map(serde_json::to_value).transpose().map_err(|e| e.to_string())?;
+        if actual != expected { return Err("Installed plugin changed after review; inspect and approve again".into()); }
+    }
+    Ok(())
+}
+fn write_snapshot_files(temp: &Path, files: &BTreeMap<String, Vec<u8>>) -> Result<(), String> {
+    for (relative, bytes) in files {
+        let target = temp.join(relative);
+        if let Some(parent) = target.parent() { fs::create_dir_all(parent).map_err(|e| format!("Create package path: {e}"))?; }
+        intake::write_new(&target, bytes)?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -832,8 +853,23 @@ pub fn plugin_install_directory(
     expected_fingerprint: String,
     approved_permissions: Vec<String>,
 ) -> Result<InstalledPlugin, String> {
+    install_directory_inner(&app, &source_path, &expected_fingerprint, approved_permissions, None)
+}
+
+#[tauri::command]
+pub async fn plugin_install_reviewed_directory(
+    app: AppHandle, source_path: String, expected_fingerprint: String,
+    approved_permissions: Vec<String>, expected_state: Option<Value>,
+) -> Result<InstalledPlugin, String> {
+    tauri::async_runtime::spawn_blocking(move || install_directory_inner(&app, &source_path, &expected_fingerprint, approved_permissions, Some(expected_state)))
+        .await.map_err(|e| format!("Package installation worker failed: {e}"))?
+}
+
+fn install_directory_inner(app: &AppHandle, source_path: &str, expected_fingerprint: &str, approved_permissions: Vec<String>, expected_state: Option<Option<Value>>) -> Result<InstalledPlugin, String> {
+    let _read = intake::READ_LOCK.try_lock().ok_or("Another package read is in progress")?;
     let _guard = PACKAGE_LOCK.lock();
-    let scan = scan_package(Path::new(&source_path))?;
+    let snapshot = intake::collect_manager(Path::new(source_path))?;
+    let scan = snapshot.inspection;
     if scan.fingerprint != expected_fingerprint {
         return Err("plugin package changed after permission review".into());
     }
@@ -849,6 +885,7 @@ pub fn plugin_install_directory(
     } else {
         None
     };
+    verify_reviewed_state(existing.as_ref(), expected_state)?;
     if let Some(existing) = &existing {
         if existing.manifest.publisher != scan.manifest.publisher {
             return Err("plugin publisher identity changed".into());
@@ -859,25 +896,19 @@ pub fn plugin_install_directory(
     }
 
     let packages = packages_root(&app)?;
+    recovery::assert_idle(&packages, &scan.manifest.id)?;
     let key = plugin_key(&scan.manifest.id);
-    let temp = packages.join(format!(".{key}.install-{}", now_ms()));
-    let backup = packages.join(format!(".{key}.backup-{}", now_ms()));
-    fs::create_dir_all(&temp).map_err(|error| format!("create install directory: {error}"))?;
+    let nonce = random_handle_id()?;
+    let temp = packages.join(format!(".{key}.install-{nonce}"));
+    intake::private_dir(&temp)?;
     let install_result = (|| -> Result<InstalledState, String> {
-        for (relative, source, _) in &scan.files {
-            let target = temp.join(relative);
-            if let Some(parent) = target.parent() {
-                fs::create_dir_all(parent)
-                    .map_err(|error| format!("create package path: {error}"))?;
-            }
-            fs::copy(source, &target).map_err(|error| format!("copy plugin file: {error}"))?;
-        }
+        write_snapshot_files(&temp, &snapshot.files)?;
         let state = InstalledState {
             manifest: scan.manifest.clone(),
             enabled: existing.as_ref().is_none_or(|state| state.enabled),
             granted_permissions: approved_permissions.clone(),
             fingerprint: scan.fingerprint.clone(),
-            installed_at: now_ms(),
+            installed_at: now_ms().max(existing.as_ref().map(|s| s.installed_at.checked_add(1).ok_or("Package timestamp overflow")).transpose()?.unwrap_or(0)),
             quarantined: false,
             quarantine_reason: None,
             workspace_grants: existing
@@ -905,33 +936,28 @@ pub fn plugin_install_directory(
         };
         let bytes = serde_json::to_vec_pretty(&state)
             .map_err(|error| format!("encode plugin state: {error}"))?;
-        atomic_write(&temp.join(STATE_FILE), &bytes)?;
-        if destination.exists() {
-            fs::rename(&destination, &backup)
-                .map_err(|error| format!("stage previous plugin version: {error}"))?;
-        }
-        if let Err(error) = fs::rename(&temp, &destination) {
-            if backup.exists() {
-                let _ = fs::rename(&backup, &destination);
-            }
-            return Err(format!("activate installed plugin: {error}"));
-        }
-        if backup.exists() {
-            fs::remove_dir_all(&backup)
-                .map_err(|error| format!("remove previous plugin version: {error}"))?;
-        }
+        intake::write_new(&temp.join(STATE_FILE), &bytes)?;
+        recovery::promote(&packages, &temp, &state, &nonce)?;
         Ok(state)
     })();
-    if install_result.is_err() {
+    if install_result.is_err() && recovery::assert_idle(&packages, &scan.manifest.id).is_ok() {
         let _ = fs::remove_dir_all(&temp);
     }
     install_result.map(InstalledPlugin::from)
 }
 
 #[tauri::command]
-pub fn plugin_list_installed(app: AppHandle) -> Result<Vec<InstalledPlugin>, String> {
+pub async fn plugin_list_installed(app: AppHandle) -> Result<Vec<InstalledPlugin>, String> {
+    tauri::async_runtime::spawn_blocking(move || list_installed_inner(&app, false)).await.map_err(|e| e.to_string())?
+}
+#[tauri::command]
+pub async fn plugin_recover_installed(app: AppHandle) -> Result<Vec<InstalledPlugin>, String> {
+    tauri::async_runtime::spawn_blocking(move || list_installed_inner(&app, true)).await.map_err(|e| e.to_string())?
+}
+fn list_installed_inner(app: &AppHandle, recover: bool) -> Result<Vec<InstalledPlugin>, String> {
     let _guard = PACKAGE_LOCK.lock();
     let root = packages_root(&app)?;
+    if recover { recovery::recover_all(&root)?; } else { recovery::assert_clean(&root)?; }
     let mut plugins = Vec::new();
     for entry in fs::read_dir(root).map_err(|error| format!("list plugin packages: {error}"))? {
         let entry = entry.map_err(|error| format!("list plugin package: {error}"))?;
@@ -977,18 +1003,12 @@ pub fn plugin_quarantine(app: AppHandle, plugin_id: String, reason: String) -> R
 }
 
 #[tauri::command]
-pub fn plugin_remove(app: AppHandle, plugin_id: String) -> Result<(), String> {
-    let _guard = PACKAGE_LOCK.lock();
-    let destination = package_dir(&app, &plugin_id)?;
-    let _ = read_state(&app, &plugin_id)?;
-    let trash =
-        packages_root(&app)?.join(format!(".{}.remove-{}", plugin_key(&plugin_id), now_ms()));
-    fs::rename(&destination, &trash).map_err(|error| format!("stage plugin removal: {error}"))?;
-    if let Err(error) = fs::remove_dir_all(&trash) {
-        let _ = fs::rename(&trash, &destination);
-        return Err(format!("remove plugin package: {error}"));
-    }
-    Ok(())
+pub async fn plugin_remove(app: AppHandle, plugin_id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _read = intake::READ_LOCK.try_lock().ok_or("Another package read is in progress")?;
+        let _guard = PACKAGE_LOCK.lock();
+        recovery::removal::remove_package(&packages_root(&app)?, &plugin_id, None)
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

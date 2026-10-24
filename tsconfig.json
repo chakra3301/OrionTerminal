@@ -14,7 +14,8 @@
     "types": ["vitest/globals"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "open-pencil-pdf": ["node_modules/@open-pencil/core/dist/io/formats/pdf/index.d.ts"]
     },
     "strict": true,
     "noUnusedLocals": true,

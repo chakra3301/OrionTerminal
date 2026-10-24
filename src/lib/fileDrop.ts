@@ -21,19 +21,26 @@ import { log } from "@/lib/log";
 export type DropEvent =
   | { type: "enter" }
   | { type: "leave" }
-  | { type: "drop"; paths: string[] };
+  | { type: "drop"; paths: string[]; point?: { x: number; y: number } };
 
 type ZoneHandler = (event: DropEvent) => void;
 
 const handlers = new Map<string, ZoneHandler>();
-let started = false;
+let listening: Promise<() => void> | null = null;
+let users = 0;
 let currentZone: string | null = null;
 
-function zoneAt(x: number, y: number): string | null {
-  // Tauri's drag-drop position is in PHYSICAL pixels; elementFromPoint wants
-  // CSS pixels. Divide by DPR (1 if unavailable).
-  const dpr = window.devicePixelRatio || 1;
-  let el = document.elementFromPoint(x / dpr, y / dpr) as HTMLElement | null;
+/** Tauri types the drag position as physical pixels, but on macOS wry reports
+ * window points (already CSS pixels); dividing by the Retina DPR there would
+ * hit-test halfway toward the window's top-left corner. */
+function cssPoint(position: { x: number; y: number }): { x: number; y: number } {
+  const scale = /Mac/.test(navigator.userAgent) ? 1 : window.devicePixelRatio || 1;
+  return { x: position.x / scale, y: position.y / scale };
+}
+
+function zoneAt(position: { x: number; y: number }): string | null {
+  const { x, y } = cssPoint(position);
+  let el = document.elementFromPoint(x, y) as HTMLElement | null;
   while (el) {
     const z = el.dataset?.dropZone;
     if (z && handlers.has(z)) return z;
@@ -49,40 +56,48 @@ function setActive(zone: string | null) {
   if (zone) handlers.get(zone)?.({ type: "enter" });
 }
 
-/** Register the single webview-level listener. Idempotent — safe to call
- * from App's mount effect. Returns an unlisten. */
-export async function startFileDropOrchestrator(): Promise<() => void> {
-  if (started) return () => {};
-  started = true;
-  try {
-    const unlisten = await getCurrentWebview().onDragDropEvent((event) => {
-      const p = event.payload as {
-        type: "enter" | "over" | "leave" | "drop";
-        position?: { x: number; y: number };
-        paths?: string[];
-      };
-      if (p.type === "over" || p.type === "enter") {
-        const pos = p.position;
-        setActive(pos ? zoneAt(pos.x, pos.y) : null);
-      } else if (p.type === "drop") {
-        const pos = p.position;
-        const zone = (pos ? zoneAt(pos.x, pos.y) : null) ?? currentZone;
-        setActive(null);
-        if (zone) handlers.get(zone)?.({ type: "drop", paths: p.paths ?? [] });
-      } else {
-        // "leave" / cancel
-        setActive(null);
-      }
-    });
-    return () => {
-      started = false;
-      unlisten();
-    };
-  } catch (e) {
-    started = false;
-    log.warn("file-drop orchestrator failed to start", e);
-    return () => {};
+function onDragDrop(event: { payload: unknown }) {
+  const p = event.payload as {
+    type: "enter" | "over" | "leave" | "drop";
+    position?: { x: number; y: number };
+    paths?: string[];
+  };
+  if (p.type === "over" || p.type === "enter") {
+    const pos = p.position;
+    setActive(pos ? zoneAt(pos) : null);
+  } else if (p.type === "drop") {
+    const pos = p.position;
+    const zone = (pos ? zoneAt(pos) : null) ?? currentZone;
+    setActive(null);
+    if (zone) handlers.get(zone)?.({ type: "drop", paths: p.paths ?? [], ...(pos ? { point: cssPoint(pos) } : {}) });
+  } else {
+    // "leave" / cancel
+    setActive(null);
   }
+}
+
+/** Register the single webview-level listener, shared by every caller and
+ * removed when the last one releases it. StrictMode's mount → unmount →
+ * mount must not let the first, cancelled caller tear down the listener the
+ * second one is relying on. Returns a release. */
+export async function startFileDropOrchestrator(): Promise<() => void> {
+  users += 1;
+  listening ??= getCurrentWebview().onDragDropEvent(onDragDrop).catch((e) => {
+    log.warn("file-drop orchestrator failed to start", e);
+    listening = null;
+    return () => {};
+  });
+  await listening;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    users -= 1;
+    if (users > 0 || !listening) return;
+    const stop = listening;
+    listening = null;
+    void stop.then((unlisten) => unlisten());
+  };
 }
 
 function register(name: string, handler: ZoneHandler): () => void {

@@ -43,6 +43,7 @@ export async function listSkills(): Promise<Skill[]> {
 }
 
 export async function upsertSkill(s: Skill): Promise<void> {
+  if (s.imported || s.id.startsWith("imported:")) throw new Error("Imported originals are immutable. Use the imported skill lifecycle controls.");
   const db = await getDb();
   const now = Date.now();
   await db.execute(
@@ -55,6 +56,7 @@ export async function upsertSkill(s: Skill): Promise<void> {
 }
 
 export async function deleteSkill(id: string): Promise<void> {
+  if (id.startsWith("imported:")) throw new Error("Remove imported skills through Skill Codex's package controls.");
   const db = await getDb();
   await db.execute("DELETE FROM skills WHERE id=$1", [id]);
 }

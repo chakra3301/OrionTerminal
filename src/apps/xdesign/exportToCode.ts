@@ -14,10 +14,8 @@ import { beginXDesignActivity } from "@/apps/xdesign/runtimeActivity";
 import { beginOrionActivity } from "@/apps/orion/runtimeActivity";
 
 /**
- * Export the selected frame to React + Orion design tokens, written into the
- * project's src/components/ as a REVIEWABLE STAGED EDIT (reuses the Phase-1
- * pending-edit + DiffReview flow). The wedge Figma structurally can't do:
- * real code into the real repo next door, accept/reject like any AI edit.
+ * Stage a complete React component in the active Orion project, preserving the
+ * original file for Accept/Reject in the existing DiffReview workflow.
  */
 export async function exportSelectionToCode(): Promise<void> {
   if (!appRegistry.has("orion")) {
@@ -35,26 +33,6 @@ export async function exportSelectionToCode(): Promise<void> {
     return;
   }
 
-  // Prefer a selected frame; fall back to the first selected shape.
-  const selected = [...xd.selection]
-    .map((id) => xd.shapes.find((s) => s.id === id))
-    .filter(Boolean);
-  const root = (selected.find((s) => s!.kind === "frame") ?? selected[0]) as
-    | (typeof xd.shapes)[number]
-    | undefined;
-  if (!root) {
-    toast.warning("Select a frame to export to React");
-    return;
-  }
-
-  const gen = generateComponent(root.id, xd.shapes, xd.variables);
-  if (!gen) {
-    toast.error("Couldn't generate code for that selection");
-    return;
-  }
-
-  const path = `${project.root_path}/src/components/${gen.componentName}.tsx`;
-  const code = `${gen.code}`;
   const endXDesignActivity = beginXDesignActivity(
     "export-to-orion",
     "Wait for XDesign to finish exporting code before disabling the plugin.",
@@ -64,14 +42,47 @@ export async function exportSelectionToCode(): Promise<void> {
     "Wait for XDesign's Orion export to finish before disabling the editor plugin.",
   );
   try {
+    let gen: { componentName: string; code: string } | null = null;
+    if (xd.pencilDocument) {
+      const { usePencilWorkspace, exportPencil } = await import("./pencil/runtime");
+      const editor = usePencilWorkspace.getState().editor;
+      const selected = editor?.getSelectedNodes() ?? [];
+      const root = selected.find(node => node.type === "FRAME" || node.type === "COMPONENT") ?? selected[0];
+      if (!root) { toast.warning("Select a design layer to export to React"); return; }
+      try {
+        const componentName = (root.name.match(/[a-z][a-z0-9]*/gi) ?? [])
+          .map(word => word[0]!.toUpperCase() + word.slice(1)).join("").slice(0, 80) || "DesignComponent";
+        const code = new TextDecoder().decode(await exportPencil("REACT", 1, [root.id]));
+        gen = { componentName, code };
+      } catch (error) { toast.error("Design code export failed", { body: String(error) }); return; }
+    } else {
+      // Prefer a selected frame; fall back to the first selected shape.
+      const selected = [...xd.selection]
+        .map((id) => xd.shapes.find((s) => s.id === id))
+        .filter(Boolean);
+      const root = (selected.find((s) => s!.kind === "frame") ?? selected[0]) as
+        | (typeof xd.shapes)[number]
+        | undefined;
+      if (!root) {
+        toast.warning("Select a frame to export to React");
+        return;
+      }
+
+      gen = generateComponent(root.id, xd.shapes, xd.variables);
+    }
+    if (!gen) {
+      toast.error("Couldn't generate code for that selection");
+      return;
+    }
+
+    const path = `${project.root_path}/src/components/${gen.componentName}.tsx`;
+    const code = `${gen.code}`;
+    if (useProjectStore.getState().active?.root_path !== project.root_path) throw new Error("The Orion project changed during code export");
     let original = "";
     let existed = false;
-    try {
-      existed = await ipc.pathExists(path);
-      if (existed) original = await ipc.readFile(path);
-    } catch {
-      /* treat as new */
-    }
+    existed = await ipc.pathExists(path);
+    if (existed) original = await ipc.readFile(path);
+    if (useProjectStore.getState().active?.root_path !== project.root_path || !appRegistry.has("orion")) throw new Error("The Orion workspace changed during code export");
     // Disk holds `updated` so Accept keeps it / Reject restores `original`
     // (or deletes the new file) — exactly the staged-edit contract.
     await ipc.saveFileAtomic(path, code);

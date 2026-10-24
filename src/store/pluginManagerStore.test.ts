@@ -139,10 +139,19 @@ describe("plugin enablement persistence", () => {
   });
 
   it("activates only the core apps for the persisted first-install defaults", () => {
-    usePluginManager.getState().hydrate({ version: 1, disabled: [BUILTIN_APP_PLUGIN_IDS.hermes, BUILTIN_APP_PLUGIN_IDS.command] });
+    usePluginManager.getState().hydrate({ version: 1, disabled: [BUILTIN_APP_PLUGIN_IDS.hermes, BUILTIN_APP_PLUGIN_IDS.command, BUILTIN_APP_PLUGIN_IDS.incubator] });
     expect(appRegistry.list().map(app => app.id).sort()).toEqual(["archives", "orion", "xdesign"]);
     expect(registry.has("app.openHermes")).toBe(false);
     expect(registry.has("app.openCommandCenter")).toBe(false);
+  });
+
+  it("persists Incubator disablement through the existing plugin lifecycle", async () => {
+    usePluginManager.getState().hydrate(null);
+    expect(appRegistry.has("incubator")).toBe(true);
+    expect(await usePluginManager.getState().setEnabled(BUILTIN_APP_PLUGIN_IDS.incubator, false)).toBe(true);
+    expect(appRegistry.has("incubator")).toBe(false);
+    expect(registry.has("app.openIncubator")).toBe(false);
+    expect(setAppState).toHaveBeenCalledWith("plugins.state", { version: 1, disabled: [BUILTIN_APP_PLUGIN_IDS.incubator] });
   });
 
   it("preserves legacy implicit enablement when no first-install defaults were seeded", () => {

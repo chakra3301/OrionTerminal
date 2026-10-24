@@ -97,6 +97,7 @@ describe("built-in app plugins", () => {
       "xdesign",
       "command",
       "hermes",
+      "incubator",
     ]);
     expect(appRegistry.ownerOf("hermes")).toBe(BUILTIN_APP_PLUGIN_IDS.hermes);
     expect(registry.ownerOf("app.openHermes")).toBe(BUILTIN_APP_PLUGIN_IDS.hermes);
@@ -203,6 +204,17 @@ describe("built-in app plugins", () => {
       event: { kind: "assistant", text: "after disable" },
     });
     expect(useCommand.getState().activeRun?.text).toBe("before disable");
+  });
+
+  it("Incubator owns its Dock/Spotlight descriptor, command and disposable window", () => {
+    ensureBuiltinAppPlugins();
+    expect(appRegistry.ownerOf("incubator")).toBe(BUILTIN_APP_PLUGIN_IDS.incubator);
+    expect(registry.ownerOf("app.openIncubator")).toBe(BUILTIN_APP_PLUGIN_IDS.incubator);
+    useShell.getState().openApp("incubator");
+    expect(deactivateBuiltinAppPlugin(BUILTIN_APP_PLUGIN_IDS.incubator)).toEqual([]);
+    expect(appRegistry.has("incubator")).toBe(false);
+    expect(registry.has("app.openIncubator")).toBe(false);
+    expect(useShell.getState().windows.some((w) => w.app === "incubator")).toBe(false);
   });
 
   it("deactivating Hermes removes its app, command, and open window", () => {

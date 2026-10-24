@@ -3,6 +3,8 @@
 @import "./styles/workstationApps.css";
 @import "./styles/lightThemes.css";
 @import "./styles/customThemes.css";
+@import "./styles/materials.css";
+@import "./styles/orionWorkbench.css";
 
 @tailwind base;
 @tailwind components;

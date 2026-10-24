@@ -15,7 +15,7 @@
 
 :root body :is(.ot-window-title, .ot-menubar-items button.ot-menubar-app) {
   font-family: var(--f-display);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
@@ -38,7 +38,7 @@
   .learn-rail-title, .learn-model-label, .xd-fx-panel-head
 ) {
   font-family: var(--f-display);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   line-height: 1.5;
   letter-spacing: .01em;
@@ -61,10 +61,10 @@
   .or-home-btn, .xd-home-new, .ar-new-btn, .ar-db-newrow,
   .hm-btn, .rl-btn, .ot-prompt-btn
 ) {
-  min-height: 34px;
+  min-height: 36px;
   padding: 8px 13px;
   font-family: var(--f-display);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   line-height: 1.35;
   letter-spacing: 0;
@@ -99,8 +99,8 @@
   .ot-claude-rail, .ot-rosie-panel, .hm-bar, .hm-floorbar, .hm-rail,
   .cc-root, .rl-scanbar, .learn-rail, .ot-prompt-card,
   .ot-ctx-menu, .ot-spotlight
-) :is(button, input, select, textarea, a, [role="button"]):focus-visible {
-  outline: 2px solid var(--neon-cyan);
+) :is(button, a, [role="button"]):focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--t-primary) 55%, transparent);
   outline-offset: 2px;
 }
 :root body :is(.ar-new-btn, .or-home-btn, .xd-home-new, .rl-btn):disabled { cursor: not-allowed; opacity: .45; }
@@ -108,7 +108,7 @@
 :root body .ot-claude-name { color: var(--t-primary); }
 :root body .ot-claude-sub { font-size: 11px; color: var(--work-muted); line-height: 1.5; }
 :root body .ot-claude-messages { padding: 18px 14px; gap: 16px; }
-:root body .ot-msg { font-size: 13px; line-height: 1.65; }
+:root body .ot-msg { font-size: 14px; line-height: 1.65; }
 :root body .ot-msg.assistant { background: transparent; border-color: transparent; padding-left: 0; padding-right: 0; max-width: 100%; }
 :root body .ot-claude-empty { color: var(--work-muted); line-height: 1.75; max-width: 240px; padding: 16px; }
 :root body .ot-claude-suggest { gap: 7px; }
@@ -131,7 +131,7 @@
 :root body .ot-spotlight-item .label .secondary { font: 11px/1.5 var(--f-display); letter-spacing: 0; color: var(--work-muted); }
 :root body .ot-ctx-hint { font-variant-numeric: tabular-nums; }
 :root body .ot-spotlight-footer { font-family: var(--f-display); letter-spacing: 0; }
-:root body .ot-ctx-item { min-height: 32px; padding-top: 8px; padding-bottom: 8px; font-family: var(--f-display); font-size: 12px; }
+:root body .ot-ctx-item { min-height: 34px; padding-top: 8px; padding-bottom: 8px; font-family: var(--f-display); font-size: 13px; }
 :root body .ot-ctx-hint { font-size: 10px; color: var(--work-muted); }
 
 :root body .ot-prompt-title { font-family: var(--f-display); font-weight: 500; font-size: 18px; line-height: 1.4; letter-spacing: -.025em; text-transform: none; }
@@ -143,7 +143,7 @@
 }
 :root body :is(.or-home-menu, .xd-home-menu) button.danger { color: var(--neon-magenta); }
 :root body .xd-home-start-menu { max-width: calc(100vw - 28px); max-height: min(480px, calc(100dvh - 120px)); overflow-y: auto; overscroll-behavior: contain; }
-:root body :is(.ot-panel-tab, .xd-tab, .ar-nav):focus-visible { outline: 2px solid var(--neon-cyan); outline-offset: -2px; }
+:root body :is(.ot-panel-tab, .xd-tab, .ar-nav):focus-visible { outline: 1px solid color-mix(in srgb, var(--t-primary) 55%, transparent); outline-offset: -2px; }
 :root body .ot-ctx-menu { max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; }
 :root body :is(.or-home-menu, .xd-home-menu) button { min-height: 32px; font: 12px/1.4 var(--f-display); }
 :root body :is(.or-home-card, .xd-home-card):focus-within :is(.or-home-card-menu-btn, .xd-home-card-menu-btn),
@@ -152,4 +152,50 @@
 :root body :is(.or-home-card-menu-btn, .xd-home-card-menu-btn) { width: 28px; height: 28px; color: var(--t-secondary); opacity: 1; }
 @media (hover: none) {
   :root body :is(.or-home-card-menu-btn, .xd-home-card-menu-btn, .ot-panel-tab .x, .xd-tab-close, .xd-page-del) { opacity: 1; }
+}
+
+/* Quiet focus (owner, 2026-10-12): no neon rings. Text fields always match
+   :focus-visible, so they signal focus with their border, never a ring. */
+:root body :is(input:not([type="checkbox"], [type="radio"], [type="range"]), textarea, select):focus-visible {
+  outline: none;
+}
+
+/* Liquid glass buttons (owner, 2026-10-12): primary actions read as raised
+   glass, not solid white slabs. Other themes keep their ink fills. */
+:root[data-theme="liquid"] body :is(
+  .or-home-btn-primary, .xd-home-new, .ar-new-btn, .rl-btn--primary, .hm-btn.primary,
+  .ot-prompt-btn.primary, .cc-send:not(.stop), .ar-brain-detail-actions button.ask,
+  .cp-surface .cp-btn:not(.ghost), .cp-surface .ot-settings-btn.primary, .cp-surface .pm-install,
+  .skill-intake .cp-btn:not(.ghost), .ot-claude-input button.send:not([aria-label="Stop response"])
+) {
+  color: var(--t-primary);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--t-primary) 17%, transparent),
+    color-mix(in srgb, var(--t-primary) 7%, transparent));
+  border: 1px solid color-mix(in srgb, var(--t-primary) 24%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--t-primary) 30%, transparent),
+    inset 0 -1px 0 #0000002e,
+    0 8px 20px -12px #000000b3;
+}
+:root[data-theme="liquid"] body :is(
+  .or-home-btn-primary, .xd-home-new, .ar-new-btn, .rl-btn--primary, .hm-btn.primary,
+  .ot-prompt-btn.primary, .cc-send:not(.stop), .ar-brain-detail-actions button.ask,
+  .cp-surface .cp-btn:not(.ghost), .cp-surface .ot-settings-btn.primary, .cp-surface .pm-install,
+  .skill-intake .cp-btn:not(.ghost), .ot-claude-input button.send:not([aria-label="Stop response"])
+):hover:not(:disabled) {
+  color: var(--t-primary);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--t-primary) 24%, transparent),
+    color-mix(in srgb, var(--t-primary) 11%, transparent));
+  border-color: color-mix(in srgb, var(--t-primary) 34%, transparent);
+}
+:root[data-theme="liquid"]:not(.ot-reduce-glass) body :is(
+  .or-home-btn-primary, .xd-home-new, .ar-new-btn, .rl-btn--primary, .hm-btn.primary,
+  .ot-prompt-btn.primary, .cc-send:not(.stop), .ar-brain-detail-actions button.ask,
+  .cp-surface .cp-btn:not(.ghost), .cp-surface .ot-settings-btn.primary, .cp-surface .pm-install,
+  .skill-intake .cp-btn:not(.ghost), .ot-claude-input button.send:not([aria-label="Stop response"])
+) {
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
 }

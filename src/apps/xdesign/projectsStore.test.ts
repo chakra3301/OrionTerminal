@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+const native = vi.hoisted(() => ({ invoke: vi.fn() }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: native.invoke, isTauri: () => false, convertFileSrc: (path: string) => path }));
 
 vi.mock("@/lib/db", () => {
   const mem = new Map<string, unknown>();
@@ -28,6 +30,11 @@ import { useHtmlArtifact } from "./htmlArtifactStore";
 import { markProjectDirty, useXDesignSaveState } from "./saveState";
 
 const mem = (db as unknown as { __mem: Map<string, unknown> }).__mem;
+const interruptedReceipt = { projectId: '01ARZ3NDEKTSV4RRFFQ69G5FAV', operationId: '01ARZ3NDEKTSV4RRFFQ69G5FAW' };
+const otherMeta = { id: '01ARZ3NDEKTSV4RRFFQ69G5FAX', name: 'Copy', createdAt: 1, updatedAt: 2 };
+function recoveryReply(phase: string, document = emptyDoc(), registry: unknown[] | null = null) {
+  return { version: 1, ...interruptedReceipt, phase, imported: phase === 'staged' || phase === 'committed' ? { name: 'Copy', document } : null, registry };
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -35,11 +42,128 @@ beforeEach(() => {
   mem.clear();
   useXDesignSaveState.setState({ documents: {}, names: {} });
   vi.clearAllMocks();
+  native.invoke.mockReset();
   useXDProjects.setState({ registry: [], openTabs: [], activeId: null, ready: false, loadError: null, transitioning: false });
   useXDesign.getState().hydrate(emptyDoc());
 });
 
+describe('interrupted project recovery', () => {
+  beforeEach(() => { useXDProjects.setState({ ready: true }); });
+  it('reopens the existing staged identity using the current database registry without copying or losing another window’s project', async () => {
+    const original = emptyDoc(); mem.set(`xdesign.project.${otherMeta.id}`, original); mem.set('xdesign.projects', { registry: [otherMeta] });
+    const document = { ...emptyDoc(), pages: [{ id: 'recovered', name: 'Recovered', shapes: [], past: [], future: [] }], activePageId: 'recovered' };
+    native.invoke.mockResolvedValue(recoveryReply('staged', document));
+    const id = await useXDProjects.getState().recoverDesignImport(interruptedReceipt);
+    expect(id).toBe(interruptedReceipt.projectId); expect(useXDProjects.getState()).toMatchObject({ activeId: id, openTabs: [id], registry: [{ id, name: 'Copy 2' }, otherMeta] });
+    expect(mem.get(`xdesign.project.${otherMeta.id}`)).toBe(original); expect(mem.get(`xdesign.project.${id}`)).toEqual(document); expect(useXDesign.getState().activePageId).toBe('recovered');
+    expect(native.invoke).toHaveBeenCalledExactlyOnceWith('xdesign_project_import_control', { operation: { kind: 'status', ...interruptedReceipt } });
+    expect(db.setXDesignStateAtomic).toHaveBeenCalledExactlyOnceWith(expect.any(Array), interruptedReceipt);
+  });
+  it('retains a staged copy after failed recovery saving and retries the same identity', async () => {
+    native.invoke.mockResolvedValue(recoveryReply('staged')); vi.mocked(db.setXDesignStateAtomic).mockRejectedValueOnce(new Error('Recovery disk full'));
+    await expect(useXDProjects.getState().recoverDesignImport(interruptedReceipt)).rejects.toThrow('Recovery disk full');
+    expect(useXDProjects.getState()).toMatchObject({ activeId: null, openTabs: [], registry: [] }); expect(mem.has(`xdesign.project.${interruptedReceipt.projectId}`)).toBe(false);
+    expect(native.invoke.mock.calls.every(([, args]) => args.operation.kind === 'status')).toBe(true);
+    expect(await useXDProjects.getState().recoverDesignImport(interruptedReceipt)).toBe(interruptedReceipt.projectId);
+    expect(useXDProjects.getState().registry).toHaveLength(1); expect(db.setXDesignStateAtomic).toHaveBeenCalledTimes(2);
+  });
+  it('recovers a lost registration reply using canonical later data without replaying or deleting the copy', async () => {
+    const savedMeta = { ...otherMeta, id: interruptedReceipt.projectId, name: 'Saved and renamed' };
+    const canonical = { ...emptyDoc(), pages: [{ id: 'canonical', name: 'Latest', shapes: [], past: [], future: [] }], activePageId: 'canonical' };
+    native.invoke.mockResolvedValueOnce(recoveryReply('staged')).mockResolvedValueOnce(recoveryReply('committed', canonical, [savedMeta, otherMeta]));
+    vi.mocked(db.setXDesignStateAtomic).mockImplementationOnce(async writes => { for (const { key, value } of writes) mem.set(key, value); throw new Error('Lost recovery commit reply'); });
+    expect(await useXDProjects.getState().recoverDesignImport(interruptedReceipt)).toBe(interruptedReceipt.projectId);
+    expect(useXDesign.getState().activePageId).toBe('canonical'); expect(useXDProjects.getState().registry).toEqual([savedMeta, otherMeta]); expect(db.setXDesignStateAtomic).toHaveBeenCalledOnce();
+    expect(native.invoke.mock.calls.map(([, args]) => args.operation.kind)).toEqual(['status', 'status']);
+  });
+  it('opens an already registered copy without another registry write or duplicate tab', async () => {
+    const savedMeta = { ...otherMeta, id: interruptedReceipt.projectId };
+    useXDProjects.setState({ openTabs: [savedMeta.id] }); native.invoke.mockResolvedValue(recoveryReply('committed', emptyDoc(), [savedMeta]));
+    await useXDProjects.getState().recoverDesignImport(interruptedReceipt); expect(db.setXDesignStateAtomic).not.toHaveBeenCalled(); expect(useXDProjects.getState().openTabs).toEqual([savedMeta.id]);
+  });
+  it.each(['preparing', 'discarded'])('preserves incomplete %s copies without writing or opening a project', async phase => {
+    native.invoke.mockResolvedValue(recoveryReply(phase)); await expect(useXDProjects.getState().recoverDesignImport(interruptedReceipt)).rejects.toThrow(phase === 'preparing' ? 'finished saving' : 'Removal has already started');
+    expect(db.setXDesignStateAtomic).not.toHaveBeenCalled(); expect(useXDProjects.getState()).toMatchObject({ activeId: null, registry: [], openTabs: [] });
+  });
+  it('preserves invalid recovered artwork and missing canonical metadata for review', async () => {
+    native.invoke.mockResolvedValueOnce(recoveryReply('staged', { ...emptyDoc(), formatVersion: 3 } as never));
+    await expect(useXDProjects.getState().recoverDesignImport(interruptedReceipt)).rejects.toThrow('newer application');
+    native.invoke.mockResolvedValueOnce(recoveryReply('committed', emptyDoc(), [otherMeta]));
+    await expect(useXDProjects.getState().recoverDesignImport(interruptedReceipt)).rejects.toThrow('metadata is unavailable'); expect(db.setXDesignStateAtomic).not.toHaveBeenCalled(); expect(useXDProjects.getState().activeId).toBeNull();
+  });
+  it('refuses recovery and removal after another project becomes active, preserving live unsaved work', async () => {
+    const original = await useXDProjects.getState().newProject('Live original');
+    useXDesign.getState().addShape({ kind: 'rect', x: 7, y: 8, w: 20, h: 30, fill: '#000', stroke: 'transparent', strokeWidth: 0, radius: 0 }); vi.clearAllMocks();
+    await expect(useXDProjects.getState().recoverDesignImport(interruptedReceipt)).rejects.toThrow('start screen'); await expect(useXDProjects.getState().removeInterruptedImport(interruptedReceipt)).rejects.toThrow('start screen');
+    expect(native.invoke).not.toHaveBeenCalled(); expect(db.setXDesignStateAtomic).not.toHaveBeenCalled(); expect(useXDProjects.getState().activeId).toBe(original); expect(useXDesign.getState().shapes).toMatchObject([{ kind: 'rect', x: 7 }]);
+  });
+  it('removes only the unused import through its original receipt and leaves saved projects intact', async () => {
+    mem.set(`xdesign.project.${otherMeta.id}`, emptyDoc()); mem.set('xdesign.projects', { registry: [otherMeta] }); useXDProjects.setState({ registry: [otherMeta] }); native.invoke.mockResolvedValue(recoveryReply('discarded'));
+    expect(await useXDProjects.getState().removeInterruptedImport(interruptedReceipt)).toBe('removed'); expect(db.setXDesignStateAtomic).not.toHaveBeenCalled(); expect(mem.has(`xdesign.project.${otherMeta.id}`)).toBe(true); expect(useXDProjects.getState().registry).toEqual([otherMeta]);
+    expect(native.invoke).toHaveBeenCalledExactlyOnceWith('xdesign_project_import_control', { operation: { kind: 'discard', ...interruptedReceipt } });
+  });
+  it('keeps a copy registered by another window and refreshes its metadata without opening or rewriting it', async () => {
+    const savedMeta = { ...otherMeta, id: interruptedReceipt.projectId }; native.invoke.mockResolvedValue(recoveryReply('committed', emptyDoc(), [savedMeta, otherMeta]));
+    expect(await useXDProjects.getState().removeInterruptedImport(interruptedReceipt)).toBe('kept'); expect(db.setXDesignStateAtomic).not.toHaveBeenCalled(); expect(useXDProjects.getState()).toMatchObject({ activeId: null, openTabs: [], registry: [savedMeta, otherMeta] });
+  });
+});
+
 describe("xdesign projectsStore", () => {
+  it('cleans failed managed imports without changing the original project', async () => {
+    const original = await useXDProjects.getState().newProject('Original');
+    let receipt!: { projectId: string; operationId: string };
+    native.invoke.mockImplementation(async (_command, args) => ({ version: 1, projectId: args.operation.projectId, operationId: args.operation.operationId, phase: 'discarded', imported: null, registry: null }));
+    vi.mocked(db.setXDesignStateAtomic).mockRejectedValueOnce(new Error('Registry disk full'));
+    await expect(useXDProjects.getState().importDesignProject(async (id, assets) => {
+      receipt = { projectId: id, operationId: assets.receipt.operationId };
+      return assets.run(async () => ({ name: 'Copy', document: emptyDoc() }));
+    })).rejects.toThrow('Registry disk full');
+    expect(native.invoke).toHaveBeenCalledExactlyOnceWith('xdesign_project_import_control', { operation: { kind: 'discard', ...receipt } });
+    expect(useXDProjects.getState()).toMatchObject({ activeId: original, registry: [{ id: original }] });
+    expect(mem.has(`xdesign.project.${receipt.projectId}`)).toBe(false);
+    expect(db.setXDesignStateAtomic).toHaveBeenLastCalledWith(expect.any(Array), receipt);
+  });
+  it('opens canonical registered data after a lost managed commit reply without saving twice', async () => {
+    const original = await useXDProjects.getState().newProject('Original');
+    const canonical = { ...emptyDoc(), activePageId: 'canonical', pages: [{ id: 'canonical', name: 'Saved copy', shapes: [], past: [], future: [] }] };
+    vi.mocked(db.setXDesignStateAtomic).mockImplementationOnce(async writes => {
+      for (const { key, value } of writes) mem.set(key, value);
+      throw new Error('Lost commit reply');
+    });
+    native.invoke.mockImplementation(async (_command, args) => {
+      const { projectId, operationId } = args.operation;
+      return { version: 1, projectId, operationId, phase: 'committed', imported: { name: 'Saved copy', document: canonical }, registry: (mem.get('xdesign.projects') as { registry: unknown[] }).registry };
+    });
+    const id = await useXDProjects.getState().importDesignProject(async (_id, assets) => assets.run(async () => ({ name: 'Copy', document: emptyDoc() })));
+    expect(id).not.toBe(original); expect(useXDProjects.getState().activeId).toBe(id); expect(useXDesign.getState().activePageId).toBe('canonical');
+    expect(db.setXDesignStateAtomic).toHaveBeenCalledTimes(2); expect(native.invoke).toHaveBeenCalledOnce();
+  });
+  it('cleans staged assets when validation fails before registry saving', async () => {
+    native.invoke.mockImplementation(async (_command, args) => ({ version: 1, projectId: args.operation.projectId, operationId: args.operation.operationId, phase: 'discarded', imported: null, registry: null }));
+    await expect(useXDProjects.getState().importDesignProject(async (_id, assets) => assets.run(async () => ({ name: 'Future', document: { ...emptyDoc(), formatVersion: 3 } as never })))).rejects.toThrow('newer application');
+    expect(db.setXDesignStateAtomic).not.toHaveBeenCalled(); expect(native.invoke).toHaveBeenCalledOnce(); expect(useXDProjects.getState().activeId).toBeNull();
+  });
+  it("opens a portable import under a fresh identity and publishes its document and registry together", async () => {
+    const original = await useXDProjects.getState().newProject("Original");
+    useXDesign.getState().addShape({kind:"rect",x:1,y:2,w:30,h:40,fill:"#000000",stroke:"transparent",strokeWidth:0,radius:0});
+    const imported = {...emptyDoc(),pages:[{id:"imported-page",name:"Imported",shapes:[],past:[],future:[]}],activePageId:"imported-page"};
+    let assetProject="";
+    const id = await useXDProjects.getState().importDesignProject(async newId => {assetProject=newId;return {name:"Original",document:imported};});
+    expect(id).not.toBe(original);expect(assetProject).toBe(id);
+    expect(useXDProjects.getState()).toMatchObject({activeId:id,registry:[{id,name:"Original 2"},{id:original}]});
+    expect(mem.get(`xdesign.project.${original}`)).toMatchObject({pages:[{shapes:[{kind:"rect",x:1}]}]});
+    expect(mem.get(`xdesign.project.${id}`)).toEqual(imported);
+    expect(db.setXDesignStateAtomic).toHaveBeenLastCalledWith([{key:`xdesign.project.${id}`,value:imported},{key:"xdesign.projects",value:{registry:useXDProjects.getState().registry}}]);
+    expect(useXDesign.getState().activePageId).toBe("imported-page");
+  });
+  it("preserves the current project and registry when an import is invalid or cannot commit", async () => {
+    const original = await useXDProjects.getState().newProject("Original");
+    await expect(useXDProjects.getState().importDesignProject(async () => ({name:"Future",document:{...emptyDoc(),formatVersion:3} as never}))).rejects.toThrow("newer application");
+    vi.mocked(db.setXDesignStateAtomic).mockRejectedValueOnce(new Error("Disk full"));
+    await expect(useXDProjects.getState().importDesignProject(async () => ({name:"Import",document:emptyDoc()}))).rejects.toThrow("Disk full");
+    expect(useXDProjects.getState()).toMatchObject({activeId:original,registry:[{id:original}],transitioning:false});
+    expect([...mem.keys()].filter(key=>key.startsWith("xdesign.project."))).toEqual([`xdesign.project.${original}`]);
+  });
   it("migrates unopened browser pages into their SQLite documents and retains originals", async () => {
     const a = await useXDProjects.getState().newProject("Legacy A");
     const b = await useXDProjects.getState().newProject("Legacy B");

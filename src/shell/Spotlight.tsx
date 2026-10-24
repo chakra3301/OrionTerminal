@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Fuse from "fuse.js";
-import { Search, Sparkles, Archive as ArchiveIcon, Folder, Clock } from "lucide-react";
+import { Search, Sparkles, Archive as ArchiveIcon, Folder, Clock, FileText, AppWindow, ChevronRight } from "lucide-react";
 import { useShell } from "@/shell/store/useShell";
 import { appRegistry, useAppDescriptors, type AppId } from "@/plugins/appRegistry";
 import { registry, type Command } from "@/commands/registry";
@@ -199,7 +199,11 @@ export function Spotlight() {
       },
     }));
 
-    const cmds: SpotlightEntry[] = commands.map((c) => ({
+    const appOpenIds = new Set(appDescriptors.map((d) => d.openCommand.id));
+    const appNames = new Set(appDescriptors.map((d) => `View: Open ${d.name}`));
+    const cmds: SpotlightEntry[] = commands
+      .filter((c) => isCommandsOnly || (!appOpenIds.has(c.id) && !appNames.has(c.label)))
+      .map((c) => ({
       kind: "command",
       id: `cmd:${c.id}`,
       label: c.label,
@@ -389,15 +393,13 @@ export function Spotlight() {
   };
 
   const sections: Array<{ label: string; items: SpotlightEntry[] }> = [];
-  let lastLabel: string | null = null;
   for (const e of visible) {
     const s = sectionFor(e);
-    if (s !== lastLabel) {
-      sections.push({ label: s, items: [] });
-      lastLabel = s;
-    }
-    sections[sections.length - 1]!.items.push(e);
+    const section = sections.find((x) => x.label === s);
+    if (section) section.items.push(e);
+    else sections.push({ label: s, items: [e] });
   }
+  const ordered = sections.flatMap((x) => x.items);
 
   const flatIndex = (sectionIdx: number, itemIdx: number): number => {
     let n = 0;
@@ -413,7 +415,7 @@ export function Spotlight() {
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelected((s) => Math.min(s + 1, visible.length - 1));
+      setSelected((s) => Math.min(s + 1, ordered.length - 1));
       return;
     }
     if (e.key === "ArrowUp") {
@@ -423,13 +425,12 @@ export function Spotlight() {
     }
     if (e.key === "Enter") {
       e.preventDefault();
-      const entry = visible[selected];
+      const entry = ordered[selected];
       if (entry) entry.run();
       return;
     }
   };
 
-  // Suppress unused warnings for fields we'll use in Phase B/C.
   void focusedId;
   void windows;
 
@@ -483,6 +484,12 @@ export function Spotlight() {
                         <Folder size={11} color="var(--neon-cyan)" />
                       ) : entry.kind === "activity" ? (
                         <Clock size={11} color="var(--neon-violet)" />
+                      ) : entry.kind === "app" ? (
+                        <AppWindow size={11} />
+                      ) : entry.kind === "file" ? (
+                        <FileText size={11} />
+                      ) : entry.kind === "command" ? (
+                        <ChevronRight size={11} />
                       ) : (
                         <Search size={11} />
                       )}

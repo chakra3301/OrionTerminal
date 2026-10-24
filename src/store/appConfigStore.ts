@@ -151,6 +151,7 @@ export const useAppConfig = create<AppConfigState>((set, get) => ({
  *  active. Kept first-turn-only so long prompts don't re-bill every turn. */
 export function appFirstTurnPreamble(app: AppId): string {
   const r = useAppConfig.getState().resolved(app);
+  if (r.skillIds.some((id) => id.startsWith("imported:"))) throw new Error("Imported skills cannot be app-wide defaults. Detach them in app settings, then select them per turn in Orion or through Agent Forge.");
   const parts: string[] = [];
   if (r.systemPromptEnabled && r.systemPrompt.trim()) parts.push(r.systemPrompt.trim());
   if (r.skillIds.length) {
@@ -168,6 +169,7 @@ export function appFirstTurnPreamble(app: AppId): string {
  *  enabled skills require. */
 export function appAllowedTools(app: AppId): string[] | null {
   const r = useAppConfig.getState().resolved(app);
+  if (r.skillIds.some((id) => id.startsWith("imported:"))) throw new Error("Imported skills cannot grant app-wide tools. Detach them in app settings.");
   const grants: ToolGrant[] = [];
   if (r.toolsCustomized) grants.push(...r.tools);
   if (r.skillIds.length) {

@@ -1,5 +1,8 @@
 import * as THREE from "three";
 import { resolveClips } from "./catalog";
+import type { CompanionRoles } from "./companionRig";
+
+const MIXAMO_FIDGETS = /^(sad idle|happy|bashful|thankful|cheering|silly dancing|joyful jump|female dynamic pose)$/i;
 
 export class CompanionAnimator {
   readonly mixer: THREE.AnimationMixer;
@@ -9,6 +12,7 @@ export class CompanionAnimator {
   readonly error: string | null;
   readonly gesture: string | null;
   private clips: Map<string, THREE.AnimationClip>;
+  private alias: Readonly<Record<string, string>>;
   private idle: THREE.AnimationAction | null;
   private active: THREE.AnimationAction | null = null;
   private pending: string[] = [];
@@ -20,25 +24,38 @@ export class CompanionAnimator {
   private testName: string | null = null;
   private lastFidget = "";
   private fidgets: string[];
+  /** Fires when a one-shot clip starts or ends (spring solvers reset on discontinuities). */
+  onSwitch: (() => void) | null = null;
 
-  constructor(scene: THREE.Object3D, animations: THREE.AnimationClip[], private random = Math.random) {
+  constructor(scene: THREE.Object3D, animations: THREE.AnimationClip[], private random = Math.random, roles?: CompanionRoles) {
     this.mixer = new THREE.AnimationMixer(scene);
     this.clips = new Map(animations.map((clip) => [clip.name, clip]));
     this.names = animations.map((clip) => clip.name);
-    const resolved = resolveClips(this.names);
-    this.idleName = resolved.idle;
-    this.greeting = resolved.select === resolved.idle ? null : resolved.select;
-    this.error = this.names.find((name) => /angry|rejected|error/i.test(name)) ?? null;
-    this.gesture = this.names.find((name) => /^talking$/i.test(name)) ?? this.greeting;
-    this.fidgets = this.names.filter((name) => name !== this.idleName && /^(sad idle|happy|bashful|thankful|cheering|silly dancing|joyful jump|female dynamic pose)$/i.test(name));
+    this.alias = roles?.alias ?? {};
+    if (roles) {
+      this.idleName = this.clips.has(roles.idle) ? roles.idle : this.names[0] ?? null;
+      this.greeting = this.clips.has(roles.greeting) ? roles.greeting : null;
+      this.error = this.clips.has(roles.error) ? roles.error : null;
+      this.gesture = this.clips.has(roles.gesture) ? roles.gesture : this.greeting;
+      this.fidgets = roles.fidgets.filter((name) => this.clips.has(name));
+    } else {
+      const resolved = resolveClips(this.names);
+      this.idleName = resolved.idle;
+      this.greeting = resolved.select === resolved.idle ? null : resolved.select;
+      this.error = this.names.find((name) => /angry|rejected|error/i.test(name)) ?? null;
+      this.gesture = this.names.find((name) => /^talking$/i.test(name)) ?? this.greeting;
+      this.fidgets = this.names.filter((name) => name !== this.idleName && MIXAMO_FIDGETS.test(name));
+    }
     if (!this.fidgets.length && this.greeting) this.fidgets = [this.greeting];
     const idleClip = this.idleName ? this.clips.get(this.idleName) : undefined;
     this.idle = idleClip ? this.mixer.clipAction(idleClip) : null;
     this.restoreIdle(0);
   }
 
+  /** Accepts this companion's own clip names or the shared reaction names. */
   queue(name: string | null) {
-    if (name && name !== this.idleName && this.clips.has(name) && this.pending.length < 4) this.pending.push(name);
+    const clip = name ? this.alias[name] ?? name : null;
+    if (clip && clip !== this.idleName && this.clips.has(clip) && this.pending.length < 4 && this.pending.at(-1) !== clip) this.pending.push(clip);
   }
 
   private restoreIdle(fade: number) {
@@ -68,6 +85,7 @@ export class CompanionAnimator {
         action.reset().setLoop(THREE.LoopRepeat, Infinity).setEffectiveWeight(1).play();
         action.clampWhenFinished = false;
         this.testName = testClip;
+        this.onSwitch?.();
       }
     } else {
       if (this.testName) {
@@ -77,6 +95,7 @@ export class CompanionAnimator {
         this.pending = [];
         this.restoreIdle(0.3);
         this.nextFidget = this.time + 75;
+        this.onSwitch?.();
       }
       if (this.active && !this.fadeEnd && (this.time >= this.endAt || (this.pending.length && !this.priority) || (!idleMode && !this.priority))) {
         this.active.fadeOut(0.4);

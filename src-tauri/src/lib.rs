@@ -1,4 +1,6 @@
 #![recursion_limit = "256"]
+mod agent_chat;
+mod agent_cli;
 mod api_key;
 mod app_handle;
 mod asset;
@@ -22,12 +24,14 @@ mod fs_watch;
 mod git_ops;
 mod hermes;
 mod inline_edit;
+mod intake;
 mod learn;
 mod lsp;
 mod mcp_config;
 mod mcp_grants;
 pub mod mcp_server;
 mod messages_chat;
+mod media_download;
 mod nous_oauth;
 mod pi_engine;
 mod plugin_runtime;
@@ -43,7 +47,14 @@ mod terminal;
 mod ui_bridge;
 mod wallpaper;
 mod xdesign_image;
+mod xdesign_assets;
+mod xdesign_room;
 mod xdesign_state;
+mod xdesign_archive;
+mod xdesign_project_imports;
+mod xdesign_history;
+mod xdesign_photo;
+mod xdesign_fonts;
 mod xdesign_web;
 
 use tauri::Manager;
@@ -233,6 +244,66 @@ fn database_migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/0029_xdesign_design_systems.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 30,
+            description: "local skill intake staging",
+            sql: include_str!("../migrations/0030_skill_intake_staging.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 31,
+            description: "immutable installed skill packages",
+            sql: include_str!("../migrations/0031_installed_skill_packages.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 32,
+            description: "immutable pinned static-app source captures",
+            sql: include_str!("../migrations/0032_static_app_sources.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 33,
+            description: "immutable static-app prepared candidates",
+            sql: include_str!("../migrations/0033_static_app_candidates.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 34,
+            description: "Archives media download history",
+            sql: include_str!("../migrations/0034_media_downloads.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 35,
+            description: "Media format options and non-destructive playback copies",
+            sql: include_str!("../migrations/0035_media_download_options.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 36,
+            description: "Download defaults and durable source archive",
+            sql: include_str!("../migrations/0036_media_download_preferences.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 37,
+            description: "URL-scoped generic extractor archive identities",
+            sql: include_str!("../migrations/0037_media_download_generic_archive.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 38,
+            description: "Durable held media download queue",
+            sql: include_str!("../migrations/0038_media_download_queue.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 39,
+            description: "Explicit local asset caption indexes and preserved archive search",
+            sql: include_str!("../migrations/0039_asset_transcripts.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -296,9 +367,36 @@ pub fn run() {
             fs_ops::read_dir_tree,
             fs_ops::read_file,
             fs_ops::theme_read_markdown,
+            intake::intake_discover,
+            intake::intake_inspect,
+            intake::intake_release,
+            intake::intake_stage,
+            intake::intake_list,
+            intake::intake_discard,
+            intake::intake_read,
+            intake::github::intake_github_discover,
+            intake::github::intake_github_inspect,
+            intake::github::review::intake_github_review,
+            intake::github::intake_github_cancel,
+            intake::github::static_apps::intake_static_fetch,
+            intake::github::static_apps::intake_static_cancel,
+            intake::github::static_apps::intake_static_list,
+            intake::github::static_apps::intake_static_read,
+            intake::github::static_apps::intake_static_discard,
+            intake::github::static_apps::prepared::intake_prepared_save,
+            intake::github::static_apps::prepared::intake_prepared_list,
+            intake::github::static_apps::prepared::intake_prepared_read,
+            intake::github::static_apps::prepared::intake_prepared_discard,
+            intake::github::static_apps::prepared::install::intake_prepared_install,
+            intake::installed::intake_installed,
+            intake::installed::intake_install,
+            intake::installed::intake_skill_change,
+            intake::installed::intake_skill_context,
+            intake::installed::intake_installed_read,
             fs_ops::read_file_base64,
             fs_ops::count_files,
             fs_ops::save_file_atomic,
+            fs_ops::write_file_base64,
             fs_ops::analysis_work_dir,
             fs_ops::path_exists,
             fs_ops::search_in_files,
@@ -316,6 +414,8 @@ pub fn run() {
             git_ops::git_push,
             git_ops::git_branches,
             git_ops::git_checkout,
+            git_ops::git_create_branch,
+            git_ops::git_pull,
             git_ops::git_file_diff,
             git_ops::git_blame_line,
             lsp::lsp_probe,
@@ -337,11 +437,18 @@ pub fn run() {
             provider_keys::provider_key_clear,
             provider_keys::provider_key_status,
             plugin_runtime::plugin_inspect_directory,
+            plugin_runtime::intake::plugin_inspect_intake_directory,
+            plugin_runtime::intake::plugin_install_intake_directory,
             plugin_runtime::plugin_install_directory,
+            plugin_runtime::plugin_install_reviewed_directory,
+            plugin_runtime::recovery::plugin_previous_version,
+            plugin_runtime::recovery::plugin_rollback_reviewed,
             plugin_runtime::plugin_list_installed,
+            plugin_runtime::plugin_recover_installed,
             plugin_runtime::plugin_set_enabled,
             plugin_runtime::plugin_quarantine,
             plugin_runtime::plugin_remove,
+            plugin_runtime::recovery::removal::plugin_remove_reviewed,
             plugin_runtime::plugin_read_entrypoint,
             plugin_runtime::plugin_workspace_grant,
             plugin_runtime::plugin_workspace_revoke,
@@ -373,6 +480,7 @@ pub fn run() {
             claude_cli::claude_send,
             claude_cli::claude_cancel,
             runtime::runtime_send,
+            runtime::runtime_send_reviewed,
             runtime::runtime_cancel,
             cli_engine::cli_status,
             cli_engine::cli_login,
@@ -401,17 +509,99 @@ pub fn run() {
             terminal::terminal_open,
             terminal::terminal_open_claude,
             terminal::terminal_open_agent,
+            agent_chat::agent_chat_send,
+            agent_chat::agent_chat_cancel,
+            agent_cli::agent_cli_info,
             terminal::terminal_write,
             terminal::terminal_resize,
             terminal::terminal_kill,
+            media_download::media_download_engines,
+            media_download::media_download_list,
+            media_download::media_download_inspect,
+            media_download::media_download_start,
+            media_download::media_download_playable_copy,
+            media_download::media_download_stop,
+            media_download::media_download_import,
+            media_download::media_download_remove,
+            media_download::preferences::media_download_preferences,
+            media_download::preferences::media_download_archive_count,
+            media_download::preferences::media_download_archive_forget,
+            media_download::export::media_download_export,
+            media_download::sidecars::media_download_asset_extras,
+            media_download::sidecars::media_download_export_sidecar,
+            media_download::sidecars::media_download_index_captions,
+            media_download::sidecars::media_download_clear_captions,
+            media_download::sidecars::media_download_sidecar_cancel,
+            media_download::sidecars::media_download_search_captions,
+            media_download::sidecars::media_download_refresh_caption_matches,
+            media_download::queue::media_download_batch,
+            media_download::queue::media_download_queue_status,
+            media_download::queue::media_download_queue_run,
+            media_download::queue::media_download_queue_hold,
+            media_download::queue::media_download_queue_add,
+            media_download::queue::media_download_queue_pause,
+            media_download::queue::media_download_queue_resume,
+            media_download::queue::media_download_queue_reorder,
+            media_download::playlists::media_download_playlist,
+            media_download::playlists::media_download_playlist_queue,
             asset::asset_store_file,
             asset::asset_store_bytes,
             asset::asset_delete_file,
             asset::xdesign_snapshot_write,
+            xdesign_assets::xdesign_asset_request,
+            xdesign_assets::xdesign_stock_image,
+            xdesign_room::xdesign_room_open,
+            xdesign_room::xdesign_room_request,
+            xdesign_room::xdesign_room_image_file_request,
+            xdesign_room::xdesign_room_cancel,
+            xdesign_room::xdesign_room_close,
+            xdesign_room::xdesign_room_key_set,
+            xdesign_room::xdesign_room_key_clear,
+            xdesign_room::xdesign_room_key_status,
             xdesign_image::xdesign_image_gen,
             xdesign_web::xdesign_fetch_url,
             xdesign_web::xdesign_save_bytes,
             xdesign_state::xdesign_state_commit,
+            xdesign_archive::xdesign_project_export,
+            xdesign_archive::xdesign_project_import,
+            xdesign_archive::xdesign_project_clone,
+            xdesign_project_imports::xdesign_project_import_control,
+            xdesign_history::xdesign_state_save,
+            xdesign_history::xdesign_checkpoint_create,
+            xdesign_history::xdesign_checkpoint_list,
+            xdesign_history::xdesign_checkpoint_delete,
+            xdesign_history::xdesign_checkpoint_restore,
+            xdesign_photo::xdesign_photo_open,
+            xdesign_photo::xdesign_photo_color_settings,
+            xdesign_photo::xdesign_photo_clipboard,
+            xdesign_photo::xdesign_photo_import_decision,
+            xdesign_photo::xdesign_photo_command,
+            xdesign_photo::xdesign_photo_source_inspect,
+            xdesign_photo::xdesign_storage_report,
+            xdesign_photo::xdesign_storage_startup,
+            xdesign_photo::xdesign_storage_schedule_compaction,
+            xdesign_photo::xdesign_photo_channel_operation,
+            xdesign_photo::xdesign_photo_catalog,
+            xdesign_photo::xdesign_photo_export,
+            xdesign_photo::xdesign_photo_render,
+            xdesign_photo::xdesign_photo_tile,
+            xdesign_photo::xdesign_photo_layer_thumbnails,
+            xdesign_photo::xdesign_photo_channel_thumbnails,
+            xdesign_photo::xdesign_photo_histogram,
+            xdesign_photo::xdesign_photo_sample,
+            xdesign_photo::xdesign_photo_tone_pixels,
+            xdesign_photo::xdesign_photo_view_preview,
+            xdesign_photo::xdesign_photo_command_preview,
+            xdesign_photo::xdesign_photo_magnetic_trace,
+            xdesign_photo::xdesign_photo_preset_preview,
+            xdesign_photo::xdesign_photo_stroke_preview,
+            xdesign_photo::xdesign_photo_stroke_pixels,
+            xdesign_photo::xdesign_photo_stroke_preview_pixels,
+            xdesign_photo::xdesign_photo_stroke_end,
+            xdesign_photo::xdesign_photo_smart_open,
+            xdesign_photo::xdesign_photo_smart_apply,
+            xdesign_fonts::xdesign_font_families,
+            xdesign_fonts::xdesign_font_load,
             fs_watch::fs_watch_set_root,
             wallpaper::wallpaper_store_file,
             wallpaper::wallpaper_clear_file,

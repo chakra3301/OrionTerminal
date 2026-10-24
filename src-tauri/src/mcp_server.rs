@@ -1297,6 +1297,7 @@ fn tool_search_archive(args: &Value) -> Result<String, String> {
         .collect::<Vec<_>>()
         .join(" ");
     let conn = open_db()?;
+    crate::media_download::sidecars::refresh_caption_matches(&conn, &fts_query)?;
     let mut stmt = conn
         .prepare(
             "SELECT s.entity_id, s.entity_type, s.title, \

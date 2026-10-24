@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
   AlertTriangle,
@@ -82,6 +82,11 @@ export function PluginManagerPanel() {
   const clearSafeMode = useCommunityPlugins((state) => state.clearSafeMode);
   const clearCommunityError = useCommunityPlugins((state) => state.clearError);
   const [inspecting, setInspecting] = useState(false);
+  const [reviewingRollback, setReviewingRollback] = useState(false);
+  const rollbackReview = useRef(false);
+  const removalReview = useRef(false);
+  const alive = useRef(true), inspectingRef = useRef(false);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   useEffect(() => {
     if (installed.length > 0) void refreshCommunityResources();
@@ -106,19 +111,17 @@ export function PluginManagerPanel() {
   };
 
   const inspectAndInstall = async () => {
-    const selected = await openDialog({
-      directory: true,
-      multiple: false,
-      title: "Choose an .orion-plugin package folder",
-    });
-    if (typeof selected !== "string") return;
-    setInspecting(true);
+    if (inspectingRef.current) return;
+    inspectingRef.current = true; setInspecting(true);
     clearCommunityError();
     try {
-      const inspection = await ipc.pluginInspectDirectory(selected);
+      const selected = await openDialog({ directory: true, multiple: false, title: "Choose an .orion-plugin package folder" });
+      if (!alive.current || typeof selected !== "string") return;
+      const inspection = structuredClone(await ipc.pluginInspectDirectory(selected));
+      if (!alive.current) return;
       const validation = validatePluginManifest(inspection.manifest);
       if (!validation.ok) throw new Error(validation.issues.join("\n"));
-      const current = installed.find((plugin) => plugin.manifest.id === validation.manifest.id);
+      const current = structuredClone(useCommunityPlugins.getState().installed.find((plugin) => plugin.manifest.id === validation.manifest.id) ?? null);
       const addedPermissions = validation.manifest.permissions.filter(
         (permission) => !current?.grantedPermissions.includes(permission),
       );
@@ -130,23 +133,45 @@ export function PluginManagerPanel() {
         body: [
           `${validation.manifest.publisher} · v${validation.manifest.version} · ${inspection.fileCount} files · ${formatBytes(inspection.totalBytes)}`,
           "",
+          `Reviewed package SHA-256: ${inspection.fingerprint}`,
           "Requested capabilities:",
           permissionCopy,
           ...(current && addedPermissions.length > 0
             ? ["", `New in this update: ${addedPermissions.map(permissionLabel).join(", ")}`]
             : []),
           "",
+          "Publisher identity is declared, not authenticated. This review is not security or license clearance.",
+          "New packages can activate after installation; updates preserve the reviewed enabled state. Safe mode still holds activation. Use Incubator for disabled-only new installations.",
           "Community code runs in an opaque sandbox. Every privileged request is checked again by the native broker.",
         ].join("\n"),
         confirmLabel: current ? "Approve update" : "Install plugin",
       });
-      if (!approved) return;
-      await installCommunity(selected, { ...inspection, manifest: validation.manifest });
+      if (!approved || !alive.current) return;
+      await installCommunity(selected, { ...inspection, manifest: validation.manifest }, "manager-reviewed", false, current);
     } catch (error) {
-      useCommunityPlugins.setState({ error: error instanceof Error ? error.message : String(error) });
+      if (alive.current) useCommunityPlugins.setState({ error: error instanceof Error ? error.message : String(error) });
     } finally {
-      setInspecting(false);
+      inspectingRef.current = false;
+      if (alive.current) setInspecting(false);
     }
+  };
+
+  const rollbackPackage = async (pluginId: string) => {
+    if (rollbackReview.current) return;
+    rollbackReview.current = true; setReviewingRollback(true);
+    try {
+      const current = structuredClone(useCommunityPlugins.getState().installed.find((p) => p.manifest.id === pluginId));
+      if (!current) throw new Error("Package is no longer installed.");
+      const previous = await ipc.pluginPreviousVersion(pluginId);
+      if (!alive.current) return;
+      const approved = await confirmAction({
+        title: `Roll back ${current.manifest.name}?`,
+        body: [`${current.manifest.version} → ${previous.manifest.version}`, `Current SHA-256: ${current.fingerprint}`, `Retained SHA-256: ${previous.fingerprint}`, "Retained permission requests:", previous.grantedPermissions.join("\n") || "None", "", "Code/resources only: private plugin data is NOT rolled back and may be incompatible.", "The restored package stays disabled. Existing workspace access is removed; enable and approve folders again explicitly."].join("\n"),
+        confirmLabel: "Roll back disabled",
+      });
+      if (approved && alive.current) await useCommunityPlugins.getState().rollback(pluginId, current, previous);
+    } catch (error) { if (alive.current) useCommunityPlugins.setState({ error: error instanceof Error ? error.message : String(error) }); }
+    finally { rollbackReview.current = false; if (alive.current) setReviewingRollback(false); }
   };
 
   const toggleCommunity = async (pluginId: string, name: string, enabled: boolean) => {
@@ -162,14 +187,21 @@ export function PluginManagerPanel() {
     await setCommunityEnabled(pluginId, !enabled);
   };
 
-  const uninstall = async (pluginId: string, name: string) => {
-    const approved = await confirmAction({
-      title: `Remove ${name}?`,
-      body: "The installed package will be removed. Namespaced plugin data is deliberately retained so reinstalling can restore it.",
-      confirmLabel: "Remove package",
-      danger: true,
-    });
-    if (approved) await removeCommunity(pluginId);
+  const uninstall = async (pluginId: string) => {
+    if (removalReview.current) return;
+    const current = useCommunityPlugins.getState().installed.find((p) => p.manifest.id === pluginId);
+    if (!current) return;
+    const reviewed = structuredClone(current);
+    removalReview.current = true;
+    try {
+      const approved = await confirmAction({
+        title: `Remove ${reviewed.manifest.name}?`,
+        body: `Version ${reviewed.manifest.version} · SHA-256 ${reviewed.fingerprint}\nThe installed package and its retained rollback version will be removed. Namespaced plugin data is deliberately retained so reinstalling can restore it. Interrupted removals recover disabled. Retired code can remain after cleanup failure; deletion is not secure erasure.`,
+        confirmLabel: "Remove package",
+        danger: true,
+      });
+      if (approved && alive.current) await removeCommunity(pluginId, reviewed);
+    } finally { removalReview.current = false; }
   };
 
   const revokeWorkspace = async (
@@ -308,6 +340,8 @@ export function PluginManagerPanel() {
         </button>
       </div>
 
+      <button type="button" className="cp-btn ghost" disabled={communityBusyIds.length > 0 || inspecting || reviewingRollback} onClick={() => void useCommunityPlugins.getState().hydrate()}>Reload packages / recover interrupted changes</button>
+      <p>Recovery holds restored packages disabled and clears their workspace access. Reload may restart other enabled packages.</p>
       {installed.length === 0 ? (
         <div className="pm-empty">
           <Blocks size={26} />
@@ -378,12 +412,13 @@ export function PluginManagerPanel() {
                 <footer className="pm-card-foot">
                   <div><span>Local</span><span>v{plugin.manifest.version}</span><span>{plugin.manifest.publisher}</span></div>
                   <div className="pm-card-actions">
+                    <button type="button" className="cp-btn ghost" disabled={communityBusyIds.length > 0 || reviewingRollback || inspecting} onClick={() => void rollbackPackage(plugin.manifest.id)} title={`Review rollback for ${plugin.manifest.name}`}><RotateCcw size={12} /> Review rollback</button>
                     <button
                       type="button"
                       className="pm-remove"
                       title={`Remove ${plugin.manifest.name}`}
                       disabled={busy}
-                      onClick={() => void uninstall(plugin.manifest.id, plugin.manifest.name)}
+                      onClick={() => void uninstall(plugin.manifest.id)}
                     ><Trash2 size={12} /></button>
                     <button
                       type="button"

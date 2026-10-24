@@ -35,6 +35,8 @@ function blameAge(ts: number): string {
   return `${Math.floor(s / 31_536_000)}y ago`;
 }
 
+const PROSE_LANGUAGES = new Set(["markdown", "plaintext"]);
+
 export function OrionEditor({ path }: { path: string }) {
   const editorTheme = useEditorTheme();
   const buffer = useTabsStore((s) => s.fileBuffers[path]);
@@ -52,6 +54,14 @@ export function OrionEditor({ path }: { path: string }) {
   const pendingDecosRef = useRef<DecorationsCollection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mountTick, setMountTick] = useState(0);
+  // Prose wraps so long lines reflow when panes resize instead of running
+  // under the neighbouring rail; code stays unwrapped. ⌥Z flips it.
+  const proseByDefault = PROSE_LANGUAGES.has(languageForPath(path));
+  const [wrapOverride, setWrapOverride] = useState<boolean | null>(null);
+  const proseRef = useRef(proseByDefault);
+  proseRef.current = proseByDefault;
+  useEffect(() => setWrapOverride(null), [path]);
+  const wrapped = wrapOverride ?? proseByDefault;
   const [enclosingSymbol, setEnclosingSymbol] = useState<string | null>(null);
   const symbolTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -391,6 +401,10 @@ export function OrionEditor({ path }: { path: string }) {
       scheduleGitDecorations();
     });
 
+    editor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyZ, () => {
+      setWrapOverride((w) => !(w ?? proseRef.current));
+    });
+
     // ⌘F12 — project-wide definition jump (F12 stays Monaco's own,
     // which covers same-file/open-model definitions until LSP).
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.F12, () => {
@@ -596,7 +610,7 @@ export function OrionEditor({ path }: { path: string }) {
           scrollBeyondLastLine: false,
           renderWhitespace: "selection",
           renderLineHighlight: "all",
-          wordWrap: "off",
+          wordWrap: wrapped ? "on" : "off",
           automaticLayout: true,
           tabSize: 2,
           detectIndentation: true,

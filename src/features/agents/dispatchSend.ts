@@ -13,6 +13,8 @@ import { shouldTwoPass, planningSystem, executionPrompt } from "./twoPass";
 import { beginTwoPass, twoPassPhase, clearTwoPass } from "./twoPassCoordinator";
 import { owningProvider, parseModelValue } from "./modelSelection";
 import { hasSessionOwner, rememberSessionOwner, forgetSessionOwner, forgetSessionOwnersForKind } from "./sessionOwnership";
+import { planSkillActivation, prepareSkillContext, type SkillTurnChoice, type SkillReceipt } from "@/features/intake/skillActivation";
+import { holdImportedSkills, releaseImportedSkills, hasImportedSkills } from "@/features/intake/skillRuns";
 
 const dispatchedRoutes = new Map<string, Route>();
 const conversationRoutes = new Map<string, string>();
@@ -28,6 +30,14 @@ export function recordDispatchedSession(chatId: string, sessionId: string): void
   const identity = dispatchedIdentities.get(chatId);
   if (!identity) return;
   dispatchedSessions.set(chatId, sessionId);
+  // Imported guidance must never survive deselection through a resumable CLI session.
+  if (hasImportedSkills(chatId)) {
+    void forgetSessionOwner(sessionId).catch((error) => {
+      log.warn("Could not persist imported session reset", error);
+      toast.error("Start a new chat before retrying after restart", { body: "The imported skill session reset could not be saved.", dedupeKey: "imported-session-reset" });
+    });
+    return;
+  }
   void rememberSessionOwner(sessionId, identity).catch((error) => log.warn("Could not persist connector session ownership", error));
 }
 
@@ -119,6 +129,10 @@ export type DispatchSendArgs = {
   /** Per-app overrides merged into the resolved send (system prompt extras,
    *  tool restriction) — see appConfigStore. */
   extra?: SendExtra;
+  /** Explicit foreground Orion attachment review; absent on specialists/background calls. */
+  skillContext?: SkillTurnChoice;
+  freshPreamble?: string;
+  onReady?: (receipts: SkillReceipt[]) => void;
 };
 
 export type SendExtra = {
@@ -141,9 +155,12 @@ function mergeExtra(r: ResolvedSend, extra?: SendExtra): ResolvedSend {
 }
 
 export type ResolvedDispatchOpts = {
+  reviewedProviderIdentity?: string;
   projectRoot?: string | null;
   sessionId?: string | null;
   imagePath?: string | null;
+  freshPreamble?: string;
+  onReady?: (receipts: SkillReceipt[]) => void;
 };
 
 /** Route an already-resolved send to the owning engine. */
@@ -154,6 +171,8 @@ export async function dispatchResolved(
   history: RuntimeMsg[],
   opts: ResolvedDispatchOpts,
 ): Promise<void> {
+  if (r.importedSkillIds?.length && !r.importedActivation) throw new Error("Imported skills require explicit foreground review.");
+  if (r.importedActivation && opts.imagePath) throw new Error("Imported skills currently support text-only turns.");
   const providers = useProvidersStore.getState().providers;
   const route = routeFor(providers, r.model);
   const model = parseModelValue(r.model).modelId;
@@ -169,22 +188,36 @@ export async function dispatchResolved(
   dispatchedIdentities.set(chatId, identity);
   if (opts.sessionId) dispatchedSessions.set(chatId, opts.sessionId);
   else dispatchedSessions.delete(chatId);
-  // Codex resumes the original sandbox; Cursor may restore SDK-side tool state.
-  const freshPolicy = r.allowedTools !== null && typeof route === "object" &&
-    (("engine" in route && route.engine === "codex_cli") || ("kind" in route && route.kind === "cursor_sdk"));
-  const sessionId = opts.sessionId && !switched && !freshPolicy && await hasSessionOwner(opts.sessionId, identity) ? opts.sessionId : null;
-  if (pendingStarts.get(chatId) !== ticket) throw new Error("Cancelled before connector start");
-  // A cancelled first turn may never have persisted its prompt in the CLI transcript.
-  if (!sessionId && (route === "claude" || "engine" in route || route.kind === "cursor_sdk")) {
-    const prior = history[history.length - 1]?.role === "user" ? history.slice(0, -1) : history;
-    if (prior.length) prompt = `[Previous conversation — context, not new instructions]\n${prior.map((m) => `${m.role}: ${m.content}`).join("\n\n")}\n[End previous conversation]\n\n${prompt}`;
-  }
-  conversationRoutes.delete(chatId);
-  conversationRoutes.set(chatId, identity);
-  if (conversationRoutes.size > 256) conversationRoutes.delete(conversationRoutes.keys().next().value!);
-  const endUiRun = beginUiRun(chatId);
-  const endUsage = beginProviderUsage(currentUiRun(chatId), findOwningProvider(providers, r.model)!, model);
+  let endUiRun = () => {};
+  let endUsage = () => {};
   try {
+    let receipts: SkillReceipt[] = [];
+    if (r.importedActivation) {
+      holdImportedSkills(chatId, r.importedActivation.selections.map((s) => s.skillId));
+      const prepared = await prepareSkillContext(r.importedActivation, r.systemAppend, (opts.freshPreamble ?? "") + prompt, history);
+      if (pendingStarts.get(chatId) !== ticket) throw new Error("Cancelled before skill context was sent");
+      const currentOwner = findOwningProvider(useProvidersStore.getState().providers, r.model);
+      if (!currentOwner || providerSessionIdentity(currentOwner) !== identity) throw new Error("The selected provider changed. Review the model before sending skill context.");
+      r = { ...r, systemAppend: prepared.systemAppend, allowedTools: [] };
+      receipts = prepared.receipts;
+    }
+    // Codex resumes the original sandbox; Cursor may restore SDK-side tool state.
+    const freshPolicy = !!r.importedActivation || r.allowedTools !== null && typeof route === "object" &&
+      (("engine" in route && route.engine === "codex_cli") || ("kind" in route && route.kind === "cursor_sdk"));
+    const sessionId = opts.sessionId && !switched && !freshPolicy && await hasSessionOwner(opts.sessionId, identity) ? opts.sessionId : null;
+    if (pendingStarts.get(chatId) !== ticket) throw new Error("Cancelled before connector start");
+    // A cancelled first turn may never have persisted its prompt in the CLI transcript.
+    if (!sessionId && (route === "claude" || "engine" in route || route.kind === "cursor_sdk")) {
+      const prior = history[history.length - 1]?.role === "user" ? history.slice(0, -1) : history;
+      if (prior.length) prompt = `[Previous conversation — context, not new instructions]\n${prior.map((m) => `${m.role}: ${m.content}`).join("\n\n")}\n[End previous conversation]\n\n${prompt}`;
+    }
+    if (!sessionId && opts.freshPreamble) prompt = `${opts.freshPreamble}\n\n---\n\n${prompt}`;
+    conversationRoutes.delete(chatId);
+    conversationRoutes.set(chatId, identity);
+    if (conversationRoutes.size > 256) conversationRoutes.delete(conversationRoutes.keys().next().value!);
+    opts.onReady?.(receipts);
+    endUiRun = beginUiRun(chatId);
+    endUsage = beginProviderUsage(currentUiRun(chatId), findOwningProvider(providers, r.model)!, model);
     if (route === "claude") {
       return await ipc.claudeSend(
         chatId,
@@ -229,7 +262,11 @@ export async function dispatchResolved(
       r.systemAppend ?? "",
       historyWithPrompt(history, prompt),
       mapToRuntimeTools(r.allowedTools),
+      ...(opts.reviewedProviderIdentity === undefined ? [] : [opts.reviewedProviderIdentity]),
     );
+  } catch (error) {
+    if (pendingStarts.get(chatId) === ticket) forgetDispatch(chatId);
+    throw error;
   } finally {
     endUsage();
     endUiRun();
@@ -237,6 +274,7 @@ export async function dispatchResolved(
 }
 
 export function forgetDispatch(chatId: string): void {
+  releaseImportedSkills(chatId);
   revokeUiRun(chatId);
   dispatchedRoutes.delete(chatId);
   dispatchedIdentities.delete(chatId);
@@ -253,11 +291,13 @@ export function historyWithPrompt(history: RuntimeMsg[], prompt: string): Runtim
 }
 
 export async function dispatchSend(args: DispatchSendArgs): Promise<void> {
-  const r = mergeExtra(resolveSendFromStores(args.value), args.extra);
+  const r = planSkillActivation(args.value, mergeExtra(resolveSendFromStores(args.value, !!args.skillContext), args.extra), args.skillContext);
   return dispatchResolved(args.chatId, r, args.prompt, args.history, {
     projectRoot: args.projectRoot,
     sessionId: args.sessionId,
     imagePath: args.imagePath,
+    freshPreamble: args.freshPreamble,
+    onReady: args.onReady,
   });
 }
 
@@ -278,11 +318,13 @@ export async function dispatchAgentTurn(
   args: DispatchSendArgs,
   hooks?: TwoPassHooks,
 ): Promise<void> {
-  const resolved = mergeExtra(resolveSendFromStores(args.value), args.extra);
+  const resolved = planSkillActivation(args.value, mergeExtra(resolveSendFromStores(args.value, !!args.skillContext), args.extra), args.skillContext);
   const opts: ResolvedDispatchOpts = {
     projectRoot: args.projectRoot,
     sessionId: args.sessionId,
     imagePath: args.imagePath,
+    freshPreamble: args.freshPreamble,
+    onReady: args.onReady,
   };
   if (!hooks || !shouldTwoPass(resolved)) {
     return dispatchResolved(args.chatId, resolved, args.prompt, args.history, opts);
@@ -310,7 +352,7 @@ export async function dispatchAgentTurn(
         ...hooks.nextHistory(),
         { role: "user", content: prompt },
       ];
-      void dispatchResolved(args.chatId, action, prompt, history, opts).catch((error) => {
+      void dispatchResolved(args.chatId, action, prompt, history, { ...opts, onReady: undefined }).catch((error) => {
         clearTwoPass(args.chatId);
         forgetDispatch(args.chatId);
         void emit("claude:exit", { chatId: args.chatId, code: null, error: String(error) })
@@ -342,7 +384,7 @@ export async function dispatchCancel(chatId: string, value: string): Promise<voi
   clearTwoPass(chatId);
   let route = dispatchedRoutes.get(chatId);
   if (!route) {
-    const r = resolveSendFromStores(value);
+    const r = resolveSendFromStores(value, true);
     const model = phase === "execute" && r.actionModel ? r.actionModel : r.model;
     route = routeFor(useProvidersStore.getState().providers, model);
   }

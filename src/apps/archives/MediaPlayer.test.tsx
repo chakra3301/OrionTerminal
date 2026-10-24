@@ -1,0 +1,38 @@
+// @vitest-environment jsdom
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { beforeEach, afterEach, expect, it, vi } from "vitest";
+const m=vi.hoisted(()=>({copy:vi.fn(),stop:vi.fn(),refresh:vi.fn(),confirm:vi.fn(),external:vi.fn(),selected:vi.fn(),assets:new Map<string,unknown>(),jobs:[] as Array<Record<string,unknown>>,previewingId:"original" as string|null}));
+vi.mock("@/components/ConfirmModal",()=>({confirmAction:m.confirm}));
+vi.mock("@tauri-apps/api/core",async(original)=>({...await original<object>(),convertFileSrc:(path:string)=>`asset://local${path}`}));
+vi.mock("@/store/assetsStore",()=>({useAssetsStore:(select:(s:unknown)=>unknown)=>select({assets:m.assets})}));
+vi.mock("./useArchives",()=>({useArchives:{getState:()=>({previewingAssetId:m.previewingId,setPreviewingAssetId:m.selected})}}));
+vi.mock("./downloads/downloadStore",()=>({useDownloads:Object.assign(()=>({jobs:m.jobs,pending:null,uncertain:false,error:null,playableCopy:m.copy,stop:m.stop}),{getState:()=>({refresh:m.refresh,playableCopy:m.copy})})}));
+import { ArchivesMediaPlayer } from "./MediaPlayer";
+import type { Asset } from "@/store/assetsStore";
+const asset:Asset={id:"original",kind:"video",title:"Original clip",filePath:"/owned/original.mkv",mimeType:"video/x-matroska",sizeBytes:1000,originalName:"original.mkv",createdAt:1,tags:["video"],favorite:false};
+let host:HTMLDivElement,root:Root;
+beforeEach(()=>{(globalThis as {IS_REACT_ACT_ENVIRONMENT?:boolean}).IS_REACT_ACT_ENVIRONMENT=true;vi.clearAllMocks();m.assets=new Map();m.jobs=[];m.previewingId="original";m.selected.mockImplementation((id:string)=>{m.previewingId=id;});m.confirm.mockResolvedValue(true);m.copy.mockResolvedValue(undefined);host=document.createElement("div");document.body.append(host);root=createRoot(host);});
+afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
+const render=async(a=asset)=>act(async()=>root.render(<ArchivesMediaPlayer asset={a} src="asset://local/file" onOpenExternal={m.external}/>));
+const button=(text:string)=>[...host.querySelectorAll("button")].find((b)=>b.textContent?.includes(text))!;
+it("unsupported containers show explicit recovery, not an unexplained crossed-out player",async()=>{await render();expect(host.querySelector("video")).toBeNull();expect(host.textContent).toContain("Create playable copy");await act(async()=>button("Open in another app").click());expect(m.external).toHaveBeenCalledOnce();});
+it("requires confirmation before local non-destructive conversion",async()=>{m.confirm.mockResolvedValue(false);await render();await act(async()=>button("Create playable copy").click());expect(m.copy).not.toHaveBeenCalled();m.confirm.mockResolvedValue(true);await act(async()=>button("Create playable copy").click());expect(m.copy).toHaveBeenCalledWith("original");});
+it("late confirmation cannot convert a different or closed Media item",async()=>{let resolve!:(yes:boolean)=>void;m.confirm.mockReturnValue(new Promise<boolean>((r)=>{resolve=r;}));await render();await act(async()=>button("Create playable copy").click());await act(async()=>root.render(null));await act(async()=>resolve(true));expect(m.copy).not.toHaveBeenCalled();});
+const playable={...asset,id:"copy",filePath:"/owned/copy.mp4",derivedFrom:"original",playback:{compatible:true,container:"mp4",videoCodec:"h264",audioCodec:"aac",converted:true}};
+it("opens the verified copy after this preview explicitly requested conversion",async()=>{await render();await act(async()=>button("Create playable copy").click());m.assets.set(playable.id,playable);await render();expect(m.selected).toHaveBeenCalledExactlyOnceWith("copy");});
+it("a completed copy cannot reopen a closed or different preview",async()=>{await render();await act(async()=>button("Create playable copy").click());m.previewingId="different";m.assets.set(playable.id,playable);await render();expect(m.selected).not.toHaveBeenCalled();});
+it("stopping conversion revokes automatic handoff",async()=>{await render();await act(async()=>button("Create playable copy").click());m.jobs=[{id:"job",sourceAssetId:"original",state:"downloading",progress:{phase:"converting",processing:true,fraction:0.1}}];await render();await act(async()=>button("Stop").click());expect(m.stop).toHaveBeenCalledWith("job");m.jobs=[];m.assets.set(playable.id,playable);await render();expect(m.selected).not.toHaveBeenCalled();});
+it("failed conversion cannot later take over the preview",async()=>{await render();await act(async()=>button("Create playable copy").click());m.jobs=[{id:"job",sourceAssetId:"original",state:"failed",error:"Conversion failed",progress:{}}];await render();m.jobs=[];m.assets.set(playable.id,playable);await render();expect(m.selected).not.toHaveBeenCalled();});
+it("conversion intent stays bound to its source if the component is reused",async()=>{await render();await act(async()=>button("Create playable copy").click());m.previewingId="other-source";m.assets.set("other-copy",{...playable,id:"other-copy",derivedFrom:"other-source"});await render({...asset,id:"other-source"});expect(m.selected).not.toHaveBeenCalled();});
+it("an existing copy does not auto-navigate without a request",async()=>{m.assets.set(playable.id,playable);await render();expect(m.selected).not.toHaveBeenCalled();await act(async()=>button("Play compatible copy").click());expect(m.selected).toHaveBeenCalledWith("copy");});
+it("confirmation cannot start conversion after selection changes before unmount",async()=>{let resolve!:(yes:boolean)=>void;m.confirm.mockReturnValue(new Promise<boolean>((r)=>{resolve=r;}));await render();await act(async()=>button("Create playable copy").click());m.previewingId=null;await act(async()=>resolve(true));expect(m.copy).not.toHaveBeenCalled();});
+it("exposes only actual player caption tracks, with explicit off/showing and no autoplay",async()=>{
+  await render({...asset,filePath:"/owned/playable.mp4",posterPath:"/owned/original.poster.jpg",playback:{compatible:true,container:"mp4",videoCodec:"h264",audioCodec:"aac",converted:false}});
+  const video=host.querySelector("video")!;const track={label:"English",language:"en",mode:"disabled"};Object.defineProperty(video,"textTracks",{value:[track],configurable:true});
+  await act(async()=>video.dispatchEvent(new Event("loadedmetadata")));
+  const select=host.querySelector<HTMLSelectElement>('select[aria-label="Player captions"]')!;expect(select).not.toBeNull();expect(select.value).toBe("off");
+  await act(async()=>{select.value="0";select.dispatchEvent(new Event("change",{bubbles:true}));});expect(track.mode).toBe("showing");
+  await act(async()=>{select.value="off";select.dispatchEvent(new Event("change",{bubbles:true}));});expect(track.mode).toBe("disabled");expect(video.hasAttribute("autoplay")).toBe(false);
+});
+it("compatible video is mounted with controls and no asset-protocol CORS mode",async()=>{await render({...asset,filePath:"/owned/playable.mp4",playback:{compatible:true,container:"mp4",videoCodec:"h264",audioCodec:"aac",converted:true}});const video=host.querySelector("video")!;expect(video.controls).toBe(true);expect(video.hasAttribute("crossorigin")).toBe(false);expect(video.hasAttribute("autoplay")).toBe(false);await act(async()=>video.dispatchEvent(new Event("error")));expect(host.textContent).toContain("could not load");expect(button("Retry player")).toBeTruthy();});

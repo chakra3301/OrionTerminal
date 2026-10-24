@@ -1,0 +1,154 @@
+/* XDesign design canvas — Figma UI3 layout (owner, 2026-10-21: "match figmas exactly").
+   Structure, density and interaction follow Figma; colors come from the --xd-* scope so
+   every Orion theme still applies. */
+
+.xd-pencil.xd-figma { background: var(--xd-bg); font-size: 11px; }
+.xd-figma-body { position: relative; }
+.xd-pencil.xd-figma .xd-figma-spacer { flex: 1; min-width: 0; }
+
+/* Shared small controls */
+.xd-pencil.xd-figma .xd-figma-icon { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--xd-text-2); cursor: pointer; }
+.xd-pencil.xd-figma .xd-figma-icon:hover:not(:disabled) { background: var(--xd-hover); color: var(--xd-text); }
+.xd-pencil.xd-figma .xd-editor-history { gap: 0; }
+.xd-pencil.xd-figma .xd-editor-history .xd-editor-icon-button { width: 28px; height: 28px; }
+.xd-pencil.xd-figma .xd-figma-rename { width: 100%; height: 26px; padding: 0 6px; font-size: 11px; background: var(--xd-bg); border: 1px solid var(--xd-accent); border-radius: var(--r-sm); color: var(--xd-text); outline: none; }
+
+/* Popover menus (file menu, zoom menu, tool flyouts) */
+.xd-figma-popover { position: relative; display: inline-flex; min-width: 0; }
+.xd-pencil.xd-figma .xd-figma-popover-trigger { display: inline-flex; align-items: center; gap: 4px; min-width: 0; height: 28px; padding: 0 6px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--xd-text); cursor: pointer; white-space: nowrap; }
+.xd-pencil.xd-figma .xd-figma-popover-trigger:hover:not(:disabled),
+.xd-pencil.xd-figma .xd-figma-popover-trigger[aria-expanded=true] { background: var(--xd-hover); }
+.xd-pencil.xd-figma .xd-figma-popover-trigger svg { flex: none; color: var(--xd-text-2); }
+.xd-figma-menu { position: absolute; z-index: 60; top: calc(100% + 4px); left: 0; min-width: 200px; max-height: min(70vh, 520px); overflow-y: auto; padding: 8px 0; background: var(--xd-panel); color: var(--xd-text); border-radius: var(--r-md); box-shadow: 0 0 0 1px var(--xd-border), var(--shadow-window); font-size: 11px; }
+.xd-figma-menu[data-align=end] { left: auto; right: 0; }
+.xd-figma-menu[data-side=top] { top: auto; bottom: calc(100% + 10px); }
+.xd-pencil.xd-figma .xd-figma-menu button { display: flex; align-items: center; gap: 6px; width: 100%; height: 24px; padding: 0 16px 0 6px; border: 0; border-radius: 0; background: transparent; color: inherit; text-align: left; cursor: default; }
+.xd-pencil.xd-figma .xd-figma-menu button:hover:not(:disabled),
+.xd-pencil.xd-figma .xd-figma-menu button:focus-visible { background: var(--xd-accent); color: var(--xd-text); outline: none; }
+.xd-pencil.xd-figma .xd-figma-menu button:disabled { opacity: .4; }
+.xd-figma-menu-check { display: inline-grid; place-items: center; width: 16px; flex: none; }
+.xd-figma-menu-label { flex: 1; white-space: nowrap; }
+.xd-figma-menu kbd { font: inherit; color: var(--xd-text-3); margin-left: 24px; }
+.xd-pencil.xd-figma .xd-figma-menu button:hover kbd { color: inherit; }
+.xd-figma-menu hr { margin: 8px 0; border: 0; border-top: 1px solid var(--xd-border); }
+
+/* ── Left: navigation bar + sidebar (file header, Pages, Layers) ───────── */
+.xd-pencil.xd-figma .xd-figma-left { flex-direction: row; max-width: none; padding: 0; border-right: 1px solid var(--xd-border); background: var(--xd-panel); }
+.xd-figma-nav { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 0 0 52px; width: 52px; padding: 10px 0; border-right: 1px solid var(--xd-border); overflow-y: auto; }
+.xd-pencil.xd-figma .xd-figma-nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 44px; padding: 6px 0 5px; border: 0; border-radius: var(--r-md); background: transparent; color: var(--xd-text-2); font-size: 9px; text-align: center; cursor: pointer; }
+.xd-pencil.xd-figma .xd-figma-nav-item:hover { color: var(--xd-text); }
+.xd-pencil.xd-figma .xd-figma-nav-item svg { padding: 5px; box-sizing: content-box; border-radius: var(--r-sm); }
+.xd-pencil.xd-figma .xd-figma-nav-item:hover svg { background: var(--xd-hover); }
+.xd-pencil.xd-figma .xd-figma-nav-item[aria-pressed=true] { color: var(--xd-text); }
+.xd-pencil.xd-figma .xd-figma-nav-item[aria-pressed=true] svg { background: var(--bg-3); }
+.xd-figma-sidebar { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.xd-figma-file { display: flex; align-items: flex-start; gap: 4px; padding: 10px 8px 10px 10px; border-bottom: 1px solid var(--xd-border); flex: none; }
+.xd-figma-file-name { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.xd-figma-file-name .xd-figma-popover { max-width: 100%; }
+.xd-pencil.xd-figma .xd-figma-file-name .xd-figma-popover-trigger { height: 26px; margin-left: -6px; max-width: 100%; }
+.xd-figma-file-name strong { overflow: hidden; text-overflow: ellipsis; font-size: 13px; font-weight: 600; }
+.xd-figma-file-name small { padding-left: 0; font-size: 11px; color: var(--xd-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xd-figma-sidebar-scroll { display: flex; flex-direction: column; }
+.xd-figma-section { padding: 4px 0 8px; }
+.xd-figma-section + .xd-figma-section { border-top: 1px solid var(--xd-border); }
+.xd-figma-section > header { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 8px 0 4px; }
+.xd-pencil.xd-figma .xd-figma-section-toggle { display: inline-flex; align-items: center; gap: 4px; width: auto; height: 28px; padding: 0 6px 0 2px; border: 0; background: transparent; color: var(--xd-text); font-size: 11px; font-weight: 600; }
+.xd-pencil.xd-figma .xd-figma-section-toggle svg { color: var(--xd-text-3); transition: transform .12s ease; }
+.xd-pencil.xd-figma .xd-figma-section-toggle[aria-expanded=false] svg { transform: rotate(-90deg); }
+.xd-figma-section-title { padding-left: 8px; font-weight: 600; }
+.xd-figma-page-list { display: flex; flex-direction: column; padding: 0 8px; }
+.xd-pencil.xd-figma .xd-figma-page { display: flex; align-items: center; justify-content: space-between; height: 28px; padding: 0 8px 0 24px; border-radius: var(--r-sm); color: var(--xd-text-2); }
+.xd-pencil.xd-figma .xd-figma-page:hover { background: var(--xd-hover); }
+.xd-pencil.xd-figma .xd-figma-page[aria-selected=true] { color: var(--xd-text); font-weight: 600; background: var(--xd-hover); }
+.xd-figma-page span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xd-figma-layers-section { flex: 1; }
+.xd-figma-layers { display: flex; flex-direction: column; padding: 0 8px; }
+.xd-figma-layer { position: relative; display: flex; align-items: center; height: 32px; min-width: 0; border-radius: var(--r-sm); }
+.xd-figma-layer:hover { box-shadow: inset 0 0 0 1px var(--xd-border); }
+.xd-figma-layer.selected { background: rgba(var(--xd-accent-rgb), .22); box-shadow: none; }
+.xd-figma-layer.tinted { background: rgba(var(--xd-accent-rgb), .08); border-radius: 0; }
+.xd-pencil.xd-figma .xd-figma-layer-caret { display: inline-grid; place-items: center; flex: 0 0 16px; width: 16px; height: 24px; padding: 0; border: 0; background: transparent; color: var(--xd-text-3); }
+.xd-pencil.xd-figma .xd-figma-layer-caret svg { transition: transform .12s ease; }
+.xd-figma-layer[aria-expanded=true] > .xd-figma-layer-caret svg { transform: rotate(90deg); }
+.xd-pencil.xd-figma .xd-figma-layer .xd-pencil-layer-row { flex: 1; min-width: 0; min-height: 0; height: 32px; padding: 0 4px; gap: 8px; border: 0; border-radius: 0; background: transparent; font-size: 11px; color: var(--xd-text); }
+.xd-pencil.xd-figma .xd-figma-layer .xd-pencil-layer-row:hover,
+.xd-pencil.xd-figma .xd-figma-layer .xd-pencil-layer-row.selected { background: transparent; }
+.xd-pencil.xd-figma .xd-figma-layer .xd-pencil-layer-row > svg { color: var(--xd-text-2); }
+.xd-figma-layer.component .xd-pencil-layer-row,
+.xd-pencil.xd-figma .xd-figma-layer.component .xd-pencil-layer-row > svg { color: var(--neon-violet); }
+.xd-figma-layer.hidden-layer .xd-pencil-layer-row { opacity: .45; }
+.xd-figma-layer-actions { display: flex; gap: 0; padding-right: 4px; opacity: 0; }
+.xd-figma-layer:hover .xd-figma-layer-actions,
+.xd-figma-layer:focus-within .xd-figma-layer-actions,
+.xd-figma-layer.locked .xd-figma-layer-actions,
+.xd-figma-layer.hidden-layer .xd-figma-layer-actions { opacity: 1; }
+.xd-pencil.xd-figma .xd-figma-layer-actions button { display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: var(--xd-text-2); }
+.xd-pencil.xd-figma .xd-figma-layer-actions button:hover { color: var(--xd-text); background: transparent; }
+.xd-figma-layer:not(:hover):not(.locked) .xd-figma-layer-actions button:first-child,
+.xd-figma-layer:not(:hover):not(.hidden-layer) .xd-figma-layer-actions button:last-child { visibility: hidden; }
+.xd-figma-tools-list { display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; }
+.xd-pencil.xd-figma .xd-figma-tools-list button { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; color: var(--xd-text); }
+.xd-pencil.xd-figma .xd-figma-tools-list button:hover:not(:disabled) { background: var(--xd-hover); }
+.xd-figma-tools-list svg { color: var(--xd-text-2); }
+.xd-figma-pad { padding: 4px 0; }
+
+/* ── Canvas, floating toolbar, minimized-UI chips ───────────────────────── */
+.xd-pencil.xd-figma .xd-figma-canvas { background-image: none; background-color: var(--xd-bg); overflow: hidden; }
+.xd-figma-toolbar { position: absolute; left: 50%; bottom: 12px; z-index: 25; display: flex; align-items: center; gap: 4px; padding: 4px; transform: translateX(-50%); background: var(--xd-panel); border-radius: var(--r-lg); box-shadow: 0 0 0 1px var(--xd-border), 0 6px 18px -4px rgba(0, 0, 0, .45); max-width: calc(100% - 24px); }
+.xd-figma-toolbar-tools { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.xd-figma-tool-group { display: flex; align-items: center; }
+.xd-pencil.xd-figma .xd-figma-tool { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--r-md); background: transparent; color: var(--xd-text); cursor: pointer; }
+.xd-pencil.xd-figma .xd-figma-tool:hover:not(:disabled) { background: var(--xd-hover); }
+.xd-pencil.xd-figma .xd-figma-tool[aria-pressed=true] { background: var(--xd-accent); color: var(--xd-text); }
+.xd-pencil.xd-figma .xd-figma-tool:disabled { opacity: .4; }
+.xd-pencil.xd-figma .xd-figma-tool-flyout .xd-figma-popover-trigger { width: 14px; height: 32px; padding: 0; justify-content: center; border-radius: var(--r-sm); }
+.xd-figma-tool-flyout .xd-figma-menu { left: -42px; }
+.xd-figma-toolbar-mode { display: flex; align-items: center; padding-left: 6px; margin-left: 2px; border-left: 1px solid var(--xd-border); }
+.xd-pencil.xd-figma .xd-figma-toolbar-mode button { display: grid; place-items: center; width: 44px; height: 28px; padding: 0; border: 0; border-radius: var(--r-md); background: var(--xd-raised); color: var(--xd-text-2); }
+.xd-pencil.xd-figma .xd-figma-toolbar-mode button[aria-pressed=true] { background: rgba(var(--xd-accent-rgb), .22); color: var(--xd-accent); }
+.xd-figma-mini { position: absolute; top: 12px; z-index: 24; display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 6px 0 12px; max-width: 45%; background: var(--xd-panel); border-radius: var(--r-lg); box-shadow: 0 0 0 1px var(--xd-border), 0 6px 18px -4px rgba(0, 0, 0, .45); }
+.xd-figma-mini-left { left: 12px; }
+.xd-figma-mini-left strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.xd-figma-mini-right { right: 12px; padding-left: 8px; }
+.xd-figma-toast { position: absolute; left: 50%; bottom: 64px; z-index: 26; max-width: min(560px, calc(100% - 32px)); padding: 8px 12px; transform: translateX(-50%); background: var(--xd-panel); color: var(--xd-text); border-radius: var(--r-md); box-shadow: 0 0 0 1px var(--xd-border), var(--shadow-window); font-size: 11px; line-height: 1.5; }
+
+/* ── Right: header, Design / Prototype tabs, properties ─────────────────── */
+.xd-pencil.xd-figma .xd-figma-right { border-left: 1px solid var(--xd-border); }
+.xd-figma-right-head { display: flex; align-items: center; gap: 4px; height: 48px; padding: 0 8px 0 12px; flex: none; }
+.xd-figma-avatar { display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: var(--r-pill); background: var(--neon-amber); color: var(--t-on-accent); font-size: 11px; font-weight: 600; }
+.xd-pencil.xd-figma .xd-figma-share { flex: none; height: 28px; padding: 0 12px; border: 0; border-radius: var(--r-md); background: var(--xd-accent); color: var(--xd-text); font-weight: 600; text-align: center; }
+.xd-pencil.xd-figma .xd-figma-share:hover:not(:disabled) { background: var(--xd-accent); filter: brightness(1.08); }
+.xd-figma-right-head .xd-presence-controls { max-width: 40%; padding-right: 0; }
+.xd-figma-tabs { display: flex; align-items: center; gap: 2px; height: 40px; padding: 0 8px; border-bottom: 1px solid var(--xd-border); flex: none; }
+.xd-pencil.xd-figma .xd-figma-tabs [role=tab] { height: 28px; padding: 0 8px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--xd-text-2); font-weight: 600; }
+.xd-pencil.xd-figma .xd-figma-tabs [role=tab]:hover { color: var(--xd-text); background: transparent; }
+.xd-pencil.xd-figma .xd-figma-tabs [role=tab][aria-selected=true] { background: var(--xd-hover); color: var(--xd-text); }
+.xd-pencil.xd-figma .xd-figma-tabs .xd-figma-popover-trigger { font-size: 11px; color: var(--xd-text-2); }
+.xd-figma-zoom .xd-figma-menu { min-width: 220px; }
+.xd-pencil.xd-figma .xd-figma-right .xd-editor-section { padding: 0 16px; }
+.xd-pencil.xd-figma .xd-figma-right .xd-editor-section > summary { padding: 12px 0; font-size: 11px; font-weight: 600; }
+.xd-pencil.xd-figma .xd-pencil-selection-head { padding: 12px 16px; border-bottom: 1px solid var(--xd-border); }
+.xd-pencil.xd-figma .xd-pencil-selection-head > span { margin-bottom: 4px; font-size: 11px; }
+.xd-pencil.xd-figma .xd-pencil-selection-head input { height: 28px; padding: 0 6px; margin-left: -6px; font-size: 13px; font-weight: 600; border-color: transparent; }
+.xd-pencil.xd-figma .xd-pencil-selection-head input:hover { border-color: var(--xd-border); }
+.xd-pencil.xd-figma .xd-figma-right :is(input, select, textarea):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]) { background: var(--xd-raised); border-color: transparent; border-radius: var(--r-sm); font-size: 11px; }
+.xd-pencil.xd-figma .xd-figma-right :is(input, select, textarea):hover { border-color: var(--xd-border); }
+.xd-pencil.xd-figma .xd-figma-right :is(input, select, textarea):focus { border-color: var(--xd-accent); outline: none; }
+.xd-pencil.xd-figma .xd-pencil-grid label { color: var(--xd-text-3); font-size: 11px; }
+.xd-pencil.xd-figma .xd-figma-flow { display: flex; align-items: center; gap: 8px; width: 100%; height: 32px; padding: 0 4px; color: var(--xd-text); }
+.xd-pencil.xd-figma .xd-figma-prototype .xd-editor-empty { padding: 16px; }
+
+/* Overlay (narrow window): panels slide over the canvas from the edges. */
+.xd-figma-body[data-overlay=true] > .xd-editor-panel-left { left: 0; }
+
+/* Light themes keep Figma's white-on-accent for the active tool and Share. */
+:root[data-color-mode="light"] body .xd-pencil.xd-figma :is(.xd-figma-tool[aria-pressed=true], .xd-figma-share, .xd-figma-menu button:hover:not(:disabled), .xd-figma-menu button:focus-visible) { color: var(--t-on-accent); }
+
+@container xd-studio (max-width: 640px) {
+  .xd-figma-toolbar-mode { display: none; }
+  .xd-figma-right-head .xd-editor-history { display: none; }
+}
+
+/* Figma never rings the canvas itself on focus; selection chrome shows the state. */
+.xd-pencil.xd-figma .xd-figma-canvas canvas:focus,
+.xd-pencil.xd-figma .xd-figma-canvas canvas:focus-visible { outline: none; }

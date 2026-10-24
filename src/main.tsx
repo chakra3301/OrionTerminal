@@ -3,6 +3,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "@/app/App";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
+import { installPanelDragGuard } from "@/lib/panelDragGuard";
 
 import "@fontsource/space-grotesk/300.css";
 import "@fontsource/space-grotesk/400.css";
@@ -17,6 +18,8 @@ import "@fontsource/jetbrains-mono/600.css";
 import "@/styles/tokens.css";
 import "@/styles/themes.css";
 import "@/styles.css";
+
+installPanelDragGuard();
 
 window.addEventListener("error", (e) => {
   // eslint-disable-next-line no-console

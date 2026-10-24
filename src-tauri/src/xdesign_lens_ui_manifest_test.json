@@ -1,0 +1,35 @@
+[
+  {
+    "id": "filter.lensCorrection",
+    "params": {
+      "focalLength": 0,
+      "distortion": 0,
+      "redCyan": 0,
+      "blueYellow": 0,
+      "vignetteAmount": 0,
+      "vignetteMidpoint": 50,
+      "vertical": 0,
+      "horizontal": 0,
+      "angle": 0,
+      "scale": 100,
+      "profile": "none",
+      "correctDistortion": true,
+      "correctVignette": true,
+      "correctCA": true,
+      "autoScale": false,
+      "edge": "transparency",
+      "edgeColor": "#000000"
+    }
+  },
+  {
+    "id": "filter.adaptiveWideAngle",
+    "params": {
+      "focalLength": 0,
+      "cropFactor": 1,
+      "scale": 100,
+      "model": "auto",
+      "interpolation": "bicubic",
+      "constraints": []
+    }
+  }
+]

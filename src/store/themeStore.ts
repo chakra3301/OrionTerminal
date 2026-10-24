@@ -17,7 +17,7 @@ export const LIGHT_THEMES: { id: LightThemeName; label: string; blurb: string }[
   { id: "ivory-keep", label: "Ivory Keep", blurb: "Warm ivory with soft graphite and muted gold." },
 ];
 export const THEMES: { id: BuiltinThemeName; label: string; blurb: string }[] = [
-  { id: "liquid", label: "Liquid", blurb: "Hyperliquid frosted glass — heavy blur, icy specular edges." },
+  { id: "liquid", label: "Liquid", blurb: "See-through icy glass, soft highlights and refined controls." },
   { id: "minimal", label: "Minimal", blurb: "Calm monochrome, no glow, flatter." },
   { id: "bmw-m", label: "BMW M", blurb: "Motorsport black — M tricolor, zero radius." },
   ...LIGHT_THEMES,

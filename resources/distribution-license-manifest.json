@@ -1,9 +1,9 @@
 {
   "target": "aarch64-apple-darwin",
   "scope": "Selected native normal/build graph; build-only crates conservatively included",
-  "cargoLockSha256": "be25072d50eba96b429ae278f6a2961101b2d5752833ccbb4af668feff0ce1a8",
-  "cargoManifestSha256": "2917a83f9e49a87638d9e2f12410ef6d1da039facb34005b9b64e91d93acd875",
-  "npmLockSha256": "c9e4156b15a8c4ea587f41dee4d8789d4d47885575ab820c04f4566a9c5f10c4",
+  "cargoLockSha256": "da8c71017ac7891c4102ac178fb424c1677b1ca2856be240cd8f0e0351f83e9c",
+  "cargoManifestSha256": "65584f29938468222ad203279b36f2c9c477a0808091a8b1200ed95e9ee02ff9",
+  "npmLockSha256": "d126b502ec8d7dcf7a1695f15e9f7459ce2b30bac63c97ce556ff81beba3e62b",
   "native": [
     {
       "name": "adler2",
@@ -28,6 +28,22 @@
       "crateSha256": "c982642fa9e8606056828ee9a8505737230110bb1099153c79efe865c59d12ba",
       "notice": "THIRD_PARTY_LICENSES/native/aho-corasick-1.1.5.md",
       "noticeSha256": "1bc9af2147e61a137a209485a853d8ac71a183beb79f7f14381d36b9c1d16101"
+    },
+    {
+      "name": "aligned",
+      "version": "0.4.3",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "ee4508988c62edf04abd8d92897fca0c2995d907ce1dfeaf369dac3716a40685",
+      "notice": "THIRD_PARTY_LICENSES/native/aligned-0.4.3.md",
+      "noticeSha256": "ca58997a666b5a72581a21873159376dffc2968a80df89c046b23ffdd8f7fc51"
+    },
+    {
+      "name": "aligned-vec",
+      "version": "0.6.4",
+      "license": "MIT",
+      "crateSha256": "dc890384c8602f339876ded803c97ad529f3842aba97f6392b3dba0dd171769b",
+      "notice": "THIRD_PARTY_LICENSES/native/aligned-vec-0.6.4.md",
+      "noticeSha256": "38dc7ffbf72a377ef8ae8d3a745f35be2d4ba81f4f142f87900f1b49fed8e411"
     },
     {
       "name": "alloc-no-stdlib",
@@ -62,12 +78,28 @@
       "noticeSha256": "0e79bf3079a562be27ff3ac95e57b64c0ad47d74bab5797ef69b2bbdd1ec5343"
     },
     {
+      "name": "arg_enum_proc_macro",
+      "version": "0.3.4",
+      "license": "MIT",
+      "crateSha256": "0ae92a5119aa49cdbcf6b9f893fe4e1d98b04ccbf82ee0584ad948a44a734dea",
+      "notice": "THIRD_PARTY_LICENSES/native/arg_enum_proc_macro-0.3.4.md",
+      "noticeSha256": "2d59798122f92657fc1d46986f394bb8024ae047d3fc9e28504e73936012823a"
+    },
+    {
       "name": "arrayvec",
       "version": "0.7.8",
       "license": "MIT OR Apache-2.0",
       "crateSha256": "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56",
       "notice": "THIRD_PARTY_LICENSES/native/arrayvec-0.7.8.md",
       "noticeSha256": "84ec9d42d09373c349683068921016fb4629e72c8430545e6be9e67517499d10"
+    },
+    {
+      "name": "as-slice",
+      "version": "0.2.1",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "516b6b4f0e40d50dcda9365d53964ec74560ad4284da2e7fc97122cd83174516",
+      "notice": "THIRD_PARTY_LICENSES/native/as-slice-0.2.1.md",
+      "noticeSha256": "9dcd57e3b01fa9673fe37f44916ba991c9ffa7255ace03b719a4ac0ba2bdbea8"
     },
     {
       "name": "atoi",
@@ -92,6 +124,30 @@
       "crateSha256": "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53",
       "notice": "THIRD_PARTY_LICENSES/native/autocfg-1.5.1.md",
       "noticeSha256": "70762a313f64c2e2b18dd59aac0a819e559d98cff9bc2b498e492555095e1ffb"
+    },
+    {
+      "name": "av-scenechange",
+      "version": "0.14.1",
+      "license": "MIT",
+      "crateSha256": "0f321d77c20e19b92c39e7471cf986812cbb46659d2af674adc4331ef3f18394",
+      "notice": "THIRD_PARTY_LICENSES/native/av-scenechange-0.14.1.md",
+      "noticeSha256": "9ee647af2099080a9554f87d1b10aed959adf4327dcada4b635f323919dcba08"
+    },
+    {
+      "name": "av1-grain",
+      "version": "0.2.5",
+      "license": "BSD-2-Clause",
+      "crateSha256": "8cfddb07216410377231960af4fcab838eaa12e013417781b78bd95ee22077f8",
+      "notice": "THIRD_PARTY_LICENSES/native/av1-grain-0.2.5.md",
+      "noticeSha256": "5f7e341289b8b5d5c1781c9627da368f0a15c6e98dddd98d62e2ae236cdf7f2d"
+    },
+    {
+      "name": "avif-serialize",
+      "version": "0.8.9",
+      "license": "BSD-3-Clause",
+      "crateSha256": "e7178fe5f7d460b13895ebb9dcb28a3a6216d2df2574a0806cb51b555d297f38",
+      "notice": "THIRD_PARTY_LICENSES/native/avif-serialize-0.8.9.md",
+      "noticeSha256": "ec457c1d212dab587ef3b3cc6e94283a7a6cbbed4b4e4549a201be578ef4b04b"
     },
     {
       "name": "base64",
@@ -134,6 +190,14 @@
       "noticeSha256": "93e054b867124ea6729d64e540edbd7040091ce4ac105cca982b3b4d5c18d380"
     },
     {
+      "name": "bit_field",
+      "version": "0.10.3",
+      "license": "Apache-2.0/MIT",
+      "crateSha256": "1e4b40c7323adcfc0a41c4b88143ed58346ff65a288fc144329c5c45e05d70c6",
+      "notice": "THIRD_PARTY_LICENSES/native/bit_field-0.10.3.md",
+      "noticeSha256": "e8f885c9f5feb5e0574e5c2af4aadacbc5e90ad40c3201597dfaa8e80aac525e"
+    },
+    {
       "name": "bitflags",
       "version": "1.3.2",
       "license": "MIT/Apache-2.0",
@@ -148,6 +212,22 @@
       "crateSha256": "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06",
       "notice": "THIRD_PARTY_LICENSES/native/bitflags-2.13.2.md",
       "noticeSha256": "075bddbb5319396220f43d6fc1679e4807eecc5b01892c26fa9bb89f7ba88683"
+    },
+    {
+      "name": "bitstream-io",
+      "version": "4.10.0",
+      "license": "MIT/Apache-2.0",
+      "crateSha256": "7eff00be299a18769011411c9def0d827e8f2d7bf0c3dbf53633147a8867fd1f",
+      "notice": "THIRD_PARTY_LICENSES/native/bitstream-io-4.10.0.md",
+      "noticeSha256": "0cde248e37b45d7eeb2088fe4d4e36c0aa3edf8cff0f952f92cc2ee7f1328a0c"
+    },
+    {
+      "name": "blake3",
+      "version": "1.8.7",
+      "license": "CC0-1.0 OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception",
+      "crateSha256": "6d9e454fc11f76977dc803893aff6304ed33d6a26efae8696573bea74baa27ae",
+      "notice": "THIRD_PARTY_LICENSES/native/blake3-1.8.7.md",
+      "noticeSha256": "c3eeb3360ba84fa78671b4de504bab6663bc4858e993221adcead2a8b13d1beb"
     },
     {
       "name": "block-buffer",
@@ -182,12 +262,44 @@
       "noticeSha256": "d4f1c8eb4b708c4f5aba6914feaea25bdefff9d56e9184b3b51214d0f9dac943"
     },
     {
+      "name": "built",
+      "version": "0.8.1",
+      "license": "MIT",
+      "crateSha256": "5c0e531d93d39c34eef561e929e8a7f86d77a5af08aac4f6d6e39976c51858e9",
+      "notice": "THIRD_PARTY_LICENSES/native/built-0.8.1.md",
+      "noticeSha256": "2ed753bd9a02ac44129264936b24864456c7f0367c467b758a0ba4c12816d873"
+    },
+    {
+      "name": "bytemuck",
+      "version": "1.25.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "crateSha256": "95832e849adfb21180ccb6826a99da14e5d266ae5c2e668e1602cf234f153797",
+      "notice": "THIRD_PARTY_LICENSES/native/bytemuck-1.25.2.md",
+      "noticeSha256": "7d4f1783c07cbc3cbcbeb699521d5f09535ac9f7e8741df8ea26fa99abf066c3"
+    },
+    {
+      "name": "bytemuck_derive",
+      "version": "1.12.1",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "crateSha256": "6a1f896587b6f2c069c73d2f0913e2d590c3990285cd2f0b6aa02b786b4c679c",
+      "notice": "THIRD_PARTY_LICENSES/native/bytemuck_derive-1.12.1.md",
+      "noticeSha256": "d442795bf6ddd4a01c306653e9e10e509f22dbe62f44b7c29bfff6144acdfe61"
+    },
+    {
       "name": "byteorder",
       "version": "1.5.0",
       "license": "Unlicense OR MIT",
       "crateSha256": "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b",
       "notice": "THIRD_PARTY_LICENSES/native/byteorder-1.5.0.md",
       "noticeSha256": "72417f2c24fac95f510e7771fcadcea8495a949a46409e42c26b20a07390db7b"
+    },
+    {
+      "name": "byteorder-lite",
+      "version": "0.1.0",
+      "license": "Unlicense OR MIT",
+      "crateSha256": "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495",
+      "notice": "THIRD_PARTY_LICENSES/native/byteorder-lite-0.1.0.md",
+      "noticeSha256": "ed984d733b835f1003bb029945b0809946cc12d59ce8635939678061f5b29553"
     },
     {
       "name": "bytes",
@@ -260,6 +372,22 @@
       "crateSha256": "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e",
       "notice": "THIRD_PARTY_LICENSES/native/cfg_aliases-0.1.1.md",
       "noticeSha256": "858f9d3e6e5e3333e5ab6748ff13c2c95e0676dc0a9eb67ca2ae983f63da83f0"
+    },
+    {
+      "name": "color_quant",
+      "version": "1.1.0",
+      "license": "MIT",
+      "crateSha256": "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b",
+      "notice": "THIRD_PARTY_LICENSES/native/color_quant-1.1.0.md",
+      "noticeSha256": "0141fd3c19306169ca928f89c248d5ebcb5c3532c21333975ee3ea40f3a82055"
+    },
+    {
+      "name": "constant_time_eq",
+      "version": "0.4.2",
+      "license": "CC0-1.0 OR MIT-0 OR Apache-2.0",
+      "crateSha256": "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b",
+      "notice": "THIRD_PARTY_LICENSES/native/constant_time_eq-0.4.2.md",
+      "noticeSha256": "dfe387c9b566846b1e1f0a585e8ff936ba638c128ccc1b98a280797b961ffa0a"
     },
     {
       "name": "cookie",
@@ -590,6 +718,22 @@
       "noticeSha256": "e8144a865ccd1809647cbe73cc5d5dcf1b2ca75624eed25f1b964cff061b40b4"
     },
     {
+      "name": "equator",
+      "version": "0.4.2",
+      "license": "MIT",
+      "crateSha256": "4711b213838dfee0117e3be6ac926007d7f433d7bbe33595975d4190cb07e6fc",
+      "notice": "THIRD_PARTY_LICENSES/native/equator-0.4.2.md",
+      "noticeSha256": "818dccd6793cc27fa1c014857a7fdc9c749a0d542552aba353038f44d28eaa9a"
+    },
+    {
+      "name": "equator-macro",
+      "version": "0.4.2",
+      "license": "MIT",
+      "crateSha256": "44f23cf4b44bfce11a86ace86f8a73ffdec849c9fd00a386a53d278bd9e81fb3",
+      "notice": "THIRD_PARTY_LICENSES/native/equator-macro-0.4.2.md",
+      "noticeSha256": "5be3f7fdc05af99d1ce9221fefca30caeed945f8a73042e23fb8cb8964352c05"
+    },
+    {
       "name": "equivalent",
       "version": "1.0.2",
       "license": "Apache-2.0 OR MIT",
@@ -620,6 +764,14 @@
       "crateSha256": "5a23add41df1562121a9393cb065eab5146a1242410f23a644851e90cfd669d2",
       "notice": "THIRD_PARTY_LICENSES/native/event-listener-5.4.2.md",
       "noticeSha256": "e23cc3492b78f1afe4d6e2c66e8c00bf249c5dadb519390a08c09e205b5d9089"
+    },
+    {
+      "name": "exr",
+      "version": "1.74.2",
+      "license": "BSD-3-Clause",
+      "crateSha256": "711fe42c9964295e01ee3fba3f9fe0e1d24b98886950d68efe81b1c76e21adf3",
+      "notice": "THIRD_PARTY_LICENSES/native/exr-1.74.2.md",
+      "noticeSha256": "e5c36c7368ddb66bb50b68bff262cb967de0ab02470556ed0fdf640ec0253955"
     },
     {
       "name": "fallible-iterator",
@@ -716,6 +868,22 @@
       "crateSha256": "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb",
       "notice": "THIRD_PARTY_LICENSES/native/foldhash-0.2.0.md",
       "noticeSha256": "cb504e6ee4ff5e16ed75c9090c7735c352a1be7c9627db12c854f01f58f91e22"
+    },
+    {
+      "name": "font-types",
+      "version": "0.12.6",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "6c92d9081c7ab3bd83ef1eecdfad090f3d966e3ce74106779664114cfe1a6274",
+      "notice": "THIRD_PARTY_LICENSES/native/font-types-0.12.6.md",
+      "noticeSha256": "630fc3133580a7f3dc96b6ce49e8b839c0d0d788d3d790a5127c803b12ad9800"
+    },
+    {
+      "name": "fontique",
+      "version": "0.11.1",
+      "license": "Apache-2.0 OR MIT",
+      "crateSha256": "6688bc1294fe7117d788937b6c53480169b29c566954af490830d4c09da9516a",
+      "notice": "THIRD_PARTY_LICENSES/native/fontique-0.11.1.md",
+      "noticeSha256": "7f5b842a45d2dfcb6b5876958f328faad7dbd5fced94b9db3201ea6dce164ede"
     },
     {
       "name": "foreign-types",
@@ -862,6 +1030,14 @@
       "noticeSha256": "cf0fefc48312ac8724eb697ebb9b55196d3c8c32c3c2c54471ab10c7052e83a3"
     },
     {
+      "name": "gif",
+      "version": "0.14.2",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "ee8cfcc411d9adbbaba82fb72661cc1bcca13e8bba98b364e62b2dba8f960159",
+      "notice": "THIRD_PARTY_LICENSES/native/gif-0.14.2.md",
+      "noticeSha256": "d9484851a06b83e3983d013e3a6a14e7210a1bf721bb3a270c1ce6bf98eb4a4e"
+    },
+    {
       "name": "glob",
       "version": "0.3.4",
       "license": "MIT OR Apache-2.0",
@@ -876,6 +1052,22 @@
       "crateSha256": "8c386b0a4a70cb2d39fffd74480f985b6f0bfbcb934b6a6b6b7e630e448f242e",
       "notice": "THIRD_PARTY_LICENSES/native/global-hotkey-0.8.0.md",
       "noticeSha256": "a0677ced8d18730a57a0901dbd4842e9d539a44a4ecba95c4eb833bc8cbf5456"
+    },
+    {
+      "name": "half",
+      "version": "2.7.1",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "6ea2d84b969582b4b1864a92dc5d27cd2b77b622a8d79306834f1be5ba20d84b",
+      "notice": "THIRD_PARTY_LICENSES/native/half-2.7.1.md",
+      "noticeSha256": "01d4201c7bd6bc22ad2dab7b5dc09646d22ea5338d3e9549a7b51c5d4eed2013"
+    },
+    {
+      "name": "harfrust",
+      "version": "0.12.0",
+      "license": "MIT",
+      "crateSha256": "c03d949a14aa089bbb282f7dd76a498a7f684428e4257202efc119ec010376f9",
+      "notice": "THIRD_PARTY_LICENSES/native/harfrust-0.12.0.md",
+      "noticeSha256": "438b885ad48173c93d8cb041b8abc2c039d19099f14c8adec9e3281c0dabe4c9"
     },
     {
       "name": "hashbrown",
@@ -932,6 +1124,14 @@
       "crateSha256": "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea",
       "notice": "THIRD_PARTY_LICENSES/native/heck-0.5.0.md",
       "noticeSha256": "1095d652761c4f3f982f1ba42bb5a211a23c2101e6099194b5d9d2e4287be860"
+    },
+    {
+      "name": "heic-rs",
+      "version": "0.1.1",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "adf9dde634bb6d5b718bacd01bef80192f2334306b2f785519a0136cca7b9618",
+      "notice": "THIRD_PARTY_LICENSES/native/heic-rs-0.1.1.md",
+      "noticeSha256": "37b366f8e121e2baa4ef2cc670f64d70adce116b518a5eeb33466500e662a67a"
     },
     {
       "name": "hex",
@@ -1038,6 +1238,22 @@
       "noticeSha256": "45808b5886d234540f2d4c6c6c6adc1610ea19c13defa51702c2c6cf739c69e7"
     },
     {
+      "name": "icu_locale_fallback",
+      "version": "2.3.0",
+      "license": "Unicode-3.0",
+      "crateSha256": "251af8e57c9400e3eb58242fe5b8b1152b2a64fdf4cf632f923c38ccee6f2fa9",
+      "notice": "THIRD_PARTY_LICENSES/native/icu_locale_fallback-2.3.0.md",
+      "noticeSha256": "bd37cb3f8eac2c9ca88ff8a3130e51c2f846dbba19f11a6f5145cbefa0ce0fd5"
+    },
+    {
+      "name": "icu_locale_fallback_data",
+      "version": "2.3.0",
+      "license": "Unicode-3.0",
+      "crateSha256": "decf2a22ec8fa68f1a0c1129a3f8583f8f8bc24e8b9ccbe98ead99f62a4dc3a8",
+      "notice": "THIRD_PARTY_LICENSES/native/icu_locale_fallback_data-2.3.0.md",
+      "noticeSha256": "5b9d1e7297813cb633c6c06f66434667644d1ac25e9450c1922aefba084328b4"
+    },
+    {
       "name": "icu_normalizer",
       "version": "2.3.0",
       "license": "Unicode-3.0",
@@ -1078,6 +1294,22 @@
       "noticeSha256": "738d121592a53df3c3b7623223e5bafa8379fed0489a46d56ebb1eff69436cfc"
     },
     {
+      "name": "icu_segmenter",
+      "version": "2.3.0",
+      "license": "Unicode-3.0",
+      "crateSha256": "82d07aafccd67af15d02512a6adf5896fbc5ed00f2e99b471d2efa14016db3db",
+      "notice": "THIRD_PARTY_LICENSES/native/icu_segmenter-2.3.0.md",
+      "noticeSha256": "86bfcd0235fa23df223211da8ca5dfe6554ca76fe9a101ee16ec1452521ed79d"
+    },
+    {
+      "name": "icu_segmenter_data",
+      "version": "2.3.0",
+      "license": "Unicode-3.0",
+      "crateSha256": "ae293c039020f9ec10710af98d29ce6aa2051486638b49c9a6409f3b4a9e98ad",
+      "notice": "THIRD_PARTY_LICENSES/native/icu_segmenter_data-2.3.0.md",
+      "noticeSha256": "ecf6827a74c896874d66730eee4fe57c17f3c20698f19005f06d8c3d66ff582a"
+    },
+    {
       "name": "ident_case",
       "version": "1.0.1",
       "license": "MIT/Apache-2.0",
@@ -1100,6 +1332,30 @@
       "crateSha256": "cb68373c0d6620ef8105e855e7745e18b0d00d3bdb07fb532e434244cdb9a714",
       "notice": "THIRD_PARTY_LICENSES/native/idna_adapter-1.2.2.md",
       "noticeSha256": "841dd08dfef30ab4ab460e682de459c279a730e0ee72a4fff88e5fb3c02d7f47"
+    },
+    {
+      "name": "image",
+      "version": "0.25.10",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "85ab80394333c02fe689eaf900ab500fbd0c2213da414687ebf995a65d5a6104",
+      "notice": "THIRD_PARTY_LICENSES/native/image-0.25.10.md",
+      "noticeSha256": "3a0001039b8fea7c5097676f4fb12b035c74935199d5b6d16491ead206d073c7"
+    },
+    {
+      "name": "image-webp",
+      "version": "0.2.4",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "525e9ff3e1a4be2fbea1fdf0e98686a6d98b4d8f937e1bf7402245af1909e8c3",
+      "notice": "THIRD_PARTY_LICENSES/native/image-webp-0.2.4.md",
+      "noticeSha256": "a3df50399cc0da72cac51f3cad97f23e1192ad287c8b852636ff2073f4fed3ed"
+    },
+    {
+      "name": "imgref",
+      "version": "1.12.3",
+      "license": "CC0-1.0 OR Apache-2.0",
+      "crateSha256": "6e44b0a4eaa4c82f441d50a963f2d5f05a787240aeee097597033e72accfd22f",
+      "notice": "THIRD_PARTY_LICENSES/native/imgref-1.12.3.md",
+      "noticeSha256": "f3e6c0aa5c705f140b3efdb6ef155a23032d9afa476a20e9343c127428227c6f"
     },
     {
       "name": "indexmap",
@@ -1134,12 +1390,28 @@
       "noticeSha256": "b9775bb251a6dbf57ad57c9c1034177f8409ff17ca3394083d4b0ed448e8b74b"
     },
     {
+      "name": "itertools",
+      "version": "0.14.0",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285",
+      "notice": "THIRD_PARTY_LICENSES/native/itertools-0.14.0.md",
+      "noticeSha256": "1f773c9281c839b8c676f61ce454f4a0db42a9b59af88fbed735011d3ed473dd"
+    },
+    {
       "name": "itoa",
       "version": "1.0.18",
       "license": "MIT OR Apache-2.0",
       "crateSha256": "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682",
       "notice": "THIRD_PARTY_LICENSES/native/itoa-1.0.18.md",
       "noticeSha256": "7961e443d5953a19481528baeada70b09039339dadc66865ef4d5bed6e59eeac"
+    },
+    {
+      "name": "jpeg-encoder",
+      "version": "0.6.1",
+      "license": "(MIT OR Apache-2.0) AND IJG",
+      "crateSha256": "b454d911ac55068f53495488d8ccd0646eaa540c033a28ee15b07838afafb01f",
+      "notice": "THIRD_PARTY_LICENSES/native/jpeg-encoder-0.6.1.md",
+      "noticeSha256": "3e1da17a40056bf79c842f6e62ec0acb54b4c7029a0383c2203201eb15a30ab1"
     },
     {
       "name": "json-patch",
@@ -1174,6 +1446,14 @@
       "noticeSha256": "ddfc355380f8328ea18f7796f3b39ec931412cdcc34eb2a29bdca39178929558"
     },
     {
+      "name": "lebe",
+      "version": "0.5.3",
+      "license": "BSD-3-Clause",
+      "crateSha256": "7a79a3332a6609480d7d0c9eab957bca6b455b91bb84e66d19f5ff66294b85b8",
+      "notice": "THIRD_PARTY_LICENSES/native/lebe-0.5.3.md",
+      "noticeSha256": "32d9597143ac5caba664eae2cc45fdcf8ac1df657cc18a173530e2eb52e88cc2"
+    },
+    {
       "name": "libc",
       "version": "0.2.189",
       "license": "MIT OR Apache-2.0",
@@ -1182,12 +1462,28 @@
       "noticeSha256": "02f6db71ba5ba1c6b12cf66d122863b81ae5a2d5076030fd77ac7f854596a926"
     },
     {
+      "name": "libm",
+      "version": "0.2.16",
+      "license": "MIT",
+      "crateSha256": "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981",
+      "notice": "THIRD_PARTY_LICENSES/native/libm-0.2.16.md",
+      "noticeSha256": "af739652835182d0fafb44efca3157ffc6fd9e4af52d56abc47bba889878d7cc"
+    },
+    {
       "name": "libsqlite3-sys",
       "version": "0.30.1",
       "license": "MIT",
       "crateSha256": "2e99fb7a497b1e3339bc746195567ed8d3e24945ecd636e3619d20b9de9e9149",
       "notice": "THIRD_PARTY_LICENSES/native/libsqlite3-sys-0.30.1.md",
       "noticeSha256": "53265cb6977767389d2b2ba7c18024053b1249cf1a142755bd72419e23231166"
+    },
+    {
+      "name": "linebender_resource_handle",
+      "version": "0.1.1",
+      "license": "Apache-2.0 OR MIT",
+      "crateSha256": "d4a5ff6bcca6c4867b1c4fd4ef63e4db7436ef363e0ad7531d1558856bae64f4",
+      "notice": "THIRD_PARTY_LICENSES/native/linebender_resource_handle-0.1.1.md",
+      "noticeSha256": "39e3aeb48afdd8198d5345f5b4243be8c04af60071aa54052ca9a9b961a0fb86"
     },
     {
       "name": "litemap",
@@ -1214,6 +1510,14 @@
       "noticeSha256": "61625379722b0d0c185ad03ceb395c187430898fea652c57684ee0b46e98533d"
     },
     {
+      "name": "loop9",
+      "version": "0.1.5",
+      "license": "MIT",
+      "crateSha256": "0fae87c125b03c1d2c0150c90365d7d6bcc53fb73a9acaef207d2d065860f062",
+      "notice": "THIRD_PARTY_LICENSES/native/loop9-0.1.5.md",
+      "noticeSha256": "906da58822b1f386c6462c8908cccb98854f56f24872c36c00da88e01f5ff9f5"
+    },
+    {
       "name": "markup5ever",
       "version": "0.38.0",
       "license": "MIT OR Apache-2.0",
@@ -1222,12 +1526,28 @@
       "noticeSha256": "392996c38bb6a150869baa89698925687ed435a07c092f9d3711163a96a48a00"
     },
     {
+      "name": "maybe-rayon",
+      "version": "0.1.1",
+      "license": "MIT",
+      "crateSha256": "8ea1f30cedd69f0a2954655f7188c6a834246d2bcf1e315e2ac40c4b24dc9519",
+      "notice": "THIRD_PARTY_LICENSES/native/maybe-rayon-0.1.1.md",
+      "noticeSha256": "1bae3c70632ab2c6bce450b1683b0e93a1a63b495b15f0a2d01ba5797db3b1a8"
+    },
+    {
       "name": "memchr",
       "version": "2.8.3",
       "license": "Unlicense OR MIT",
       "crateSha256": "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98",
       "notice": "THIRD_PARTY_LICENSES/native/memchr-2.8.3.md",
       "noticeSha256": "2a850804e477ef71a31cbdee02fd804d5e514f9475e3e15202b25e0639bd7018"
+    },
+    {
+      "name": "memmap2",
+      "version": "0.9.11",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "d1219ed1b7f229ee7104d281dd01d6802fe28bb6e95d292942c4daacdeb798c0",
+      "notice": "THIRD_PARTY_LICENSES/native/memmap2-0.9.11.md",
+      "noticeSha256": "ed5b625c7dc861254ecfc52cfb8f75c8c1ca1c62c3928818b063d78ed84a58b3"
     },
     {
       "name": "mime",
@@ -1262,6 +1582,14 @@
       "noticeSha256": "bc279980b29e0439817b40f03356d2251f1873d1ac6fac18c93ca9eaca01b184"
     },
     {
+      "name": "moxcms",
+      "version": "0.8.1",
+      "license": "BSD-3-Clause OR Apache-2.0",
+      "crateSha256": "bb85c154ba489f01b25c0d36ae69a87e4a1c73a72631fc6c0eb6dde34a73e44b",
+      "notice": "THIRD_PARTY_LICENSES/native/moxcms-0.8.1.md",
+      "noticeSha256": "5d58577cf316296cf027000af2f6e06a4a0d86ba612bcf0e5a2ad9f2ed401b19"
+    },
+    {
       "name": "muda",
       "version": "0.19.3",
       "license": "Apache-2.0 OR MIT",
@@ -1286,6 +1614,30 @@
       "noticeSha256": "50afecf28df9bca7e0d121d912db6ebbacb8d44c44a52f46975b8bc3793ebe22"
     },
     {
+      "name": "no_std_io2",
+      "version": "0.9.4",
+      "license": "Apache-2.0 OR MIT",
+      "crateSha256": "418abd1b6d34fbf6cae440dc874771b0525a604428704c76e48b29a5e67b8003",
+      "notice": "THIRD_PARTY_LICENSES/native/no_std_io2-0.9.4.md",
+      "noticeSha256": "a3f1b0d98d875a9a019f8801b17d28a6257969650caf016f25eef15529422583"
+    },
+    {
+      "name": "nom",
+      "version": "8.0.0",
+      "license": "MIT",
+      "crateSha256": "df9761775871bdef83bee530e60050f7e54b1105350d6884eb0fb4f46c2f9405",
+      "notice": "THIRD_PARTY_LICENSES/native/nom-8.0.0.md",
+      "noticeSha256": "05db3f7e321091cd7d66fcec15a54f52c47aa4526427acb50e19938157e6cce1"
+    },
+    {
+      "name": "noop_proc_macro",
+      "version": "0.3.0",
+      "license": "MIT",
+      "crateSha256": "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8",
+      "notice": "THIRD_PARTY_LICENSES/native/noop_proc_macro-0.3.0.md",
+      "noticeSha256": "f158141e359095e8f6b4f83c290d3c623ebe65c6795b5e4bc5be6c0fc92ad95e"
+    },
+    {
       "name": "notify",
       "version": "6.1.1",
       "license": "CC0-1.0",
@@ -1302,12 +1654,52 @@
       "noticeSha256": "780b9947272f856b00bec7f633a286c02625e2f628f038a81b2014b2d08cd501"
     },
     {
+      "name": "num-bigint",
+      "version": "0.4.8",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "c89e69e7e0f03bea5ef08013795c25018e101932225a656383bd384495ecc367",
+      "notice": "THIRD_PARTY_LICENSES/native/num-bigint-0.4.8.md",
+      "noticeSha256": "4fc21068ea8ebc270a2fe2f03c8bbeb5c0b254bd38fff6e0b32b47e73b46694d"
+    },
+    {
+      "name": "num-complex",
+      "version": "0.4.6",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "73f88a1307638156682bada9d7604135552957b7818057dcef22705b4d509495",
+      "notice": "THIRD_PARTY_LICENSES/native/num-complex-0.4.6.md",
+      "noticeSha256": "c9620194575df816cd582c419896b107f7d10a4f1a7e1661a05e862e8f16f778"
+    },
+    {
       "name": "num-conv",
       "version": "0.2.2",
       "license": "MIT OR Apache-2.0",
       "crateSha256": "521739c6d2bac4aa25192232afe6841231376b2b26d4d9fae5ecf8ca5772e441",
       "notice": "THIRD_PARTY_LICENSES/native/num-conv-0.2.2.md",
       "noticeSha256": "d69e4840270be1e2274b83c9c7ab27ffc6e3c0275343db38f08370c6cf496cf2"
+    },
+    {
+      "name": "num-derive",
+      "version": "0.4.2",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202",
+      "notice": "THIRD_PARTY_LICENSES/native/num-derive-0.4.2.md",
+      "noticeSha256": "e8d7f3cbf9318acfeff48864ef195f34e954c9de4840f889aa1be17afff9648b"
+    },
+    {
+      "name": "num-integer",
+      "version": "0.1.47",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "7ce2d95d4b3734dc35aa2f45e1aa22cd416814592a4f9d9205e11affd5b8e10b",
+      "notice": "THIRD_PARTY_LICENSES/native/num-integer-0.1.47.md",
+      "noticeSha256": "9ab15ebb3af28bee87550cc0bc418144790223a599cb738579993973bde61887"
+    },
+    {
+      "name": "num-rational",
+      "version": "0.4.2",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824",
+      "notice": "THIRD_PARTY_LICENSES/native/num-rational-0.4.2.md",
+      "noticeSha256": "e1c523249e5ecf004149c4129d1bfa6338e63350554aae3015df08995bc37d65"
     },
     {
       "name": "num-traits",
@@ -1422,6 +1814,46 @@
       "noticeSha256": "bf6bc129c8da5687cb7a8e9ceda391932c7fc71136065e1156d324379aa7c147"
     },
     {
+      "name": "parlance",
+      "version": "0.1.0",
+      "license": "Apache-2.0 OR MIT",
+      "crateSha256": "4b6937eda350acc1a5d05872c3cbf99fe78619c269096e2be3d4a350058639d5",
+      "notice": "THIRD_PARTY_LICENSES/native/parlance-0.1.0.md",
+      "noticeSha256": "2f1e9765e1d2314934c97e144a8d13ffc08b5555be8c9994cd129380a01eb473"
+    },
+    {
+      "name": "parley",
+      "version": "0.11.1",
+      "license": "Apache-2.0 OR MIT",
+      "crateSha256": "22d2ff88bd3f7d68d1d9b09c7e6209f9a8e8c05088295140a2bcf2e9b17038c5",
+      "notice": "THIRD_PARTY_LICENSES/native/parley-0.11.1.md",
+      "noticeSha256": "fecb8bc5d59eeba0c5a7ef51f6c7679f770683f6f567f85eb10593a52680ab80"
+    },
+    {
+      "name": "parley_data",
+      "version": "0.11.1",
+      "license": "Apache-2.0 OR MIT",
+      "crateSha256": "1567535334d6ba2d3cde19221ba9a7bd0fabb3cbd99046ddfb10ae061cfcc889",
+      "notice": "THIRD_PARTY_LICENSES/native/parley_data-0.11.1.md",
+      "noticeSha256": "3ac61ee6f1aa5df22b7e84102c3042936663f1025f841c062291f6e68530d5b9"
+    },
+    {
+      "name": "paste",
+      "version": "1.0.15",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a",
+      "notice": "THIRD_PARTY_LICENSES/native/paste-1.0.15.md",
+      "noticeSha256": "452f0bc6f062c879a1ae2339a00cab4afadebd650127ea2f7c4ceb969abbe229"
+    },
+    {
+      "name": "pastey",
+      "version": "0.1.1",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "35fb2e5f958ec131621fdd531e9fc186ed768cbe395337403ae56c17a74c68ec",
+      "notice": "THIRD_PARTY_LICENSES/native/pastey-0.1.1.md",
+      "noticeSha256": "c409a09cee6cc228a545366f1280bfde27c72611341d98aeeae8e89f290a7e5c"
+    },
+    {
       "name": "percent-encoding",
       "version": "2.3.2",
       "license": "MIT OR Apache-2.0",
@@ -1468,6 +1900,178 @@
       "crateSha256": "e57fef6bc5981e38c2ce2d63bfa546861309f875b8a75f092d1d54ae2d64f266",
       "notice": "THIRD_PARTY_LICENSES/native/phf_shared-0.13.1.md",
       "noticeSha256": "859f13e811272607ea53c4baa78afb19a81914350d08b55ae7fcf91341cb2b16"
+    },
+    {
+      "name": "photocraft-algo",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-algo-0.3.0.md",
+      "noticeSha256": "8ec6ec744fcca4e66b4fdd4ac23ed63709bcfe2cec8f9c301c039be73db75139"
+    },
+    {
+      "name": "photocraft-cms",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-cms-0.3.0.md",
+      "noticeSha256": "2455b8c12a9f5084613e8810b0bdff0910569ade06131240cd7964f15a1d08a2"
+    },
+    {
+      "name": "photocraft-codecs",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-codecs-0.3.0.md",
+      "noticeSha256": "1239cb100abdfae6778b1cbaa3180fc48cdda242a0dbf791a8a724d42d2a4008"
+    },
+    {
+      "name": "photocraft-color",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-color-0.3.0.md",
+      "noticeSha256": "f092bbfc825beb8b47ad1a7e9aceb49525c909310cf7f03c359e6dd237242d3d"
+    },
+    {
+      "name": "photocraft-compose",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-compose-0.3.0.md",
+      "noticeSha256": "94b05dc6599795a5c3e10b973ac5b2702f11daf9a0d8c76dc27cc3eccb1c4967"
+    },
+    {
+      "name": "photocraft-doc",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-doc-0.3.0.md",
+      "noticeSha256": "41a3b4967fb1596eda483094c1b80d55ac273f35c8a6d5fca5e909f4c433f279"
+    },
+    {
+      "name": "photocraft-engine",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-engine-0.3.0.md",
+      "noticeSha256": "5a40b41af4dda51455b05679fbddfaeeaacdcdd7bd2a794075c39b30ae5b9096"
+    },
+    {
+      "name": "photocraft-format",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "vendoredFrom": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "localChanges": "src-tauri/vendor/photocraft/ORION_CHANGES.md",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-format-0.3.0.md",
+      "noticeSha256": "036cecc807eaa6d822bbb6166484eeb2d170263157d0396060dcf14cfdd82d71"
+    },
+    {
+      "name": "photocraft-geom",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-geom-0.3.0.md",
+      "noticeSha256": "4c68d45727674000764b94cabc216264ed00dfb15af88345074bd4e426f0da3d"
+    },
+    {
+      "name": "photocraft-heif",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-heif-0.3.0.md",
+      "noticeSha256": "a70c65131a7b3cad109130cd39d3105cd29625800afb510edd4f247da70e9e6e"
+    },
+    {
+      "name": "photocraft-io",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-io-0.3.0.md",
+      "noticeSha256": "20c39b5320cdc7ad774cd15596e4a90626ed2552503b15b3a8908a5dddc8d994"
+    },
+    {
+      "name": "photocraft-ops",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-ops-0.3.0.md",
+      "noticeSha256": "b038181ddf78a2ef2026e7bea6925c489bb7db6b5916adda433208abfad91ac1"
+    },
+    {
+      "name": "photocraft-paint",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-paint-0.3.0.md",
+      "noticeSha256": "06385a10330383a7f8cec238acf79a013ad0af5362f2c99fc1f9a4d4f9531f1f"
+    },
+    {
+      "name": "photocraft-plugins",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-plugins-0.3.0.md",
+      "noticeSha256": "dbc3f041e99b3097f264146312b302b3101fc23d859c68825672d9f33dc1a90a"
+    },
+    {
+      "name": "photocraft-psd",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-psd-0.3.0.md",
+      "noticeSha256": "06457fba6f33342ebfa92c2c676fd6d0d1d93d4aba56646ddaba0600fd4ab2d1"
+    },
+    {
+      "name": "photocraft-raster",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-raster-0.3.0.md",
+      "noticeSha256": "771024fc9b90e53ca26a7ebcd5f264e339e98a4807acf06a60428fed53bd4fb8"
+    },
+    {
+      "name": "photocraft-raw",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-raw-0.3.0.md",
+      "noticeSha256": "83ef395ed82a56cd3f2cc0c14cda6a9145b15abde3c6bb312aaea89539cd9fbd"
+    },
+    {
+      "name": "photocraft-text",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-text-0.3.0.md",
+      "noticeSha256": "63d64747d8c5a7cc3c84b5c40b94a4ddc1c9e1cb28056f434f86c30268285722"
+    },
+    {
+      "name": "photocraft-vector",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "lockedSource": "git+https://github.com/storytold/photocraft?rev=47f9306fd06d5dee11acb84b108606f4c867222a#47f9306fd06d5dee11acb84b108606f4c867222a",
+      "sourceRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-vector-0.3.0.md",
+      "noticeSha256": "82037ff38eb2fc814f19329998218dc6de5c6cb6e5e7d05417d996e6bada464f"
     },
     {
       "name": "pin-project-lite",
@@ -1558,6 +2162,62 @@
       "noticeSha256": "af584573537e31e514b56b36fe990456334a0933055f7543a0b69c77bbc3ff1a"
     },
     {
+      "name": "profiling",
+      "version": "1.0.18",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5",
+      "notice": "THIRD_PARTY_LICENSES/native/profiling-1.0.18.md",
+      "noticeSha256": "46bd34a351cc5cf7e912dc7fe9afd675ab7242ff2d8b15c44db84dd422364add"
+    },
+    {
+      "name": "profiling-procmacros",
+      "version": "1.0.18",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "4488a4a36b9a4ba6b9334a32a39971f77c1436ec82c38707bce707699cc3bbcb",
+      "notice": "THIRD_PARTY_LICENSES/native/profiling-procmacros-1.0.18.md",
+      "noticeSha256": "01bb3c09ccb48aefc218d8df4160156579b93710f44a270e7b5214960b096478"
+    },
+    {
+      "name": "pulp",
+      "version": "0.22.3",
+      "license": "MIT",
+      "crateSha256": "046aa45b989642ec2e4717c8e72d677b13edd831a4d3b6cf37d9a3e54912496a",
+      "notice": "THIRD_PARTY_LICENSES/native/pulp-0.22.3.md",
+      "noticeSha256": "11d334768871b7c612e7b486652d63e9beed3b4c5df9e596d37ed05f8edb797d"
+    },
+    {
+      "name": "pulp-wasm-simd-flag",
+      "version": "0.1.1",
+      "license": "MIT",
+      "crateSha256": "1d8f70e07b9c3962945a74e59ca1c511bba65b6419468acc217c457d93f3c740",
+      "notice": "THIRD_PARTY_LICENSES/native/pulp-wasm-simd-flag-0.1.1.md",
+      "noticeSha256": "dff19587adad83f8962e922c349e208780df02da005c0e34bc4a7498b0723e09"
+    },
+    {
+      "name": "pxfm",
+      "version": "0.1.30",
+      "license": "BSD-3-Clause OR Apache-2.0",
+      "crateSha256": "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea",
+      "notice": "THIRD_PARTY_LICENSES/native/pxfm-0.1.30.md",
+      "noticeSha256": "0780be2b1674bad0fddd77b5924b29570e44fa66a64bdd869ac955aa7484610e"
+    },
+    {
+      "name": "qoi",
+      "version": "0.4.1",
+      "license": "MIT/Apache-2.0",
+      "crateSha256": "7f6d64c71eb498fe9eae14ce4ec935c555749aef511cca85b5568910d6e48001",
+      "notice": "THIRD_PARTY_LICENSES/native/qoi-0.4.1.md",
+      "noticeSha256": "10463a954c2e126fa0bbd1026c5cec0134624c9253609cf55373582366587a7f"
+    },
+    {
+      "name": "quick-error",
+      "version": "2.0.1",
+      "license": "MIT/Apache-2.0",
+      "crateSha256": "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3",
+      "notice": "THIRD_PARTY_LICENSES/native/quick-error-2.0.1.md",
+      "noticeSha256": "8a121092f6236ccbd79972979cbb242d60dcda3a4be80fbb15d0b423ee727bce"
+    },
+    {
       "name": "quick-xml",
       "version": "0.42.0",
       "license": "MIT",
@@ -1598,6 +2258,22 @@
       "noticeSha256": "9ae0a77dc97dcc1b78b9da7c7e08a3de05adf02b7223d544f762bf725f1db463"
     },
     {
+      "name": "rav1e",
+      "version": "0.8.1",
+      "license": "BSD-2-Clause",
+      "crateSha256": "43b6dd56e85d9483277cde964fd1bdb0428de4fec5ebba7540995639a21cb32b",
+      "notice": "THIRD_PARTY_LICENSES/native/rav1e-0.8.1.md",
+      "noticeSha256": "6fd4f7808b1430f582eb335afb1b257ea93e4d22195b85a84fb64d37babe46f2"
+    },
+    {
+      "name": "ravif",
+      "version": "0.13.0",
+      "license": "BSD-3-Clause",
+      "crateSha256": "e52310197d971b0f5be7fe6b57530dcd27beb35c1b013f29d66c1ad73fbbcc45",
+      "notice": "THIRD_PARTY_LICENSES/native/ravif-0.13.0.md",
+      "noticeSha256": "cbe4dcc028e712bd3983ab8bd5656e6a88b1635203401f4b4e6181ccbe248074"
+    },
+    {
       "name": "raw-window-handle",
       "version": "0.6.2",
       "license": "MIT OR Apache-2.0 OR Zlib",
@@ -1620,6 +2296,22 @@
       "crateSha256": "22e18b0f0062d30d4230b2e85ff77fdfe4326feb054b9783a3460d8435c8ab91",
       "notice": "THIRD_PARTY_LICENSES/native/rayon-core-1.13.0.md",
       "noticeSha256": "20e8d52ab9ed16fda09eb7cc87ba2d451f5929218a572dc53186cc8092d90521"
+    },
+    {
+      "name": "read-fonts",
+      "version": "0.41.0",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "046a7d674daf459825b32f5062056d6882db0d2f5a479fbd76ccfc870ac18709",
+      "notice": "THIRD_PARTY_LICENSES/native/read-fonts-0.41.0.md",
+      "noticeSha256": "459971041ade4172fe566b84907cb5f87f5450c99387254ce3a2a7e52067c424"
+    },
+    {
+      "name": "reborrow",
+      "version": "0.5.5",
+      "license": "MIT",
+      "crateSha256": "03251193000f4bd3b042892be858ee50e8b3719f2b08e5833ac4353724632430",
+      "notice": "THIRD_PARTY_LICENSES/native/reborrow-0.5.5.md",
+      "noticeSha256": "91b42e8e44266c061ad99553394cd1bf36be34fc71f1033f5d8100adb510d2c2"
     },
     {
       "name": "regex",
@@ -1660,6 +2352,14 @@
       "crateSha256": "a15ad77d9e70a92437d8f74c35d99b4e4691128df018833e99f90bcd36152672",
       "notice": "THIRD_PARTY_LICENSES/native/rfd-0.16.0.md",
       "noticeSha256": "678daeb7718b09910d276d1f84ff0b3d143648f086a2086a7a20782dc2fa6d81"
+    },
+    {
+      "name": "rgb",
+      "version": "0.8.53",
+      "license": "MIT",
+      "crateSha256": "47b34b781b31e5d73e9fbc8689c70551fd1ade9a19e3e28cfec8580a79290cc4",
+      "notice": "THIRD_PARTY_LICENSES/native/rgb-0.8.53.md",
+      "noticeSha256": "588cfb3e98d21f700786d66f5b3ee4bd127380eaa0968d6e5168c6d1d57b1e42"
     },
     {
       "name": "ring",
@@ -1724,6 +2424,14 @@
       "crateSha256": "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2",
       "notice": "THIRD_PARTY_LICENSES/native/rustls-webpki-0.103.15.md",
       "noticeSha256": "1259f2df8558f6f3e628b8914b05adc1039692fa9971ec77b63a947f564acdc6"
+    },
+    {
+      "name": "ruzstd",
+      "version": "0.9.0",
+      "license": "MIT",
+      "crateSha256": "a252f5e20f038fe7b4ea53e073e65398d652c864cc162fc77c56c2f13717b888",
+      "notice": "THIRD_PARTY_LICENSES/native/ruzstd-0.9.0.md",
+      "noticeSha256": "f00e34d6b8187f28b5530f6c24b1d4b6de796b6f93a5647b88d7fa6872b81b9d"
     },
     {
       "name": "ryu",
@@ -1942,12 +2650,28 @@
       "noticeSha256": "b4177389fb2470a2d29cb4691ef6d641354509c57e2087a23ae40496c3bee92f"
     },
     {
+      "name": "simd_helpers",
+      "version": "0.1.0",
+      "license": "MIT",
+      "crateSha256": "95890f873bec569a0362c235787f3aca6e1e887302ba4840839bcc6459c42da6",
+      "notice": "THIRD_PARTY_LICENSES/native/simd_helpers-0.1.0.md",
+      "noticeSha256": "dc46b22467f75b326c2bbd44e360524bcf1ed6f11913ddd431a6cc0f6193231c"
+    },
+    {
       "name": "siphasher",
       "version": "1.0.3",
       "license": "MIT/Apache-2.0",
       "crateSha256": "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649",
       "notice": "THIRD_PARTY_LICENSES/native/siphasher-1.0.3.md",
       "noticeSha256": "2ebb6c2bb8562c7a688a51b7f6a2f7474acd148d5dab03fe4013a6c9abeb57e0"
+    },
+    {
+      "name": "skrifa",
+      "version": "0.44.0",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "819ab7d62b1d3e72d9d9dea5650bac30424f9111364bb94928dbf5ecad1baa68",
+      "notice": "THIRD_PARTY_LICENSES/native/skrifa-0.44.0.md",
+      "noticeSha256": "cc9295ae396973acd7da7db3225cd74b3cb5c9a893802768ecea89dc2203e620"
     },
     {
       "name": "slab",
@@ -2270,6 +2994,14 @@
       "noticeSha256": "ca58f2d239c241fd4efd1450fbb6e737da32988c236d2accd8bcfe12ceb6ceb9"
     },
     {
+      "name": "tiff",
+      "version": "0.11.3",
+      "license": "MIT",
+      "crateSha256": "b63feaf3343d35b6ca4d50483f94843803b0f51634937cc2ec519fc32232bc52",
+      "notice": "THIRD_PARTY_LICENSES/native/tiff-0.11.3.md",
+      "noticeSha256": "44860d2f425d49d07058c046e133e543c2091453b6c0987ad54a367ad52a7b37"
+    },
+    {
       "name": "time",
       "version": "0.3.55",
       "license": "MIT OR Apache-2.0",
@@ -2454,6 +3186,14 @@
       "noticeSha256": "62ba57a4f2fdb2c7faf6eacc9adfe5f98794db4c3031a14d09cd90eef0e37ce0"
     },
     {
+      "name": "twox-hash",
+      "version": "2.1.5",
+      "license": "MIT",
+      "crateSha256": "86a801b3cea342a06d468c8710662aa29e5e05e4f5c0d62f00bbb7f2ad7941c2",
+      "notice": "THIRD_PARTY_LICENSES/native/twox-hash-2.1.5.md",
+      "noticeSha256": "a3c37461b883f466cd26410a84bdbb7989e6100bf7cb40184176c55367c66ced"
+    },
+    {
       "name": "typeid",
       "version": "1.0.3",
       "license": "MIT OR Apache-2.0",
@@ -2574,6 +3314,14 @@
       "noticeSha256": "f3e1c3a8ece592d0c40bb161c3f7e6cc6931db98dda392c9e65ae14a3a024073"
     },
     {
+      "name": "v_frame",
+      "version": "0.3.9",
+      "license": "BSD-2-Clause",
+      "crateSha256": "666b7727c8875d6ab5db9533418d7c764233ac9c0cff1d469aec8fa127597be2",
+      "notice": "THIRD_PARTY_LICENSES/native/v_frame-0.3.9.md",
+      "noticeSha256": "2bda5214b24fd3cf7cf624224f8ea9e1d7fc877db175c3fc03bc93fdcc1699e5"
+    },
+    {
       "name": "vcpkg",
       "version": "0.2.15",
       "license": "MIT/Apache-2.0",
@@ -2606,6 +3354,46 @@
       "noticeSha256": "18c32e7ee731322c37024f620bd0af37ebfa91d8dd7f56bbe1d7f424ff013102"
     },
     {
+      "name": "wasmi",
+      "version": "2.0.0",
+      "license": "MIT/Apache-2.0",
+      "crateSha256": "78693fcdd618e0fc34af59c6b8efa9ac5d58c68df940beff4bedddb6acfe7c27",
+      "notice": "THIRD_PARTY_LICENSES/native/wasmi-2.0.0.md",
+      "noticeSha256": "a34356eb3ab72c61414b91538b5d37c75b38f171e1890413b800b7fb75157597"
+    },
+    {
+      "name": "wasmi_collections",
+      "version": "2.0.0",
+      "license": "MIT/Apache-2.0",
+      "crateSha256": "8a8be2aa467cf2d29e96ff759472c36eeb44a3c81c67fc9cb76c9a24c519c557",
+      "notice": "THIRD_PARTY_LICENSES/native/wasmi_collections-2.0.0.md",
+      "noticeSha256": "4fd78d88d3858550b031bc531ec1b8dea4d3e14dc4d6aa25126eb481f61122c4"
+    },
+    {
+      "name": "wasmi_core",
+      "version": "2.0.0",
+      "license": "MIT/Apache-2.0",
+      "crateSha256": "69372d5fda3ea3d1e0aa6603c7888110e0187e88ea17cd8fc2e2df0a0e1f37fa",
+      "notice": "THIRD_PARTY_LICENSES/native/wasmi_core-2.0.0.md",
+      "noticeSha256": "8ad46facef0c22ab55ed9a7a990176cea994ed53825b648ac3fc19412bddc80d"
+    },
+    {
+      "name": "wasmi_ir",
+      "version": "2.0.0",
+      "license": "MIT/Apache-2.0",
+      "crateSha256": "8f17b774caa13c618c7244f1ee51fe23c5e7b8538a471fa46d9949779758aed6",
+      "notice": "THIRD_PARTY_LICENSES/native/wasmi_ir-2.0.0.md",
+      "noticeSha256": "dff99a8b5b9205d02e0a571df1a1a32c9188e57cb1cfd4a123fa1ca0746d2900"
+    },
+    {
+      "name": "wasmparser",
+      "version": "0.228.0",
+      "license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+      "crateSha256": "4abf1132c1fdf747d56bbc1bb52152400c70f336870f968b85e89ea422198ae3",
+      "notice": "THIRD_PARTY_LICENSES/native/wasmparser-0.228.0.md",
+      "noticeSha256": "fd5cb71891af4647c93726c3418ddc5f6cc53f4b27ed0a2d3b8651850d88cc1c"
+    },
+    {
       "name": "web_atoms",
       "version": "0.2.6",
       "license": "MIT OR Apache-2.0",
@@ -2620,6 +3408,14 @@
       "crateSha256": "7dcd9d09a39985f5344844e66b0c530a33843579125f23e21e9f0f220850f22a",
       "notice": "THIRD_PARTY_LICENSES/native/webpki-roots-1.0.9.md",
       "noticeSha256": "3d42aa6b2faa8ef40f0fff7aa3420241e461f728e8e898ad4a19791c7e2b99b4"
+    },
+    {
+      "name": "weezl",
+      "version": "0.1.12",
+      "license": "MIT OR Apache-2.0",
+      "crateSha256": "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88",
+      "notice": "THIRD_PARTY_LICENSES/native/weezl-0.1.12.md",
+      "noticeSha256": "b7f3daf5ec329a4b4ff59e16f9ffda757429be5383b39e373d153b848a2dee9f"
     },
     {
       "name": "window-vibrancy",
@@ -2662,6 +3458,14 @@
       "noticeSha256": "0ed435d48c62023a7caeaea5d631fc442431808164777f5199f9f4671083fa9c"
     },
     {
+      "name": "y4m",
+      "version": "0.8.0",
+      "license": "MIT",
+      "crateSha256": "7a5a4b21e1a62b67a2970e6831bc091d7b87e119e7f9791aef9702e3bef04448",
+      "notice": "THIRD_PARTY_LICENSES/native/y4m-0.8.0.md",
+      "noticeSha256": "6f4d74c5044cd0b3c3cb4de9bb8e5762fe66f90e23483938d17c1829dbd317d3"
+    },
+    {
       "name": "yoke",
       "version": "0.8.3",
       "license": "Unicode-3.0",
@@ -2684,6 +3488,14 @@
       "crateSha256": "d35102a9f36d089ccae9e4c6802bc118be4487b80aaffc0ab4e0cf5ce92d2873",
       "notice": "THIRD_PARTY_LICENSES/native/zerocopy-0.8.57.md",
       "noticeSha256": "8aa48f02081be7b2ff2b8be611e0c3c358454c070253a1ee998f1401964859ab"
+    },
+    {
+      "name": "zerocopy-derive",
+      "version": "0.8.57",
+      "license": "BSD-2-Clause OR Apache-2.0 OR MIT",
+      "crateSha256": "146c01f5ab44258da43cf276c74a2763db2ff3969c9c652c3f2de07041d0b2bc",
+      "notice": "THIRD_PARTY_LICENSES/native/zerocopy-derive-0.8.57.md",
+      "noticeSha256": "1f9276c30beea6ebcda149545146575d1ce41d6460d3f6597575edfd448916f5"
     },
     {
       "name": "zerofrom",
@@ -2740,6 +3552,30 @@
       "crateSha256": "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b",
       "notice": "THIRD_PARTY_LICENSES/native/zmij-1.0.23.md",
       "noticeSha256": "6a1c82fc4822b154d766526f906fdafa05fe631fecacc9451f4ed7195a44229f"
+    },
+    {
+      "name": "zune-core",
+      "version": "0.5.3",
+      "license": "MIT OR Apache-2.0 OR Zlib",
+      "crateSha256": "d56377fd46368984a170bc5aac5567e52ca5da874caa60bea39fcbca78fb658b",
+      "notice": "THIRD_PARTY_LICENSES/native/zune-core-0.5.3.md",
+      "noticeSha256": "c4bb7f37de41384eef82c4fbd892b4bfbd941a4744af527da8d87a1dee16ce90"
+    },
+    {
+      "name": "zune-inflate",
+      "version": "0.2.54",
+      "license": "MIT OR Apache-2.0 OR Zlib",
+      "crateSha256": "73ab332fe2f6680068f3582b16a24f90ad7096d5d39b974d1c0aff0125116f02",
+      "notice": "THIRD_PARTY_LICENSES/native/zune-inflate-0.2.54.md",
+      "noticeSha256": "5e51fdfdfcdc4398bf7e276fb7b02fbe5ba0a07a5e2027841566e866ecd13ada"
+    },
+    {
+      "name": "zune-jpeg",
+      "version": "0.5.15",
+      "license": "MIT OR Apache-2.0 OR Zlib",
+      "crateSha256": "27bc9d5b815bc103f142aa054f561d9187d191692ec7c2d1e2b4737f8dbd7296",
+      "notice": "THIRD_PARTY_LICENSES/native/zune-jpeg-0.5.15.md",
+      "noticeSha256": "39544c75e541d78a3ba084ac4a68c92fc1abffa07e4f00f6005bb617ca77573a"
     }
   ],
   "sources": [
@@ -2827,7 +3663,9 @@
       "license": "MIT",
       "notice": "THIRD_PARTY_LICENSES/LobeIcons-MIT.txt",
       "noticeSha256": "add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a",
-      "scope": ["src/shell/notch/logos/"],
+      "scope": [
+        "src/shell/notch/logos/"
+      ],
       "originalPortRevisionKnown": true,
       "additionalUpstream": "@lobehub/icons-static-svg@1.95.0 (Nous Research); per-file provenance and hashes in src/shell/notch/logos/sources.json"
     },
@@ -2838,7 +3676,12 @@
       "license": "MIT",
       "notice": "THIRD_PARTY_LICENSES/Codenotch-MIT.txt",
       "noticeSha256": "2868a2239cb49e84eae28db7a9069c6c04f8f9d4623aa360fd69feefa96edc63",
-      "scope": ["src/shell/notch/", "src/shell/monitorNotch.css", "src-tauri/src/subscription_quota.rs", "src-tauri/src/quota_keychain.rs"],
+      "scope": [
+        "src/shell/notch/",
+        "src/shell/monitorNotch.css",
+        "src-tauri/src/subscription_quota.rs",
+        "src-tauri/src/quota_keychain.rs"
+      ],
       "originalPortRevisionKnown": true
     },
     {
@@ -2849,7 +3692,8 @@
       "notice": "THIRD_PARTY_LICENSES/RepoLens-MIT.txt",
       "noticeSha256": "41797d46a3e8c02be8920a26d53e81b04f762f3ed4fe323cfd5425b384180a58",
       "scope": [
-        "src/apps/archives/repolens/"
+        "src/apps/archives/repolens/",
+        "src/features/repoAnalysis/sourceText.ts"
       ],
       "originalPortRevisionKnown": false
     },
@@ -2901,6 +3745,134 @@
         "src/apps/xdesign/model3d/"
       ],
       "originalPortRevisionKnown": false
+    },
+    {
+      "name": "2048 pinned recipe and inert source fixture",
+      "repository": "https://github.com/gabrielecirulli/2048",
+      "inspectedRevision": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "license": "MIT",
+      "notice": "THIRD_PARTY_LICENSES/2048-MIT.txt",
+      "noticeSha256": "57e12c39a6ad9d98b2e451065bfdfbd15fc9e0c2ed3bf4dc1d09acab41ff02fc",
+      "scope": [
+        "src/features/staticApps/"
+      ],
+      "originalPortRevisionKnown": true,
+      "additionalUpstream": "Golden fixture is byte data only; preparation tests never evaluate upstream JavaScript. Generated candidates retain exact source and notices."
+    },
+    {
+      "name": "Clear Sans inert font fixture and candidate notice",
+      "repository": "https://github.com/intel/clear-sans",
+      "inspectedRevision": "1993725b24a36af21e7ebaa8977103983b608572",
+      "license": "Apache-2.0",
+      "notice": "THIRD_PARTY_LICENSES/ClearSans-Apache-2.0.txt",
+      "noticeSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "scope": [
+        "src/features/staticApps/__fixtures__/source2048.json"
+      ],
+      "originalPortRevisionKnown": false,
+      "additionalUpstream": "Unchanged WOFF bytes from the pinned 2048 source; full Intel notices retained. Font conversion/metadata identity is not certified."
+    },
+    {
+      "name": "Sassy Math conservative recipe attribution",
+      "repository": "https://github.com/at-import/Sassy-math",
+      "inspectedRevision": "60d130108bcd20c5cd5aa50b52505afab9a40519",
+      "license": "MIT",
+      "notice": "THIRD_PARTY_LICENSES/SassyMath-MIT.txt",
+      "noticeSha256": "bf404329ac2bec2579c272d347ecf56f1ee873e5e7a2431199af6f4fee2043a3",
+      "scope": [
+        "src/features/staticApps/__fixtures__/source2048.json"
+      ],
+      "originalPortRevisionKnown": false,
+      "additionalUpstream": "Observed source/readme retained for helper attribution; original copied-helper revision remains unknown."
+    },
+    {
+      "name": "OpenPencil pattern tile rendering",
+      "repository": "https://github.com/open-pencil/open-pencil",
+      "inspectedRevision": "b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d",
+      "license": "MIT",
+      "notice": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+      "noticeSha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+      "scope": [
+        "src/apps/xdesign/pencil/proceduralPaints.ts"
+      ],
+      "originalPortRevisionKnown": false,
+      "additionalUpstream": "Adapted tile layout from published @open-pencil/core@0.15.1 src/canvas/fills.ts; repository inspection is separate from the npm artifact identity."
+    },
+    {
+      "name": "OpenPencil component slot semantics and Figma slot protocol",
+      "repository": "https://github.com/open-pencil/open-pencil",
+      "inspectedRevision": "b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d",
+      "license": "MIT",
+      "notice": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+      "noticeSha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+      "scope": [
+        "src/apps/xdesign/pencil/slots.ts",
+        "src/apps/xdesign/pencil/figSlots.ts"
+      ],
+      "originalPortRevisionKnown": false,
+      "additionalUpstream": "Adapted from packages/scene-graph/src/slots and packages/fig/src/node-change/export/slots.ts at the inspected MIT-licensed repository revision; integrated through Orion graph and archive adapters."
+    },
+    {
+      "name": "OpenPencil interactive behavior contracts and binding helpers",
+      "repository": "https://github.com/open-pencil/open-pencil",
+      "inspectedRevision": "b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d",
+      "license": "MIT",
+      "notice": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+      "noticeSha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+      "scope": [
+        "src/apps/xdesign/pencil/behaviour/kinds.ts",
+        "src/apps/xdesign/pencil/behaviour/schema.ts",
+        "src/apps/xdesign/pencil/behaviour/model.ts",
+        "src/apps/xdesign/pencil/behaviour/spec.ts",
+        "src/apps/xdesign/pencil/behaviour/pluginData.ts"
+      ],
+      "originalPortRevisionKnown": false,
+      "additionalUpstream": "Adapted from packages/scene-graph/src/behaviours and plugin-data/field.ts at the inspected MIT-licensed repository revision; preview uses Orion native React controls and an isolated CanvasKit graph."
+    },
+    {
+      "name": "PhotoCraft continuous retouch feedback formulas",
+      "repository": "https://github.com/storytold/photocraft",
+      "inspectedRevision": "47f9306fd06d5dee11acb84b108606f4c867222a",
+      "license": "MIT OR Apache-2.0",
+      "notice": "THIRD_PARTY_LICENSES/native/photocraft-engine-0.3.0.md",
+      "noticeSha256": "5a40b41af4dda51455b05679fbddfaeeaacdcdd7bd2a794075c39b30ae5b9096",
+      "scope": [
+        "src-tauri/src/xdesign_photo_retouch.rs",
+        "src-tauri/src/xdesign_photo_retouch_dabs.rs",
+        "src-tauri/src/xdesign_photo_smudge.rs",
+        "src-tauri/src/xdesign_photo_history.rs",
+        "src-tauri/src/xdesign_photo_prepared.rs",
+        "src-tauri/src/xdesign_photo_retouch_admission.rs",
+        "src-tauri/src/xdesign_photo_retouch_sparse.rs",
+        "src-tauri/src/xdesign_photo_retouch_working.rs",
+        "src-tauri/src/xdesign_photo_float_tiles.rs",
+        "src-tauri/src/xdesign_photo_smudge_boundary.rs",
+        "src-tauri/src/xdesign_photo_smudge_retention.rs",
+        "src-tauri/src/xdesign_photo_healing_coverage.rs",
+        "src-tauri/src/xdesign_photo_healing_publish.rs",
+        "src-tauri/src/xdesign_photo_spot_inpaint.rs",
+        "src-tauri/src/xdesign_photo_healing_solve.rs",
+        "src-tauri/src/xdesign_photo_healing_sources.rs",
+        "src-tauri/src/xdesign_photo_brush_feedback.rs",
+        "src-tauri/src/xdesign_photo_history_persistence.rs",
+        "src-tauri/src/xdesign_photo_bundle_compaction.rs",
+        "src-tauri/src/xdesign_photo_maintenance.rs"
+      ],
+      "originalPortRevisionKnown": true,
+      "additionalUpstream": "Adapted clone sampling/composition, Poisson healing, coverage padding, spot-healing and tone/focus formulas from crates/engine/src/retouch_cmds.rs; sequential mixer/replacement paint from crates/paint/src/mixer.rs and replace.rs; nonseparable color helpers from crates/color/src/blend.rs, all at the pinned revision. Uses public paint renderers/dynamics and algorithm crates; streamed sample ownership, float working/carry state, provisional tails, resource budgets and cancellable leases are Orion adapters. Boundary-sensitive Smudge feedback uses the public Smudge API in crates/paint/src/retouch.rs; native source/composite sampling and stroke mixing are retained, with owned float tile checkpoints, dependency windows and bounded rewind/eviction. History Brush coverage/source-target lookup follows the pinned engine's retouch_cmds.rs and channel_cmds.rs; snapshot identifiers, weak source registry and trim/eviction validation are Orion-owned adapters over public native history APIs. Prepared retouch completion uses the public engine jobs API (crates/engine/src/jobs.rs) and native edit/history rules (lib.rs), clone response fields (retouch_cmds.rs), and final mixer carry conversion (crates/paint/src/mixer.rs). The guarded transfer, coalesced-history adapter and event draining are Orion-owned; the pinned engine and dependencies remain unchanged. Cooperative cancellation uses the pinned public raster Interrupt, algorithm inpaint::complete_with and poisson::membrane_fill_with APIs. The seamless clone adapter retains the native dst-minus-src boundary data and exact final mixing without an engine fork. Pre-raster primary/dual/tail geometry admission, transformed source bounds and shared dab budgets are Orion-owned. Sparse Clone/History Brush feedback uses the pinned public render::COV_TILE, StrokeRenderer::coverage_at and tail_preview APIs. Dirty primary/dual/tail patch ownership and restoration are Orion-owned; native source sampling/blending are retained through existing adapters. Sequential retouch working/visible state now uses Orion-owned 64-pixel copy-on-write float tiles, exact native per-dab/finite-halo regions, dirty opacity publication and immutable-source composition caching. Native tone/focus/mixer/replacement formulas remain in the existing adapted module; no intermediate integer quantization or engine fork. Smudge working/visible pixels and checkpoints now share the same Orion-owned 64-pixel float tiles with exact local carry windows clipped to full-prefix bounds. Dirty publication includes required native bounds strips to retain transparent-float opacity rounding; read-only publication does not retain untouched source tiles. Native Smudge carry/pickup formulas remain unchanged. Smudge carry-window summary indexing and incremental checkpoint pointer/reference accounting are Orion-owned metadata adapters. They retain the exact native clipping predicate, rewind eligibility and additional-payload eviction semantics, hold no extra float Arcs and cooperatively interrupt metadata scans. Healing/Spot Healing global coverage staging uses the same pinned public tail_preview and coverage_at APIs. Orion-owned region staging avoids full-renderer cloning and duplicate dense coverage buffers while preserving the complete native padded/context solve domain. Coverage rows observe cancellation; final publication installs document and damage together only after the last check. Native source/composite/solver formulas and the engine remain unchanged. Healing/Spot Healing publication uses the unchanged public paint::retouch::apply_coverage API on bounded 64-pixel patches; coverage extraction and restricted-channel restoration are Orion-owned cancellable adapters. Proximity search, deterministic SplitMix64, integral/hole geometry and texture synthesis are adapted from the same revision's crates/algo/src/inpaint.rs with unchanged candidate order, scoring, tie behavior and float math. Row/candidate/score/block/copy checks add cancellation; empty-source synthesis uses the public interruptible Poisson API. The full native solve domain and pinned engine remain unchanged. Healing solve staging in xdesign_photo_healing_solve.rs retains the pinned retouch_cmds.rs mask bounding/inflate/clamp and public interruptible Poisson semantics. Orion-owned strided difference/mask construction removes copied cropped source/destination regions, borrows the original destination instead of cloning full solved paint, and lazily overlays the exact corrected region in bounded publication patches. Mask/staging/mix/overlay rows observe cancellation; source and mask buffers are released before publication. The solve domain and native engine remain unchanged. Healing/Spot Healing source staging in xdesign_photo_healing_sources.rs preserves native current/below/all-layer visibility and the complete native compose/source regions. Orion-owned bounded reads, color encoding and destination resampling batches poll cancellation; affine batches call the unchanged public clone_source::resample against the complete sampled source. Chunk endpoint math is safe at integer limits. Composition and allocator calls remain individually uninterruptible; no source-domain cropping or engine fork. Ordinary Brush/Pencil/Eraser feedback in xdesign_photo_brush_feedback.rs uses the unchanged public engine LiveStroke API. Implicit mask/alpha/Quick Mask routing and single-color-channel restoration follow the pinned crates/engine/src/channel_cmds.rs; restoration uses bounded 64-pixel patches while retaining native changed-tile selection and pruning. Tool/target/symmetry/source guards and prepared transfer are Orion-owned; native brush math and the engine remain unchanged. Native image history persistence in xdesign_photo_history_persistence.rs uses the pinned public History APIs (crates/ops/src/lib.rs), format loaders/writers and raster Surface::put_tiles. Versioned snapshot references, weak source-ID/file bindings, metadata validation, public undo/redo reconstruction and exact-byte tile re-sharing are Orion-owned. Immutable publication, project undo/reopen, source choice persistence, portable export and startup reference protection retain native history semantics without an engine fork; no total native resource or device guarantee. Native image storage compaction uses public format ZIP/directory APIs from the same pinned revision. Startup scheduling, byte-for-byte entry manifests, original-ZIP recovery intents, guarded file-to-directory replacement, equal-object hardlink replacement, preflight and maintenance reporting are Orion-owned adapters. All version/source IDs and view metadata remain unchanged; native previews and opaque entries are preserved within the supported bundle layout. No engine fork, history deletion or total-resource guarantee."
+    },
+    {
+      "name": "OpenPencil fractional sibling ordering",
+      "repository": "https://github.com/open-pencil/open-pencil",
+      "inspectedRevision": "b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d",
+      "license": "MIT",
+      "notice": "THIRD_PARTY_LICENSES/OpenPencil-MIT.txt",
+      "noticeSha256": "38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b",
+      "scope": [
+        "src/apps/xdesign/pencil/sharedOrder.ts"
+      ],
+      "originalPortRevisionKnown": true,
+      "additionalUpstream": "Fractional sibling ordering from packages/scene-graph/src/order-keys.ts at the inspected revision. Shared graph/value/tree/comment adapters are Orion-owned host code using the unchanged published engine and existing installed Yjs, not an engine fork."
     }
   ]
 }

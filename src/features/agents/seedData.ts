@@ -19,13 +19,15 @@ export const CODEX_CLI_PROVIDER: Provider = {
   name: "OpenAI (ChatGPT subscription)",
   kind: "codex_cli",
   baseUrl: "",
+  // The listed models of codex-cli 0.163 (`codex debug models`, 2026-10-21).
   models: [
+    { id: "gpt-6.1-sol", label: "GPT-6.1 Sol" },
+    { id: "gpt-6-astra", label: "GPT-6 Astra" },
+    { id: "gpt-6-sol", label: "GPT-6 Sol" },
+    { id: "gpt-6-luna", label: "GPT-6 Luna" },
     { id: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
     { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
     { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
-    { id: "gpt-5.5", label: "GPT-5.5" },
-    { id: "gpt-6-astra", label: "GPT-6 Astra" },
-    { id: "gpt-5.3-codex-spark", label: "GPT-5.3 Codex Spark" },
   ],
   keyRef: "",
   enabled: true,

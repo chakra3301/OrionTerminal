@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { X, Home, Plus } from "lucide-react";
 import { flushActive, useXDProjects } from "./projectsStore";
 import { ProjectNameInput } from "./ProjectNameInput";
 import { useXDesignSaveState } from "./saveState";
 
-export function XDesignTabs() {
+export function XDesignTabs({ actions }: { actions?: ReactNode } = {}) {
   const registry = useXDProjects((s) => s.registry);
   const openTabs = useXDProjects((s) => s.openTabs);
   const activeId = useXDProjects((s) => s.activeId);
@@ -68,15 +68,15 @@ export function XDesignTabs() {
         onClick={() => void retrySave()} title={unsaved.error ?? "Save the current project"}>
         {saving ? "Saving…" : unsaved.error ? "Retry save" : "Unsaved · Save"}
       </button>}
-      <button
+      {actions ? <div className="xd-tabs-actions">{actions}</div> : <button
         type="button"
         className="xd-tab-new"
-        onClick={() => void useXDProjects.getState().newProject().catch(() => {})}
+        onClick={() => void import("./pencil/runtime").then(m=>m.newPencilProject()).catch(() => {})}
         title="New project"
         aria-label="New project"
       >
         <Plus size={14} />
-      </button>
+      </button>}
     </div>
   );
 }

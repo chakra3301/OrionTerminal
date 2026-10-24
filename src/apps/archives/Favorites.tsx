@@ -77,8 +77,8 @@ export function ArchivesFavorites() {
   if (total === 0) {
     return (
       <div className="ar-empty-state" style={{ flex: 1 }}>
-        <Star size={22} color="var(--neon-yellow)" />
-        <div className="title">Nothing favorited yet.</div>
+        <Star size={20} />
+        <div className="title">Nothing favorited yet</div>
         <div className="hint">
           Right-click any note, entry, asset, or board → "Add to favorites", or
           hit the star in the toolbar while one's open.

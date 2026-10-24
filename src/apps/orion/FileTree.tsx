@@ -2,16 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronRight,
   ChevronDown,
-  File as FileIcon,
-  Folder,
-  FolderOpen,
   FilePlus,
   FolderPlus,
   Pencil,
   Trash2,
   Copy,
   FolderSearch,
-  GitBranch,
+  RefreshCw,
+  ChevronsDownUp,
 } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { confirmAction } from "@/components/ConfirmModal";
@@ -29,8 +27,16 @@ import { log } from "@/lib/log";
 import { trackOrionActivity } from "@/apps/orion/runtimeActivity";
 import { renameBlockedReason } from "./renameSafety";
 import { useFileDropZone } from "@/lib/fileDrop";
+import { FileTypeIcon } from "@/lib/fileIcon";
 
 type RowContext = (e: React.MouseEvent, node: TreeNode) => void;
+
+
+/** Folder rows subscribe here so the header's Collapse All can close them. */
+const collapseListeners = new Set<() => void>();
+function collapseAll() {
+  for (const fn of collapseListeners) fn();
+}
 
 function TreeRow({
   node,
@@ -41,7 +47,13 @@ function TreeRow({
   depth: number;
   onContext: RowContext;
 }) {
-  const [open, setOpen] = useState(depth === 0);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!node.is_dir) return;
+    const close = () => setOpen(false);
+    collapseListeners.add(close);
+    return () => { collapseListeners.delete(close); };
+  }, [node.is_dir]);
   const openTab = useWorkspace((s) => s.openTab);
   const root = useWorkspace((s) => s.root);
   const fileBuffers = useTabsStore((s) => s.fileBuffers);
@@ -67,15 +79,21 @@ function TreeRow({
           ? "git-modified"
           : "";
 
+  // Single click previews (italic tab, replaced by the next preview); double
+  // click keeps the file open. Same as Cursor's explorer.
   const onClick = () => {
     if (node.is_dir) {
       setOpen((o) => !o);
     } else {
       openTab(
         { kind: "file", path: node.path },
-        { label: node.name, preferRole: "editor" },
+        { label: node.name, preferRole: "editor", preview: true },
       );
     }
+  };
+  const onDoubleClick = () => {
+    if (node.is_dir) return;
+    openTab({ kind: "file", path: node.path }, { label: node.name, preferRole: "editor" });
   };
 
   const classes = [
@@ -92,44 +110,28 @@ function TreeRow({
     <div>
       <div
         className={classes}
-        style={{ paddingLeft: 12 + depth * 12 }}
+        style={{ paddingLeft: 8 + depth * 12 }}
         onClick={onClick}
+        onDoubleClick={onDoubleClick}
         onContextMenu={(e) => onContext(e, node)}
         title={node.path}
+        role="treeitem"
+        aria-expanded={node.is_dir ? open : undefined}
+        aria-selected={isActive}
       >
         {node.is_dir ? (
           open ? (
-            <ChevronDown size={10} color="var(--t-tertiary)" />
+            <ChevronDown size={14} className="or-tree-chev" />
           ) : (
-            <ChevronRight size={10} color="var(--t-tertiary)" />
+            <ChevronRight size={14} className="or-tree-chev" />
           )
         ) : (
-          <span style={{ width: 10, display: "inline-block" }} />
-        )}
-        {node.is_dir ? (
-          open ? (
-            <FolderOpen size={13} color="var(--neon-cyan)" />
-          ) : (
-            <Folder size={13} color="var(--t-secondary)" />
-          )
-        ) : (
-          <FileIcon size={12} color="var(--t-secondary)" />
+          <FileTypeIcon path={node.name} className="or-tree-glyph" />
         )}
         <span className="or-tree-label">{node.name}</span>
-        {gitLetter && !dirty && (
+        {dirty && <span className="or-tree-dirty" aria-label="Unsaved changes" />}
+        {gitLetter && (
           <span className="or-tree-git">{gitLetter === "?" ? "U" : gitLetter}</span>
-        )}
-        {dirty && (
-          <span
-            style={{
-              marginLeft: "auto",
-              color: "var(--neon-yellow)",
-              fontSize: 14,
-              lineHeight: 1,
-            }}
-          >
-            •
-          </span>
         )}
       </div>
       {open && node.is_dir && node.children && (
@@ -434,57 +436,65 @@ export function OrionFileTree() {
       className={`or-files-panel${dropOver ? " drop-over" : ""}`}
     >
       <div className="or-files-header">
-        <span>EXPLORER</span>
-        <div style={{ display: "flex", gap: 2 }}>
+        <span className="or-files-title" title={project?.root_path}>{project?.name ?? "No folder"}</span>
+        <div className="or-files-actions">
           <button
             type="button"
             onClick={() => project && doNewFile(project.root_path)}
             disabled={!project}
-            title="New file"
+            title="New File…"
+            aria-label="New File"
             className="or-files-hbtn"
           >
-            <FilePlus size={12} />
+            <FilePlus size={15} />
           </button>
           <button
             type="button"
             onClick={() => project && doNewFolder(project.root_path)}
             disabled={!project}
-            title="New folder"
+            title="New Folder…"
+            aria-label="New Folder"
             className="or-files-hbtn"
           >
-            <FolderPlus size={12} />
+            <FolderPlus size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            disabled={!project}
+            title="Refresh Explorer"
+            aria-label="Refresh Explorer"
+            className="or-files-hbtn"
+          >
+            <RefreshCw size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={collapseAll}
+            disabled={!project}
+            title="Collapse Folders in Explorer"
+            aria-label="Collapse Folders"
+            className="or-files-hbtn"
+          >
+            <ChevronsDownUp size={15} />
           </button>
         </div>
       </div>
 
       <div className="or-tree-scroll scroll" onContextMenu={onRootContext}>
         {!project && (
-          <div style={{ padding: 14, fontSize: 12, color: "var(--t-tertiary)" }}>
-            <p style={{ marginBottom: 8 }}>No project open.</p>
-            <button
-              type="button"
-              onClick={() => registry.run("file.openProject")}
-              style={{
-                color: "var(--neon-cyan)",
-                background: "none",
-                border: 0,
-                cursor: "pointer",
-                padding: 0,
-                font: "inherit",
-                textDecoration: "underline",
-              }}
-            >
-              Open a folder…
+          <div className="or-files-empty">
+            <p>You have not yet opened a folder.</p>
+            <button type="button" className="or-files-open" onClick={() => registry.run("file.openProject")}>
+              Open Folder
             </button>
           </div>
         )}
         {project && loading && (
-          <div style={{ padding: 14, fontSize: 12, color: "var(--t-tertiary)" }}>
-            Loading…
-          </div>
+          <div className="or-files-empty">Loading…</div>
         )}
         {project && !loading && tree && (
-          <div className="or-tree">
+          <div className="or-tree" role="tree">
             {tree.children?.map((c) => (
               <TreeRow
                 key={c.path}
@@ -497,15 +507,6 @@ export function OrionFileTree() {
         )}
       </div>
 
-      {project && (
-        <div className="or-files-footer">
-          <div className="branch">
-            <GitBranch size={11} color="var(--neon-green)" />
-            <span>{project.name}</span>
-          </div>
-          <div>orion · workspace</div>
-        </div>
-      )}
       {menu}
     </div>
   );

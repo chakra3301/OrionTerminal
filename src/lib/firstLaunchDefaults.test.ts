@@ -27,7 +27,7 @@ print(json.dumps({'before':before, 'after':after, 'fresh':bool(fresh)}))
 describe("first-install defaults", () => {
   it("atomically seeds only three apps, a still wallpaper and optional tour, once", () => {
     const { after } = apply("INSERT INTO app_state VALUES('window_size','{\"width\":800}');");
-    expect(JSON.parse(after["plugins.state"])).toEqual({ version: 1, disabled: ["@orion/command-center", "@orion/hermes"] });
+    expect(JSON.parse(after["plugins.state"])).toEqual({ version: 1, disabled: ["@orion/command-center", "@orion/hermes", "@orion/incubator"] });
     expect(JSON.parse(after.wallpaper).overlay).toBe("none");
     expect(JSON.parse(after["onboarding.completed"])).toBe(true);
     expect(after.window_size).toBe('{"width":800}');

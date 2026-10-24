@@ -1,0 +1,923 @@
+[
+  {
+    "id": "filter.blur.gaussianBlur",
+    "params": {
+      "radius": 1
+    }
+  },
+  {
+    "id": "filter.blur.boxBlur",
+    "params": {
+      "radius": 1
+    }
+  },
+  {
+    "id": "filter.blur.motionBlur",
+    "params": {
+      "angle": 0,
+      "distance": 10
+    }
+  },
+  {
+    "id": "filter.blur.radialBlur",
+    "params": {
+      "amount": 10,
+      "centerX": 0.5,
+      "centerY": 0.5,
+      "method": "spin"
+    }
+  },
+  {
+    "id": "filter.blur.surfaceBlur",
+    "params": {
+      "radius": 5,
+      "threshold": 15
+    }
+  },
+  {
+    "id": "filter.sharpen.unsharpMask",
+    "params": {
+      "amount": 50,
+      "radius": 1,
+      "threshold": 0
+    }
+  },
+  {
+    "id": "filter.sharpen.smartSharpen",
+    "params": {
+      "amount": 100,
+      "radius": 1,
+      "reduceNoise": 10
+    }
+  },
+  {
+    "id": "filter.noise.addNoise",
+    "params": {
+      "amount": 12.5,
+      "seed": 0,
+      "distribution": "uniform",
+      "monochromatic": false
+    }
+  },
+  {
+    "id": "filter.noise.median",
+    "params": {
+      "radius": 1
+    }
+  },
+  {
+    "id": "filter.noise.dustAndScratches",
+    "params": {
+      "radius": 1,
+      "threshold": 0
+    }
+  },
+  {
+    "id": "filter.pixelate.mosaic",
+    "params": {
+      "cellSize": 10
+    }
+  },
+  {
+    "id": "filter.stylize.emboss",
+    "params": {
+      "angle": 135,
+      "height": 3,
+      "amount": 100
+    }
+  },
+  {
+    "id": "filter.stylize.findEdges",
+    "params": {}
+  },
+  {
+    "id": "filter.stylize.solarize",
+    "params": {}
+  },
+  {
+    "id": "filter.distort.twirl",
+    "params": {
+      "angle": 50
+    }
+  },
+  {
+    "id": "filter.distort.pinch",
+    "params": {
+      "amount": 50
+    }
+  },
+  {
+    "id": "filter.distort.spherize",
+    "params": {
+      "amount": 100,
+      "mode": "normal"
+    }
+  },
+  {
+    "id": "filter.distort.wave",
+    "params": {
+      "generators": 5,
+      "wavelengthMin": 10,
+      "wavelengthMax": 120,
+      "amplitudeMin": 5,
+      "amplitudeMax": 35,
+      "seed": 0,
+      "type": "sine",
+      "undefinedAreas": "wrap"
+    }
+  },
+  {
+    "id": "filter.distort.ripple",
+    "params": {
+      "amount": 100,
+      "size": "medium"
+    }
+  },
+  {
+    "id": "filter.distort.polarCoordinates",
+    "params": {
+      "mode": "rectangularToPolar"
+    }
+  },
+  {
+    "id": "filter.other.highPass",
+    "params": {
+      "radius": 10
+    }
+  },
+  {
+    "id": "filter.other.minimum",
+    "params": {
+      "radius": 1,
+      "preserve": "squareness"
+    }
+  },
+  {
+    "id": "filter.other.maximum",
+    "params": {
+      "radius": 1,
+      "preserve": "squareness"
+    }
+  },
+  {
+    "id": "filter.other.offset",
+    "params": {
+      "horizontal": 0,
+      "vertical": 0,
+      "undefinedAreas": "wrap"
+    }
+  },
+  {
+    "id": "filter.blur.blur",
+    "params": {}
+  },
+  {
+    "id": "filter.blur.blurMore",
+    "params": {}
+  },
+  {
+    "id": "filter.sharpen.sharpen",
+    "params": {}
+  },
+  {
+    "id": "filter.sharpen.sharpenMore",
+    "params": {}
+  },
+  {
+    "id": "filter.sharpen.sharpenEdges",
+    "params": {}
+  },
+  {
+    "id": "filter.noise.despeckle",
+    "params": {}
+  },
+  {
+    "id": "filter.lastFilter",
+    "params": {}
+  },
+  {
+    "id": "filter.pixelate.colorHalftone",
+    "params": {
+      "maxRadius": 8,
+      "channel1": 108,
+      "channel2": 162,
+      "channel3": 90,
+      "channel4": 45
+    }
+  },
+  {
+    "id": "filter.pixelate.crystallize",
+    "params": {
+      "cellSize": 10,
+      "seed": 0
+    }
+  },
+  {
+    "id": "filter.pixelate.facet",
+    "params": {}
+  },
+  {
+    "id": "filter.pixelate.fragment",
+    "params": {}
+  },
+  {
+    "id": "filter.pixelate.mezzotint",
+    "params": {
+      "seed": 0,
+      "type": "fineDots"
+    }
+  },
+  {
+    "id": "filter.pixelate.pointillize",
+    "params": {
+      "cellSize": 5,
+      "seed": 0,
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.stylize.diffuse",
+    "params": {
+      "seed": 0,
+      "mode": "normal"
+    }
+  },
+  {
+    "id": "filter.stylize.extrude",
+    "params": {
+      "size": 30,
+      "depth": 30,
+      "seed": 0,
+      "type": "blocks",
+      "depthMode": "random",
+      "solidFrontFaces": false,
+      "maskIncompleteBlocks": false
+    }
+  },
+  {
+    "id": "filter.stylize.oilPaint",
+    "params": {
+      "stylization": 4,
+      "cleanliness": 5,
+      "scale": 1,
+      "bristleDetail": 5,
+      "angle": -60,
+      "shine": 1,
+      "lighting": true
+    }
+  },
+  {
+    "id": "filter.stylize.tiles",
+    "params": {
+      "count": 10,
+      "maxOffset": 10,
+      "seed": 0,
+      "fill": "background",
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.stylize.traceContour",
+    "params": {
+      "level": 128,
+      "edge": "lower"
+    }
+  },
+  {
+    "id": "filter.stylize.wind",
+    "params": {
+      "seed": 0,
+      "method": "wind",
+      "direction": "fromRight"
+    }
+  },
+  {
+    "id": "filter.distort.displace",
+    "params": {
+      "horizontal": 10,
+      "vertical": 10,
+      "fit": "stretch",
+      "undefinedAreas": "repeat"
+    }
+  },
+  {
+    "id": "filter.distort.shear",
+    "params": {
+      "amount": 0,
+      "undefinedAreas": "wrap"
+    }
+  },
+  {
+    "id": "filter.distort.zigZag",
+    "params": {
+      "amount": 10,
+      "ridges": 5,
+      "style": "pondRipples"
+    }
+  },
+  {
+    "id": "filter.render.fibers",
+    "params": {
+      "variance": 16,
+      "strength": 4,
+      "seed": 0,
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.render.lensFlare",
+    "params": {
+      "brightness": 100,
+      "centerX": 0.5,
+      "centerY": 0.5,
+      "lens": "zoom"
+    }
+  },
+  {
+    "id": "filter.render.lightingEffects",
+    "params": {
+      "intensity": 75,
+      "lightX": 0.25,
+      "lightY": 0.2,
+      "lightZ": 0.6,
+      "targetX": 0.5,
+      "targetY": 0.55,
+      "cone": 45,
+      "hotspot": 50,
+      "angle": 135,
+      "elevation": 45,
+      "gloss": 0,
+      "metallic": 0,
+      "exposure": 0,
+      "ambience": 8,
+      "height": 50,
+      "radius": 0.8,
+      "lightType": "spot",
+      "texture": "none",
+      "whiteIsHigh": true,
+      "color": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.noise.reduceNoise",
+    "params": {
+      "strength": 6,
+      "preserveDetails": 60,
+      "reduceColorNoise": 45,
+      "sharpenDetails": 25,
+      "removeJpegArtifact": false
+    }
+  },
+  {
+    "id": "filter.blur.smartBlur",
+    "params": {
+      "radius": 3,
+      "threshold": 25,
+      "quality": "high",
+      "mode": "normal"
+    }
+  },
+  {
+    "id": "filter.blur.lensBlur",
+    "params": {
+      "radius": 15,
+      "bladeCurvature": 0,
+      "rotation": 0,
+      "focalDistance": 0,
+      "brightness": 0,
+      "threshold": 255,
+      "noise": 0,
+      "seed": 0,
+      "shape": "hexagon",
+      "depthMap": "none",
+      "distribution": "uniform",
+      "invert": false,
+      "monochromatic": false
+    }
+  },
+  {
+    "id": "filter.blur.shapeBlur",
+    "params": {
+      "radius": 10,
+      "shape": "circle"
+    }
+  },
+  {
+    "id": "filter.blurGallery.tiltShift",
+    "params": {
+      "blur": 15,
+      "centerX": 0.5,
+      "centerY": 0.5,
+      "angle": 0,
+      "focus": 0.1,
+      "transition": 0.15
+    }
+  },
+  {
+    "id": "filter.blurGallery.irisBlur",
+    "params": {
+      "blur": 15,
+      "centerX": 0.5,
+      "centerY": 0.5,
+      "radiusX": 0.35,
+      "radiusY": 0.25,
+      "angle": 0,
+      "roundness": 0,
+      "feather": 0.5
+    }
+  },
+  {
+    "id": "filter.blurGallery.fieldBlur",
+    "params": {
+      "blur": 15,
+      "centerX": 0.5,
+      "centerY": 0.5
+    }
+  },
+  {
+    "id": "filter.blurGallery.spinBlur",
+    "params": {
+      "blurAngle": 15,
+      "centerX": 0.5,
+      "centerY": 0.5,
+      "radiusX": 0.3,
+      "radiusY": 0.3,
+      "angle": 0
+    }
+  },
+  {
+    "id": "filter.blurGallery.pathBlur",
+    "params": {
+      "speed": 50,
+      "taper": 0,
+      "startX": 0.2,
+      "startY": 0.5,
+      "endX": 0.8,
+      "endY": 0.5
+    }
+  },
+  {
+    "id": "filter.other.custom",
+    "params": {
+      "scale": 1,
+      "offset": 0
+    }
+  },
+  {
+    "id": "filter.other.hsbHsl",
+    "params": {
+      "inputMode": "rgb",
+      "rowOrder": "hsb"
+    }
+  },
+  {
+    "id": "filter.video.deInterlace",
+    "params": {
+      "eliminate": "oddFields",
+      "createBy": "interpolation"
+    }
+  },
+  {
+    "id": "filter.video.ntscColors",
+    "params": {}
+  },
+  {
+    "id": "filter.gallery.coloredPencil",
+    "params": {
+      "pencilWidth": 4,
+      "strokePressure": 8,
+      "paperBrightness": 25
+    }
+  },
+  {
+    "id": "filter.gallery.cutout",
+    "params": {
+      "numberOfLevels": 4,
+      "edgeSimplicity": 4,
+      "edgeFidelity": 2
+    }
+  },
+  {
+    "id": "filter.gallery.dryBrush",
+    "params": {
+      "brushSize": 2,
+      "brushDetail": 8,
+      "texture": 1
+    }
+  },
+  {
+    "id": "filter.gallery.filmGrain",
+    "params": {
+      "grain": 4,
+      "highlightArea": 0,
+      "intensity": 10
+    }
+  },
+  {
+    "id": "filter.gallery.fresco",
+    "params": {
+      "brushSize": 2,
+      "brushDetail": 8,
+      "texture": 1
+    }
+  },
+  {
+    "id": "filter.gallery.neonGlow",
+    "params": {
+      "glowSize": 5,
+      "glowBrightness": 15,
+      "glowColor": [
+        0,
+        0.62,
+        1,
+        1
+      ]
+    }
+  },
+  {
+    "id": "filter.gallery.paintDaubs",
+    "params": {
+      "brushSize": 8,
+      "sharpness": 7,
+      "brushType": "simple"
+    }
+  },
+  {
+    "id": "filter.gallery.paletteKnife",
+    "params": {
+      "strokeSize": 25,
+      "strokeDetail": 3,
+      "softness": 0
+    }
+  },
+  {
+    "id": "filter.gallery.plasticWrap",
+    "params": {
+      "highlightStrength": 15,
+      "detail": 9,
+      "smoothness": 7
+    }
+  },
+  {
+    "id": "filter.gallery.posterEdges",
+    "params": {
+      "edgeThickness": 2,
+      "edgeIntensity": 1,
+      "posterization": 2
+    }
+  },
+  {
+    "id": "filter.gallery.roughPastels",
+    "params": {
+      "strokeLength": 6,
+      "strokeDetail": 4,
+      "scaling": 100,
+      "relief": 20,
+      "texture": "canvas",
+      "light": "bottom",
+      "invert": false
+    }
+  },
+  {
+    "id": "filter.gallery.smudgeStick",
+    "params": {
+      "strokeLength": 2,
+      "highlightArea": 0,
+      "intensity": 10
+    }
+  },
+  {
+    "id": "filter.gallery.sponge",
+    "params": {
+      "brushSize": 2,
+      "definition": 12,
+      "smoothness": 5
+    }
+  },
+  {
+    "id": "filter.gallery.underpainting",
+    "params": {
+      "brushSize": 6,
+      "textureCoverage": 16,
+      "scaling": 100,
+      "relief": 4,
+      "texture": "canvas",
+      "light": "top",
+      "invert": false
+    }
+  },
+  {
+    "id": "filter.gallery.watercolor",
+    "params": {
+      "brushDetail": 9,
+      "shadowIntensity": 1,
+      "texture": 1
+    }
+  },
+  {
+    "id": "filter.gallery.accentedEdges",
+    "params": {
+      "edgeWidth": 2,
+      "edgeBrightness": 38,
+      "smoothness": 5
+    }
+  },
+  {
+    "id": "filter.gallery.angledStrokes",
+    "params": {
+      "directionBalance": 50,
+      "strokeLength": 15,
+      "sharpness": 3
+    }
+  },
+  {
+    "id": "filter.gallery.crosshatch",
+    "params": {
+      "strokeLength": 9,
+      "sharpness": 6,
+      "strength": 1
+    }
+  },
+  {
+    "id": "filter.gallery.darkStrokes",
+    "params": {
+      "balance": 5,
+      "blackIntensity": 6,
+      "whiteIntensity": 2
+    }
+  },
+  {
+    "id": "filter.gallery.inkOutlines",
+    "params": {
+      "strokeLength": 4,
+      "darkIntensity": 20,
+      "lightIntensity": 10
+    }
+  },
+  {
+    "id": "filter.gallery.spatter",
+    "params": {
+      "sprayRadius": 10,
+      "smoothness": 5
+    }
+  },
+  {
+    "id": "filter.gallery.sprayedStrokes",
+    "params": {
+      "strokeLength": 12,
+      "sprayRadius": 7,
+      "strokeDirection": "rightDiagonal"
+    }
+  },
+  {
+    "id": "filter.gallery.sumiE",
+    "params": {
+      "strokeWidth": 10,
+      "strokePressure": 2,
+      "contrast": 16
+    }
+  },
+  {
+    "id": "filter.gallery.diffuseGlow",
+    "params": {
+      "graininess": 6,
+      "glowAmount": 10,
+      "clearAmount": 15,
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.glass",
+    "params": {
+      "distortion": 5,
+      "smoothness": 3,
+      "scaling": 100,
+      "texture": "frosted",
+      "invert": false
+    }
+  },
+  {
+    "id": "filter.gallery.oceanRipple",
+    "params": {
+      "rippleSize": 9,
+      "rippleMagnitude": 9
+    }
+  },
+  {
+    "id": "filter.gallery.basRelief",
+    "params": {
+      "detail": 13,
+      "smoothness": 3,
+      "light": "bottom",
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.chalkCharcoal",
+    "params": {
+      "charcoalArea": 6,
+      "chalkArea": 6,
+      "strokePressure": 1,
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.charcoal",
+    "params": {
+      "charcoalThickness": 1,
+      "detail": 5,
+      "lightDarkBalance": 50,
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.chrome",
+    "params": {
+      "detail": 4,
+      "smoothness": 7
+    }
+  },
+  {
+    "id": "filter.gallery.conteCrayon",
+    "params": {
+      "foregroundLevel": 11,
+      "backgroundLevel": 7,
+      "scaling": 100,
+      "relief": 4,
+      "texture": "canvas",
+      "light": "top",
+      "invert": false,
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.graphicPen",
+    "params": {
+      "strokeLength": 15,
+      "lightDarkBalance": 50,
+      "strokeDirection": "rightDiagonal",
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.halftonePattern",
+    "params": {
+      "size": 1,
+      "contrast": 5,
+      "patternType": "dot",
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.notePaper",
+    "params": {
+      "imageBalance": 25,
+      "graininess": 10,
+      "relief": 11,
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.photocopy",
+    "params": {
+      "detail": 7,
+      "darkness": 8,
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.plaster",
+    "params": {
+      "imageBalance": 20,
+      "smoothness": 2,
+      "light": "top",
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.reticulation",
+    "params": {
+      "density": 12,
+      "foregroundLevel": 40,
+      "backgroundLevel": 5,
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.stamp",
+    "params": {
+      "lightDarkBalance": 25,
+      "smoothness": 5,
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.tornEdges",
+    "params": {
+      "imageBalance": 25,
+      "smoothness": 11,
+      "contrast": 17,
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.waterPaper",
+    "params": {
+      "fiberLength": 15,
+      "brightness": 60,
+      "contrast": 80
+    }
+  },
+  {
+    "id": "filter.gallery.glowingEdges",
+    "params": {
+      "edgeWidth": 2,
+      "edgeBrightness": 6,
+      "smoothness": 5
+    }
+  },
+  {
+    "id": "filter.gallery.craquelure",
+    "params": {
+      "crackSpacing": 15,
+      "crackDepth": 6,
+      "crackBrightness": 9
+    }
+  },
+  {
+    "id": "filter.gallery.grain",
+    "params": {
+      "intensity": 40,
+      "contrast": 50,
+      "grainType": "regular",
+      "foreground": "#000000",
+      "background": "#ffffff"
+    }
+  },
+  {
+    "id": "filter.gallery.mosaicTiles",
+    "params": {
+      "tileSize": 12,
+      "groutWidth": 3,
+      "lightenGrout": 9
+    }
+  },
+  {
+    "id": "filter.gallery.patchwork",
+    "params": {
+      "squareSize": 4,
+      "relief": 8
+    }
+  },
+  {
+    "id": "filter.gallery.stainedGlass",
+    "params": {
+      "cellSize": 10,
+      "borderThickness": 4,
+      "lightIntensity": 3,
+      "foreground": "#000000"
+    }
+  },
+  {
+    "id": "filter.gallery.texturizer",
+    "params": {
+      "scaling": 100,
+      "relief": 4,
+      "texture": "canvas",
+      "light": "top",
+      "invert": false
+    }
+  },
+  {
+    "id": "filter.filterGallery",
+    "params": {
+      "foreground": "#000000",
+      "background": "#ffffff",
+      "effects": [
+        {
+          "filter": "coloredPencil",
+          "params": {
+            "pencilWidth": 4,
+            "strokePressure": 8,
+            "paperBrightness": 25
+          },
+          "visible": true
+        }
+      ]
+    }
+  }
+]

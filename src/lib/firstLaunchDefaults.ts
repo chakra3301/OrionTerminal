@@ -1,7 +1,7 @@
 import { getDb } from "./db";
 
 const DEFAULTS = [
-  ["plugins.state", { version: 1, disabled: ["@orion/command-center", "@orion/hermes"] }],
+  ["plugins.state", { version: 1, disabled: ["@orion/command-center", "@orion/hermes", "@orion/incubator"] }],
   ["wallpaper", { mode: "default", customPath: null, originalName: null, overlay: "none", overlayIntensity: 0.6, matrixHue: 145, coreHue: 354 }],
   // The tour remains available from Help, without becoming a third setup step.
   ["onboarding.completed", true],

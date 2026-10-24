@@ -71,7 +71,7 @@ const CORE_VERT = /* glsl */ `
   }
 `;
 const CORE_FRAG = /* glsl */ `
-  precision mediump float;
+  precision highp float;
   uniform vec3 uLow;
   uniform vec3 uMid;
   uniform vec3 uHot;
@@ -113,7 +113,7 @@ const PT_VERT = /* glsl */ `
   }
 `;
 const PT_FRAG = /* glsl */ `
-  precision mediump float;
+  precision highp float;
   uniform vec3 uColor;
   uniform float uOpacity;
   uniform float uSpark;

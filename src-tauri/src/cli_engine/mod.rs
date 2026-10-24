@@ -40,8 +40,10 @@ impl Drop for CliRun {
 
 fn reviewed_restricted_version(engine: CliEngine, output: &str) -> bool {
     let version = output.trim().strip_prefix("codex-cli ").unwrap_or(output.trim());
-    let prefix = match engine { CliEngine::Codex => "0.154.", CliEngine::Gemini => "0.47." };
-    version.strip_prefix(prefix).is_some_and(|patch| !patch.is_empty() && patch.bytes().all(|b| b.is_ascii_digit()))
+    // 0.163 re-reviewed 2026-10-21: every flag in `restrict_args` still exists and a
+    // restricted turn could not run shell commands or write files.
+    let prefixes: &[&str] = match engine { CliEngine::Codex => &["0.154.", "0.163."], CliEngine::Gemini => &["0.47."] };
+    prefixes.iter().any(|prefix| version.strip_prefix(prefix).is_some_and(|patch| !patch.is_empty() && patch.bytes().all(|b| b.is_ascii_digit())))
 }
 
 #[derive(Serialize, Clone)]
@@ -336,7 +338,7 @@ pub async fn cli_send(
             output = crate::connector_status::probe(program, &["--version"]) => output,
         };
         if !output.filter(|out| out.status.success()).is_some_and(|out| reviewed_restricted_version(eng, &String::from_utf8_lossy(&out.stdout))) {
-            return Err("Restricted tool grants require a reviewed CLI version: Codex 0.154.x or Gemini 0.47.x. No model request was started.".into());
+            return Err("Restricted tool grants require a reviewed CLI version: Codex 0.154.x/0.163.x or Gemini 0.47.x. No model request was started.".into());
         }
     }
     if eng == CliEngine::Codex && !crate::codex_subscription::status().subscription_ready {
@@ -545,6 +547,8 @@ mod engine_tests {
     fn unknown_cli_revisions_do_not_inherit_reviewed_permissions() {
         use super::reviewed_restricted_version as reviewed;
         assert!(reviewed(CliEngine::Codex, "codex-cli 0.154.0\n"));
+        assert!(reviewed(CliEngine::Codex, "codex-cli 0.163.0\n"));
+        assert!(!reviewed(CliEngine::Codex, "codex-cli 0.164.0"));
         assert!(reviewed(CliEngine::Gemini, "0.47.0\n"));
         assert!(!reviewed(CliEngine::Codex, "codex-cli 0.155.0"));
         assert!(!reviewed(CliEngine::Gemini, "0.47.0-nightly"));

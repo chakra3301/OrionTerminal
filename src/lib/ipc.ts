@@ -14,12 +14,30 @@ export type GitFileStatus = {
   worktree: string;
 };
 
+/** Per-run overrides for an agent CLI; unset = the CLI's own default. */
+export type AgentRunOptions = { model?: string | null; effort?: string | null; mode?: string | null };
+
+export type AgentCliInfo = {
+  installed: boolean;
+  path: string | null;
+  version: string | null;
+  install: string;
+  models: { id: string; label: string; group: string | null }[];
+  defaultModel: string | null;
+  defaultEffort: string | null;
+  efforts: string[];
+  account: string | null;
+};
+
 export type GitStatus = {
   branch: string;
   ahead: number;
   behind: number;
   files: GitFileStatus[];
   is_repo: boolean;
+  /** Tracks a remote branch; when false Push publishes the branch. */
+  upstream?: boolean;
+  has_remote?: boolean;
 };
 
 export type SearchMatch = {
@@ -59,6 +77,8 @@ export const ipc = {
     invoke<boolean>("path_exists", { path }),
   saveFileAtomic: (path: string, contents: string): Promise<void> =>
     invoke("save_file_atomic", { path, contents }),
+  writeFileBase64: (path: string, data: string): Promise<void> =>
+    invoke("write_file_base64", { path, data }),
   searchInFiles: (
     root: string,
     query: string,
@@ -95,6 +115,21 @@ export const ipc = {
   gitCommit: (root: string, message: string): Promise<string> =>
     invoke<string>("git_commit", { root, message }),
   gitPush: (root: string): Promise<string> => invoke<string>("git_push", { root }),
+  gitPull: (root: string): Promise<string> => invoke<string>("git_pull", { root }),
+  gitCreateBranch: (root: string, name: string): Promise<string> =>
+    invoke<string>("git_create_branch", { root, name }),
+  // Agent tabs' Chat view: one headless CLI turn, streamed as `agent:event`.
+  agentChatSend: (
+    agent: "claude" | "codex" | "hermes" | "pi",
+    chatId: string,
+    prompt: string,
+    cwd: string,
+    sessionId: string | null,
+    options: AgentRunOptions = {},
+  ): Promise<void> => invoke("agent_chat_send", { agent, chatId, prompt, cwd, sessionId, options }),
+  agentCliInfo: (agent: "claude" | "codex" | "hermes" | "pi"): Promise<AgentCliInfo> =>
+    invoke<AgentCliInfo>("agent_cli_info", { agent }),
+  agentChatCancel: (chatId: string): Promise<void> => invoke("agent_chat_cancel", { chatId }),
   gitBranches: (root: string): Promise<{ current: string; branches: string[] }> =>
     invoke("git_branches", { root }),
   gitCheckout: (root: string, branch: string): Promise<string> =>
@@ -219,8 +254,9 @@ export const ipc = {
     system: string,
     history: Array<{ role: "user" | "assistant"; content: string }>,
     allowedTools: string[],
+    reviewedProviderIdentity?: string,
   ): Promise<void> =>
-    invoke("runtime_send", {
+    invoke(reviewedProviderIdentity === undefined ? "runtime_send" : "runtime_send_reviewed", {
       chatId,
       uiRunId: currentUiRun(chatId),
       providerId,
@@ -228,6 +264,7 @@ export const ipc = {
       system,
       history,
       allowedTools,
+      ...(reviewedProviderIdentity === undefined ? {} : { reviewedProviderIdentity }),
     }),
   runtimeCancel: (chatId: string): Promise<void> =>
     invoke("runtime_cancel", { chatId }),
@@ -436,7 +473,7 @@ export const ipc = {
   ): Promise<void> =>
     invoke("terminal_open_claude", { ptyId, cwd, cols, rows }),
   terminalOpenAgent: (
-    agent: "claude" | "hermes" | "pi",
+    agent: "claude" | "codex" | "hermes" | "pi",
     ptyId: string,
     cwd: string,
     cols: number,
@@ -514,20 +551,36 @@ export const ipc = {
   characterClearFile: (filePath: string): Promise<void> =>
     invoke("character_clear_file", { filePath }),
 
+  pluginInspectIntakeDirectory: (sourcePath: string): Promise<import("@/plugins/communityTypes").CommunityPluginInspection> =>
+    invoke("plugin_inspect_intake_directory", { sourcePath }),
+  pluginInstallIntakeDirectory: (sourcePath: string, expectedFingerprint: string, approvedPermissions: string[], rightsReviewed: boolean): Promise<import("@/plugins/communityTypes").InstalledCommunityPlugin> =>
+    invoke("plugin_install_intake_directory", { sourcePath, expectedFingerprint, approvedPermissions, rightsReviewed }),
+  pluginInstallPrepared: (selection: import("@/plugins/communityTypes").PreparedInstallSelection, rightsReviewed: boolean): Promise<import("@/plugins/communityTypes").InstalledCommunityPlugin> =>
+    invoke("intake_prepared_install", { approval: { schemaVersion: 1, id: selection.id, outputHash: selection.outputHash, captureHash: selection.captureHash, fingerprint: selection.inspection.fingerprint, permissions: selection.inspection.manifest.permissions, rightsReviewed } }),
   pluginInspectDirectory: (sourcePath: string): Promise<import("@/plugins/communityTypes").CommunityPluginInspection> =>
     invoke("plugin_inspect_directory", { sourcePath }),
+  pluginPreviousVersion: (pluginId: string): Promise<import("@/plugins/communityTypes").InstalledCommunityPlugin> =>
+    invoke("plugin_previous_version", { pluginId }),
+  pluginRollbackReviewed: (pluginId: string, expectedCurrent: import("@/plugins/communityTypes").InstalledCommunityPlugin, expectedPrevious: import("@/plugins/communityTypes").InstalledCommunityPlugin): Promise<import("@/plugins/communityTypes").InstalledCommunityPlugin> =>
+    invoke("plugin_rollback_reviewed", { pluginId, expectedCurrent, expectedPrevious }),
+  pluginInstallReviewedDirectory: (sourcePath: string, expectedFingerprint: string, approvedPermissions: string[], expectedState: import("@/plugins/communityTypes").InstalledCommunityPlugin | null): Promise<import("@/plugins/communityTypes").InstalledCommunityPlugin> =>
+    invoke("plugin_install_reviewed_directory", { sourcePath, expectedFingerprint, approvedPermissions, expectedState }),
   pluginInstallDirectory: (
     sourcePath: string,
     expectedFingerprint: string,
     approvedPermissions: string[],
   ): Promise<import("@/plugins/communityTypes").InstalledCommunityPlugin> =>
     invoke("plugin_install_directory", { sourcePath, expectedFingerprint, approvedPermissions }),
+  pluginRecoverInstalled: (): Promise<import("@/plugins/communityTypes").InstalledCommunityPlugin[]> =>
+    invoke("plugin_recover_installed"),
   pluginListInstalled: (): Promise<import("@/plugins/communityTypes").InstalledCommunityPlugin[]> =>
     invoke("plugin_list_installed"),
   pluginSetEnabled: (pluginId: string, enabled: boolean): Promise<void> =>
     invoke("plugin_set_enabled", { pluginId, enabled }),
   pluginQuarantine: (pluginId: string, reason: string): Promise<void> =>
     invoke("plugin_quarantine", { pluginId, reason }),
+  pluginRemoveReviewed: (pluginId: string, expectedCurrent: import("@/plugins/communityTypes").InstalledCommunityPlugin): Promise<void> =>
+    invoke("plugin_remove_reviewed", { pluginId, expectedCurrent }),
   pluginRemove: (pluginId: string): Promise<void> =>
     invoke("plugin_remove", { pluginId }),
   pluginReadEntrypoint: (

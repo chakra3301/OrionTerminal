@@ -58,6 +58,11 @@ function clampY(y: number): number {
   return Math.max(40, y);
 }
 
+const MENUBAR_H = 44;
+/** Space a window must leave above the viewport bottom: the dock (14px gap + 66px
+ * tall) plus an 8px breath, so title bars, composers and footers never sit under it. */
+const DOCK_CLEARANCE = 88;
+
 export const useShell = create<ShellState>((set, get) => ({
   windows: [],
   focusedWindowId: null,
@@ -82,9 +87,10 @@ export const useShell = create<ShellState>((set, get) => ({
     // Clamp the default to the viewport so a large app default fills a big
     // screen but never overflows a small one.
     const w = Math.min(size.w, window.innerWidth - 48);
-    const h = Math.min(size.h, window.innerHeight - 104);
-    const x = Math.max(24, Math.round((window.innerWidth - w) / 2) + offset);
-    const y = clampY(Math.round((window.innerHeight - h) / 2) + offset);
+    const h = Math.min(size.h, window.innerHeight - MENUBAR_H - DOCK_CLEARANCE);
+    // The cascade offset must not push a later window past the right edge or under the dock.
+    const x = Math.max(24, Math.min(Math.round((window.innerWidth - w) / 2) + offset, window.innerWidth - w - 24));
+    const y = clampY(Math.min(Math.round((window.innerHeight - h) / 2) + offset, window.innerHeight - h - DOCK_CLEARANCE));
     const nextZ = get().maxZ + 1;
     const next: WindowState = {
       id,
@@ -150,9 +156,9 @@ export const useShell = create<ShellState>((set, get) => ({
           maximized: true,
           preMaximize: { x: w.x, y: w.y, w: w.w, h: w.h },
           x: 12,
-          y: 44,
+          y: MENUBAR_H,
           w: window.innerWidth - 24,
-          h: window.innerHeight - 44 - 80,
+          h: window.innerHeight - MENUBAR_H - DOCK_CLEARANCE,
         };
       }),
     }));
@@ -257,8 +263,7 @@ export const useShell = create<ShellState>((set, get) => ({
     const vh = window.innerHeight;
     const MIN_W = 480;
     const MIN_H = 320;
-    const MENUBAR_H = 44;
-    const DOCK_GUARD = 80;
+    const DOCK_GUARD = DOCK_CLEARANCE;
     let maxZ = 10;
     const clamped: WindowState[] = available.map((w) => {
       const cw = Math.max(MIN_W, Math.min(w.w, Math.max(MIN_W, vw - 48)));

@@ -226,7 +226,7 @@ export function buildMenu(app: AppId | null, name: string): MenuItem[] {
         ];
       case "View":
         return [
-          cmd("panel.toggleSidebar", "Toggle Sidebar"),
+          cmd("panel.toggleSidebar", "Focus Explorer"),
           cmd("panel.toggleRightRail", "Toggle Right Rail"),
           sep,
           cmd("view.openFilesTree", "Files Tree"),
@@ -240,6 +240,7 @@ export function buildMenu(app: AppId | null, name: string): MenuItem[] {
         return [
           cmd("view.openPreview", "Open Preview"),
           cmd("view.openClaudeCode", "Open Claude Code"),
+          cmd("view.openCodex", "Open Codex"),
           cmd("view.openHermes", "Open Hermes"),
           cmd("view.openPi", "Open Pi"),
         ];

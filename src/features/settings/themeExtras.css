@@ -33,6 +33,6 @@
 .ot-finish-swatch.colorful { background: conic-gradient(#f17ab0, #b09eff, #74d7ff, #91efb6, #f17ab0); }
 .ot-finish-swatch.ocean { background: linear-gradient(135deg, #54f1ee, #547aff); }
 .ot-finish-swatch.sunset { background: linear-gradient(135deg, #ffe39f, #ff8c66, #da527e); }
-.ot-theme-extras :is(button, select, input):focus-visible { outline: 2px solid var(--neon-cyan); outline-offset: 3px; }
+.ot-theme-extras :is(button, select, input):focus-visible { outline: 1px solid color-mix(in srgb, var(--t-primary) 55%, transparent); outline-offset: 3px; }
 .ot-theme-extras .ot-extras-help { margin-top: 16px; font-size: 10px; }
 @media (prefers-reduced-motion: reduce) { .ot-extras-style, .ot-extras-choices button { transition: none; } }
