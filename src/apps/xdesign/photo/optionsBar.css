@@ -1,7 +1,7 @@
 .xd-ps-icon-cluster { display: inline-flex; gap: 1px; align-items: center; }
-.xd-ps-icon-cluster > button, .xd-ps-chevron, .xd-ps-brush-trigger { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; color: var(--xd-text-2); font: inherit; cursor: default; }
-.xd-ps-icon-cluster > button { width: 24px; height: 24px; }
-.xd-ps-icon-cluster > button:hover:not(:disabled), .xd-ps-chevron:hover:not(:disabled), .xd-ps-brush-trigger:hover:not(:disabled) { background: var(--xd-hover); color: var(--xd-text); }
+.xd-ps-icon-cluster > button, .xd-ps-info > button, .xd-ps-chevron, .xd-ps-brush-trigger { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; color: var(--xd-text-2); font: inherit; cursor: default; }
+.xd-ps-icon-cluster > button, .xd-ps-info > button { width: 24px; height: 24px; }
+.xd-ps-icon-cluster > button:hover:not(:disabled), .xd-ps-info > button:hover, .xd-ps-chevron:hover:not(:disabled), .xd-ps-brush-trigger:hover:not(:disabled) { background: var(--xd-hover); color: var(--xd-text); }
 .xd-ps-icon-cluster > button[aria-pressed="true"] { background: var(--bg-3); color: var(--xd-text); }
 .xd-ps-icon-cluster > button:disabled, .xd-ps-chevron:disabled, .xd-ps-brush-trigger:disabled { color: var(--xd-text-3); }
 

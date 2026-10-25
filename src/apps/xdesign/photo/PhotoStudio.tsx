@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type MouseEvent } from "react";
+import { flushSync } from "react-dom";
 import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
 import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ArrowLeftRight, RotateCcw, SquareDashed, Undo2, Redo2, Plus, Trash2, Eye, EyeOff, Layers, ZoomIn, ZoomOut, Search, SlidersHorizontal, Lock, Link2, CornerLeftDown, House, ChevronDown, ChevronRight, ChevronsRight, X, History as HistoryIcon, Compass, Brush, Sparkles, Shapes, Bookmark, Grid2x2, Move, Contrast, Folder, Menu, Info as InfoIcon, SunMedium, ChartColumn, ChartSpline, Diff, Triangle, Palette, Scale, Camera, Blend, Grid3x3, SquareSplitVertical, ChartNoAxesColumnIncreasing, Mountain, Rainbow, Target, Type, Box, Maximize, Pilcrow, Ruler, Ban, Check, type LucideIcon } from "lucide-react";
 import { pencilPhotoDocumentId, usePencilWorkspace } from "../pencil/runtime";
@@ -14,7 +15,7 @@ import { usePhotoWorkspace, controlsLocked, refreshImage, runPhotoCommand, setPh
 import { docTabDetail } from "./docTab";
 import { catchPaste, clipboardImage } from "../pasteCatcher";
 import { useXDProjects } from "../projectsStore";
-import type { PhotoCloneSource, PhotoEffect, PhotoLayer, PhotoState } from "./types";
+import type { PhotoCloneSource, PhotoDocument, PhotoEffect, PhotoLayer, PhotoState } from "./types";
 import "./photo.css";
 import "./photoshop.css";
 import { EditorToolRail, InspectorSection, PanelResize, useEditorPanels } from "../EditorChrome";
@@ -507,7 +508,12 @@ export function PhotoStudio() {
   const [cropBox,setCropBox]=useState<CropBox|null>(null),[cropAngle,setCropAngle]=useState(0),[cropShift,setCropShift]=useState<[number,number]>([0,0]);
   const cropPresets=useCropPresets();
   const [selectionBox,setSelectionBox]=useState<{from:CropBox;box:CropBox}|null>(null);
-  useEffect(()=>{setCropBox(null);setCropAngle(0);setCropShift([0,0]);setSelectionBox(null);},[tool,document?.id,document?.version]);
+  // The canvas shows the previous version until the next preview decodes, so the stage and the crop box stay in that version's size meanwhile
+  // instead of stretching its pixels to the new one. A preview that never shows (a failed view preview) stops holding it after two seconds.
+  const [shownSize,setShownSize]=useState<Pick<PhotoDocument,"id"|"version"|"width"|"height">|null>(null);
+  const frame=document&&shownSize?.id===document.id?shownSize:document;
+  useEffect(()=>{if(!frame||!document||frame.version===document.version)return;const timer=window.setTimeout(()=>setShownSize(null),2000);return()=>window.clearTimeout(timer);},[frame,document]);
+  useLayoutEffect(()=>{setCropBox(null);setCropAngle(0);setCropShift([0,0]);setSelectionBox(null);},[tool,document?.id,frame?.version]);
   // Photoshop puts the crop box on the canvas edges as soon as the Crop tool is picked, but not again after a crop is applied.
   useEffect(()=>{if(tool==="crop"&&document)setCropBox({x:0,y:0,width:document.width,height:document.height});},[tool]);
   const [thumbnails,setThumbnails]=useState<Record<number,string>>({}),[maskThumbnails,setMaskThumbnails]=useState<Record<number,string>>({}),thumbnailsVisible=panels.right&&layersTab==="Layers"&&!collapsed.layers;
@@ -673,9 +679,9 @@ export function PhotoStudio() {
     const steps:[string,Record<string,unknown>][]=[];
     if(fill)steps.push(["select.lasso",{points:added}],["select.inverse",{}],["edit.fill",fill],["select.deselect",{}]);
     if(size)steps.push(["image.imageSize",{width:size.width,height:size.height,resolution:size.ppi,resample}]);
-    void crop.then(()=>steps.length?steps.reduce<Promise<unknown>>((done,[id,params])=>done.then(()=>runPhotoCommand(id,params)),Promise.resolve()).then(
+    void untilShown(crop.then(()=>steps.length?steps.reduce<Promise<unknown>>((done,[id,params])=>done.then(()=>runPhotoCommand(id,params)),Promise.resolve()).then(
       ()=>base!==undefined&&runPhotoCommand("history.fold",{from:base,label:"Crop"}),
-      error=>{if(base!==undefined)void command("history.select",{index:base,discardRedo:true});throw error;}):undefined).catch(()=>{}).finally(()=>{setCropBox(null);setCropAngle(0);setCropShift([0,0]);});
+      error=>{if(base!==undefined)void command("history.select",{index:base,discardRedo:true});throw error;}):undefined)).then(()=>{setCropBox(null);setCropAngle(0);setCropShift([0,0]);});
   };
   const resetCrop=()=>{setCropBox(fullCrop);setCropAngle(0);setCropShift([0,0]);};
   const snapCrop=(box:CropBox,from:CropBox)=>snapBox(cropAngle?null:snapContext(document.id,document.width,document.height,zoom,state?.resolution),box,from);
@@ -1011,7 +1017,7 @@ export function PhotoStudio() {
   };
   const duplicateTitle=(state?.selectedLayers?.length??1)>1?"Duplicate Layers":currentLayer?.children?"Duplicate Group":"Duplicate Layer";
   // The engine always names a copy "{name} copy"; Photoshop numbers it when that is taken, so any other name is set as part of the same step.
-  const duplicateLayer=()=>{if(!state||!currentLayer)return;const several=(state.selectedLayers?.length??1)>1;setDuplicateDialog({title:duplicateTitle,source:several?"Layers":currentLayer.name,name:several?null:copyName(state.layers,currentLayer.name),document:state.name,
+  const duplicateLayer=()=>{if(!state||!currentLayer)return;const several=(state.selectedLayers?.length??1)>1;setDuplicateDialog({title:duplicateTitle,source:several?"":currentLayer.name,name:several?null:copyName(state.layers,currentLayer.name),document:state.name,
     create:name=>name===null||name===`${currentLayer.name} copy`?runPhotoCommand("layer.duplicate",{}):withLayerOptions(()=>runPhotoCommand("layer.duplicate",{}),{name},"Duplicate Layer")});};
   const askNewLayer=(base:string,label:string,create:()=>Promise<unknown>,then?:()=>void)=>{if(state)setNewLayerDialog({name:nextLayerName(state.layers,base),kind:"other",create:({name,renamed,props})=>withLayerOptions(create,{...props,...renamed&&{name}},label).then(then)});};
   const newLayer=()=>{if(state)setNewLayerDialog({name:nextLayerName(state.layers,"Layer"),kind:"layer",create:({name,neutral,props})=>neutral
@@ -1709,8 +1715,8 @@ export function PhotoStudio() {
         <button className="xd-editor-icon-button" aria-label="Screen Mode" title={`${SCREEN_MODES[screenMode]} (F)`} onClick={()=>chooseScreenMode((screenMode+1)%3)}><Maximize size={17}/></button>
       </EditorToolRail>
       <div className="xd-ps-canvas" onPointerDownCapture={()=>{if(flyout)setFlyout(null);}}>
-    <div ref={stage} className="xd-photo-stage" tabIndex={0} aria-label="Image canvas" onScroll={()=>{clearCloneMarker();placeBrushTip();previewStroke();scheduleView();}}><div className="xd-photo-scroll-space" style={cropShifted?{overflow:"clip"}:undefined}><div ref={image} className="xd-photo-image" style={{width:`${document.width*zoom}px`,height:`${document.height*zoom}px`,...(cropShifted?{transform:`translate(${cropShift[0]*zoom}px, ${cropShift[1]*zoom}px)`}:{})}}>
-      <img className="xd-photo-preview-source" src={viewPreview.active?viewPreview.url??undefined:convertFileSrc(document.previewPath)} hidden={viewPreview.active&&!viewPreview.url} alt="" draggable={false} onLoad={event=>{void surface.show(event.currentTarget).then(shown=>{if(shown)imageShown();});}}/>
+    <div ref={stage} className="xd-photo-stage" tabIndex={0} aria-label="Image canvas" onScroll={()=>{clearCloneMarker();placeBrushTip();previewStroke();scheduleView();}}><div className="xd-photo-scroll-space" style={cropShifted?{overflow:"clip"}:undefined}><div ref={image} className="xd-photo-image" style={{width:`${frame!.width*zoom}px`,height:`${frame!.height*zoom}px`,...(cropShifted?{transform:`translate(${cropShift[0]*zoom}px, ${cropShift[1]*zoom}px)`}:{})}}>
+      <img className="xd-photo-preview-source" src={viewPreview.active?viewPreview.url??undefined:convertFileSrc(document.previewPath)} hidden={viewPreview.active&&!viewPreview.url} alt="" draggable={false} onLoad={event=>{const {id,version,width,height}=document;void surface.show(event.currentTarget).then(shown=>{if(!shown)return;flushSync(()=>setShownSize({id,version,width,height}));imageShown();});}}/>
       <canvas ref={surface.attach} className="xd-photo-preview" role="img" aria-label={viewPreview.active?`${document.name} · ${editTarget}`:document.name} hidden={viewPreview.active&&!viewPreview.url}/>
       <PhotoTiles key={`${document.id}/${displayState?.viewKey}`} document={document} projectId={projectId} zoom={zoom} hasSelection={!!displayState?.hasSelection} selectionDisplay={selectionDisplay} edges={selectionEdgesVisible(aids)} viewKey={displayState?.viewKey} stage={stage} image={image} status={setPreviewStatus} surface={tileSurface}/>
       <CanvasDraftPreview document={document} draft={fillDraft??layerPropsDraft(layerDraft)} canvas={image.current}/>
@@ -1723,14 +1729,14 @@ export function PhotoStudio() {
       {resizeReadout&&<div className="xd-photo-brush-readout" role="status" style={{left:resizeReadout.x+16,top:resizeReadout.y+18}}><span>Diameter:</span><span>{tool==="select.quick"?Number(toolOptions.size):size} px</span>{tool!=="select.quick"&&<><span>Hardness:</span><span>{Math.round(hardness*100)}%</span></>}</div>}
       {currentLayer&&(state?.selectedLayers?.length??1)<=1&&<MoveDragPreview key={`move/${document.id}/${currentLayer.id}`} document={document} layer={currentLayer.id} bind={movePreview} redraw={()=>redrawStroke.current?.()}/>}
       {(tool==="move"&&transformControls||freeTransforming)&&!geometryActive&&shownLayer&&<ImageTransformOverlay key={`${document.id}/${shownLayer.id}`} document={document} layer={shownLayer} zoom={zoom} untilShown={untilShown} autoSelect={tool==="move"&&autoSelect}/>}
-      {tool==="crop"&&cropBox&&!cropStraighten&&!geometryActive&&<CropOverlay shade={cropShield} shadeOpacity={cropShieldOpacity} hideOutside={!cropShowCropped} width={document.width} height={document.height} zoom={zoom} box={cropBox} ratio={cropRatio} change={box=>setCropBox(snapCrop(box,cropBox))} angle={cropAngle} rotate={setCropAngle} guide={cropOverlayShow==="never"?"none":cropGuide} autoGuide={cropOverlayShow==="auto"} orientation={cropOrientation} menu={at=>{if(!busy)setContextMenu({...at,kind:"crop"});}} movable={!cropUntouched} pan={panCrop}/>}
+      {tool==="crop"&&cropBox&&!cropStraighten&&!geometryActive&&<CropOverlay shade={cropShield} shadeOpacity={cropShieldOpacity} hideOutside={!cropShowCropped} width={frame!.width} height={frame!.height} zoom={zoom} box={cropBox} ratio={cropRatio} change={box=>setCropBox(snapCrop(box,cropBox))} angle={cropAngle} rotate={setCropAngle} guide={cropOverlayShow==="never"?"none":cropGuide} autoGuide={cropOverlayShow==="auto"} orientation={cropOrientation} menu={at=>{if(!busy)setContextMenu({...at,kind:"crop"});}} movable={!cropUntouched} pan={panCrop}/>}
       {editPath&&!PATH_SELECT_TOOLS.includes(tool)&&!geometryActive&&targetPathVisible(aids)&&<TargetPathOverlay width={document.width} height={document.height} zoom={zoom} path={editPath.path}/>}
       {editPath&&PATH_SELECT_TOOLS.includes(tool)&&!geometryActive&&<PathEditOverlay width={document.width} height={document.height} zoom={zoom} path={editPath.path} direct={tool==="path.direct"}
         commit={path=>editPath.layer!==undefined?command("shape.edit",{layer:editPath.layer,path}):command("path.set",{name:editPath.name,path})}
         move={(dx,dy)=>editPath.layer!==undefined?command("shape.edit",{layer:editPath.layer,move:[dx,dy]}):command("path.transform",{name:editPath.name,translateX:dx,translateY:dy})}/>}
       {canvasText&&<CanvasTextEditor key={canvasText.layer?`layer-${canvasText.layer.id}`:canvasText.point.join(",")} target={canvasText} zoom={zoom} resolution={state?.resolution??72} font={textFont} size={textSize} color={typeColor??paintColor} create={{...typeStyleParams(textStyle),...(textAlign!=="left"?{align:textAlign}:{})}} after={{antialias:textAntialias,orientation:textOrientation}} close={work=>{const closing=canvasText;if(!work){setCanvasText(null);return;}void untilShown(work).then(()=>setCanvasText(current=>current===closing?null:current));}}/>}
       {textWarp&&textLayer&&document&&<PhotoTextGeometryDialog key={`${textLayer.id}/warp`} kind="warp" document={document} layer={textLayer} close={()=>setTextWarp(false)}/>}
-      {selectionBox&&!geometryActive&&<CropOverlay label="Selection" shade={false} width={document.width} height={document.height} zoom={zoom} box={selectionBox.box} change={box=>setSelectionBox(current=>current&&{...current,box})}/>}</div></div></div>
+      {selectionBox&&!geometryActive&&<CropOverlay label="Selection" shade={false} width={frame!.width} height={frame!.height} zoom={zoom} box={selectionBox.box} change={box=>setSelectionBox(current=>current&&{...current,box})}/>}</div></div></div>
     <ViewAids stage={stage} image={image} docId={document.id} width={document.width} height={document.height} zoom={zoom} resolution={state?.resolution} moveTool={tool==="move"}/>
       {tool==="crop"&&cropBox&&!geometryActive&&<ContextualTaskBar place={taskBar} change={placeTaskBar} busy={busy} anchor={()=>image.current?.querySelector('svg[aria-label="Crop box"] .xd-photo-crop-area')} trailing={!cropUntouched&&<><button onClick={resetCrop}>Cancel</button><button onClick={commitCrop}>Done</button></>}>
         <CropRatioSelect values={toolOptions} ratios={CROP_RATIOS} original={[document.width,document.height]} resolution={imagePpi} disabled={busy} apply={cropToRatio} applySize={cropToSize} clear={()=>cropOptions({style:"normal"})}/>

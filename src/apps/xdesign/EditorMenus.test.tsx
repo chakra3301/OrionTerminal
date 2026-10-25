@@ -2,7 +2,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Menu } from "lucide-react";
-import { ContextMenu, MenuBar, MenuButton } from "./EditorMenus";
+import { ContextMenu, MenuBar, MenuButton, positionPopup } from "./EditorMenus";
 import type { MenuEntry, MenuSpec } from "./menuModel";
 
 let root: Root, container: HTMLDivElement;
@@ -220,5 +220,30 @@ describe("ContextMenu", () => {
     expect(close).toHaveBeenCalledTimes(1);
     expect(document.activeElement).toBe(before);
     before.remove();
+  });
+});
+
+describe("positionPopup", () => {
+  const rect = (left: number, top: number, width: number, height: number) => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
+  const placeBelow = (anchorTop: number, menuHeight: number) => {
+    const host = document.createElement("div"), anchor = document.createElement("button"), menu = document.createElement("div");
+    host.className = "xd-root"; host.append(anchor, menu); container.append(host);
+    host.getBoundingClientRect = () => rect(0, 0, 800, 600);
+    anchor.getBoundingClientRect = () => rect(100, anchorTop, 60, 26);
+    menu.getBoundingClientRect = () => rect(parseFloat(menu.style.left), parseFloat(menu.style.top), 200, Math.min(menuHeight, parseFloat(menu.style.maxHeight) || Infinity));
+    positionPopup(menu, { kind: "below", el: anchor, align: "start" });
+    return menu.style;
+  };
+
+  it("keeps a pull-down taller than the space below under its title and lets it scroll", () => {
+    const style = placeBelow(20, 900);
+    expect(style.top).toBe("46px");
+    expect(style.maxHeight).toBe("554px");
+  });
+
+  it("opens a pull-down above a title near the bottom instead of covering the title", () => {
+    const style = placeBelow(500, 300);
+    expect(style.top).toBe("200px");
+    expect(style.maxHeight).toBe("");
   });
 });

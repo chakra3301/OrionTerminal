@@ -13,9 +13,11 @@ const editable=(target:EventTarget|null)=>target instanceof HTMLElement&&!!targe
 export function ImageTransformOverlay({document,layer,zoom,untilShown,autoSelect=false}:{document:PhotoDocument;layer:PhotoLayer;zoom:number;autoSelect?:boolean;untilShown:(work:Promise<unknown>)=>Promise<void>}) {
   const projectId=usePhotoWorkspace(workspace=>workspace.projectId),busy=usePhotoWorkspace(controlsLocked),viewKey=usePhotoWorkspace(workspace=>workspace.state?.viewKey);
   const active=useFreeTransform(store=>store.session),held=useFreeTransform(store=>store.held),session=active&&active.documentId===document.id&&active.layerId===layer.id?active:null;
-  const raw=layer.transformBounds??layer.bounds,bounds=session?.bounds??(raw&&raw[2]>0&&raw[3]>0?layerFrame(document,layer):null);
+  // `layer` still has its old bounds until the committed image is shown.
+  const shape=session??(held&&held.documentId===document.id&&held.layerId===layer.id?held:null);
+  const raw=layer.transformBounds??layer.bounds,bounds=shape?.bounds??(raw&&raw[2]>0&&raw[3]>0?layerFrame(document,layer):null);
   const [cmd,setCmd]=useState(false),drag=useRef<Drag|null>(null),svg=useRef<SVGSVGElement|null>(null),shownRef=useRef(untilShown);shownRef.current=untilShown;
-  const mode=session?.mode??"free",visible=session?.settings??identityTransform(bounds??[0,0,1,1]),quad=session?.quad??null,changed=!!session&&freeTransformChanged(session);
+  const mode=session?.mode??"free",visible=shape?.settings??identityTransform(bounds??[0,0,1,1]),quad=shape?.quad??null,changed=!!session&&freeTransformChanged(session);
   const params=session?freeTransformParams(session):{layer:layer.id,matrix:transformMatrix(bounds??[0,0,1,1],visible),interpolation:"bicubic"};
   const preview=usePhotoCommandPreview(document,projectId,"edit.transform",params,{automatic:true,enabled:changed&&document.width*document.height<=16_777_216,viewKey,delay:120});
   useEffect(()=>{if(session&&session.preview!==preview.url)patchFreeTransform({preview:preview.url});},[session!==null,preview.url]);
@@ -106,7 +108,7 @@ export function ImageTransformOverlay({document,layer,zoom,untilShown,autoSelect
   };
   // With Auto-Select on (⌘ inverts it), the Move tool's box lets the click through so the canvas can pick the layer under the cursor.
   const passThrough=!session&&!held&&autoSelect!==cmd;
-  const shown=changed?preview.url:held;
+  const shown=changed?preview.url:held?.preview;
   return <>{shown&&<img className="xd-photo-main-transform-preview" src={shown} alt="Unapplied layer transform"/>}
     <svg ref={svg} className="xd-photo-main-transform" data-pending={session?"":undefined} viewBox={`0 0 ${document.width} ${document.height}`} aria-label="Layer transform handles" onPointerMove={event=>moved(event)} onPointerUp={finish} onPointerCancel={abort} onLostPointerCapture={abort}>
       <polygon role="button" tabIndex={0} aria-disabled={busy} aria-label="Move selected image layer" points={corners.map(p=>p.join(",")).join(" ")} vectorEffect="non-scaling-stroke" style={passThrough?{pointerEvents:"none"}:undefined} onPointerDown={event=>begin(event,"move")} onDoubleClick={()=>{if(session&&!busy)commitFreeTransform(untilShown)?.catch(()=>{});}} onKeyDown={event=>keyTransform(event,"move")}/>

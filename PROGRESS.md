@@ -1,3 +1,67 @@
+## 2026-10-25 (late night) — XDesign: Photoshop parity live checks (step 3 of 3)
+
+Branch: `validation/alpha-2026-09-14`. **Committed**, not pushed. This is step 3 of the owner's "do 1, then 2, then 3, and commit after each". Cargo.toml is unchanged, so no licence refresh.
+
+Live checks ran on release builds launched with the scratch HOME (`/tmp/xd-release-home`) and a scratch image only. Photoshop was not touched in this step, and `/Applications/Orion Terminal.app` was not replaced.
+
+Passed live:
+- ⌘H toggles View › Extras, and ⌘R toggles Rulers.
+- The Contextual Task Bar sits above the ruler strips.
+- The Gradient bar order matches Photoshop.
+- The Move tool's box stays where it was dropped, with no snap-back while the transform commits.
+- A crop commit shows no stretched frame, and the crop box clears in the same frame as the new image.
+- The Duplicate Layer dialog matches Photoshop's single-layer and multi-layer forms.
+- New image and Color Settings, opened from design mode, are styled.
+- The Layer menu opens under its title and scrolls.
+- All 19 tool shortcuts give a 34 px options bar.
+- The Crop bar's overlay menu drops down under its icon.
+
+Fixed (found live in this step):
+1. **Move box snap-back** (`freeTransform.ts`, `ImageTransformOverlay.tsx`). `held` now keeps the whole committed session, not just its preview, so the box keeps its dropped shape until the committed image is shown.
+2. **Crop stretch on commit** (`PhotoStudio.tsx`). The stage and crop box keep the shown version's size until the new preview decodes (`flushSync` in the image's onLoad, with a 2 s fallback). `commitCrop` clears the box through `untilShown`.
+3. **Options bar**:
+   - The Crop bar no longer wraps "Perspective Crop…".
+   - Icon-only menu buttons are 26 px.
+   - The ⓘ note button is a 24 px ghost button.
+   - The History Brush "History source" row drops its panel padding and keeps its help text on one line. Before, the bar grew to about 113 px.
+   - Files: `photoshop.css`, `optionsBar.css`.
+4. **Duplicate Layer dialog, several layers** (`DuplicateLayerDialog.tsx`, `PhotoStudio.tsx`). It matches Photoshop's probe:
+   - Duplicate: is blank.
+   - As: is shown but disabled.
+   - Artboard is disabled, showing "Canvas".
+   - Name is disabled.
+5. **Photoshop dialogs opened from design mode are styled** (`XDesignApp.tsx`).
+   - New image, Camera Raw develop, Color Settings, colour import and Paste color are now wrapped in a `display:contents` `.xd-photo` scope.
+   - Their CSS is scoped there, so outside it they rendered unstyled.
+6. **Menubar menus no longer cover their title** (`positionPopup` in `EditorMenus.tsx`).
+   - A pull-down taller than the room below now stays below its title and scrolls.
+   - It flips above only when there is more room there, like macOS.
+   - Point and side placement are unchanged.
+
+Tests added:
+- `EditorMenus.test.tsx`: tall pull-down stays below and scrolls; pull-down near the bottom flips above. Both failed first.
+- `ImageTransformOverlay.test.tsx`: held box shape.
+- `PhotoStudio.tools.test.tsx`: crop handoff, and the Duplicate dialog's several-layer form.
+- The CSS fixes were checked live only.
+
+Gaps noticed, not built:
+- The Fill dialog has no Mode.
+- Perspective Crop is a bar button, not a tool in the Crop group.
+- Photoshop picks the History Brush source in the History panel, not the options bar.
+
+Verify:
+- vitest `src/apps/xdesign`: 356 files, 4154 tests passed. A first run had one file fail with no failed test (a load or timeout failure, file not captured); the rerun passed.
+- `EditorMenus.test.tsx`: 20 passed.
+- typecheck clean.
+- `cargo test --lib`: 1390 passed, 0 failed, 20 ignored. No Rust changes in this step.
+
+Next: owner decisions.
+- Push.
+- Install over `/Applications`.
+- A Figma-made `.fig` for round-trip checks.
+- Engine features: layer colour labels, Color and vibrance, Clarity and dehaze, Grain, Fill Mode.
+- Signing and notarisation.
+
 ## 2026-10-25 (night) — XDesign: Photoshop parity leftovers (step 2 of 3)
 
 Branch: `validation/alpha-2026-09-14`. **Committed**, not pushed. This is step 2 of the owner's "do 1, then 2, then 3, and commit after each"; step 3, the live checks, comes next. Cargo.toml is unchanged, so no licence refresh.

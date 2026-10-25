@@ -16,12 +16,15 @@
 
 /* Options bar */
 .xd-photo .xd-ps-options { gap: 10px; min-height: 34px; padding: 3px 8px; background: var(--xd-panel); border-bottom: 1px solid var(--xd-border); }
+.xd-photo .xd-ps-options .xd-editor-icon-button { width: 26px; height: 26px; }
+.xd-photo .xd-ps-options .xd-photo-property { padding: 0; }
+.xd-photo .xd-ps-options .xd-photo-section-help { margin: 0; white-space: nowrap; }
 .xd-ps-tool-preset { display: inline-flex; align-items: center; gap: 1px; flex: none; height: 26px; padding: 0 6px 0 4px; margin-right: 2px; border-right: 1px solid var(--xd-border); color: var(--xd-text); }
 .xd-ps-tool-preset svg:last-child { color: var(--xd-text-3); }
 .xd-photo .xd-ps-options label { gap: 4px; color: var(--xd-text-2); }
 .xd-photo .xd-ps-options :is(input[type=number], select) { height: 22px; padding: 0 4px; font-size: 11px; background: var(--xd-raised); border: 1px solid var(--xd-border); border-radius: 2px; }
 .xd-photo .xd-ps-options input[type=number] { width: 52px; }
-.xd-photo .xd-ps-options > button { padding: 2px 8px; border: 1px solid var(--xd-border); border-radius: 2px; background: var(--xd-raised); }
+.xd-photo .xd-ps-options > button { flex: none; white-space: nowrap; padding: 2px 8px; border: 1px solid var(--xd-border); border-radius: 2px; background: var(--xd-raised); }
 .xd-ps-tool-options { display: flex; align-items: center; flex: none; }
 .xd-ps-tool-options .xd-photo-paint-options { display: flex; align-items: center; gap: 10px; }
 .xd-ps-tool-options .xd-photo-paint-options label { flex: none; justify-content: flex-start; gap: 4px; white-space: nowrap; }

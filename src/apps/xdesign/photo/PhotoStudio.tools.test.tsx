@@ -286,7 +286,7 @@ describe("Image workspace Photoshop tools",()=>{
     const layer=usePhotoWorkspace.getState().state!.layers[0]!;
     await menu("Layer","Duplicate Layer…");expect(command).not.toHaveBeenCalled();
     expect(dialog()!.textContent).toContain("Duplicate:Portrait layer");expect(field("As").value).toBe("Portrait layer copy");
-    expect(field("Document").value).toBe("Portrait");expect(field("Name").disabled).toBe(true);
+    expect(field("Document").value).toBe("Portrait");expect(field("Artboard").value).toBe("Canvas");expect(field("Artboard").disabled).toBe(true);expect(field("Name").disabled).toBe(true);
     await click("OK");expect(dialog()).toBeNull();expect(command.mock.calls).toEqual([["layer.duplicate",{}]]);
     command.mockClear();await menu("Layer","Duplicate Layer…");await type("As","Sky");await click("OK");
     expect(command.mock.calls).toEqual([["layer.duplicate",{}],["layer.setProps",{name:"Sky"}],["history.fold",{from:1,label:"Duplicate Layer"}]]);
@@ -295,7 +295,8 @@ describe("Image workspace Photoshop tools",()=>{
     await setState({activeLayer:2});await menu("Layer","Duplicate Layer…");expect(field("As").value).toBe("Portrait layer copy 2");await click("OK");
     expect(command.mock.calls).toEqual([["layer.duplicate",{}],["layer.setProps",{name:"Portrait layer copy 2"}],["history.fold",{from:1,label:"Duplicate Layer"}]]);
     command.mockClear();await setState({selectedLayers:[1,2]});await menu("Layer","Duplicate Layers…");
-    expect(dialog("Duplicate Layers")!.querySelector('[aria-label="As"]')).toBeNull();await click("OK");expect(command.mock.calls).toEqual([["layer.duplicate",{}]]);
+    expect(dialog("Duplicate Layers")!.textContent).toContain("Duplicate:As:");expect(field("As","Duplicate Layers").value).toBe("");expect(field("As","Duplicate Layers").disabled).toBe(true);
+    await click("OK");expect(command.mock.calls).toEqual([["layer.duplicate",{}]]);
     command.mockClear();await setState({selectedLayers:[3],activeLayer:3,layers:[{...layer,id:3,name:"Group 1",kind:"Group",children:[layer]}]});
     await menu("Layer","Duplicate Group…");expect(field("As","Duplicate Group").value).toBe("Group 1 copy");await click("Cancel");expect(command).not.toHaveBeenCalled();
   });
@@ -559,6 +560,21 @@ describe("Image workspace Photoshop tools",()=>{
     const area=container.querySelector('[aria-label="Move crop box"]')!;
     await act(async()=>area.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:400,clientY:300})));await act(async()=>box.dispatchEvent(new MouseEvent("pointermove",{bubbles:true,clientX:495,clientY:300})));
     expect(area.getAttribute("x")).toBe("0");expect(container.querySelector<HTMLElement>(".xd-photo-image")!.style.transform).toBe("translate(100px, 0px)");
+  });
+  it("keeps the crop box and the old canvas size until the cropped image is shown",async()=>{
+    const box=()=>container.querySelector('svg[aria-label="Crop box"]'),image=()=>container.querySelector<HTMLElement>(".xd-photo-image")!,source=image().querySelector<HTMLImageElement>("img.xd-photo-preview-source")!;
+    const contexts=vi.spyOn(HTMLCanvasElement.prototype,"getContext").mockReturnValue(null);
+    try {
+      Object.defineProperty(source,"decode",{configurable:true,value:async()=>{}});
+      await act(async()=>source.dispatchEvent(new Event("load")));
+      const before=[image().style.width,image().style.height],doc=useXDesign.getState().photoDocuments[usePhotoWorkspace.getState().documentId!]!;
+      command.mockImplementationOnce(async()=>{const version=ulid();useXDesign.getState().applyPhotoDocument({...doc,version,width:200,height:200,previewWidth:200,previewHeight:200,previewPath:`/assets/${version}.png`});});
+      await key("c");await pointer("pointerdown",{clientX:100,clientY:50});await pointer("pointermove",{clientX:300,clientY:250});await pointer("pointerup",{clientX:300,clientY:250});await key("Enter");
+      expect(command).toHaveBeenLastCalledWith("image.crop",{x:100,y:50,width:200,height:200,deleteCroppedPixels:false});
+      expect(source.getAttribute("src")).not.toBe(doc.previewPath);expect([image().style.width,image().style.height]).toEqual(before);expect(box()).not.toBeNull();
+      await act(async()=>source.dispatchEvent(new Event("load")));
+      expect([image().style.width,image().style.height]).not.toEqual(before);expect(image().style.width).toBe(image().style.height);expect(box()).toBeNull();
+    } finally { contexts.mockRestore(); }
   });
   it("drags the image under an edited crop box like Photoshop, past the canvas edge, until Escape puts it back",async()=>{
     await key("c");

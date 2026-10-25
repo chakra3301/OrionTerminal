@@ -9,7 +9,8 @@ export type TransformMode = "free" | "scale" | "rotate" | "skew" | "distort" | "
 export type Interpolation = "bicubic" | "bilinear" | "nearest";
 export const INTERPOLATIONS: [Interpolation, string][] = [["nearest", "Nearest Neighbor"], ["bilinear", "Bilinear"], ["bicubic", "Bicubic"]];
 export type FreeTransformSession = { documentId: string; layerId: number; version: string; viewKey: string | undefined; mode: TransformMode; bounds: Bounds; settings: TransformSettings; quad: Quad | null; interpolation: Interpolation; linked: boolean; preview: string | null };
-export const useFreeTransform = create<{ session: FreeTransformSession | null; held: string | null }>(() => ({ session: null, held: null }));
+/** `held` is the committed session while its preview stands in for the image, so the box stays where it was dropped. */
+export const useFreeTransform = create<{ session: FreeTransformSession | null; held: FreeTransformSession | null }>(() => ({ session: null, held: null }));
 let release: (() => void) | null = null;
 
 /** The gesture hold stays for the whole session so nothing else edits the document meanwhile. */
@@ -47,7 +48,7 @@ export function commitFreeTransform(untilShown: (work: Promise<unknown>) => Prom
   // Released first: the commit would otherwise wait for its own hold.
   release?.(); release = null;
   const work = runPhotoCommand("edit.transform", params);
-  useFreeTransform.setState({ session: null, held: session.preview });
+  useFreeTransform.setState({ session: null, held: session.preview ? session : null });
   void untilShown(work).catch(() => {}).then(() => useFreeTransform.setState({ held: null }));
   return work;
 }

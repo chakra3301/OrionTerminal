@@ -235,11 +235,14 @@ export function XDesignApp() {
         ]}/>
       </>}/>
       <input hidden ref={importDesignRef} type="file" accept=".fig,.pen" onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(file)void import("./pencil/runtime").then(m=>m.newPencilProject(file)).catch(error=>toast.error("Design import failed",{body:String(error)}));}}/>
-      {newImageOpen&&<NewImageDialog close={()=>setNewImageOpen(false)}/>}
-      {rawImport&&rawImport.projectId===activeId&&<RawDevelopDialog key={`${rawImport.projectId}:${rawImport.path}`} path={rawImport.path} close={()=>setRawImport(null)} develop={(path,options)=>{if(useXDProjects.getState().activeId!==rawImport.projectId)return Promise.reject(new Error("The active project changed before RAW import."));return createImage(path,undefined,options);}}/>}
-      {colorSettingsOpen&&<ColorSettingsDialog close={()=>setColorSettingsOpen(false)}/>}
-      <ColorImportDialog/>
-      <PasteColorDialog/>
+      {/* These Photoshop dialogs are styled under the image editor's .xd-photo scope; outside it they would render unstyled. */}
+      <div className="xd-photo" style={{display:"contents"}}>
+        {newImageOpen&&<NewImageDialog close={()=>setNewImageOpen(false)}/>}
+        {rawImport&&rawImport.projectId===activeId&&<RawDevelopDialog key={`${rawImport.projectId}:${rawImport.path}`} path={rawImport.path} close={()=>setRawImport(null)} develop={(path,options)=>{if(useXDProjects.getState().activeId!==rawImport.projectId)return Promise.reject(new Error("The active project changed before RAW import."));return createImage(path,undefined,options);}}/>}
+        {colorSettingsOpen&&<ColorSettingsDialog close={()=>setColorSettingsOpen(false)}/>}
+        <ColorImportDialog/>
+        <PasteColorDialog/>
+      </div>
       {draftsOpen&&<DraftRecoveryDialog close={()=>setDraftsOpen(false)}/>}
       {historyOpen&&<ProjectHistoryDialog close={()=>setHistoryOpen(false)}/>}
       {pencilDocument&&<div className="xd-editor-shell" ref={setShellEl} style={{display:photoShapeId?"none":"flex"}} aria-hidden={!!photoShapeId}><Suspense fallback={<div role="status">Loading design workspace…</div>}><PencilStudio key={activeId}/></Suspense><XDesignClaudeRail dockTarget={shellEl} launcher="hidden"/><HtmlArtifactPreview/></div>}

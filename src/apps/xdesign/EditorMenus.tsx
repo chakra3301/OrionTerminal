@@ -13,16 +13,21 @@ export function positionPopup(el: HTMLElement, place: PopupPlace) {
   const host = el.closest(".xd-root")?.getBoundingClientRect();
   const bounds = host ?? { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
   const { width } = el.getBoundingClientRect();
-  let x: number, y: number;
+  let { height } = el.getBoundingClientRect();
+  let x: number, y: number, space = bounds.bottom - bounds.top;
   if (place.kind === "point") ({ x, y } = place);
   else {
     const anchor = place.el.getBoundingClientRect();
-    if (place.kind === "below") { x = place.align === "end" ? anchor.right - width : anchor.left; y = anchor.bottom; }
+    if (place.kind === "below") {
+      x = place.align === "end" ? anchor.right - width : anchor.left; y = anchor.bottom;
+      const below = bounds.bottom - anchor.bottom, above = anchor.top - bounds.top;
+      // Like macOS pull-downs, never cover the title: flip above only when that side has more room, otherwise scroll.
+      if (height > below && above > below) { space = above; y = anchor.top - Math.min(height, above); }
+      else space = below;
+    }
     else { x = anchor.right; y = anchor.top - 5; if (x + width > bounds.right) x = anchor.left - width; }
   }
   x = Math.max(bounds.left, Math.min(x, bounds.right - width));
-  const space = bounds.bottom - bounds.top;
-  let { height } = el.getBoundingClientRect();
   if (height > space) { el.style.maxHeight = `${space}px`; height = space; }
   y = Math.max(bounds.top, Math.min(y, bounds.bottom - height));
   el.style.left = `${x}px`; el.style.top = `${y}px`;

@@ -38,6 +38,13 @@ it("keeps the preview up after a commit and clears the session",async()=>{
   await drag("Move selected image layer",[70,60],[90,80]);expect(session()).toBeNull();expect(container.querySelector("img.xd-photo-main-transform-preview")).not.toBeNull();
   await act(async()=>{finish();await held;});expect(container.querySelector("img.xd-photo-main-transform-preview")).toBeNull();
 });
+it("keeps the box where it was dropped until the committed image is shown",async()=>{
+  let finish!:()=>void;const held=new Promise<void>(resolve=>{finish=resolve;});
+  await act(async()=>root.render(<ImageTransformOverlay document={image} layer={layer} zoom={1} untilShown={()=>held}/>));
+  const points=()=>el("Move selected image layer").getAttribute("points");
+  await drag("Move selected image layer",[70,60],[90,80]);expect(points()).toBe("40,50 140,50 140,110 40,110");
+  await act(async()=>{finish();await held;});expect(points()).toBe("20,30 120,30 120,90 20,90");
+});
 it("accumulates a handle drag as a pending transform and commits once on Enter",async()=>{
   await render();await drag("Resize image layer bottom right",[120,90],[220,150]);
   expect(native.run).not.toHaveBeenCalled();expect(session()).not.toBeNull();expect(usePhotoWorkspace.getState().busy).toBe(true);expect(el("Commit transform")).toBeTruthy();
