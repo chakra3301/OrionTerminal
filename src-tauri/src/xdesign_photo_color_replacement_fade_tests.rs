@@ -46,6 +46,7 @@ fn endpoints(engine:&Session,before:&DocState,undo:&Arc<Document>,layer:LayerId)
 
 #[test]
 fn color_replacement_fades_actual_inactive_pixels_at_three_depths_despite_coverage_targets() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for depth in [8,16,32] {for view in ["alpha","quickMask","mask"] {for explicit in [false,true] {for cached in [false,true] {
         let(mut engine,layer,mut params)=fixture(depth,view,true);if explicit {params["target"]=match view {"alpha"=>json!({"channel":0}),"quickMask"=>json!("quickMask"),_=>json!("mask")};}let before=engine.active().unwrap().clone();let journal=engine.journal.len();paint(&mut engine,COMMAND,&params,cached);let state=engine.active().unwrap();assert_ne!(pixels(&state.doc,layer).read_region(state.doc.bounds()),pixels(&before.doc,layer).read_region(before.doc.bounds()));let fade=engine.edit_state.fade.as_ref().unwrap();assert_eq!(fade.layer,layer);assert!(!fade.mask);assert_eq!(Some(fade.label.as_str()),state.history.undo_label());assert_eq!(state.history.past_len(),before.history.past_len()+1);assert_eq!(engine.journal.len(),journal+1);assert!(engine.journal.last().unwrap().1.get(FADE_MARKER).is_none());assert!(!can_fade(&engine));assert!(engine.is_enabled("edit.fade"));endpoints(&engine,&before,&before.doc,layer);
     }}}}
@@ -53,6 +54,7 @@ fn color_replacement_fades_actual_inactive_pixels_at_three_depths_despite_covera
 
 #[test]
 fn color_replacement_grouped_after_mask_brush_retains_first_label_and_other_planes() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for depth in [8,16,32] {for cached in [false,true] {
         let(mut engine,layer,mut params)=fixture(depth,"alpha",true);let start=engine.active().unwrap().clone();let mut first=params.clone();first["target"]=json!("mask");first["coalesce"]=json!("mask then replacement");paint(&mut engine,"paint.stroke",&first,cached);let before=engine.active().unwrap().clone();let label=before.history.undo_label().unwrap().to_owned();assert_ne!(before.doc.layer(layer).unwrap().mask,start.doc.layer(layer).unwrap().mask);params["coalesce"]=json!("mask then replacement");params["target"]=json!({"channel":0});paint(&mut engine,COMMAND,&params,cached);let state=engine.active().unwrap();assert_eq!(state.history.past_len(),start.history.past_len()+1);let fade=engine.edit_state.fade.as_ref().unwrap();assert_eq!(fade.layer,layer);assert!(!fade.mask);assert_eq!(fade.label,label);endpoints(&engine,&before,&start.doc,layer);
     }}
@@ -60,6 +62,7 @@ fn color_replacement_grouped_after_mask_brush_retains_first_label_and_other_plan
 
 #[test]
 fn color_replacement_active_layer_fallback_preserves_exact_native_journal_and_fade() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for view in ["alpha","quickMask","mask"] {for layer_param in [None,Some(Value::Null),Some(json!("invalid")),Some(json!(-1))] {for cached in [false,true] {
         let(mut engine,layer,mut params)=fixture(16,view,false);match &layer_param {Some(value)=>params["layer"]=value.clone(),None=>{params.as_object_mut().unwrap().remove("layer");}}params["target"]=json!("mask");let mut expected=twin(&engine);let mut sanitized=params.clone();sanitized.as_object_mut().unwrap().remove(FADE_MARKER);expected.execute(COMMAND,sanitized).unwrap();paint(&mut engine,COMMAND,&params,cached);assert_eq!(engine.journal,expected.journal);assert_eq!(engine.edit_state.fade,expected.edit_state.fade);assert_eq!(engine.edit_state.fade.as_ref().unwrap().layer,layer);assert!(!engine.edit_state.fade.as_ref().unwrap().mask);
     }}}
@@ -67,6 +70,7 @@ fn color_replacement_active_layer_fallback_preserves_exact_native_journal_and_fa
 
 #[test]
 fn color_replacement_errors_stale_context_and_identity_edits_preserve_native_semantics() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for cached in [false,true] {
         let(mut engine,layer,params)=fixture(16,"alpha",true);paint(&mut engine,COMMAND,&params,cached);
         for (key,value) in [("points",json!([])),("mode",json!("unknown")),("layer",json!(u64::MAX))] {

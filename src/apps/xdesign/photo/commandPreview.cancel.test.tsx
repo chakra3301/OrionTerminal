@@ -77,7 +77,11 @@ describe("cancelable native command previews", () => {
     await render({ regions: [b] });
     expect(native.invoke).toHaveBeenCalledOnce();
     await act(async () => finish({ width: 80, height: 60, png: "AA==" }));
-    expect(native.invoke).toHaveBeenCalledOnce();
+    // The pan renders on a 0 ms timer once the request finishes; under load it can beat act's flush, so wait for it.
+    await act(async () => new Promise(resolve => setTimeout(resolve, 0)));
+    expect(native.invoke).toHaveBeenCalledTimes(2);
+    expect(native.invoke.mock.calls[1]![1]).toMatchObject({ regions: [b], requestId: expect.any(String) });
+    expect(native.invoke.mock.calls[1]![1]).not.toHaveProperty("cancel");
 
     await render({ regions: [], exposure: 3, cancelable: false }); await click();
     expect(native.invoke.mock.calls.at(-1)![1].requestId).toBeUndefined();

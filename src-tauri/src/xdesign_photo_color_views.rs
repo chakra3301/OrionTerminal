@@ -202,6 +202,7 @@ mod tests {
     }
     #[test]
     fn color_views_adjustment_selection_and_stroke_previews_share_proofs(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut s=fixture(16);command(&mut s,"view.proofSetup.colorBlindnessDeuteranopia",json!({}));let before=key(&s).unwrap();let color=Snapshot::capture(&s).unwrap();let state=s.active().unwrap();let doc=state.doc.clone();
         let parameters=json!({"brightness":15,"contrast":20});let mut expected=Session::new();expected.add_document((*doc).clone(),None);*expected.active_mut().unwrap()=state.clone();color.install(&mut expected).unwrap();expected.execute("image.adjustments.brightnessContrast",parameters.clone()).unwrap();
         let preview=host::preview::render_with_color(state,&color,"image.adjustments.brightnessContrast",parameters,None).unwrap();let active=expected.active().unwrap();let plan=display::View::new(&expected.color,&active.doc).unwrap();assert_eq!(preview.png,host::render_color_view_preview(&active.doc,&active.channel_view,Some(&plan)).unwrap().png);

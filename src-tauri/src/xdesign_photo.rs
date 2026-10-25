@@ -1239,6 +1239,7 @@ mod tests {
     }
     #[test]
     fn desktop_stroke_preview_retains_history_brush_sources_and_isolates_other_tools(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         use super::*;
         let mut source=Session::new();source.execute("file.new",serde_json::json!({"width":32,"height":32,"background":"#905080"})).unwrap();
         source.execute("paint.stroke",serde_json::json!({"points":[[4,8],[27,8]],"size":9,"color":"#20b0c0","seed":31})).unwrap();
@@ -2302,6 +2303,13 @@ pub async fn xdesign_photo_command_preview(
 }
 
 fn stroke_preview_engine()->&'static std::sync::Mutex<Option<(String,Session)>>{static ENGINE:std::sync::OnceLock<std::sync::Mutex<Option<(String,Session)>>>=std::sync::OnceLock::new();ENGINE.get_or_init(Default::default)}
+// Tests share the capped stroke feedback caches and preview request slots,
+// so parallel tests evict, exhaust or poison them for each other.
+#[cfg(test)]
+fn feedback_serial()->std::sync::MutexGuard<'static,()>{
+    static LOCK:std::sync::Mutex<()>=std::sync::Mutex::new(());
+    LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 fn stroke_preview_session(mut state:photocraft_engine::DocState,command:&str)->Result<Session,String>{
     // History Brush resolves source IDs against the retained native history.
     // Ordinary feedback can release those references in its isolated copy.

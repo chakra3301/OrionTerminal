@@ -366,6 +366,7 @@ mod tests {
 
     #[test]
     fn native_clone_source_offsets_pair_before_or_after_first_anchor_without_document_edits() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         use photocraft_engine::presets::clone_source::mapping;
         for paired in [false,true]{
             let dir=std::env::temp_dir().join(format!("orion-clone-offset-{}",ulid::Ulid::new()));let mut engine=clone_canvas_fixture(16);activate(&dir,&mut engine).unwrap();
@@ -383,6 +384,7 @@ mod tests {
 
     #[test]
     fn native_clone_source_offsets_reset_preserves_pairing_and_explicit_stroke_transform_precedence() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         use photocraft_engine::presets::clone_source::mapping;
         for depth in [8,16,32]{for cached in [false,true]{for command in ["paint.cloneStamp","paint.healingBrush"]{
             let dir=std::env::temp_dir().join(format!("orion-clone-reset-{}",ulid::Ulid::new()));let mut engine=clone_canvas_fixture(depth);activate(&dir,&mut engine).unwrap();color_command(&dir,&mut engine,"cloneSource.set",json!({"index":1,"source":[55,35]}));color_command(&dir,&mut engine,"cloneSource.set",json!({"index":2,"source":[10,10],"width":200,"height":50,"rotation":90,"flipH":true,"flipV":true}));clone_canvas_paint(&dir,&mut engine,command,json!({"points":[[40,30]],"size":5,"hardness":100,"aligned":true,"seed":1967}),cached);assert_eq!(engine.presets.clone.slots[2].anchor,Some([40.0,30.0]));let before=engine.active().unwrap().clone();let brush=engine.tools.brush.clone();color_command(&dir,&mut engine,"cloneSource.set",json!({"index":2,"offset":[-30,-20]}));let slots=engine.presets.clone.clone();
@@ -420,6 +422,7 @@ mod tests {
 
     #[test]
     fn native_clone_source_canvas_ordinary_and_cached_strokes_keep_donors_alignment_and_slot_transforms() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         for depth in [8,16,32]{for command in ["paint.cloneStamp","paint.healingBrush"]{for aligned in [false,true]{for cached in [false,true]{
             let dir=std::env::temp_dir().join(format!("orion-clone-strokes-{}",ulid::Ulid::new()));let mut engine=clone_canvas_fixture(depth);activate(&dir,&mut engine).unwrap();color_command(&dir,&mut engine,"cloneSource.set",json!({"index":2,"source":[10,10]}));let layer=engine.active().unwrap().active_layer.unwrap();let before=engine.active().unwrap().doc.clone();let first=before.layer(layer).unwrap().surface().unwrap().pixel(10,10);let second=before.layer(layer).unwrap().surface().unwrap().pixel(if aligned{20}else{10},if aligned{20}else{10});
             for point in [[40,30],[50,40]]{clone_canvas_paint(&dir,&mut engine,command,json!({"points":[point],"size":5,"hardness":100,"opacity":100,"flow":100,"aligned":aligned,"seed":1967}),cached);if command=="paint.cloneStamp"{let expected=if point[0]==40{&first}else{&second};let actual=engine.active().unwrap().doc.layer(layer).unwrap().surface().unwrap().pixel(point[0],point[1]);for(actual,expected)in actual.iter().zip(expected){assert!((actual-expected).abs()<0.02,"known donor/{depth}/{aligned}/{cached}: {actual} vs {expected}");}}}
@@ -432,6 +435,7 @@ mod tests {
 
     #[test]
     fn native_clone_source_canvas_activation_samples_current_document_and_missing_source_refuses_unchanged() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         for cached in [false,true]{let dir=std::env::temp_dir().join(format!("orion-clone-docs-{}",ulid::Ulid::new()));let mut first=clone_canvas_fixture(16);activate(&dir,&mut first).unwrap();color_command(&dir,&mut first,"cloneSource.set",json!({"source":[10,10]}));clone_canvas_paint(&dir,&mut first,"paint.cloneStamp",json!({"points":[[40,30]],"size":5,"hardness":100,"seed":1967}),cached);
             let mut second=clone_canvas_fixture(16);second.edit("Different image donor",|doc,active|{doc.layer_mut(active.unwrap()).unwrap().surface_mut().unwrap().fill_rect(photocraft_engine::doc::Rect::from_xywh(0,0,32,24),&[0.2,0.8,0.4,1.0]);Ok(())}).unwrap();activate(&dir,&mut second).unwrap();assert_ne!(first.active().unwrap().doc.id,second.active().unwrap().doc.id);assert_eq!(presets(&first)["cloneSource"],presets(&second)["cloneSource"]);clone_canvas_paint(&dir,&mut second,"paint.cloneStamp",json!({"points":[[50,40]],"size":5,"hardness":100,"seed":1967}),cached);let pixel=second.active().unwrap().doc.layer(second.active().unwrap().active_layer.unwrap()).unwrap().surface().unwrap().pixel(50,40);for(actual,expected)in pixel.iter().zip([0.2,0.8,0.4,1.0]){assert!((actual-expected).abs()<0.02);}
             color_command(&dir,&mut second,"cloneSource.select",json!({"index":4}));let before=second.active().unwrap().clone();let sources=second.presets.clone.clone();let journal=second.journal.clone();let fade=second.edit_state.fade.clone();let params=json!({"points":[[40,30]],"size":5,"seed":1967});assert!(execute(&dir,&mut second,"paint.cloneStamp",|engine|super::super::execute_view_command(engine,"paint.cloneStamp",params.clone())).is_err());assert!(super::super::stroke::render_with_identity(&second,Some("clone-missing"),"paint.cloneStamp",&params,0,0,64,48,1).is_err());assert!(std::sync::Arc::ptr_eq(&before.doc,&second.active().unwrap().doc));assert_eq!(second.active().unwrap().history.entries(),before.history.entries());assert_eq!(second.active().unwrap().revision,before.revision);assert_eq!(second.presets.clone,sources);assert_eq!(second.journal,journal);assert_eq!(second.edit_state.fade,fade);

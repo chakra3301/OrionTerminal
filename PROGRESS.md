@@ -1,3 +1,25 @@
+## 2026-10-25 (evening) — `npm run verify` green: the native parallel test race and the preview-cancel flake fixed
+
+Branch: `validation/alpha-2026-09-14`. **Committed**, not pushed. Owner approved the plan "do 1, then 2, then 3, and commit after each"; this is step 1. Step 2 is the quick Photoshop parity leftovers, step 3 the live checks.
+
+- **Native race (tests only, 14 `src-tauri/src/xdesign_photo*.rs` files).**
+  - Stroke feedback, retouch and preview tests share process-wide state: two-slot caches, the two preview request slots and their mutexes. Under libtest's parallel threads they evicted, exhausted or poisoned each other, which gave 31 failures.
+  - The fix is a new `#[cfg(test)] feedback_serial()` in `xdesign_photo.rs`. It is a poison-tolerant lock, modelled on `clipboard::tests::serial()`, and the first line of each of the 74 tests that touch that state. Production code is unchanged.
+- **`commandPreview.cancel.test.tsx` flake (test only).**
+  - When a request finishes, the hook renders a panned region on a 0 ms timer. Under load that timer can fire before React `act`'s `setImmediate` flush, so the test saw a second call.
+  - Forcing the timer first reproduced it every time, and the extra call is the pan render, not a cancel. The test now waits for that render and asserts it carries the new region and no cancel.
+
+Verify:
+- Native in parallel twice, before the full gate: 1390 passed, 0 failed (75 s and 74 s; serial took 298 s).
+- `npm run verify`: exit 0.
+  - typecheck clean;
+  - vitest 571 files, 5580 tests passed;
+  - bridges 260/0;
+  - build OK;
+  - native 1390 passed, 0 failed, 20 ignored (71 s).
+
+Closes the 2026-10-25 entry's "Native tests" open item. The other open items there still stand.
+
 ## 2026-10-25 — XDesign: remaining gaps closed, release build smoke-tested (design, photo, FX), PSD and FIG round trips
 
 Branch: `validation/alpha-2026-09-14`. **Committed** in one commit, together with the uncommitted work of the two 2026-10-24 entries below. Not pushed. Owner: "lets try to close all the gapes then step 2-4 once thats all done we commit". Step 2 is the release build and smoke test, step 3 is `npm run verify`, and step 4 is real PSD and .fig files opened, edited, saved and reopened.

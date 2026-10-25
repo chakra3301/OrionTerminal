@@ -753,6 +753,7 @@ mod tests {
     }
     #[test]
     fn repeat_preview_parity_ordinary_mask_alpha_quickmask_separate_and_no_layer(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         for depth in [8,16,32] {for route in ["pixels","mask","alpha","quickMask"] {for separate in [false,true] {
             let mut engine=repeat_fixture(depth,route);
             let (command,params)=if separate {("filter.cameraRaw",json!({"exposure":-1.5}))}else{("filter.blur.gaussianBlur",json!({"radius":2}))};
@@ -771,6 +772,7 @@ mod tests {
     }
     #[test]
     fn repeat_preview_saved_target_wins_over_current_view_and_two_candidates_keep_order(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=repeat_fixture(8,"alpha");
         super::super::execute_view_command(&mut engine,"filter.blur.gaussianBlur",json!({"radius":1,"target":{"channel":0}})).unwrap();
         super::super::execute_view_command(&mut engine,"filter.cameraRaw",json!({"exposure":-1,"target":{"channel":0}})).unwrap();
@@ -782,6 +784,7 @@ mod tests {
     }
     #[test]
     fn repeat_preview_invalid_saved_lens_and_displacement_and_prestart_cancel_keep_source(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         for (command,params) in [
             ("filter.lensCorrection",json!({"straighten":[[1,2],[1,2]],"target":"mask"})),
             ("filter.distort.displace",json!({"mapPath":"/no/such/repeat-map.png"})),
@@ -801,6 +804,7 @@ mod tests {
 
     #[test]
     fn repeat_preview_preserves_native_fallback_instead_of_direct_host_mask_routing(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=ordinary_filter_fixture(8);
         super::super::execute_view_command(&mut engine,"layer.layerMask.revealAll",serde_json::json!({})).unwrap();
         engine.execute("filter.blur.gaussianBlur",serde_json::json!({"radius":2})).unwrap();

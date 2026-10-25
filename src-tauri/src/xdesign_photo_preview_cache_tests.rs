@@ -863,6 +863,7 @@ fn history_free_command_snapshots_reuse_the_existing_completed_visual_result() {
 
 #[test]
 fn canceled_command_previews_do_not_compute_reuse_or_publish_cache_entries() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     let source = ordinary_filter_fixture(8);
     let state = source.active().unwrap();
     let color = super::color_views::Snapshot::capture(&source).unwrap();

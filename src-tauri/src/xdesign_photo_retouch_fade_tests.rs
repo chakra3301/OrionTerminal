@@ -30,6 +30,7 @@ fn unchanged(source:&DocState,current:&DocState,target:Target){let mut restored=
 
 #[test]
 fn retouch_coverage_fade_endpoints_match_raw_planes_for_ordinary_and_cached_commits(){
+    let _guard = crate::xdesign_photo::feedback_serial();
     for depth in [8,16,32]{for quick in [false,true]{for explicit in [false,true]{for prepared in [false,true]{for command in RETOUCH{
         let(mut engine,target,params)=fixture(depth,quick,explicit,command);let source=engine.active().unwrap().clone();let journal=engine.journal.len();let bounds=source.doc.bounds();let before=plane(&source.doc,target).unwrap().read_region(bounds);
         paint(&mut engine,command,&params,prepared);let painted=engine.active().unwrap().clone();let after=plane(&painted.doc,target).unwrap().read_region(bounds);
@@ -46,6 +47,7 @@ fn retouch_coverage_fade_endpoints_match_raw_planes_for_ordinary_and_cached_comm
 
 #[test]
 fn retouch_coverage_coalescing_keeps_first_label_and_saved_history_donor(){
+    let _guard = crate::xdesign_photo::feedback_serial();
     for quick in [false,true]{for explicit in [false,true]{for prepared in [false,true]{for first in ["paint.cloneStamp","paint.healingBrush","paint.historyBrush","paint.mixerBrush"]{
         let(mut engine,target,mut params)=fixture(16,quick,explicit,first);params["coalesce"]=json!("retouch-gesture");let source=engine.active().unwrap().clone();let original=plane(&source.doc,target).unwrap().read_region(source.doc.bounds());paint(&mut engine,first,&params,prepared);let label=engine.active().unwrap().history.undo_label().unwrap().to_owned();
         let mut second=params.clone();second["points"]=json!([[14,12,0.8],[22,18,0.7]]);paint(&mut engine,"paint.burn",&second,prepared);let painted=engine.active().unwrap().doc.clone();assert_eq!(engine.active().unwrap().history.past_len(),source.history.past_len()+1);assert_eq!(engine.active().unwrap().history.undo_label(),Some(label.as_str()));let result=run(&mut engine,"edit.fade",json!({"opacity":0})).unwrap();assert_eq!(result["faded"],label);assert_eq!(plane(&engine.active().unwrap().doc,target).unwrap().read_region(source.doc.bounds()),original);unchanged(&source,engine.active().unwrap(),target);run(&mut engine,"edit.undo",json!({})).unwrap();assert_eq!(engine.active().unwrap().doc,painted);run(&mut engine,"edit.undo",json!({})).unwrap();assert_eq!(engine.active().unwrap().doc,source.doc);run(&mut engine,"edit.redo",json!({})).unwrap();assert_eq!(engine.active().unwrap().doc,painted);
@@ -54,6 +56,7 @@ fn retouch_coverage_coalescing_keeps_first_label_and_saved_history_donor(){
 
 #[test]
 fn retouch_errors_stale_context_and_private_markers_cannot_publish_coverage_fade(){
+    let _guard = crate::xdesign_photo::feedback_serial();
     for command in RETOUCH{let(mut engine,_,mut params)=fixture(16,false,true,command);params[FADE_MARKER]=json!({"document":"forged","revision":999,"label":"forged"});paint(&mut engine,command,&params,false);assert!(can_fade(&engine));let source=engine.active().unwrap().clone();let journal=engine.journal.clone();params["points"]=json!([]);assert!(run(&mut engine,command,params).is_err());assert!(std::sync::Arc::ptr_eq(&source.doc,&engine.active().unwrap().doc));assert_eq!(engine.active().unwrap().history.entries(),source.history.entries());assert_eq!(engine.active().unwrap().revision,source.revision);assert_eq!(engine.journal,journal);run(&mut engine,"edit.undo",json!({})).unwrap();assert!(!can_fade(&engine));assert!(run(&mut engine,"edit.fade",json!({"opacity":50})).is_err());}
 }
 

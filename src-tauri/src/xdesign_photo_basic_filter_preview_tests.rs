@@ -187,6 +187,7 @@ fn basic_filter_edit_exact_selected_admission_source_caps_and_preview_limits_are
 
 #[test]
 fn basic_filter_edit_private_source_pin_survives_deletion_retires_and_cancel_never_publishes() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     let f=fixture(16,"filter.blur.boxBlur",true,true);let before=twin(&f.engine);let request=json!({"layer":f.id.0,"index":1,"params":{"radius":1}});
     let mut private=twin(&f.engine);super::super::linked_replay::prepare_preview(&mut private,COMMAND,&request).unwrap();
     let pin:Weak<Vec<u8>>={let SmartSource::Embedded{bytes,..}=&smart(&private.active().unwrap().doc,f.id).source else{panic!("Missing private source pin")};assert_eq!(bytes.as_slice(),f.bytes);Arc::downgrade(bytes)};

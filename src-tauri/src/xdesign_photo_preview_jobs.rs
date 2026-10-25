@@ -78,6 +78,7 @@ mod tests {
 
     #[test]
     fn cancellable_displacement_retains_host_file_limits_before_starting_a_worker() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let directory = std::env::temp_dir().join(format!("xdesign-job-input-{}", ulid::Ulid::new()));
         std::fs::create_dir_all(&directory).unwrap();
         let oversized = directory.join("oversized.png");
@@ -104,6 +105,7 @@ mod tests {
 
     #[test]
     fn native_filter_cancellation_keeps_source_pixels_and_history_and_drains_the_worker() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let owner = format!("actual-cancel-{}", ulid::Ulid::new());
         let request = ulid::Ulid::new().to_string();
         let lease = host::preview_requests::acquire(&owner, Some(&request)).unwrap();
@@ -137,6 +139,7 @@ mod tests {
 
     #[test]
     fn cancellable_native_filters_match_synchronous_pixels_result_history_and_journal() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         for depth in [8, 16, 32] {
             for (command, params) in [
                 (
@@ -197,6 +200,7 @@ mod tests {
 
     #[test]
     fn cancellation_joins_workers_before_releasing_the_global_preview_slot() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let owner = format!("drain-test-{}", ulid::Ulid::new());
         let request = ulid::Ulid::new().to_string();
         let lease = host::preview_requests::acquire(&owner, Some(&request)).unwrap();

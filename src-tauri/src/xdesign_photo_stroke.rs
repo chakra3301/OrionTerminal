@@ -549,16 +549,19 @@ mod tests {
     }
     #[test]
     fn color_eraser_magic_preview_matches_real_command_across_modes_depths_selection_palette_and_undo(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut params=serde_json::json!({"x":10,"y":15,"tolerance":0,"opacity":72,"antiAlias":false,"contiguous":true,"sampleAllLayers":false});
         assert_color_eraser_preview_matches_commit("paint.magicEraser",params.clone());params["contiguous"]=serde_json::json!(false);params["sampleAllLayers"]=serde_json::json!(true);assert_color_eraser_preview_matches_commit("paint.magicEraser",params);
     }
     #[test]
     fn color_eraser_background_preview_matches_pressured_command_across_modes_depths_selection_and_options(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         let params=serde_json::json!({"points":[[10,15,0.35,8,-4,12,1],[16,21,0.85,-3,6,25,2],[24,24,0.55,2,3,7,3]],"size":9,"hardness":0.63,"flow":0.74,"sampling":"continuous","limits":"findEdges","tolerance":20,"protectForegroundColor":true,"seed":913});
         assert_color_eraser_preview_matches_commit("paint.backgroundEraser",params);
     }
     #[test]
     fn color_eraser_preview_renders_the_full_multitile_viewport_when_damage_is_visible(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=Session::new();engine.execute("file.new",serde_json::json!({"width":2000,"height":1500,"depth":8,"mode":"rgb","background":"#804020"})).unwrap();
         engine.execute("paint.stroke",serde_json::json!({"points":[[900,780],[1020,820],[1100,860]],"size":48,"color":"#20b0c0","seed":21})).unwrap();
         let params=serde_json::json!({"points":[[1000,820,0.7,0,0,0,1],[1050,840,0.8,0,0,0,2]],"size":36,"hardness":0.7,"flow":0.8,"sampling":"continuous","limits":"contiguous","tolerance":50,"seed":913});
@@ -570,6 +573,7 @@ mod tests {
     }
     #[test]
     fn color_eraser_preview_keeps_far_layer_shadow_visible_when_pixel_damage_is_offscreen(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=Session::new();engine.execute("file.new",serde_json::json!({"width":800,"height":400,"background":"transparent"})).unwrap();
         engine.execute("paint.stroke",serde_json::json!({"points":[[500,200],[505,200]],"size":80,"color":"#ffffff","seed":21})).unwrap();
         engine.execute("layer.layerStyle.dropShadow",serde_json::json!({"color":"#000000","opacity":100,"angle":0,"useGlobalLight":false,"distance":400,"size":20,"add":false})).unwrap();
@@ -581,6 +585,7 @@ mod tests {
     }
     #[test]
     fn color_eraser_preview_preserves_magic_transparency_lock_palette_and_background_refusal(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=prepared_fixture(8,"rgb");engine.execute("layer.new.layer",serde_json::json!({})).unwrap();engine.execute("edit.fill",serde_json::json!({"color":"#e02060"})).unwrap();engine.execute("layer.lockLayers",serde_json::json!({"transparency":true})).unwrap();engine.execute("tools.setColors",serde_json::json!({"background":"#00ff00"})).unwrap();
         let layer=engine.active().unwrap().active_layer.unwrap();let before=engine.active().unwrap().doc.clone();let alpha_before=before.layer(layer).unwrap().surface().unwrap().rgba(20,20)[3];let params=serde_json::json!({"x":20,"y":20,"tolerance":0,"antiAlias":false,"opacity":100});
         let preview=render(&engine,"paint.magicEraser",&marked_eraser_params(&engine,&params),0,0,40,40,1).unwrap();assert_eq!(preview.len(),1);assert!(std::sync::Arc::ptr_eq(&before,&engine.active().unwrap().doc));let before_state=engine.active().unwrap();let before_color=super::super::display::View::new(&engine.color,&before_state.doc).unwrap();let before_tile=tiles::render_with_color(&before_state.doc,Some(&before_state.channel_view),Some(&before_color),0,0,40,40,1,false,true).unwrap();assert_ne!(preview[0].png,before_tile.png);
@@ -591,6 +596,7 @@ mod tests {
     }
     #[test]
     fn patch_native_feedback_matches_commit_and_preserves_selection_and_undo(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         for mode in ["source","destination"]{
             let mut engine=prepared_fixture(16,"rgb");if mode=="destination"{engine.execute("select.rect",serde_json::json!({"x":2,"y":4,"width":8,"height":8})).unwrap();}
             let offset=if mode=="destination"{serde_json::json!([16,12])}else{serde_json::json!([3,-2])};
@@ -607,6 +613,7 @@ mod tests {
     }
     #[test]
     fn patch_preview_covers_every_visible_tile_after_scale_is_raised(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=Session::new();engine.execute("file.new",serde_json::json!({"width":2000,"height":1500,"depth":8,"mode":"rgb","background":"#804020"})).unwrap();
         engine.execute("select.rect",serde_json::json!({"x":400,"y":300,"width":1200,"height":900})).unwrap();
         let params=serde_json::json!({"offset":[10,10],"mode":"source"});
@@ -617,6 +624,7 @@ mod tests {
     }
     #[test]
     fn patch_preview_and_commit_write_only_the_explicit_mask_or_alpha_target(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=prepared_fixture(8,"rgb");let layer=engine.active().unwrap().active_layer.unwrap();
         engine.execute("layer.layerMask.revealAll",serde_json::json!({})).unwrap();
         engine.execute("paint.stroke",serde_json::json!({"points":[[10,20],[15,20]],"size":7,"color":"#000000","target":"mask","seed":7})).unwrap();
@@ -642,10 +650,12 @@ mod tests {
     fn compare_prepared(engine:&mut Session,expected:&mut Session,command:&str,params:&Value){let identity=format!("prepared-{}",ulid::Ulid::new());let mut prefix=params.clone();prefix["points"]=serde_json::json!(params["points"].as_array().unwrap()[..2]);retouch_document(engine,Some(&identity),command,&prefix).unwrap();let before=engine.active().unwrap().doc.clone();let key=stroke_key(&identity,command,params).unwrap();assert_eq!(retouch_cache().lock().unwrap()[&key].live.as_ref().unwrap().samples_pushed(),2);assert!(std::sync::Arc::ptr_eq(&before,&engine.active().unwrap().doc));let mut native_params=super::super::history::normalize(expected,command,params.clone()).unwrap();let coverage_fade=super::super::mask_filters::prepare_paint_fade(expected,command,&mut native_params);let native=expected.execute(command,native_params).unwrap();super::super::mask_filters::finish_paint_fade(expected,coverage_fade);let result=commit_feedback(engine,&identity,command,params).unwrap().unwrap();assert_eq!(result,native,"result/{command}");assert!(!retouch_cache().lock().unwrap().contains_key(&key));assert_eq!(engine.jobs_with_recent().last().unwrap().state,"done");assert_prepared_state(engine,expected,command);release(&identity,933).unwrap();}
     #[test]
     fn prepared_retouch_final_tail_matches_native_depth_color_and_tool_state(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         for command in RETOUCH{for depth in [8,16,32]{for mode in ["rgb","gray","cmyk","lab"]{let mut engine=prepared_fixture(depth,mode);engine.tools.mixer.reservoir=Some([0.8,0.3,0.1,0.9]);engine.tools.mixer.amount=0.35;engine.tools.mixer.pickup=Some([0.1,0.6,0.8,0.7]);let mut expected=twin(&engine);compare_prepared(&mut engine,&mut expected,command,&prepared_params(command));}}}
     }
     #[test]
     fn prepared_masks_channels_color_restriction_clone_slots_and_fade_match_native(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         for command in RETOUCH{for kind in ["mask","implicit-mask","alpha","quickMask","red"]{let mut engine=prepared_fixture(16,"rgb");let mut params=prepared_params(command);match kind{"mask"|"implicit-mask"=>{engine.execute("layer.layerMask.revealAll",json!({})).unwrap();if kind=="mask"{params["target"]=json!("mask");}else{engine.execute("view.layerMask",json!({"mode":"gray"})).unwrap();}},"alpha"=>{engine.execute("channel.new",json!({"name":"Prepared alpha"})).unwrap();engine.execute("channel.target",json!({"channel":0})).unwrap();},"quickMask"=>{engine.execute("select.editInQuickMaskMode",json!({})).unwrap();},_=>{engine.execute("channel.target",json!({"channel":"red"})).unwrap();}}
             if command=="paint.historyBrush"{params["historySource"]=super::super::history::describe(&engine).as_array().unwrap().last().unwrap()["id"].clone();}
             let mut paint=json!({"points":[[10,14],[29,25]],"size":8,"color":"#303030","seed":29});if let Some(target)=params.get("target"){paint["target"]=target.clone();}engine.execute("paint.stroke",paint).unwrap();
@@ -655,32 +665,38 @@ mod tests {
     }
     #[test]
     fn prepared_coalescing_keeps_bounded_history_layer_targets_undo_and_redo(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         for command in RETOUCH{let mut engine=prepared_fixture(8,"rgb");engine.execute("layer.new.layer",json!({"name":"Second layer"})).unwrap();engine.active_mut().unwrap().history.max_states=1;let mut expected=twin(&engine);for step in 0..3{let mut params=prepared_params(command);params["coalesce"]=json!(if step<2{"one gesture"}else{"next gesture"});if command=="paint.historyBrush"{params["state"]=json!(engine.active().unwrap().history.past_len());}if step==1{let selected:Vec<_>=engine.active().unwrap().doc.walk().into_iter().map(|(_,_,layer)|layer.id).collect();engine.active_mut().unwrap().selected_layers=selected.clone();expected.active_mut().unwrap().selected_layers=selected;}compare_prepared(&mut engine,&mut expected,command,&params);}
             for command in ["edit.undo","edit.redo"]{engine.execute(command,json!({})).unwrap();expected.execute(command,json!({})).unwrap();assert_prepared_state(&engine,&expected,command);}
         }
     }
     #[test]
     fn prepared_feedback_falls_back_for_cancel_expiry_context_and_rewritten_samples(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         for command in ["paint.cloneStamp","paint.mixerBrush","paint.historyBrush"]{for change in ["cancel","expired","tools","pixels","rewritten"]{let mut engine=prepared_fixture(8,"rgb");let mut params=prepared_params(command);let identity=format!("prepared-fallback-{}",ulid::Ulid::new());retouch_document(&engine,Some(&identity),command,&params).unwrap();let key=stroke_key(&identity,command,&params).unwrap();match change{"cancel"=>release(&identity,933).unwrap(),"expired"=>{retouch_cache().lock().unwrap().get_mut(&key).unwrap().touched=Instant::now()-Duration::from_secs(31);},"tools"=>{engine.tools.foreground=[0.1,0.3,0.8,1.0];},"pixels"=>{engine.execute("paint.stroke",json!({"points":[[20,20]],"size":4,"color":"#ffffff"})).unwrap();},_=>{params["points"][0][0]=json!(12);}}
             let before=engine.active().unwrap().doc.clone();assert!(commit_feedback(&mut engine,&identity,command,&params).is_none(),"{command}/{change}");assert!(std::sync::Arc::ptr_eq(&before,&engine.active().unwrap().doc));let mut expected=twin(&engine);let actual=super::super::execute_view_command(&mut engine,command,params.clone()).unwrap();let native=expected.execute(command,super::super::history::normalize(&expected,command,params.clone()).unwrap()).unwrap();assert_eq!(actual,native);assert_prepared_state(&engine,&expected,&format!("fallback/{command}/{change}"));release(&identity,933).unwrap();
         }}
     }
     #[test]
     fn prepared_native_completion_refreshes_slices_and_keeps_journal_script_replay(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=prepared_fixture(8,"rgb");engine.execute("select.deselect",json!({})).unwrap();engine.execute("layer.new.layer",json!({"name":"Slice target"})).unwrap();engine.execute("paint.stroke",json!({"points":[[7,7],[12,12]],"size":7,"color":"#50c030"})).unwrap();engine.execute("layer.newLayerBasedSlice",json!({"name":"Prepared layer"})).unwrap();let before=engine.active().unwrap().doc.slices.list[0].rect;
         let mut params=prepared_params("paint.cloneStamp");params["points"]=json!([[35,35,0.5],[43,45,0.8],[51,49,0.6]]);let mut replay=twin(&engine);let mut expected=twin(&engine);compare_prepared(&mut engine,&mut expected,"paint.cloneStamp",&params);assert_ne!(engine.active().unwrap().doc.slices.list[0].rect,before);assert_eq!(serde_json::to_value(&engine.active().unwrap().doc.slices).unwrap(),serde_json::to_value(&expected.active().unwrap().doc.slices).unwrap());
         let (command,params)=engine.journal.last().unwrap();let script=replay.execute("file.scripts.browse",json!({"steps":[[command,params]]})).unwrap();assert_eq!(script["ok"],true);assert_eq!(native_pixels(&replay.active().unwrap().doc),native_pixels(&engine.active().unwrap().doc));assert_eq!(serde_json::to_value(&replay.active().unwrap().doc.slices).unwrap(),serde_json::to_value(&engine.active().unwrap().doc.slices).unwrap());
     }
     #[test]
     fn prepared_explicit_layers_keep_native_single_color_and_target_semantics(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         for command in RETOUCH{let mut engine=prepared_fixture(16,"rgb");let layer=engine.active().unwrap().active_layer.unwrap();engine.execute("layer.new.layer",json!({"name":"Active other layer"})).unwrap();engine.execute("channel.target",json!({"channel":"red"})).unwrap();let mut params=prepared_params(command);params["layer"]=json!(layer.0);let mut expected=twin(&engine);compare_prepared(&mut engine,&mut expected,command,&params);}
     }
     #[test]
     fn prepared_journal_and_native_save_event_actions_remain_equivalent(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=prepared_fixture(8,"rgb");engine.execute("file.scripts.scriptEventsManager",json!({"enabled":true,"add":{"event":"saveDocument","name":"After save","steps":[["layer.setProps",{"opacity":0.5}]]}})).unwrap();let mut expected=twin(&engine);expected.prefs=engine.prefs.clone();expected.file_menu=engine.file_menu.clone();compare_prepared(&mut engine,&mut expected,"paint.dodge",&prepared_params("paint.dodge"));assert!(engine.file_menu.event_log.is_empty());assert!(expected.file_menu.event_log.is_empty());photocraft_engine::automate_cmds::document_saved(&mut engine,0);photocraft_engine::automate_cmds::document_saved(&mut expected,0);assert!(!engine.file_menu.event_log.is_empty());assert_eq!(engine.file_menu.event_log,expected.file_menu.event_log);assert_prepared_state(&engine,&expected,"save event");
     }
     #[test]
     fn continuous_retouch_batches_retry_viewport_cancel_and_context_changes_are_safe() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=Session::new();engine.execute("file.new",serde_json::json!({"width":64,"height":64,"background":"#804020"})).unwrap();let source=engine.active().unwrap().doc.clone();
         let identity=format!("coverage-batches-{}",ulid::Ulid::new());let mut params=serde_json::json!({"points":[[15,16,0.5],[23,23,0.8]],"source":[7,7],"size":8,"opacity":65,"seed":231,"_orionOffset":0});
         let first=retouch_document(&engine,Some(&identity),"paint.cloneStamp",&params).unwrap();let repeated=retouch_document(&engine,Some(&identity),"paint.cloneStamp",&params).unwrap();assert!(std::sync::Arc::ptr_eq(&first.0,&repeated.0));
@@ -697,6 +713,7 @@ mod tests {
 
     #[test]
     fn canceled_work_cannot_retain_pixels_and_offscreen_batches_keep_guards() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=Session::new();engine.execute("file.new",serde_json::json!({"width":64,"height":64,"background":"#804020"})).unwrap();let source=engine.active().unwrap().doc.clone();let identity=format!("coverage-cancel-{}",ulid::Ulid::new());
         let params=serde_json::json!({"points":[[15,16]],"source":[7,7],"size":8,"seed":2231});retouch_document(&engine,Some(&identity),"paint.cloneStamp",&params).unwrap();let key=stroke_key(&identity,"paint.cloneStamp",&params).unwrap();
         let (lease,cancel,mut live)={let mut cache=retouch_cache().lock().unwrap();let entry=cache.get_mut(&key).unwrap();(entry.lease,entry.cancel.clone(),entry.live.take().unwrap())};
@@ -706,6 +723,7 @@ mod tests {
     }
     #[test]
     fn retouch_expiry_replacement_and_eviction_signal_retained_work(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         for change in ["expiry","replacement","eviction"]{
             let mut engine=prepared_fixture(8,"rgb");let params=prepared_params("paint.cloneStamp");let identity=format!("admission-cleanup-{}",ulid::Ulid::new());
             retouch_document(&engine,Some(&identity),"paint.cloneStamp",&params).unwrap();let key=stroke_key(&identity,"paint.cloneStamp",&params).unwrap();let cancel=retouch_cache().lock().unwrap()[&key].cancel.clone();
@@ -720,6 +738,7 @@ mod tests {
     }
     #[test]
     fn final_retouch_delta_is_admitted_before_prepared_completion(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         for command in continuous_retouch::TOOLS{
             let mut engine=prepared_fixture(8,"rgb");let mut params=prepared_params(command);let identity=format!("admission-final-{}",ulid::Ulid::new());
             let old=params["points"].as_array().unwrap().clone();retouch_document(&engine,Some(&identity),command,&params).unwrap();let source=engine.active().unwrap().doc.clone();let journal=engine.journal.clone();let key=stroke_key(&identity,command,&params).unwrap();let cancel=retouch_cache().lock().unwrap()[&key].cancel.clone();
@@ -731,6 +750,7 @@ mod tests {
 
     #[test]
     fn each_coverage_tool_streams_beyond_the_old_prefix_limit_without_replaying_samples() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         for command in ["paint.cloneStamp","paint.healingBrush","paint.spotHealing","paint.historyBrush"] {
             let mut engine=Session::new();engine.execute("file.new",serde_json::json!({"width":64,"height":64,"background":"#804020"})).unwrap();engine.execute("paint.stroke",serde_json::json!({"points":[[5,8],[52,8]],"size":8,"color":"#20b0c0","seed":21})).unwrap();let before=engine.active().unwrap().doc.clone();
             let identity=format!("coverage-long-{}",ulid::Ulid::new());let all:Vec<Value>=(0..4097).map(|index|serde_json::json!([12.0+f64::from(index%96)*0.3,16+index/96%8*3,0.2+f64::from(index%7)*0.1])).collect();
@@ -743,6 +763,7 @@ mod tests {
 
     #[test]
     fn history_feedback_streams_long_native_source_and_invalidates_after_purge(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=Session::new();engine.execute("file.new",json!({"width":64,"height":64,"background":"#804020"})).unwrap();engine.execute("paint.stroke",json!({"points":[[5,16],[52,16]],"size":14,"color":"#20b0c0","seed":21})).unwrap();let before=engine.active().unwrap().doc.clone();let history=engine.active().unwrap().history.past_len();let journal=engine.journal.clone();let identity=format!("history-long-{}",ulid::Ulid::new());
         let all:Vec<Value>=(0..4097).map(|index|json!([12.0+f64::from(index%96)*0.3,16+index/96%8*3,0.2+f64::from(index%7)*0.1])).collect();let mut params=json!({"points":all[..2048],"_orionOffset":0,"historySource":super::super::history::describe(&engine)[0]["id"],"size":6,"hardness":50,"opacity":65,"flow":55,"seed":993});
         render_with_identity(&engine,Some(&identity),"paint.historyBrush",&params,0,0,0,0,1).unwrap();params["points"]=json!(all[2048..4096]);params["_orionOffset"]=json!(2048);render_with_identity(&engine,Some(&identity),"paint.historyBrush",&params,100,100,64,64,1).unwrap();params["points"]=json!(all[4096..]);params["_orionOffset"]=json!(4096);let preview=retouch_document(&engine,Some(&identity),"paint.historyBrush",&params).unwrap();let key=stroke_key(&identity,"paint.historyBrush",&params).unwrap();assert_eq!(retouch_cache().lock().unwrap()[&key].live.as_ref().unwrap().samples_pushed(),4097);assert!(std::sync::Arc::ptr_eq(&before,&engine.active().unwrap().doc));assert_eq!(engine.journal,journal);assert_eq!(engine.active().unwrap().history.past_len(),history);
@@ -752,6 +773,7 @@ mod tests {
 
     #[test]
     fn sequential_tools_stream_long_strokes_and_final_native_commands_keep_undo_fade_and_journal(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         for command in ["paint.dodge","paint.burn","paint.sponge","paint.blur","paint.sharpen","paint.mixerBrush","paint.colorReplacement","paint.smudge"] {
             let mut engine=Session::new();engine.execute("file.new",json!({"width":64,"height":64,"background":"#804020"})).unwrap();engine.execute("paint.stroke",json!({"points":[[5,8],[52,8]],"size":8,"color":"#20b0c0","seed":21})).unwrap();let before=engine.active().unwrap().doc.clone();let history=engine.active().unwrap().history.entries().len();let journal=engine.journal.clone();let carry=serde_json::to_value(&engine.tools.mixer).unwrap();
             let identity=format!("sequential-long-{}",ulid::Ulid::new());let all:Vec<Value>=(0..4097).map(|index|json!([12.0+f64::from(index%96)*0.3,16+index/96%8*3,0.2+f64::from(index%7)*0.1])).collect();
@@ -766,6 +788,7 @@ mod tests {
 
     #[test]
     fn identical_retouch_prefixes_reuse_pixels_but_tool_changes_and_cancel_invalidate_them() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=Session::new();engine.execute("file.new",serde_json::json!({"width":64,"height":64,"background":"#804020"})).unwrap();
         let identity=format!("retouch-reuse-{}",ulid::Ulid::new());let params=serde_json::json!({"points":[[16,16,0.4],[23,23,0.8],[32,32,0.6]],"size":10,"opacity":0.65,"hardness":0.5,"source":[10,10],"color":"#e01080","seed":4242,"strength":65,"type":"proximityMatch"});
         let original=engine.active().unwrap().doc.clone();let history=engine.active().unwrap().history.entries().len();let journal=engine.journal.clone();
@@ -778,6 +801,7 @@ mod tests {
     }
     #[test]
     fn streamed_batches_retries_and_commit_match_native_pixels_with_one_undo() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=Session::new();engine.execute("file.new",serde_json::json!({"width":64,"height":64,"background":"transparent"})).unwrap();
         let mut params=serde_json::json!({"points":[[10,10,0.4],[25,20,0.7]],"size":12,"color":"#f02040","seed":99871,"smoothing":0.5});
         let identity=format!("stream-test-{}",ulid::Ulid::new());let before=engine.active().unwrap().doc.clone();
@@ -801,6 +825,7 @@ mod tests {
     use serde_json::json;
     #[test]
     fn incremental_feedback_matches_committed_pressure_smoothed_stroke_and_rejects_rewritten_prefixes() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=Session::new();engine.execute("file.new",json!({"width":300,"height":60})).unwrap();
         let mut params=json!({"points":[[10,20,0.4],[30,25,0.8]],"size":12,"color":"#a02080","seed":711,"smoothing":35});
         let identity=ulid::Ulid::new().to_string();incremental(&engine,&identity,"paint.stroke",&params).unwrap();
@@ -811,6 +836,7 @@ mod tests {
     }
     #[test]
     fn every_retouch_feedback_path_matches_final_pixels_and_keeps_source_and_tool_state() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         for command in RETOUCH {
             for target in ["pixels", "mask", "channel"] {
                 if command == "paint.colorReplacement" && target != "pixels" {
@@ -883,6 +909,7 @@ mod tests {
     }
     #[test]
     fn retouch_feedback_rejects_large_prefixes_and_extreme_footprints_before_editing() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine = Session::new();
         engine
             .execute("file.new", json!({"width":64,"height":64}))
@@ -902,6 +929,7 @@ mod tests {
     }
     #[test]
     fn native_stroke_feedback_matches_commit_with_pressure_jitter_masks_and_eraser() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         for (command, erase, target) in [
             ("paint.stroke", false, None),
             ("paint.stroke", true, None),
@@ -969,6 +997,7 @@ mod tests {
     }
     #[test]
     fn streamed_stroke_pixels_patch_the_tiled_view_into_the_committed_result() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         for (command,erase,scale) in [("paint.stroke",false,1),("paint.stroke",true,2),("paint.pencil",false,4)] {
             let mut engine=Session::new();engine.execute("file.new",json!({"width":1101,"height":601,"background":"#804020"})).unwrap();
             engine.execute("paint.stroke",json!({"points":[[0,300],[1100,320]],"size":90,"color":"#20b0c0","seed":5})).unwrap();
@@ -992,6 +1021,7 @@ mod tests {
     }
     #[test]
     fn streamed_preview_pixels_patch_the_published_preview_into_the_committed_preview() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let preview=|doc:&photocraft_engine::doc::Document|{let (width,height)=super::super::preview_size(doc.size.width,doc.size.height);(width,super::super::display::rgba(doc,&photocraft_compose::render_reduced(doc,width,height)).unwrap().pixels)};
         for (command,erase,width,height) in [("paint.stroke",false,1101,601),("paint.stroke",true,3001,1203),("paint.pencil",false,2600,2600)] {
             let mut engine=Session::new();engine.execute("file.new",json!({"width":width,"height":height,"background":"#804020"})).unwrap();
@@ -1014,6 +1044,7 @@ mod tests {
     }
     #[test]
     fn streamed_retouch_pixels_patch_the_tiled_view_into_the_committed_result() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         for (index,command) in continuous_retouch::TOOLS.into_iter().enumerate() {
             let mut engine=Session::new();engine.execute("file.new",json!({"width":700,"height":160,"background":"#804020"})).unwrap();
             engine.execute("paint.stroke",json!({"points":[[400,60],[640,100]],"size":30,"color":"#20b0c0","seed":5})).unwrap();
@@ -1034,6 +1065,7 @@ mod tests {
     }
     #[test]
     fn patch_and_eraser_pixels_replace_the_tiled_view_with_the_committed_result() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let check=|engine:&Session,command:&str,preview:&Value,commit:&Value,scale:u32,context:&str|{
             let doc=engine.active().unwrap().doc.clone();let (width,height)=(doc.size.width,doc.size.height);let identity=format!("replace-pixels-test-{}",ulid::Ulid::new());
             let mut view=tiled_view(engine,&doc,scale);let before=view.clone();
@@ -1055,6 +1087,7 @@ mod tests {
     }
     #[test]
     fn streamed_view_pixels_patch_the_channel_and_mask_preview_into_the_committed_view() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let preview=|engine:&Session|{let state=engine.active().unwrap();let color=super::super::display::View::new(&engine.color,&state.doc).unwrap();let preview=super::super::render_color_view_preview(&state.doc,&state.channel_view,Some(&color)).unwrap();use base64::Engine;(preview.width,photocraft_codecs::decode(&base64::engine::general_purpose::STANDARD.decode(&preview.png).unwrap()).unwrap().as_u8().unwrap().to_vec())};
         for (case,width,height) in [("hidden green",2601,900),("alpha overlay",1500,700),("gray mask",2601,900)] {
             let mut engine=Session::new();engine.execute("file.new",json!({"width":width,"height":height,"background":"#804020"})).unwrap();
@@ -1082,6 +1115,7 @@ mod tests {
     }
     #[test]
     fn stroke_pixels_clip_to_the_viewport_and_refuse_other_tools() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine=Session::new();engine.execute("file.new",json!({"width":8192,"height":8192,"background":"transparent"})).unwrap();
         let params=json!({"points":[[4000,4000,1]],"size":200,"seed":9});let identity=format!("pixels-bounds-{}",ulid::Ulid::new());
         let parsed=chunks(&render_pixels(&engine,&identity,"paint.stroke",&params,3990,3950,300,300,4).unwrap());
@@ -1094,6 +1128,7 @@ mod tests {
     }
     #[test]
     fn stroke_feedback_is_bounded_and_rejects_unsupported_tools_and_unseeded_requests() {
+        let _guard = crate::xdesign_photo::feedback_serial();
         let mut engine = Session::new();
         engine
             .execute(

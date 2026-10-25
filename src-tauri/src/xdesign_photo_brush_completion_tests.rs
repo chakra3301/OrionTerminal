@@ -51,6 +51,7 @@ fn compare(engine: &mut Session, expected: &mut Session, command: &str, params: 
 
 #[test]
 fn prepared_brush_depth_modes_symmetry_smoothing_dynamics_and_labels_match_native() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for depth in [8,16,32] { for mode in ["rgb","gray","cmyk","lab"] { for symmetric in [false,true] {
         for (command, erase, blend) in [("paint.stroke",false,"normal"),("paint.stroke",false,"multiply"),("paint.stroke",false,"dissolve"),("paint.stroke",true,"screen"),("paint.pencil",false,"screen")] {
             let mut engine = fixture(depth, mode);
@@ -64,6 +65,7 @@ fn prepared_brush_depth_modes_symmetry_smoothing_dynamics_and_labels_match_nativ
 
 #[test]
 fn prepared_brush_implicit_explicit_masks_channels_quick_mask_and_color_restriction_match_native() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for depth in [8,16,32] { for mode in ["rgb","gray","cmyk","lab"] {
         for (command, erase) in [("paint.stroke",false),("paint.stroke",true),("paint.pencil",false)] {
             for target in ["mask","implicit-mask","alpha","explicit-alpha","quickMask","explicit-quickMask","color","explicit-other-layer"] {
@@ -84,6 +86,7 @@ fn prepared_brush_implicit_explicit_masks_channels_quick_mask_and_color_restrict
 
 #[test]
 fn prepared_brush_auto_erase_transparency_locks_presets_and_mask_eraser_labels_match_native() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for command in ["paint.stroke","paint.pencil"] { for target in ["pixels","mask"] { for erase in [false,true] {
         let mut engine=fixture(16,"rgb"); engine.execute("select.deselect",json!({})).unwrap();
         engine.tools.foreground=[0.5,0.25,0.125,1.0]; engine.tools.background=[0.2,0.7,0.9,1.0];
@@ -98,6 +101,7 @@ fn prepared_brush_auto_erase_transparency_locks_presets_and_mask_eraser_labels_m
 
 #[test]
 fn prepared_brush_raw_live_routing_gap_and_identityless_feedback_are_verified() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for target in ["mask","alpha","quickMask","color"] {
         let mut engine=fixture(16,"rgb"); let params=params();
         match target {
@@ -117,6 +121,7 @@ fn prepared_brush_raw_live_routing_gap_and_identityless_feedback_are_verified() 
 
 #[test]
 fn prepared_brush_coalescing_bounded_history_targets_undo_redo_and_slices_match_native() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for (command,erase) in [("paint.stroke",false),("paint.stroke",true),("paint.pencil",false)] {
         let mut engine=fixture(8,"rgb"); engine.execute("select.deselect",json!({})).unwrap(); engine.execute("layer.new.layer",json!({"name":"Slice target"})).unwrap(); engine.execute("paint.stroke",json!({"points":[[4,4]],"size":2,"seed":1})).unwrap(); engine.execute("layer.newLayerBasedSlice",json!({"name":"Brush slice"})).unwrap(); engine.active_mut().unwrap().history.max_states=1;
         let mut expected=twin(&engine);
@@ -132,6 +137,7 @@ fn prepared_brush_coalescing_bounded_history_targets_undo_redo_and_slices_match_
 
 #[test]
 fn prepared_brush_context_expiry_cancellation_and_rewritten_samples_fall_back_without_mutation() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for command in ["paint.stroke","paint.pencil"] { for change in ["cancel","expired","brush","foreground","background","presets","preset-store","pixels","layer","channel","symmetry-source","symmetry-segment","rewritten","offset","options","limit"] {
         let mut engine=fixture(8,"rgb"); engine.active_mut().unwrap().symmetry_path=Some(photocraft_engine::symmetry_cmds::SymmetryAxis{source:"axis".into(),segments:vec![[[24.0,-30.0],[24.0,80.0]]]});
         let mut params=params(); let identity=format!("brush-fallback-{}",ulid::Ulid::new()); incremental(&engine,&identity,command,&params).unwrap(); let key=stroke_key(&identity,command,&params).unwrap();
@@ -151,6 +157,7 @@ fn prepared_brush_context_expiry_cancellation_and_rewritten_samples_fall_back_wi
 
 #[test]
 fn prepared_brush_long_stream_full_preview_commit_replay_and_unrelated_mixer_state() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for (command,erase) in [("paint.stroke",false),("paint.stroke",true),("paint.pencil",false)] {
         let mut engine=fixture(16,"rgb"); let all:Vec<_>=(0..4097).map(|index|json!([8.0+f64::from(index%96)*0.3,12+index/96%8*3,0.2+f64::from(index%7)*0.1])).collect();
         let identity=format!("brush-long-{}",ulid::Ulid::new()); let mut params=params(); params["erase"]=json!(erase); params["points"]=json!(all[..2048]); params["_orionOffset"]=json!(0); let source=engine.active().unwrap().doc.clone();

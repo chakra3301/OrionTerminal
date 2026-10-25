@@ -66,6 +66,7 @@ fn endpoints(engine:&Session,before:&DocState,undo:&Arc<Document>,target:Plane) 
 
 #[test]
 fn actual_inactive_layer_paint_fade_matches_raw_pixels_and_masks_at_three_depths() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for depth in [8,16,32] {for mask in [false,true] {for cached in [false,true] {for command in PAINT_FADE_COMMANDS {
         let(mut engine,target,params)=fixture(depth,mask,true,command);let before=engine.active().unwrap().clone();let journal=engine.journal.len();paint(&mut engine,command,&params,cached);let state=engine.active().unwrap();let fade=engine.edit_state.fade.as_ref().unwrap();
         assert_eq!(fade.layer,target.layer());assert_eq!(fade.mask,mask);assert_eq!(fade.label,state.history.undo_label().unwrap());assert_eq!(state.history.past_len(),before.history.past_len()+1);assert_eq!(engine.journal.len(),journal+1);assert!(engine.journal.last().unwrap().1.get(FADE_MARKER).is_none());assert!(engine.is_enabled("edit.fade"));
@@ -76,6 +77,7 @@ fn actual_inactive_layer_paint_fade_matches_raw_pixels_and_masks_at_three_depths
 
 #[test]
 fn grouped_pixel_then_mask_tools_fade_latest_plane_from_gesture_start() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for depth in [8,16,32] {for inactive in [false,true] {for cached in [false,true] {for command in PAINT_FADE_COMMANDS {
         let(mut engine,target,mut params)=fixture(depth,true,inactive,command);let start=engine.active().unwrap().clone();let mut first=params.clone();first["target"]=json!("pixels");first["opacity"]=json!(0.65);first["hardness"]=json!(0.55);first["flow"]=json!(0.75);first["color"]=json!("#e01080");first["coalesce"]=json!("layer-transition");first.as_object_mut().unwrap().remove("historySource");
         paint(&mut engine,"paint.stroke",&first,cached);let before_mask=engine.active().unwrap().clone();let label=before_mask.history.undo_label().unwrap().to_owned();assert_ne!(before_mask.doc.layer(target.layer()).unwrap().surface(),start.doc.layer(target.layer()).unwrap().surface());
@@ -85,12 +87,14 @@ fn grouped_pixel_then_mask_tools_fade_latest_plane_from_gesture_start() {
 
 #[test]
 fn layer_paint_errors_stale_context_and_identity_mask_edits_keep_correct_fade() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for command in PAINT_FADE_COMMANDS {let(mut engine,target,params)=fixture(16,true,true,command);paint(&mut engine,command,&params,false);let before=engine.active().unwrap().clone();let journal=engine.journal.clone();let fade=engine.edit_state.fade.clone();let mut invalid=params;invalid["points"]=json!([]);assert!(run(&mut engine,command,invalid).is_err());assert!(Arc::ptr_eq(&before.doc,&engine.active().unwrap().doc));assert_eq!(engine.active().unwrap().revision,before.revision);assert_eq!(engine.active().unwrap().history.entries(),before.history.entries());assert_eq!(engine.journal,journal);assert_eq!(engine.edit_state.fade,fade);assert_eq!(engine.edit_state.fade.as_ref().unwrap().layer,target.layer());run(&mut engine,"edit.undo",json!({})).unwrap();assert!(!engine.is_enabled("edit.fade"));assert!(run(&mut engine,"edit.fade",json!({"opacity":50})).is_err());}
     for cached in [false,true] {let(mut engine,target,params)=fixture(32,true,true,"paint.sponge");engine.edit("Exact zero-saturation coverage",|document,_|{let format=target.surface(document).format();*target.surface_mut(document)=Surface::new(format);Ok(())}).unwrap();let before=engine.active().unwrap().clone();paint(&mut engine,"paint.sponge",&params,cached);assert_eq!(target.surface(&engine.active().unwrap().doc).read_region(before.doc.bounds()),target.surface(&before.doc).read_region(before.doc.bounds()));assert_eq!(engine.active().unwrap().history.past_len(),before.history.past_len()+1);assert!(engine.edit_state.fade.as_ref().unwrap().mask);endpoints(&engine,&before,&before.doc,target);}
 }
 
 #[test]
 fn native_nonnumeric_layer_fallback_keeps_grouped_mask_fade_on_actual_active_layer() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for command in ["paint.stroke","paint.cloneStamp","paint.mixerBrush"] {for layer in [Value::Null,json!("not an id"),json!(-1)] {for implicit in [false,true] {for cached in [false,true] {
         let(mut engine,target,mut params)=fixture(16,true,false,command);
         if implicit {engine.execute("channel.target",json!({"channel":"composite"})).unwrap();engine.execute("view.layerMask",json!({"mode":"gray"})).unwrap();}
@@ -102,6 +106,7 @@ fn native_nonnumeric_layer_fallback_keeps_grouped_mask_fade_on_actual_active_lay
 
 #[test]
 fn native_unknown_explicit_targets_edit_inactive_pixels_and_preserve_correct_fallback_journal() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for command in ["paint.stroke","paint.cloneStamp","paint.mixerBrush"] {for malformed in [Value::Null,json!("unknown target"),json!({"channel":"invalid"})] {for cached in [false,true] {
         let(mut engine,target,mut params)=fixture(16,false,true,command);params["target"]=malformed.clone();let before=engine.active().unwrap().clone();paint(&mut engine,command,&params,cached);assert_eq!(engine.edit_state.fade.as_ref().unwrap().layer,target.layer());assert!(!engine.edit_state.fade.as_ref().unwrap().mask);endpoints(&engine,&before,&before.doc,target);
         let(mut active,_,mut active_params)=fixture(16,false,false,command);active_params["target"]=malformed.clone();active_params["layer"]=Value::Null;let mut native=twin(&active);let mut executed=active_params.clone();let context=prepare_paint_fade(&native,command,&mut executed);native.execute(command,executed).unwrap();let journal=native.journal.clone();let fade=native.edit_state.fade.clone();finish_paint_fade(&mut native,context);assert_eq!(native.journal,journal);assert_eq!(native.edit_state.fade,fade);paint(&mut active,command,&active_params,cached);assert_eq!(active.journal,journal);assert_eq!(active.edit_state.fade,fade);
@@ -110,6 +115,7 @@ fn native_unknown_explicit_targets_edit_inactive_pixels_and_preserve_correct_fal
 
 #[test]
 fn native_numeric_missing_layer_still_refuses_without_fallback() {
+    let _guard = crate::xdesign_photo::feedback_serial();
     for command in ["paint.stroke","paint.cloneStamp","paint.mixerBrush"] {for mask in [false,true] {
         let(mut engine,_,mut params)=fixture(16,mask,false,command);params["layer"]=json!(u64::MAX);let before=engine.active().unwrap().clone();let journal=engine.journal.clone();let fade=engine.edit_state.fade.clone();let mut invocation=params.clone();assert!(prepare_paint_fade(&engine,command,&mut invocation).is_none());assert!(run(&mut engine,command,params.clone()).is_err());assert!(super::super::stroke::render_with_identity(&engine,Some("missing-layer-refusal"),command,&params,0,0,32,28,1).is_err());assert!(Arc::ptr_eq(&before.doc,&engine.active().unwrap().doc));assert_eq!(engine.active().unwrap().revision,before.revision);assert_eq!(engine.active().unwrap().history.entries(),before.history.entries());assert_eq!(engine.journal,journal);assert_eq!(engine.edit_state.fade,fade);
     }}

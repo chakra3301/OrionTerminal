@@ -232,6 +232,7 @@ mod tests {
     }
     #[test]
     fn native_history_saved_sources_support_history_brush_after_project_undo_redo_reopen(){
+        let _guard = crate::xdesign_photo::feedback_serial();
         for target in ["pixels","mask","alpha","quickMask"]{
             let dir=temp();let mut session=fixture(16,"rgb");
             match target{"mask"=>{session.engine.execute("layer.layerMask.revealAll",json!({})).unwrap();session.engine.execute("view.layerMask",json!({"mode":"gray"})).unwrap();},"alpha"=>{session.engine.execute("channel.new",json!({"name":"Source"})).unwrap();session.engine.execute("channel.target",json!({"channel":0})).unwrap();},"quickMask"=>{session.engine.execute("select.editInQuickMaskMode",json!({})).unwrap();},_=>{}}

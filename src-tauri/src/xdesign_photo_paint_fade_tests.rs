@@ -24,6 +24,7 @@ fn run(engine:&mut Session,command:&str,params:Value)->Result<Value,String>{supe
 
 #[test]
 fn ordinary_and_prepared_channel_paint_fade_restore_independent_raw_coverage_at_three_depths(){
+    let _guard = crate::xdesign_photo::feedback_serial();
     for depth in [8,16,32]{for quick in [false,true]{for explicit in [false,true]{for prepared in [false,true]{for command in ["paint.stroke","paint.pencil"]{for opacity in [0.0,50.0,100.0]{
         let(mut engine,target,params)=fixture(depth,quick,explicit);let source=engine.active().unwrap().clone();let bounds=source.doc.bounds();let original=plane(&source.doc,target).unwrap().read_region(bounds);
         if prepared {
@@ -68,6 +69,7 @@ fn channel_paint_errors_leave_prior_coverage_fade_history_and_journal_untouched(
 
 #[test]
 fn grouped_channel_paint_fade_restores_gesture_start_for_implicit_and_explicit_targets(){
+    let _guard = crate::xdesign_photo::feedback_serial();
     for quick in [false,true]{for explicit in [false,true]{for prepared in [false,true]{
         let(mut engine,target,mut params)=fixture(16,quick,explicit);params["coalesce"]=json!("coverage-gesture");let source=engine.active().unwrap().clone();let bounds=source.doc.bounds();let original=plane(&source.doc,target).unwrap().read_region(bounds);let mut label=String::new();
         for(index,command)in ["paint.stroke","paint.pencil"].into_iter().enumerate(){
