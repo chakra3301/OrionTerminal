@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   useFxStore,
   snapshotFxDoc,
@@ -132,5 +132,197 @@ describe("sanitizeScene", () => {
     expect(out.layers[0]!.params.angle).toBe(90);
     expect(out.layers[0]!.params.colorA).toBeDefined();
     expect(out.layers[0]!.params.warp).toBeDefined();
+  });
+});
+
+describe("undo / redo", () => {
+  const S = () => useFxStore.getState();
+
+  it("undoes and redoes layer add and remove", () => {
+    S().addLayer("gradient");
+    const id = S().scene.layers[0]!.id;
+    S().removeLayer(id);
+    expect(S().scene.layers).toHaveLength(0);
+    S().undo();
+    expect(S().scene.layers).toHaveLength(1);
+    S().undo();
+    expect(S().scene.layers).toHaveLength(0);
+    S().redo();
+    S().redo();
+    expect(S().scene.layers).toHaveLength(0);
+    expect(S().future).toHaveLength(0);
+  });
+
+  it("undo/redo are no-ops on an empty stack", () => {
+    const before = S().scene;
+    S().undo();
+    S().redo();
+    expect(S().scene).toBe(before);
+  });
+
+  it("a new edit clears the redo stack", () => {
+    S().addLayer("gradient");
+    S().undo();
+    expect(S().future).toHaveLength(1);
+    S().addLayer("gradient");
+    expect(S().future).toHaveLength(0);
+  });
+
+  it("selection, playback and other transient state are not history steps", () => {
+    S().addLayer("gradient");
+    const depth = S().past.length;
+    S().selectLayer(null);
+    S().setPlaying(false);
+    S().restart();
+    S().setScrub(0.5);
+    S().setShowPerf(true);
+    S().setAudioOn(true);
+    S().setAudioOn(false);
+    expect(S().past).toHaveLength(depth);
+  });
+
+  it("edits that change nothing do not record a step", () => {
+    S().addLayer("gradient");
+    const depth = S().past.length;
+    S().addLayer("does-not-exist");
+    S().duplicateLayer("missing");
+    S().moveLayer(S().scene.layers[0]!.id, -1);
+    expect(S().past).toHaveLength(depth);
+  });
+
+  it("keeps the selection when the layer still exists, otherwise clears it", () => {
+    S().addLayer("gradient");
+    const a = S().scene.layers[0]!.id;
+    S().addLayer("gradient");
+    const b = S().scene.layers[1]!.id;
+    expect(S().selectedLayerId).toBe(b);
+    S().undo(); // b removed
+    expect(S().selectedLayerId).toBeNull();
+    S().selectLayer(a);
+    S().setParam(a, "speed", 3);
+    S().undo();
+    expect(S().selectedLayerId).toBe(a);
+  });
+
+  it("restores the exact previous scene object", () => {
+    S().addLayer("gradient");
+    const before = S().scene;
+    S().patchScene({ background: "#123456" });
+    S().undo();
+    expect(S().scene).toBe(before);
+  });
+
+  it("caps history at 100 steps", () => {
+    for (let i = 0; i < 130; i++) S().addLayer("gradient");
+    expect(S().past).toHaveLength(100);
+  });
+
+  it("hydrateFx clears history", () => {
+    S().addLayer("gradient");
+    S().undo();
+    S().addLayer("gradient");
+    S().hydrateFx({ scene: emptyScene() });
+    expect(S().past).toHaveLength(0);
+    expect(S().future).toHaveLength(0);
+  });
+
+  it("changes scene identity on undo/redo so persistence subscribers fire", () => {
+    S().addLayer("gradient");
+    const seen: unknown[] = [];
+    const off = useFxStore.subscribe((s, p) => {
+      if (s.scene !== p.scene) seen.push(s.scene);
+    });
+    S().undo();
+    S().redo();
+    off();
+    expect(seen).toHaveLength(2);
+  });
+
+  describe("coalescing", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      S().hydrateFx({ scene: emptyScene() });
+      S().addLayer("gradient");
+      vi.advanceTimersByTime(5000);
+    });
+    afterEach(() => vi.useRealTimers());
+
+    const layerId = () => S().scene.layers[0]!.id;
+
+    it("a slider drag on one param is a single step", () => {
+      const before = S().scene;
+      const depth = S().past.length;
+      for (let i = 1; i <= 30; i++) {
+        S().setParam(layerId(), "speed", i / 10);
+        vi.advanceTimersByTime(16);
+      }
+      expect(S().past).toHaveLength(depth + 1);
+      S().undo();
+      expect(S().scene).toBe(before);
+    });
+
+    it("different params are separate steps", () => {
+      const depth = S().past.length;
+      S().setParam(layerId(), "speed", 1);
+      S().setParam(layerId(), "scale", 2);
+      expect(S().past).toHaveLength(depth + 2);
+    });
+
+    it("the same param after an idle pause starts a new step", () => {
+      const depth = S().past.length;
+      S().setParam(layerId(), "speed", 1);
+      vi.advanceTimersByTime(5000);
+      S().setParam(layerId(), "speed", 2);
+      expect(S().past).toHaveLength(depth + 2);
+    });
+
+    it("undo breaks the coalescing run", () => {
+      S().setParam(layerId(), "speed", 1);
+      S().undo();
+      const depth = S().past.length;
+      S().setParam(layerId(), "speed", 2);
+      expect(S().past).toHaveLength(depth + 1);
+      expect(S().future).toHaveLength(0);
+    });
+
+    it("an unrelated edit between two same-param edits splits them", () => {
+      const depth = S().past.length;
+      S().setParam(layerId(), "speed", 1);
+      S().patchLayer(layerId(), { opacity: 0.5 });
+      S().setParam(layerId(), "speed", 2);
+      expect(S().past).toHaveLength(depth + 3);
+    });
+
+    it("a gesture groups edits across params and pauses into one step", () => {
+      const before = S().scene;
+      const depth = S().past.length;
+      S().beginGesture();
+      S().setParam(layerId(), "x", 0.4);
+      S().setParam(layerId(), "y", 0.6);
+      vi.advanceTimersByTime(5000);
+      S().setParam(layerId(), "x", 0.7);
+      S().endGesture();
+      expect(S().past).toHaveLength(depth + 1);
+      S().undo();
+      expect(S().scene).toBe(before);
+    });
+
+    it("a gesture with no edits records nothing, and ends cleanly", () => {
+      const depth = S().past.length;
+      S().beginGesture();
+      S().endGesture();
+      expect(S().past).toHaveLength(depth);
+      S().setParam(layerId(), "speed", 1);
+      expect(S().past).toHaveLength(depth + 1);
+    });
+
+    it("hydrateFx abandons an open gesture", () => {
+      S().beginGesture();
+      S().hydrateFx({ scene: emptyScene() });
+      S().addLayer("gradient");
+      S().addLayer("gradient");
+      expect(S().past).toHaveLength(2);
+    });
   });
 });

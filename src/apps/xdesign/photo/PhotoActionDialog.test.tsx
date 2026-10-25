@@ -46,6 +46,13 @@ describe("complete native adjustment controls", () => {
     usePhotoWorkspace.setState({state:{name:"Image",width:100,height:100,mode:"RGB",depth:8,resolution:72,activeLayer:1,hasSelection:false,selectionBounds:null,layers:[],channels:{colors:[{name:"Red",visible:false}],alpha:[{index:0,name:"Cutout",spot:null,visible:true}],target:{kind:"alpha",index:0}},canUndo:false,canRedo:false,viewKey:"alpha"}});
     await render("exposure",false);expect(previewBox().checked).toBe(true);expect(shown()).toBeNull();await preview();expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_command_preview",expect.objectContaining({viewKey:"alpha",command:"image.adjustments.exposure"}));expect(native.invoke).not.toHaveBeenCalledWith("xdesign_photo_view_preview",expect.anything());expect(shown()).toBe("blob:view-1");await act(async()=>previewBox().click());expect(shown()).toBeNull();expect(native.run).not.toHaveBeenCalled();
   });
+  it("keeps live preview for adjustments on images above 16 megapixels but not for filters",async()=>{
+    native.enabled=true;const large={...photo,width:6000,height:4000};
+    const open=(id:string)=>act(async()=>root.render(<PhotoActionDialog key={id} action={[...ADJUSTMENTS,...FILTERS].find(action=>action.id===id)!} adjustment={false} document={large} canvas={canvas} onClose={vi.fn()}/>));
+    const note=()=>container.textContent!.includes("Apply renders this large image at full resolution.");
+    await open("curves");expect(previewBox().checked).toBe(true);expect(previewBox().disabled).toBe(false);expect(note()).toBe(false);
+    await open("filter.blur.gaussianBlur");expect(previewBox().checked).toBe(false);expect(previewBox().disabled).toBe(true);expect(note()).toBe(true);
+  });
   it.each(ADJUSTMENTS)("creates one $label adjustment with neutral complete parameters", async action => {
     const close = vi.fn(); await render(action.id, true, undefined, close); await submit();
     expect(native.run).toHaveBeenCalledOnce(); expect(native.run).toHaveBeenCalledWith(`layer.newAdjustmentLayer.${action.id}`, action.id === "gradientMap" ? gradientMapParams(adjustmentDefaults(action, "RGB")) : adjustmentDefaults(action, "RGB")); expect(close).toHaveBeenCalledOnce();
@@ -88,7 +95,12 @@ describe("complete native adjustment controls", () => {
   });
   it("edits multistop gradients without replacing imported middle colors", async () => {
     await render("gradientMap", true, { ...layer, adjustmentParams: { stops: [[0, "#001122"], [.4, "#aa5500"], [1, "#ffeecc"]], reverse: true, dither: true } });
-    await act(async () => container.querySelector('[aria-label="Color stop 2"]')!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))); await input("Adjustment Stop 2 position (%)", "60"); await submit();
+    container.classList.add("xd-photo");
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Edit gradient"]')!.click());
+    await act(async () => container.querySelector<HTMLElement>('[aria-label="Color stop 2"]')!.click()); await input("Color stop location", "60");
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Gradient Editor"] button[type=submit]')!.click());
+    expect(native.run).not.toHaveBeenCalled(); expect(container.querySelector('[aria-label="Gradient Editor"]')).toBeNull();
+    await submit();
     expect(native.run).toHaveBeenCalledWith("layer.setAdjustment", { layer: 7, stops: [[0, "#001122"], [.6, "#aa5500"], [1, "#ffeecc"]], reverse: true, dither: true });
   });
   it("keeps imported LUT data until explicit replacement and supports bounded native file loading", async () => {
@@ -372,9 +384,12 @@ describe("Photoshop 2026 adjustment layout", () => {
   it("offers the Gradient tool's presets in Gradient Map, starting from foreground to background", async () => {
     const preset = (name: string, stops: [number, string][]) => ({ name, stops, transparency: [] as [number, number][] });
     usePhotoWorkspace.setState({ state: { tools: { foreground: [1, 0, 0, 1], background: [0, 0, 1, 1] }, presets: { gradient: preset("Foreground to Background", [[0, "foreground"], [1, "background"]]), gradients: [{ name: "Basics", presets: [preset("Foreground to Background", [[0, "foreground"], [1, "background"]]), preset("Mono", [[0, "#102030"], [1, "#f0e0d0"]])] }], styles: [] } } as unknown as PhotoState });
-    await render("gradientMap"); expect(container.querySelector<HTMLSelectElement>('[aria-label="Adjustment Method"]')!.value).toBe("perceptual"); await submit();
+    container.classList.add("xd-photo"); await render("gradientMap"); expect(container.querySelector<HTMLSelectElement>('[aria-label="Adjustment Method"]')!.value).toBe("perceptual"); await submit();
     expect(native.run).toHaveBeenLastCalledWith("layer.newAdjustmentLayer.gradientMap", { stops: bakeGradient([[0, "#ff0000"], [1, "#0000ff"]], "perceptual"), reverse: false, dither: false });
-    await select("Gradient preset", "Basics/Mono"); await select("Adjustment Method", "classic"); await submit();
+    expect([...container.querySelectorAll(".xd-ps-dialog-group > legend")].map(legend => legend.textContent)).toEqual(["Gradient Used for Grayscale Mapping", "Gradient Options"]);
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Gradient presets"]')!.click());
+    await click("Basics"); await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Mono"]')!.click());
+    await select("Adjustment Method", "classic"); await submit();
     expect(native.run).toHaveBeenLastCalledWith("layer.newAdjustmentLayer.gradientMap", { stops: [[0, "#102030"], [1, "#f0e0d0"]], reverse: false, dither: false });
   });
 

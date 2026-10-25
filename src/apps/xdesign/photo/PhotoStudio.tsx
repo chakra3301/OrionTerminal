@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type MouseEvent } from "react";
 import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
-import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ArrowLeftRight, RotateCcw, SquareDashed, Undo2, Redo2, Plus, Trash2, Eye, EyeOff, Layers, ZoomIn, ZoomOut, Search, SlidersHorizontal, Lock, Link2, CornerLeftDown, House, ChevronDown, ChevronRight, ChevronsRight, X, Ellipsis, History as HistoryIcon, Compass, Brush, Sparkles, Shapes, Bookmark, Grid2x2, Move, Contrast, Folder, Menu, Info as InfoIcon, SunMedium, ChartColumn, ChartSpline, Diff, Triangle, Palette, Scale, Camera, Blend, Grid3x3, SquareSplitVertical, ChartNoAxesColumnIncreasing, Mountain, Rainbow, Target, Type, Box, Maximize, Pilcrow, type LucideIcon } from "lucide-react";
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ArrowLeftRight, RotateCcw, SquareDashed, Undo2, Redo2, Plus, Trash2, Eye, EyeOff, Layers, ZoomIn, ZoomOut, Search, SlidersHorizontal, Lock, Link2, CornerLeftDown, House, ChevronDown, ChevronRight, ChevronsRight, X, History as HistoryIcon, Compass, Brush, Sparkles, Shapes, Bookmark, Grid2x2, Move, Contrast, Folder, Menu, Info as InfoIcon, SunMedium, ChartColumn, ChartSpline, Diff, Triangle, Palette, Scale, Camera, Blend, Grid3x3, SquareSplitVertical, ChartNoAxesColumnIncreasing, Mountain, Rainbow, Target, Type, Box, Maximize, Pilcrow, Ruler, Ban, Check, type LucideIcon } from "lucide-react";
 import { pencilPhotoDocumentId, usePencilWorkspace } from "../pencil/runtime";
 import { useXDesign } from "../store";
 import { toast } from "@/store/toastStore";
@@ -8,7 +8,7 @@ import { ADJUSTMENTS, BLEND_MODES, FILTERS, type PhotoAction } from "./controls"
 import { AlignSection, MaskSection, TransformSection } from "./LayerProperties";
 import { DocumentProperties } from "./DocumentProperties";
 import { AdjustmentProperties, addAdjustmentLayer } from "./AdjustmentProperties";
-import { CanvasDraftPreview, layerPropsDraft, type LayerPropsDraft } from "./CanvasDraftPreview";
+import { CanvasDraftPreview, layerPropsDraft, type CanvasDraft, type LayerPropsDraft } from "./CanvasDraftPreview";
 import { usePhotoWorkspace, controlsLocked, refreshImage, runPhotoCommand, setPhotoColors, makeImageIndependent, exportImage, openSmartContents, finishSmartContents, stepSmartContentsHistory, selectHistoryBrushSource, placeImageBlob, holdImageGesture, createImageFromClipboard } from "./runtime";
 import { docTabDetail } from "./docTab";
 import { catchPaste, clipboardImage } from "../pasteCatcher";
@@ -23,6 +23,7 @@ import { findShortcut, type MenuEntry, type MenuItem, type MenuSpec } from "../m
 import { IMAGE_TOOL_GROUPS } from "../editorTools";
 import { PhotoCommandBrowser } from "./CommandBrowser";
 import { ImageCommandDialog, ImageExportDialog, ImageSizeDialog, ImageTextDialog, ImageTrimDialog } from "./ImageDialogs";
+import { NewLayerDialog, nextLayerName, type NewLayerRequest } from "./NewLayerDialog";
 import { ARTBOARD_FROM_GROUP, ARTBOARD_FROM_LAYERS, BITMAP, COLOR_DECONTAMINATE, CONTENT_AWARE_SCALE, DEFRINGE, FADE, FILL, FLAME, HDR_TONING, INDEXED_COLOR, MEASUREMENT_SCALE, matchColorCommand, NEW_ARTBOARD, PICTURE_FRAME, REPLACE_COLOR, ROTATE_CANVAS, SCALE_EFFECTS, SCALE_MARKER, SELECTION_MODIFY, SHADOWS_HIGHLIGHTS, STROKE, TRAP, TREE, type ImageCommand } from "./imageCommands";
 import { ColorTableDialog, DuotoneDialog } from "./ModeDialogs";
 import { open as openFile } from "@tauri-apps/plugin-dialog";
@@ -73,27 +74,29 @@ import type { SelectionWorkflow } from "./selectionSettings";
 import { patchOffset, patchOffsetFitsCanvas, patchTarget } from "./patchGesture";
 import { BACKGROUND_ERASER_COMMIT_SAMPLES, backgroundEraserCommitAllowed, backgroundEraserPreviewAllowed, backgroundEraserPreviewSampleAllowed, eraserTargetProblem, magicEraserParams, sameEraserGesture, type EraserGestureContext, type EraserTargetState } from "./eraserGesture";
 import { PhotoHistory } from "./PhotoHistory";
-import { PhotoPaths, pathsPanelMenu, selectedPath } from "./PhotoPaths";
+import { PhotoPaths, pathsPanelMenu, selectedPath, usePathTargets } from "./PhotoPaths";
 import { InfoPanel, useInfoCursor } from "./InfoPanel";
 import { HistogramPanel } from "./HistogramPanel";
 import { CharacterPanel } from "./CharacterPanel";
 import { ParagraphPanel } from "./ParagraphPanel";
-import { CROP_GUIDES, CropOverlay, type CropBox, type CropGuide } from "./CropOverlay";
+import { CROP_GUIDES, CROP_OVERLAY_SHOWS, CropOverlay, cropAddedCanvas, type CropBox, type CropGuide, type CropOverlayShow } from "./CropOverlay";
+import { ContextualTaskBar, TASK_BAR_HOME, type TaskBarPlace } from "./ContextualTaskBar";
 import { penKnots, simplifyPath, smoothHandles, type XY } from "./penPath";
 import { PhotoNavigator, type NavigatorView } from "./PhotoNavigator";
-import { TypeBar, ShapeStyleFields, PathOpSelect, DistributeMenu, GradientPresetSelect, typeStyleParams, shapeStyleParams, CropRatioFields, BrushBarItems, BrushSettingsToggle, BRUSH_BAR_ITEMS, type BrushBarSettings, type ShapeStyle, type PathOp, type TypeBarProps, type TypeStyle, type TypeAlign } from "./toolBars";
+import { applyCropPreset, matchingCropPreset, useCropPresets } from "./CropPresets";
+import { TypeBar, ShapeStyleFields, PathOpSelect, DistributeMenu, GradientToolPick, typeStyleParams, shapeStyleParams, CropRatioFields, CropRatioSelect, CropFillField, CROP_SIZES, cropSizeChoice, cropSizeName, cropSizePixels, BrushBarItems, BrushSettingsToggle, BRUSH_BAR_ITEMS, type BrushBarSettings, type CropSizeValues, type ShapeStyle, type PathOp, type TypeBarProps, type TypeStyle, type TypeAlign } from "./toolBars";
 import { PhotoTextGeometryDialog } from "./PhotoTextGeometryDialog";
 import { CanvasTextEditor, findTextLayer, type CanvasText } from "./CanvasTextEditor";
 import { useFontFamilies } from "./fontFamilies";
-import { PathEditOverlay, type PathData } from "./PathEditOverlay";
+import { PathEditOverlay, TargetPathOverlay, type PathData } from "./PathEditOverlay";
 import { addImageSwatch, PhotoSwatches } from "./PhotoSwatches";
 import { ColorPanel, colorPanelMenu, type ColorPanelMode } from "./ColorPanel";
 import { ColorPickerDialog } from "./ColorPickerDialog";
 import { grayHex, sampleImageColor, sampleLayerColor } from "./eyedropper";
 import { SamplingRing } from "./SamplingRing";
-import { GRADIENT_METHODS, bakeGradient, type GradientMethod, type GradientStop } from "./gradientMethod";
+import { GRADIENT_METHODS, bakeRemembered, type GradientMethod, type GradientStop } from "./gradientMethod";
 import { GuideDialogs, ViewAids } from "./viewAids";
-import { selectionEdgesVisible, shapeGuides, snapBox, snapContext, snapXY, useViewAids } from "./viewGuides";
+import { selectionEdgesVisible, shapeGuides, targetPathVisible, snapBox, snapContext, snapXY, useViewAids } from "./viewGuides";
 
 type Point = [number, number, number, number, number, number, number];
 type HeldSample={clientX:number;clientY:number;pressure:number;pointerType:string;tiltX:number;tiltY:number;twist:number;timeStamp:number;shiftKey:boolean;altKey:boolean;metaKey:boolean;ctrlKey:boolean};
@@ -249,7 +252,7 @@ function LayerFilterRow({filter,change}:{filter:LayerFilter;change:(filter:Layer
   </div>;
 }
 
-function LayerRows({layers,active,busy,editMask,editingMask,selectPixels,menu,thumbnails,masks,openStyle,openProperties,depth=0,folds:[shown,fold]}:{layers:PhotoLayer[];active:number|null;busy:boolean;editMask:(layer:PhotoLayer,event:MouseEvent)=>void;editingMask:boolean;selectPixels:()=>void;menu:(layer:PhotoLayer,event:MouseEvent)=>void;thumbnails:Record<number,string>;masks:Record<number,string>;openStyle:(layer:PhotoLayer,pane:LayerStylePane)=>void;openProperties:()=>void;depth?:number;folds:[Record<number,boolean>,(groups:number[],open:boolean)=>void]}) {
+function LayerRows({layers,active,busy,editMask,editingMask,selectPixels,menu,thumbnails,masks,openStyle,openProperties,openFill,depth=0,folds:[shown,fold]}:{layers:PhotoLayer[];active:number|null;busy:boolean;editMask:(layer:PhotoLayer,event:MouseEvent)=>void;editingMask:boolean;selectPixels:()=>void;menu:(layer:PhotoLayer,event:MouseEvent)=>void;thumbnails:Record<number,string>;masks:Record<number,string>;openStyle:(layer:PhotoLayer,pane:LayerStylePane)=>void;openProperties:()=>void;openFill:()=>void;depth?:number;folds:[Record<number,boolean>,(groups:number[],open:boolean)=>void]}) {
   const [renaming,setRenaming]=useState<number|null>(null),[folded,setFolded]=useState<number[]>([]);
   useEffect(()=>{const rename=(event:Event)=>{const id=(event as CustomEvent<number>).detail;if(layers.some(layer=>layer.id===id))setRenaming(id);};window.addEventListener("xd-photo-rename-layer",rename);return ()=>window.removeEventListener("xd-photo-rename-layer",rename);},[layers]);
   // Photoshop keeps the eye column fixed and indents what follows; a step is the chevron plus the row gap, so children line up under their group's folder.
@@ -278,7 +281,7 @@ function LayerRows({layers,active,busy,editMask,editingMask,selectPixels,menu,th
         const groups=e.metaKey||e.ctrlKey?layers.filter(other=>other.children):[layer];
         fold(e.altKey?groups.flatMap(groupIds):groups.map(other=>other.id),!expanded);}}>{expanded?<ChevronDown size={12}/>:<ChevronRight size={12}/>}</button>}
       {layer.clipped&&<span className="xd-photo-layer-clip" role="img" aria-label="Clipped to the layer below" title="Clipped to the layer below"><CornerLeftDown size={12}/></span>}
-      <button disabled={busy} tabIndex={-1} aria-hidden="true" className={`xd-photo-layer-thumb-button${group?" group":""}${targeted&&!(editingMask&&layer.hasMask)?" targeted":""}`} onPointerDown={e=>drag(e,layer)} onDragStart={e=>e.preventDefault()} onClick={e=>select(e,layer)} onDoubleClick={()=>{if(layer.smartObject&&!busy)attempt(openSmartContents(layer.id));else if(layer.adjustmentKind)openProperties();else style(layer,"blending");}}>{group?<Folder size={14}/>:thumbnails[layer.id]?<img className="xd-photo-layer-thumb" src={`data:image/png;base64,${thumbnails[layer.id]}`} alt=""/>:AdjustmentIcon?<AdjustmentIcon size={16}/>:<Layers size={13}/>}</button>
+      <button disabled={busy} tabIndex={-1} aria-hidden="true" className={`xd-photo-layer-thumb-button${group?" group":""}${targeted&&!(editingMask&&layer.hasMask)?" targeted":""}`} onPointerDown={e=>drag(e,layer)} onDragStart={e=>e.preventDefault()} onClick={e=>select(e,layer)} onDoubleClick={()=>{if(layer.smartObject&&!busy)attempt(openSmartContents(layer.id));else if(layer.adjustmentKind)openProperties();else if(layer.gradientFill)openFill();else style(layer,"blending");}}>{group?<Folder size={14}/>:thumbnails[layer.id]?<img className="xd-photo-layer-thumb" src={`data:image/png;base64,${thumbnails[layer.id]}`} alt=""/>:AdjustmentIcon?<AdjustmentIcon size={16}/>:<Layers size={13}/>}</button>
       {layer.hasMask&&<><button className="xd-photo-mask-link" disabled={busy||!layer.mask} aria-label={`${layer.mask?.linked===false?"Link":"Unlink"} mask of ${layer.name}`} title={layer.mask?.linked===false?"Link layer and mask":"Unlink layer and mask"} aria-pressed={layer.mask?.linked!==false} onClick={()=>attempt(runPhotoCommand("layer.layerMask.linked",{layer:layer.id,linked:layer.mask?.linked===false}))}>{layer.mask?.linked!==false&&<Link2 size={10}/>}</button>
         <button className={`xd-photo-mask-indicator${targeted&&editingMask?" targeted":""}${layer.mask?.enabled===false?" disabled-mask":""}`} disabled={busy} aria-label={`Edit mask of ${layer.name}`} title="Layer mask · Shift-click to disable, Alt-click to view grayscale, Shift+Alt-click for overlay" onClick={event=>editMask(layer,event)}>{masks[layer.id]?<img className="xd-photo-layer-thumb" src={`data:image/png;base64,${masks[layer.id]}`} alt=""/>:<SquareDashed size={14}/>}</button></>}
       <button disabled={busy} aria-pressed={!!layer.selected||targeted} title="Shift-click a range; Command/Ctrl-click to add; drag to reorder or onto a group to put it inside" className={`xd-photo-layer-name${renaming===layer.id?" renaming":""}${clipBase?" clip-base":""}`} onPointerDown={e=>drag(e,layer)} onDragStart={e=>e.preventDefault()} onDoubleClick={()=>{if(!busy)setRenaming(layer.id);}} onClick={e=>select(e,layer)}>{renaming===layer.id?null:<span>{layer.name}</span>}</button>
@@ -293,7 +296,7 @@ function LayerRows({layers,active,busy,editMask,editingMask,selectPixels,menu,th
       <div className="xd-photo-effect-row" onDoubleClick={()=>style(layer,"blending")}><button disabled={busy} style={indent} aria-label={`${layer.effects?.enabled?"Hide":"Show"} effects of ${layer.name} on canvas`} title={layer.effects?.enabled?"Hide effects":"Show effects"} onClick={()=>attempt(runPhotoCommand("layer.layerStyle.setEffectsEnabled",{layer:layer.id,enabled:!layer.effects?.enabled}))}>{layer.effects?.enabled?<Eye size={13}/>:<EyeOff size={13}/>}</button><span>Effects</span></div>
       {effects.map(([index,effect])=><div key={index} className="xd-photo-effect-row nested" onDoubleClick={()=>style(layer,effectPane(effect))}><button disabled={busy} style={indent} aria-label={`${effect.enabled?"Hide":"Show"} ${effect.kind} of ${layer.name}`} title={effect.enabled?"Hide effect":"Show effect"} onClick={()=>attempt(runPhotoCommand("layer.layerStyle.editEffect",{layer:layer.id,index,path:effectEnabledPath(effect),value:!effect.enabled}))}>{effect.enabled?<Eye size={13}/>:<EyeOff size={13}/>}</button><span>{effect.kind}</span></div>)}
     </div>}
-    {layer.children&&expanded&&<LayerRows layers={layer.children} active={active} busy={busy} editMask={editMask} editingMask={editingMask} selectPixels={selectPixels} menu={menu} thumbnails={thumbnails} masks={masks} openStyle={openStyle} openProperties={openProperties} depth={depth+1} folds={[shown,fold]}/>}
+    {layer.children&&expanded&&<LayerRows layers={layer.children} active={active} busy={busy} editMask={editMask} editingMask={editingMask} selectPixels={selectPixels} menu={menu} thumbnails={thumbnails} masks={masks} openStyle={openStyle} openProperties={openProperties} openFill={openFill} depth={depth+1} folds={[shown,fold]}/>}
   </div>;})}</>;
 }
 const groupIds=(layer:PhotoLayer):number[]=>layer.children?[layer.id,...layer.children.flatMap(groupIds)]:[];
@@ -337,7 +340,7 @@ export function PhotoStudio() {
   const panels=useEditorPanels();
   const [upperTab,setUpperTab]=useState<UpperPanel>("Color"),[middleTab,setMiddleTab]=useState<MiddlePanel>("Properties"),[layersTab,setLayersTab]=useState<LayersPanel>("Layers"),[flyout,setFlyout]=useState<StripPanel|null>(null);
   const [collapsed,setCollapsed]=useState({upper:false,middle:false,layers:false});
-  const [activePath,setActivePath]=useState<string|null>(null),[brushPickerAt,setBrushPickerAt]=useState<{x:number;y:number;tool:string}|null>(null),[layerDraft,setLayerDraft]=useState<LayerPropsDraft|null>(null),[contextMenu,setContextMenu]=useState<{x:number;y:number;kind:"layer"|"selection"|"path"|"picker"|"crop"|"fx"|"adjustment";layers?:{layer:number;name:string}[]}|null>(null);
+  const activePath=usePathTargets(s=>document?s[document.id]??null:null),setActivePath=(path:string|null)=>{if(document)usePathTargets.setState({[document.id]:path});},[brushPickerAt,setBrushPickerAt]=useState<{x:number;y:number;tool:string}|null>(null),[layerDraft,setLayerDraft]=useState<LayerPropsDraft|null>(null),[fillDraft,setFillDraft]=useState<CanvasDraft|null>(null),[contextMenu,setContextMenu]=useState<{x:number;y:number;kind:"layer"|"selection"|"path"|"picker"|"crop"|"fx"|"adjustment";layers?:{layer:number;name:string}[]}|null>(null);
   const [penMode,setPenMode]=useState<"shape"|"path">("path"),[lineWeight,setLineWeight]=useState(4),[shapeStyle,setShapeStyle]=useState<ShapeStyle>({fill:true,stroke:false,strokeColor:"#000000",strokeWidth:3}),[cornerRadius,setCornerRadius]=useState(0),[gradientTransparency,setGradientTransparency]=useState(true),[pathOp,setPathOp]=useState<PathOp>("new");
   const [size,setSize]=useState(24);
   const [opacity,setOpacity]=useState(1);
@@ -363,8 +366,9 @@ export function PhotoStudio() {
   const [selectionDialog,setSelectionDialog]=useState<SelectionWorkflow|null>(null);
   const [profileDialog,setProfileDialog]=useState<ColorProfileWorkflow|null>(null);
   const [colorSettingsOpen,setColorSettingsOpen]=useState(false);
-  const [imageDialog,setImageDialog]=useState<"size"|"canvas"|"text"|"gradient"|"trim"|"duotone"|"colorTable"|null>(null);
+  const [imageDialog,setImageDialog]=useState<"size"|"canvas"|"text"|"gradient"|"newGradient"|"trim"|"duotone"|"colorTable"|null>(null),newFillBase=useRef<number>(undefined);
   const [commandDialog,setCommandDialog]=useState<{command:ImageCommand;initial?:Record<string,unknown>}|null>(null);
+  const [newLayerDialog,setNewLayerDialog]=useState<{title?:string;name:string;kind:"layer"|"group"|"other";create:(request:NewLayerRequest)=>Promise<unknown>}|null>(null),solidFillOptions=useRef<Record<string,unknown>>(undefined);
   const [exportOpen,setExportOpen]=useState(false);
   const [textPoint,setTextPoint]=useState<[number,number]|undefined>();
   const [selectionMode,setSelectionMode]=useState("replace");
@@ -415,11 +419,14 @@ export function PhotoStudio() {
   const [scrubbyZoom,setScrubbyZoom]=useState(false);
   const scrub=useRef<{pointerId:number;x:number;y:number;startZoom:number;moved:boolean;out:boolean}|null>(null);
   const sampleDrag=useRef<{pointerId:number;key:"foreground"|"background";busy:boolean}|null>(null);
-  const [cropStraighten,setCropStraighten]=useState(false),[cropShield,setCropShield]=useState(true),[cropShieldOpacity,setCropShieldOpacity]=useState(.75),[cropShowCropped,setCropShowCropped]=useState(true);
+  const [cropStraighten,setCropStraighten]=useState(false),[cropShield,setCropShield]=useState(true),[cropShieldOpacity,setCropShieldOpacity]=useState(.75),[cropShowCropped,setCropShowCropped]=useState(true),[cropOverlayShow,setCropOverlayShow]=useState<CropOverlayShow>("always");
+  const cycleCropGuide=()=>setCropGuide(value=>{const guides=CROP_GUIDES.map(([guide])=>guide);return guides[(guides.indexOf(value)+1)%guides.length]!;}),turnCropGuide=()=>setCropOrientation(value=>(value+1)%4);
   useEffect(()=>{if(tool!=="crop")setCropStraighten(false);},[tool]);
   // A tool switch can unmount the focused options-bar control, and WebKit sends no blur for that, so focus would sit on the page body where shortcuts never arrive.
   // Opening the image hides the design shell, and WebKit drops focus from its canvas only at the next rendering update, after this check; until then ⌘2 reaches the shell.
   useEffect(()=>{const section=stage.current?.closest<HTMLElement>(".xd-photo"),page=section?.ownerDocument,active=page?.activeElement;if(section&&page&&active&&(active===page.body||!section.contains(active)&&active.closest('[aria-hidden="true"]'))&&page.hasFocus()&&!isDesignDialogOpen()&&!section.closest(".ot-window.unfocused"))section.focus({preventScroll:true});},[tool]);
+  // Opening an image from the studio File menu leaves focus on that menu's button, outside the editor, where ⇧⌘N opens Quick Capture instead of New Layer.
+  useEffect(()=>{const section=stage.current?.closest<HTMLElement>(".xd-photo"),page=section?.ownerDocument,active=page?.activeElement;if(section&&page&&active&&!section.contains(active)&&!active.matches("input,textarea,select,[contenteditable]:not([contenteditable='false'])")&&page.hasFocus()&&!isDesignDialogOpen()&&!section.closest(".ot-window.unfocused"))section.focus({preventScroll:true});},[documentId]);
   // The engine keeps the painting symmetry per document but does not report it, so the bar remembers what it set.
   const [symmetryChoice,setSymmetryChoice]=useState<Record<string,string>>({});
   // Native feedback is patched into the canvases that show the image: the preview while it holds a
@@ -491,9 +498,15 @@ export function PhotoStudio() {
     window.addEventListener("keydown",track);window.addEventListener("keyup",track);window.addEventListener("blur",release);
     return()=>{window.removeEventListener("keydown",track);window.removeEventListener("keyup",track);window.removeEventListener("blur",release);};
   },[]);
-  const [cropBox,setCropBox]=useState<CropBox|null>(null),[cropAngle,setCropAngle]=useState(0);
+  const [taskBar,setTaskBar]=useState<TaskBarPlace>(TASK_BAR_HOME),placeTaskBar=(patch:Partial<TaskBarPlace>)=>setTaskBar(current=>({...current,...patch}));
+  // Photoshop's unpinned bar goes back to its own place for the next task; a pinned one stays where it was dragged.
+  useEffect(()=>setTaskBar(current=>current.pinned||!current.at?current:{...current,at:null}),[tool]);
+  const [cropBox,setCropBox]=useState<CropBox|null>(null),[cropAngle,setCropAngle]=useState(0),[cropShift,setCropShift]=useState<[number,number]>([0,0]);
+  const cropPresets=useCropPresets();
   const [selectionBox,setSelectionBox]=useState<{from:CropBox;box:CropBox}|null>(null);
-  useEffect(()=>{setCropBox(null);setCropAngle(0);setSelectionBox(null);},[tool,document?.id,document?.version]);
+  useEffect(()=>{setCropBox(null);setCropAngle(0);setCropShift([0,0]);setSelectionBox(null);},[tool,document?.id,document?.version]);
+  // Photoshop puts the crop box on the canvas edges as soon as the Crop tool is picked, but not again after a crop is applied.
+  useEffect(()=>{if(tool==="crop"&&document)setCropBox({x:0,y:0,width:document.width,height:document.height});},[tool]);
   const [thumbnails,setThumbnails]=useState<Record<number,string>>({}),[maskThumbnails,setMaskThumbnails]=useState<Record<number,string>>({}),thumbnailsVisible=panels.right&&layersTab==="Layers"&&!collapsed.layers;
   // A fold shows at once, then gives way to the engine's state once saved, or to the old state if it fails.
   const [folds,setFolds]=useState<Record<number,boolean>>({});
@@ -520,7 +533,7 @@ export function PhotoStudio() {
   const [canvasText,setCanvasText]=useState<CanvasText|null>(null),[textFont,setTextFont]=useState("Arial"),[textSize,setTextSize]=useState(48),fonts=useFontFamilies(),[textStyle,setTextStyle]=useState<TypeStyle>("Regular"),[textAlign,setTextAlign]=useState<TypeAlign>("left"),[textAntialias,setTextAntialias]=useState("smooth"),[textOrientation,setTextOrientation]=useState("horizontal"),[textWarp,setTextWarp]=useState(false);
   useEffect(()=>{setCanvasText(null);},[tool,document?.id]);
   const activeKind=state&&findLayer(state.layers,state.activeLayer)?.kind;
-  const pathTarget=PATH_SELECT_TOOLS.includes(tool)?activeKind==="Shape"?"layer":state?.paths?.work?"work":state?.paths?.saved[0]??null:null;
+  const pathTarget=activeKind==="Shape"?"layer":state?selectedPath(state,activePath):null;
   const [editPath,setEditPath]=useState<{name:string;layer?:number;path:PathData}|null>(null);
   useEffect(()=>{
     setEditPath(null);
@@ -580,6 +593,10 @@ export function PhotoStudio() {
   const retouchPreview=RETOUCH_PREVIEW_TOOLS.includes(tool),continuousRetouch=CONTINUOUS_RETOUCH_TOOLS.includes(tool),feedbackAvailable=!retouchPreview||document.width*document.height<=16_777_216;
   const historyChoice=historyBrushSource(displayState?.historySources,historySource);
   const toolOptions:PaintOptions={...paintToolDefaults(tool,state),...paintOptions[tool],...(tool==="paint.historyBrush"&&historyChoice?{historySource:historyChoice.id}:{})};
+  const imagePpi=state?.resolution||72,cropSize=tool==="crop"?cropSizePixels(toolOptions,imagePpi):null;
+  // A crop ratio or W x H x Resolution size holds the box's shape for handle drags and for drawing a new box.
+  const cropRatio=tool!=="crop"?undefined:toolOptions.style==="fixedRatio"?Number(toolOptions.ratioWidth)/Number(toolOptions.ratioHeight):cropSize?cropSize.width/cropSize.height:undefined;
+  const gestureOptions:PaintOptions=cropSize?{...toolOptions,style:"fixedRatio",ratioWidth:cropSize.width,ratioHeight:cropSize.height}:toolOptions;
   const eraseToHistory=tool==="erase"&&toolOptions.eraseToHistory===true;
   const tipSize=(brushTool?size:tool==="select.quick"?Number(toolOptions.size)||0:0)*zoom,springReady=metaHeld&&!NO_SPRING_MOVE.includes(tool),precise=capsLock&&!STANDARD_CURSOR_TOOLS.includes(tool),showTip=tipSize>0&&(!precise||!!resizeReadout)&&!spacePan&&!springReady&&!geometryActive&&!(viewPreview.active&&!viewPreview.url);
   const toolLabel=IMAGE_TOOL_GROUPS.flatMap(group=>group.tools).find(option=>option.id===tool)?.label??tool,ToolIcon=IMAGE_TOOLS.find(option=>option.id===tool)?.icon;
@@ -640,7 +657,29 @@ export function PhotoStudio() {
   const relinkSmartObject=()=>attempt(openFile({multiple:false,title:"Relink to File"}).then(path=>typeof path==="string"?runPhotoCommand("layer.smartObjects.relinkToFile",{path}):undefined));
   const startSelectionTransform=()=>{const bounds=currentState?.selectionBounds;if(!bounds)return;const from={x:bounds[0],y:bounds[1],width:bounds[2],height:bounds[3]};setSelectionBox({from,box:from});};
   const commitSelectionTransform=()=>{if(!selectionBox||usePhotoWorkspace.getState().busy)return;const {from,box}=selectionBox;void command("select.transformSelection",{rect:[from.x,from.y,from.x+from.width,from.y+from.height],quad:[[box.x,box.y],[box.x+box.width,box.y],[box.x+box.width,box.y+box.height],[box.x,box.y+box.height]]}).finally(()=>setSelectionBox(null));};
-  const commitCrop=()=>{if(!cropBox||usePhotoWorkspace.getState().busy)return;if(cropBox.width*cropBox.height>256_000_000){setPreviewStatus("Choose a nonempty area within the image editing limits.");return;}const deleteCroppedPixels=toolOptions.deleteCroppedPixels===true;void (Math.abs(cropAngle)>.01?command("image.cropRotated",{...cropBox,angle:cropAngle,deleteCroppedPixels}):command("image.crop",{...cropBox,deleteCroppedPixels})).finally(()=>{setCropBox(null);setCropAngle(0);});};
+  const fullCrop:CropBox={x:0,y:0,width:document.width,height:document.height},cropUntouched=!!cropBox&&Math.abs(cropAngle)<=.01&&cropBox.x===0&&cropBox.y===0&&cropBox.width===document.width&&cropBox.height===document.height&&!(cropSize&&(cropSize.width!==document.width||cropSize.height!==document.height||cropSize.ppi!==imagePpi));
+  // After cropping, Fill paints the canvas the crop added (Content-Aware, or the background color on a Background layer when pixels are deleted) and a W x H x Resolution crop resamples,
+  // all folded into Photoshop's single Crop step; a failed step undoes the crop.
+  const commitCrop=()=>{
+    if(!cropBox||cropUntouched||usePhotoWorkspace.getState().busy)return;if(cropBox.width*cropBox.height>256_000_000){setPreviewStatus("Choose a nonempty area within the image editing limits.");return;}
+    const deleteCroppedPixels=toolOptions.deleteCroppedPixels===true,crop=Math.abs(cropAngle)>.01?runPhotoCommand("image.cropRotated",{...cropBox,angle:cropAngle,deleteCroppedPixels}):runPhotoCommand("image.crop",{...cropBox,deleteCroppedPixels});
+    const size=cropSize&&(cropSize.width!==cropBox.width||cropSize.height!==cropBox.height||cropSize.ppi!==imagePpi)?cropSize:null,base=usePhotoWorkspace.getState().state?.historySources?.find(source=>source.current)?.index;
+    const area=size?size.width*size.height-cropBox.width*cropBox.height:0,resample=!size||size.width===cropBox.width&&size.height===cropBox.height?"none":area>0?"preserveDetails":area<0?"lanczos":"bicubic";
+    const added=cropAddedCanvas(cropBox,Math.abs(cropAngle)>.01?cropAngle:0,document.width,document.height),backgroundLayer=deleteCroppedPixels?state?.layers.find(isBackgroundLayer):undefined;
+    const fill=!added?null:toolOptions.fill==="contentAware"?{contents:"contentAware"}:backgroundLayer?{contents:"background",layer:backgroundLayer.id}:null;
+    const steps:[string,Record<string,unknown>][]=[];
+    if(fill)steps.push(["select.lasso",{points:added}],["select.inverse",{}],["edit.fill",fill],["select.deselect",{}]);
+    if(size)steps.push(["image.imageSize",{width:size.width,height:size.height,resolution:size.ppi,resample}]);
+    void crop.then(()=>steps.length?steps.reduce<Promise<unknown>>((done,[id,params])=>done.then(()=>runPhotoCommand(id,params)),Promise.resolve()).then(
+      ()=>base!==undefined&&runPhotoCommand("history.fold",{from:base,label:"Crop"}),
+      error=>{if(base!==undefined)void command("history.select",{index:base,discardRedo:true});throw error;}):undefined).catch(()=>{}).finally(()=>{setCropBox(null);setCropAngle(0);setCropShift([0,0]);});
+  };
+  const resetCrop=()=>{setCropBox(fullCrop);setCropAngle(0);setCropShift([0,0]);};
+  const snapCrop=(box:CropBox,from:CropBox)=>snapBox(cropAngle?null:snapContext(document.id,document.width,document.height,zoom,state?.resolution),box,from);
+  // Box plus shift is the box's place on screen, which a pan keeps, so the image follows wherever snapping puts the box.
+  const panCrop=(box:CropBox)=>{if(!cropBox)return;const next=snapCrop(box,cropBox);setCropBox(next);setCropShift([cropBox.x+cropShift[0]-next.x,cropBox.y+cropShift[1]-next.y]);};
+  // Clipping keeps the shifted image out of the stage's scroll area, so no scrollbar appears and re-centres the box.
+  const cropShifted=tool==="crop"&&!!cropBox&&(cropShift[0]!==0||cropShift[1]!==0);
   const cloneSourceContext=JSON.stringify([projectId,document.id,document.version,displayState?.viewKey,cloneSources]);
   const updateCloneSource=(captured:string,id:"cloneSource.set"|"cloneSource.resetTransform",params:Record<string,unknown>)=>{
     const live=usePhotoWorkspace.getState();if(live.busy||!cloneSource?.source||useXDesign.getState().photoDocuments[live.documentId??""]?.version!==live.stateVersion||useXDProjects.getState().activeId!==live.projectId||captured!==JSON.stringify([live.projectId,live.documentId,live.stateVersion,live.state?.viewKey,live.state?.presets?.cloneSource]))return;
@@ -712,7 +751,7 @@ export function PhotoStudio() {
       if(cursor&&!curvature){const from=control(anchors.length-1,false);ctx.bezierCurveTo(from[0]!*sx,from[1]!*sy,cursor[0]*sx,cursor[1]*sy,cursor[0]*sx,cursor[1]*sy);}
       const last=all.at(-1)!,handle=curvature?null:handles.at(-1);if(handle){ctx.moveTo((2*last[0]-handle[0])*sx,(2*last[1]-handle[1])*sy);ctx.lineTo(handle[0]*sx,handle[1]*sy);}
     }
-    else if(RECTANGLE_TOOLS.includes(tool)||tool==="shape.rect"||tool==="shape.ellipse") {const rect=gestureRectangle(points[0]!,points.at(-1)!,toolOptions,gestureStart.current,gestureCurrent.current);ctx.lineWidth=1;ctx.strokeStyle="#fff";if(rect){if(tool==="ellipseSelection"||tool==="shape.ellipse")ctx.ellipse((rect.x+rect.width/2)*sx,(rect.y+rect.height/2)*sy,rect.width/2*sx,rect.height/2*sy,0,0,Math.PI*2);else ctx.rect(rect.x*sx,rect.y*sy,rect.width*sx,rect.height*sy);}}
+    else if(RECTANGLE_TOOLS.includes(tool)||tool==="shape.rect"||tool==="shape.ellipse") {const rect=gestureRectangle(points[0]!,points.at(-1)!,gestureOptions,gestureStart.current,gestureCurrent.current);ctx.lineWidth=1;ctx.strokeStyle="#fff";if(rect){if(tool==="ellipseSelection"||tool==="shape.ellipse")ctx.ellipse((rect.x+rect.width/2)*sx,(rect.y+rect.height/2)*sy,rect.width/2*sx,rect.height/2*sy,0,0,Math.PI*2);else ctx.rect(rect.x*sx,rect.y*sy,rect.width*sx,rect.height*sy);}}
     else if(tool==="straighten"||tool==="shape.line"||tool==="crop"&&cropStraighten){ctx.lineWidth=1;ctx.strokeStyle="#fff";ctx.moveTo(all[0]![0]*sx,all[0]![1]*sy);ctx.lineTo(all.at(-1)![0]*sx,all.at(-1)![1]*sy);}
     else {ctx.moveTo(points[0]![0]*sx,points[0]![1]*sy);if(selectionTool||tool==="pen.freeform"){ctx.strokeStyle="#fff";if(tool!=="select.quick")ctx.lineWidth=1;}for(const p of points) ctx.lineTo(p[0]*sx,p[1]*sy);if(polygonDraft.current&&polygonCursor.current)ctx.lineTo(polygonCursor.current[0]*sx,polygonCursor.current[1]*sy);}
     ctx.stroke();
@@ -845,7 +884,7 @@ export function PhotoStudio() {
     if(!stroke.current.length||strokePointer.current!==e.pointerId)return;
     gestureCurrent.current={shiftKey:e.shiftKey,altKey:e.altKey};
     const end=constrained(point(e),e.shiftKey),previous=stroke.current.at(-1)!;if(end&&(end[0]!==previous[0]||end[1]!==previous[1]))stroke.current.push(end);
-    const moving=tool==="move"||springMove.current,selection=!moving&&(selectionTool||tool==="crop"||tool==="straighten")?selectionGestureCommand(tool,stroke.current,toolOptions,selectionGestureMode(selectionMode,gestureStart.current,tool),gestureStart.current,gestureCurrent.current):null;
+    const moving=tool==="move"||springMove.current,selection=!moving&&(selectionTool||tool==="crop"||tool==="straighten")?selectionGestureCommand(tool,stroke.current,gestureOptions,selectionGestureMode(selectionMode,gestureStart.current,tool),gestureStart.current,gestureCurrent.current):null;
     const points=stroke.current,strokeSeed=seed.current,cloneContext=cloneGesture.current;
     if(nativeStroke.current)previewStroke();
     const gesture=takeGesture();resetStroke(true);
@@ -869,11 +908,11 @@ export function PhotoStudio() {
       if(Math.hypot(b[0]-a[0],b[1]-a[1])>=1){
         // The box turns to lie along the drawn line, so applying the crop levels it; the nearest axis counts, as in Photoshop.
         const degrees=Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI,level=degrees-Math.round(degrees/90)*90;setCropAngle(level);
-        if(!cropBox){const radians=Math.abs(level)*Math.PI/180,fit=Math.min(1,document.width/(document.width*Math.cos(radians)+document.height*Math.sin(radians)),document.height/(document.width*Math.sin(radians)+document.height*Math.cos(radians))),width=Math.max(1,Math.floor(document.width*fit)),height=Math.max(1,Math.floor(document.height*fit));setCropBox({x:Math.round((document.width-width)/2),y:Math.round((document.height-height)/2),width,height});}
+        if(!cropBox||cropUntouched){const radians=Math.abs(level)*Math.PI/180,fit=Math.min(1,document.width/(document.width*Math.cos(radians)+document.height*Math.sin(radians)),document.height/(document.width*Math.sin(radians)+document.height*Math.cos(radians))),width=Math.max(1,Math.floor(document.width*fit)),height=Math.max(1,Math.floor(document.height*fit));setCropBox({x:Math.round((document.width-width)/2),y:Math.round((document.height-height)/2),width,height});}
       }else setPreviewStatus("Draw a reference line at least one image pixel long.");
       setCropStraighten(false);clear();return;
     }
-    if(selectionTool||tool==="crop"||tool==="straighten"){if(selection&&tool==="crop"){const {x,y,width,height}=selection.params as CropBox;setCropBox({x,y,width,height});setCropAngle(0);}else if(selection){clearWhenShown(command(selection.id,selection.params));return;}else setPreviewStatus(tool==="straighten"?"Draw a reference line at least one image pixel long.":"Choose a nonempty area within the image editing limits.");clear();return;}
+    if(selectionTool||tool==="crop"||tool==="straighten"){if(selection&&tool==="crop"){const {x,y,width,height}=selection.params as CropBox;setCropBox({x,y,width,height});setCropAngle(0);}else if(tool==="crop")setCropBox(box=>box??fullCrop);else if(selection){clearWhenShown(command(selection.id,selection.params));return;}else setPreviewStatus(tool==="straighten"?"Draw a reference line at least one image pixel long.":"Choose a nonempty area within the image editing limits.");clear();return;}
     // Omit target for automatic native routing to color/alpha/Quick Mask.
     const params=strokeParameters(tool,points,size,opacity,hardness,paintColorValue,zoom,strokeSeed,toolOptions,paintingMask,null,null);
     let id=tool;
@@ -888,11 +927,11 @@ export function PhotoStudio() {
       if(liveGradient&&!grayscaleTarget)id=editing?"gradient.fill.set":"gradient.fill.create";
       if(liveGradient&&!grayscaleTarget)delete params.mode;
       const method=params.method;delete params.method;
-      Object.assign(params,{from:first.slice(0,2),to:last.slice(0,2),style:gradientStyle,reverse:gradientReverse,...(!editing?(state?.presets?{...gradientPaintParams(state.presets.gradient,paintColorValue,backgroundValue),...(gradientTransparency?{}:{transparency:[[0,100],[1,100]]})}:{stops:[[0,paintColorValue],[1,backgroundValue]]}):{})});
+      Object.assign(params,{from:first.slice(0,2),to:last.slice(0,2),style:gradientStyle,reverse:gradientReverse,...(!editing?(state?.presets?{...gradientPaintParams(state.presets.gradient,paintColorValue,backgroundValue),...(gradientTransparency||liveGradient&&!grayscaleTarget?{}:{transparency:[[0,100],[1,100]]})}:{stops:[[0,paintColorValue],[1,backgroundValue]]}):{})});
       if(editing)params.layer=currentLayer.id;
       // The engine blends stops linearly in sRGB, so other Methods go as dense baked stops (not for an existing fill, which keeps its stops).
       const stops=params.stops as GradientStop[]|undefined;
-      if(!editing&&stops&&method!=="classic"&&GRADIENT_METHODS.some(([id])=>id===method)&&stops.every(stop=>typeof stop[1]==="string"&&/^#[\da-f]{6}$/i.test(stop[1]))){const baked=bakeGradient(stops,method as GradientMethod);if(baked.length<=64)params.stops=baked;}
+      if(!editing&&stops&&method!=="classic"&&GRADIENT_METHODS.some(([id])=>id===method)&&stops.every(stop=>typeof stop[1]==="string"&&/^#[\da-f]{6}$/i.test(stop[1]))){const baked=bakeRemembered(stops,method as GradientMethod);if(baked)params.stops=baked;}
     }
     if(tool==="paint.cloneStamp"||tool==="paint.healingBrush"){
       if(!cloneSource?.source){dropGesture(gesture);clear();usePhotoWorkspace.setState({error:"Alt-click the image to choose a source point first."});return;}
@@ -903,7 +942,8 @@ export function PhotoStudio() {
   const shapeCreateParams=(geometry:Record<string,unknown>)=>({...geometry,...shapeStyleParams(shapeStyle,paintColorValue),...(pathOp!=="new"&&activeKind==="Shape"&&state?.activeLayer!=null?{addTo:state.activeLayer,op:pathOp}:{})});
   const createPenPath=(anchors:XY[],handles:readonly (XY|null)[],closed:boolean)=>{
     const path={subpaths:[{closed,knots:penKnots(anchors,handles)}]};
-    clearWhenShown(penMode==="shape"?command("shape.create",shapeCreateParams({kind:"path",path})):command("path.set",{name:"work",path}));
+    if(penMode==="shape")clearWhenShown(command("shape.create",shapeCreateParams({kind:"path",path})));
+    else{setActivePath(null);clearWhenShown(command("path.set",{name:"work",path}));}
   };
   const finishPen=(closed:boolean)=>{
     const anchors=stroke.current.map(point=>[point[0],point[1]] as XY),handles=tool==="pen.curvature"?smoothHandles(anchors,closed):[...penHandles.current];
@@ -961,16 +1001,38 @@ export function PhotoStudio() {
   const actionItem=(action:PhotoAction,adjustment:boolean,shortcut?:string)=>item(actionLabel(action),()=>{if(isDirect(action))command(action.id);else setDialog({action,adjustment});},adjustment||!!currentLayer,shortcut);
   // As in Photoshop, an adjustment layer is made with neutral values and then edited live in Properties; Image > Adjustments stays modal.
   const newAdjustmentLayer=(action:PhotoAction)=>attempt(addAdjustmentLayer(action).then(()=>openPanel("Properties")));
-  const adjustments=(layer:boolean):MenuEntry[]=>ADJUSTMENT_ORDER.map(id=>{
+  // Photoshop records a layer made through its New Layer dialog as one step, so the dialog's options fold into the creation.
+  const withLayerOptions=(create:()=>Promise<unknown>,props:Record<string,unknown>,label:string)=>{
+    const base=usePhotoWorkspace.getState().state?.historySources?.find(source=>source.current)?.index;
+    return create().then(()=>Object.keys(props).length?runPhotoCommand("layer.setProps",props).then(()=>base!==undefined?runPhotoCommand("history.fold",{from:base,label}):undefined):undefined);
+  };
+  const askNewLayer=(base:string,label:string,create:()=>Promise<unknown>,then?:()=>void)=>{if(state)setNewLayerDialog({name:nextLayerName(state.layers,base),kind:"other",create:({name,renamed,props})=>withLayerOptions(create,{...props,...renamed&&{name}},label).then(then)});};
+  const newLayer=()=>{if(state)setNewLayerDialog({name:nextLayerName(state.layers,"Layer"),kind:"layer",create:({name,neutral,props})=>neutral
+    // The engine's Fill keeps to the selection, but Photoshop fills the whole new layer, as a solid fill layer rasterised does.
+    ?withLayerOptions(()=>runPhotoCommand("layer.newFillLayer.solidColor",{color:neutral}).then(()=>runPhotoCommand("layer.rasterize.fillContent",{})),{...props,name},"New Layer")
+    :withLayerOptions(()=>runPhotoCommand("layer.new.layer",{name}),props,"New Layer")});};
+  const newGroup=(fromLayers:boolean)=>{if(state)setNewLayerDialog({title:fromLayers?"New Group from Layers":"New Group",name:nextLayerName(state.layers,"Group"),kind:"group",create:({name,props})=>withLayerOptions(()=>runPhotoCommand(fromLayers?"layer.new.groupFromLayers":"layer.new.group",{name}),props,fromLayers?"Group Layers":"New Group")});};
+  const layerFromBackground=()=>{if(state)setNewLayerDialog({name:"Layer 0",kind:"other",create:({name,renamed,props})=>withLayerOptions(()=>runPhotoCommand("layer.new.layerFromBackground",{}),{...props,...renamed&&{name}},"Layer From Background")});};
+  // The Layer menu asks for the new layer's name and options first; the Layers panel's button makes it straight away, as in Photoshop.
+  const adjustments=(layer:boolean,ask=false):MenuEntry[]=>ADJUSTMENT_ORDER.map(id=>{
     if(id==="-")return id;
     const action=ADJUSTMENTS.find(entry=>entry.id===id)!;
+    if(layer&&ask)return item(actionLabel(action),()=>askNewLayer(action.label,`New ${action.label} Layer`,()=>addAdjustmentLayer(action),()=>openPanel("Properties")));
     if(layer)return item(actionLabel(action),()=>newAdjustmentLayer(action));
     if(id==="invert")return run("Invert","image.adjustments.invert",!!currentLayer,"Mod+I");
     return actionItem(action,false,ADJUSTMENT_SHORTCUTS[id]);
   });
-  const fillLayerItems:MenuItem[]=[
-    item("Solid Color…",()=>setPicker("fillLayer")),
-    item("Gradient…",()=>{void command("layer.newFillLayer.gradient",{from:color,to:background,angle:90,style:"linear"}).then(()=>setImageDialog("gradient"));}),
+  // Photoshop shows the new fill layer while its colour is picked; it is only added on OK.
+  const solidFill=(hex:string,committing=false):CanvasDraft=>({command:"layer.newFillLayer.solidColor",params:{color:hex},committing});
+  const pickSolidFill=(options?:Record<string,unknown>)=>{solidFillOptions.current=options;setPicker("fillLayer");setFillDraft(solidFill(color));};
+  const newGradientFill=(options:Record<string,unknown>={})=>{const base=usePhotoWorkspace.getState().state?.historySources?.find(source=>source.current)?.index;return withLayerOptions(()=>runPhotoCommand("layer.newFillLayer.gradient",{from:color,to:background,angle:90,style:"linear"}),options,"New Gradient Fill Layer").then(()=>{newFillBase.current=base;setImageDialog("newGradient");});};
+  const fillLayerItems=(ask=false):MenuItem[]=>ask?[
+    item("Solid Color…",()=>{if(state)setNewLayerDialog({name:nextLayerName(state.layers,"Color Fill"),kind:"other",create:async({name,renamed,props})=>pickSolidFill({...props,...renamed&&{name}})});}),
+    item("Gradient…",()=>{if(state)setNewLayerDialog({name:nextLayerName(state.layers,"Gradient Fill"),kind:"other",create:({name,renamed,props})=>newGradientFill({...props,...renamed&&{name}})});}),
+    item("Pattern…",()=>askNewLayer("Pattern Fill","New Pattern Fill Layer",()=>runPhotoCommand("layer.newFillLayer.pattern",{}))),
+  ]:[
+    item("Solid Color…",()=>pickSolidFill()),
+    item("Gradient…",()=>void newGradientFill().catch(()=>{})),
     run("Pattern…","layer.newFillLayer.pattern"),
   ];
   const radio=(label:string,id:string,checked:boolean,enabled=true):MenuItem=>({...run(label,id,enabled&&!checked),checked,radio:true});
@@ -1099,10 +1161,10 @@ export function PhotoStudio() {
     ]},
     {label:"Layer",items:[
       {label:"New",items:[
-        run("Layer","layer.new.layer",true,"Shift+Mod+N"),
-        run("Layer from Background","layer.new.layerFromBackground",!!currentLayer),
-        run("Group","layer.new.group"),
-        run("Group from Layers","layer.new.groupFromLayers",!!currentLayer),
+        item("Layer…",newLayer,!!state,"Shift+Mod+N"),
+        item("Layer from Background…",layerFromBackground,!!currentLayer),
+        item("Group…",()=>newGroup(false),!!state),
+        item("Group from Layers…",()=>newGroup(true),!!currentLayer),
         "-",
         item("Artboard…",()=>openCommand(NEW_ARTBOARD,{width:document.width,height:document.height}),!!state),
         item("Artboard from Group…",()=>openCommand(ARTBOARD_FROM_GROUP),!!currentLayer?.children&&!!state?.layers.some(layer=>layer.id===currentLayer.id)),
@@ -1126,9 +1188,9 @@ export function PhotoStudio() {
         run("Hide All Effects","layer.layerStyle.hideAllEffects"),
         run("Show All Effects","layer.layerStyle.showAllEffects"),
       ]},
-      {label:"New Fill Layer",items:fillLayerItems},
-      {label:"New Adjustment Layer",items:adjustments(true)},
-      item("Layer Content Options…",()=>openPanel("Properties"),!!(currentLayer?.adjustmentKind||currentLayer?.gradientFill)),
+      {label:"New Fill Layer",items:fillLayerItems(true)},
+      {label:"New Adjustment Layer",items:adjustments(true,true)},
+      item("Layer Content Options…",()=>currentLayer?.gradientFill?setImageDialog("gradient"):openPanel("Properties"),!!(currentLayer?.adjustmentKind||currentLayer?.gradientFill)),
       {label:"Layer Mask",disabled:busy||!currentLayer,items:[
         run("Reveal All","layer.layerMask.revealAll",!currentLayer?.hasMask),
         run("Hide All","layer.layerMask.hideAll",!currentLayer?.hasMask),
@@ -1282,6 +1344,7 @@ export function PhotoStudio() {
       {label:"Extras",checked:aids.extras,shortcut:"Mod+H",run:()=>useViewAids.getState().setFlags({extras:!aids.extras})},
       {label:"Show",items:[
         {label:"Selection Edges",checked:aids.selectionEdges,run:()=>useViewAids.getState().setFlags({selectionEdges:!aids.selectionEdges})},
+        {label:"Target Path",checked:aids.targetPath,shortcut:"Shift+Mod+H",run:()=>useViewAids.getState().setFlags({targetPath:!aids.targetPath})},
         {label:"Grid",checked:aids.grid,shortcut:"Mod+'",run:()=>useViewAids.getState().setFlags({grid:!aids.grid})},
         {label:"Guides",checked:aids.guides,shortcut:"Mod+;",run:()=>useViewAids.getState().setFlags({guides:!aids.guides})},
       ]},
@@ -1305,7 +1368,8 @@ export function PhotoStudio() {
     ]},
     {label:"Window",items:[...ALL_PANELS.map(name=>({label:name,checked:panelOpen(name),shortcut:PANEL_KEYS[name],run:()=>togglePanel(name)})),"-" as const,
       // Essentials is the only workspace, so choosing it and resetting it are the same restore of the default panel layout.
-      {label:"Workspace",items:["Essentials (Default)","Reset Essentials"].map(label=>({label,run:()=>{panels.reset("left");panels.reset("right");setUpperTab("Color");setMiddleTab("Properties");setLayersTab("Layers");setCollapsed({upper:false,middle:false,layers:false});setFlyout(null);if(!panels.left)panels.toggle("left");if(!panels.right)panels.toggle("right");}}))}]},
+      {label:"Workspace",items:["Essentials (Default)","Reset Essentials"].map(label=>({label,run:()=>{panels.reset("left");panels.reset("right");setUpperTab("Color");setMiddleTab("Properties");setLayersTab("Layers");setCollapsed({upper:false,middle:false,layers:false});setFlyout(null);if(!panels.left)panels.toggle("left");if(!panels.right)panels.toggle("right");}}))},
+      "-",{label:"Contextual Task Bar",checked:!taskBar.hidden,run:()=>placeTaskBar({hidden:!taskBar.hidden})}]},
   ];
   const fromMenu=(path:string[],label?:string):MenuEntry[]=>{
     let found:MenuItem|undefined={label:"",items:menus},disabled=false;
@@ -1319,8 +1383,8 @@ export function PhotoStudio() {
   const pathItems:MenuEntry[]=currentState?pathsPanelMenu(currentState,selectedPath(currentState,activePath),busy,setActivePath):[];
   const allGroups=state?.layers.flatMap(groupIds)??[],collapseAll=item("Collapse All Groups",()=>fold(allGroups,false,true),allGroups.length>0);
   const layersPanelMenu=():MenuEntry[]=>[
-    ...fromMenu(["Layer","New","Layer"],"New Layer"),...fromMenu(["Layer","Duplicate Layer"]),...fromMenu(["Layer","Delete","Layer"],"Delete Layer"),...fromMenu(["Layer","Delete","Hidden Layers"],"Delete Hidden Layers"),
-    "-",...fromMenu(["Layer","New","Group"],"New Group"),...fromMenu(["Layer","New","Group from Layers"],"New Group from Layers"),collapseAll,
+    ...fromMenu(["Layer","New","Layer…"],"New Layer…"),...fromMenu(["Layer","Duplicate Layer"]),...fromMenu(["Layer","Delete","Layer"],"Delete Layer"),...fromMenu(["Layer","Delete","Hidden Layers"],"Delete Hidden Layers"),
+    "-",...fromMenu(["Layer","New","Group…"],"New Group…"),...fromMenu(["Layer","New","Group from Layers…"],"New Group from Layers…"),collapseAll,
     "-",item("Rename Layer…",renameLayer,!!currentLayer&&!isBackgroundLayer(currentLayer)),currentLayer?.visible===false?run("Show Layers","layer.showLayers"):run("Hide Layers","layer.hideLayers",!!currentLayer),...fromMenu(["Layer","Lock Layers"]),
     "-",...fromMenu(["Layer","Smart Objects","Convert to Smart Object"]),...fromMenu(["Layer","Smart Objects","Edit Contents"]),
     "-",blendingOptions,
@@ -1340,7 +1404,7 @@ export function PhotoStudio() {
     const kind:MenuEntry[]=layer?.text?fromMenu(["Layer","Rasterize","Type"],"Rasterize Type"):layer?.smartObject?[...fromMenu(["Layer","Smart Objects","Edit Contents"]),...fromMenu(["Layer","Rasterize","Smart Object"],"Rasterize Layer")]:layer&&!["Pixel","Pixels","Raster","Group","Adjustment"].includes(layer.kind)?fromMenu(["Layer","Rasterize","Layer"],"Rasterize Layer"):[];
     const mask:MenuEntry[]=layer?.hasMask?[...fromMenu(["Layer","Layer Mask","Apply"],"Apply Layer Mask"),...fromMenu(["Layer","Layer Mask","Delete"],"Delete Layer Mask")]:fromMenu(["Layer","Layer Mask",hasSelection?"Reveal Selection":"Reveal All"],"Add Layer Mask");
     return [blendingOptions,
-      "-",...fromMenu(["Layer","Duplicate Layer"],multipleLayers?"Duplicate Layers":undefined),...fromMenu(["Layer","Delete","Layer"],multipleLayers?"Delete Layers":"Delete Layer"),...fromMenu(["Layer","New","Group from Layers"]),collapseAll,
+      "-",...fromMenu(["Layer","Duplicate Layer"],multipleLayers?"Duplicate Layers":undefined),...fromMenu(["Layer","Delete","Layer"],multipleLayers?"Delete Layers":"Delete Layer"),...fromMenu(["Layer","New","Group from Layers…"]),collapseAll,
       "-",...fromMenu(["Layer","Smart Objects","Convert to Smart Object"]),...kind,
       "-",...mask,clipItem,
       "-",...fromMenu(["Layer","Link Layers"]),...fromMenu(["Layer","Select Linked Layers"]),
@@ -1349,24 +1413,40 @@ export function PhotoStudio() {
   };
   const cropOptions=(values:PaintOptions)=>setPaintOptions(current=>({...current,crop:sanitizePaintOptions("crop",{...toolOptions,...values})}));
   // As in Photoshop, choosing a ratio refits the box to the largest of that shape centred in the image.
-  const cropToRatio=(ratioWidth:number,ratioHeight:number)=>{
+  const fitCrop=(ratioWidth:number,ratioHeight:number)=>{
     const width=Math.max(1,Math.min(document.width,Math.round(document.height*ratioWidth/ratioHeight))),height=Math.max(1,Math.min(document.height,Math.round(width*ratioHeight/ratioWidth)));
-    cropOptions({style:"fixedRatio",ratioWidth,ratioHeight});setCropBox({x:Math.round((document.width-width)/2),y:Math.round((document.height-height)/2),width,height});
+    setCropBox({x:Math.round((document.width-width)/2),y:Math.round((document.height-height)/2),width,height});
+  };
+  const cropToRatio=(ratioWidth:number,ratioHeight:number)=>{cropOptions({style:"fixedRatio",ratioWidth,ratioHeight});fitCrop(ratioWidth,ratioHeight);};
+  // A new width or height refits the box like a ratio; a resolution alone leaves it be.
+  const cropToSize=(values:CropSizeValues)=>{
+    const next={...toolOptions,style:"size",...values},size=cropSizePixels(next,imagePpi);cropOptions(next);
+    if(size&&("sizeWidth" in values||"sizeHeight" in values))fitCrop(size.width,size.height);
   };
   const rotateCropBox=()=>{
     if(!cropBox)return;const scale=Math.min(1,document.width/cropBox.height,document.height/cropBox.width),width=Math.max(1,Math.round(cropBox.height*scale)),height=Math.max(1,Math.round(cropBox.width*scale));
     setCropBox({x:Math.round(Math.min(document.width-width,Math.max(0,cropBox.x+(cropBox.width-width)/2))),y:Math.round(Math.min(document.height-height,Math.max(0,cropBox.y+(cropBox.height-height)/2))),width,height});
     if(toolOptions.style==="fixedRatio")cropOptions({ratioWidth:Number(toolOptions.ratioHeight),ratioHeight:Number(toolOptions.ratioWidth)});
+    if(toolOptions.style==="size")cropOptions({sizeWidth:Number(toolOptions.sizeHeight),sizeWidthUnit:String(toolOptions.sizeHeightUnit),sizeHeight:Number(toolOptions.sizeWidth),sizeHeightUnit:String(toolOptions.sizeWidthUnit)});
   };
   const cropContextMenu=():MenuEntry[]=>{
-    const ratio=(label:string,width:number,height:number):MenuItem=>({label,radio:true,checked:toolOptions.style==="fixedRatio"&&Number(toolOptions.ratioWidth)*height===Number(toolOptions.ratioHeight)*width,disabled:busy,run:()=>cropToRatio(width,height)});
-    return [ratio("Original Ratio",document.width,document.height),...CROP_RATIOS.map(([label,width,height])=>ratio(label,width,height)),
-      "-",{label:"Reset Crop",disabled:busy,run:()=>{setCropBox({x:0,y:0,width:document.width,height:document.height});setCropAngle(0);}},{label:"Rotate Crop Box",disabled:busy||!cropBox,run:rotateCropBox},
-      "-",{label:"Crop",disabled:busy||!cropBox,run:commitCrop}];
+    const saved=matchingCropPreset(cropPresets,toolOptions);
+    const ratio=(label:string,width:number,height:number):MenuItem=>({label,radio:true,checked:!saved&&toolOptions.style==="fixedRatio"&&Number(toolOptions.ratioWidth)*height===Number(toolOptions.ratioHeight)*width,disabled:busy,run:()=>cropToRatio(width,height)});
+    const sized=toolOptions.style==="size",size=(label:string):MenuItem=>({label,radio:true,checked:!saved&&sized&&cropSizeName(toolOptions)===label,disabled:busy,run:()=>cropToSize(cropSizeChoice(label,[document.width,document.height],imagePpi)!)});
+    return [sized?{label:"Clear W x H x Resolution",disabled:busy||!Number(toolOptions.sizeWidth)&&!Number(toolOptions.sizeHeight)&&!Number(toolOptions.resolution),run:()=>cropToSize({sizeWidth:0,sizeHeight:0,resolution:0})}
+      :{label:"Clear Ratio",disabled:busy||toolOptions.style!=="fixedRatio",run:()=>cropOptions({style:"normal"})},
+      {label:"Reset Crop",disabled:busy,run:resetCrop},{label:"Rotate Crop Box",disabled:busy||!cropBox,run:rotateCropBox},
+      "-",{label:"Use Front Image Aspect Ratio",disabled:busy,run:()=>cropToRatio(document.width,document.height)},
+      {label:"Use Crop Box Aspect Ratio",disabled:busy||!cropBox,run:()=>{if(cropBox)cropOptions({style:"fixedRatio",ratioWidth:cropBox.width,ratioHeight:cropBox.height});}},
+      "-",{label:"Use Front Image Size & Resolution",disabled:busy,run:()=>cropToSize(cropSizeChoice("Front Image",[document.width,document.height],imagePpi)!)},
+      {label:"Use Crop Box Size & Resolution",disabled:busy||!cropBox,run:()=>{if(cropBox)cropOptions({style:"size",sizeWidth:cropBox.width,sizeWidthUnit:"px",sizeHeight:cropBox.height,sizeHeightUnit:"px",resolution:imagePpi,resolutionUnit:"in"});}},
+      "-",ratio("Original Ratio",document.width,document.height),...CROP_RATIOS.map(([label,width,height])=>ratio(label,width,height)),
+      "-",...CROP_SIZES.map(size),
+      ...(cropPresets.length?["-" as const,...cropPresets.map((preset):MenuItem=>({label:preset.name,radio:true,checked:saved===preset,disabled:busy,run:()=>applyCropPreset(preset.values,{apply:cropToRatio,applySize:cropToSize,clear:()=>cropOptions({style:"normal"})})}))]:[])];
   };
   const selectionContextMenu=():MenuEntry[]=>hasSelection?[
     ...fromMenu(["Select","Deselect"]),...fromMenu(["Select","Inverse"],"Select Inverse"),...fromMenu(["Select","Modify","Feather…"]),...fromMenu(["Select","Select and Mask…"]),
-    "-",...fromMenu(["Select","Save Selection"]),run("Make Work Path","select.toWorkPath",true,undefined,{tolerance:2}),
+    "-",...fromMenu(["Select","Save Selection"]),item("Make Work Path",()=>{setActivePath("work");void command("select.toWorkPath",{tolerance:2});}),
     "-",...fromMenu(["Layer","New","Layer via Copy"]),...fromMenu(["Layer","New","Layer via Cut"]),
     "-",...fromMenu(["Edit","Free Transform"]),...fromMenu(["Select","Transform Selection"]),
     "-",...fromMenu(["Edit","Fill…"]),...fromMenu(["Edit","Stroke…"]),
@@ -1378,7 +1458,7 @@ export function PhotoStudio() {
     "-",...fromMenu(["Filter","Last Filter"]),
   ];
   const contextItems=(menu:NonNullable<typeof contextMenu>):MenuEntry[]=>bare(
-    menu.kind==="layer"?layerContextMenu():menu.kind==="fx"?styleItems:menu.kind==="adjustment"?[...fillLayerItems,"-" as const,...adjustments(true)]:menu.kind==="selection"?selectionContextMenu():menu.kind==="crop"?cropContextMenu():
+    menu.kind==="layer"?layerContextMenu():menu.kind==="fx"?styleItems:menu.kind==="adjustment"?[...fillLayerItems(),"-" as const,...adjustments(true)]:menu.kind==="selection"?selectionContextMenu():menu.kind==="crop"?cropContextMenu():
     menu.kind==="path"?["Delete Path","-","Make Selection…","Fill Path…","Stroke Path…"].flatMap(label=>label==="-"?["-" as const]:pathItems.filter(entry=>entry!=="-"&&entry.label===label)):
     (menu.layers??[]).map(({layer,name})=>({label:name,disabled:busy,run:()=>attempt(runPhotoCommand("layer.select",{layer,target:"pixels",mode:"replace"}).then(()=>setMask(false)))})));
   const openLayerMenu=(layer:PhotoLayer,event:MouseEvent)=>{
@@ -1499,13 +1579,13 @@ export function PhotoStudio() {
     if(isDesignDialogOpen())return;
     if(e.key==="Escape"&&strokeEnd.current){e.preventDefault();e.stopPropagation();resetStroke();return;}
     if((e.target as HTMLElement).closest("input,select,textarea"))return;
-    // A flyout trigger keeps focus after a choice, so single-key shortcuts and Escape pass through it as they would from Photoshop's document; Space, Enter and arrows stay with the button.
+    // Menu bar and flyout triggers keep focus after a choice, so single-key shortcuts and Escape pass through them as they would from Photoshop's document; Space, Enter and arrows stay with the button.
     const menuHost=(e.target as HTMLElement).closest(".xd-menu,.xd-menubar,.xd-editor-menu");
-    if(!e.metaKey&&!e.ctrlKey&&menuHost&&!(menuHost.classList.contains("xd-editor-menu")&&(e.key.length===1&&e.key!==" "||e.key==="Escape")))return;
+    if(!e.metaKey&&!e.ctrlKey&&menuHost&&!(!menuHost.classList.contains("xd-menu")&&(e.key.length===1&&e.key!==" "||e.key==="Escape")))return;
     if(selectionBox&&(e.key==="Enter"||e.key==="Escape")){e.preventDefault();e.stopPropagation();if(e.key==="Enter")commitSelectionTransform();else setSelectionBox(null);return;}
-    if(cropBox&&(e.key==="Enter"||e.key==="Escape")){e.preventDefault();e.stopPropagation();if(e.key==="Enter")commitCrop();else{setCropBox(null);setCropAngle(0);}return;}
+    if(cropBox&&(e.key==="Enter"||e.key==="Escape")){e.preventDefault();e.stopPropagation();if(e.key==="Enter")commitCrop();else resetCrop();return;}
     // As in Photoshop, O cycles the crop overlay and Shift+O its orientation while a crop box is up.
-    if(cropBox&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==="o"){e.preventDefault();e.stopPropagation();if(e.shiftKey)setCropOrientation(value=>(value+1)%4);else setCropGuide(value=>{const guides:CropGuide[]=CROP_GUIDES.map(([guide])=>guide).filter(guide=>guide!=="none");return guides[(guides.indexOf(value)+1)%guides.length]!;});return;}
+    if(cropBox&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==="o"){e.preventDefault();e.stopPropagation();if(e.shiftKey)turnCropGuide();else cycleCropGuide();return;}
     // H, / and X are crop shortcuts only while a crop box is up; otherwise they keep their usual meaning.
     if(cropBox&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&!e.shiftKey&&["h","/","x"].includes(e.key.toLowerCase())){e.preventDefault();e.stopPropagation();const key=e.key.toLowerCase();if(key==="h")setCropShowCropped(value=>!value);else if(key==="/")setCropShield(value=>!value);else if(!busy)rotateCropBox();return;}
     if((e.metaKey||e.ctrlKey)&&!e.altKey&&["0","1","=","+","-"].includes(e.key)){e.preventDefault();e.stopPropagation();if(e.key==="0")fit();else zoomAt(z=>e.key==="1"?1:e.key==="-"?z/1.25:z*1.25);return;}
@@ -1580,8 +1660,9 @@ export function PhotoStudio() {
       {tool==="shape.line"&&<label>Weight<input aria-label="Line weight" type="number" min="1" max="1000" value={lineWeight} onChange={event=>setLineWeight(Math.max(1,Math.min(1000,event.target.valueAsNumber||1)))}/><span>px</span></label>}
       {colorTool&&grayscaleTarget&&<div className="xd-photo-mask-tones" aria-label="Channel paint tones"><button aria-label="Paint black" title="Paint black (X swaps black/white)" aria-pressed={channelColor==="#000000"} onClick={()=>setChannelColor("#000000")}><span style={{background:"#000000"}}/></button><button aria-label="Paint white" title="Paint white (X swaps black/white)" aria-pressed={channelColor==="#ffffff"} onClick={()=>setChannelColor("#ffffff")}><span style={{background:"#ffffff"}}/></button></div>}
       {selectionTool&&<SelectionModeCluster value={tool==="select.quick"&&selectionMode==="intersect"?"replace":selectionMode} modes={tool==="select.quick"?["replace","add","subtract"]:["replace","add","subtract","intersect"]} change={setSelectionMode}/>}
-      {tool==="crop"&&document&&<CropRatioFields values={toolOptions} ratios={CROP_RATIOS} original={[document.width,document.height]} disabled={busy} apply={cropToRatio} clear={()=>cropOptions({style:"normal"})}/>}
-      {toolFields&&<div className="xd-ps-tool-options"><PaintToolOptions tool={tool} lead={opacitySlider} hide={tool==="paint.gradient"&&liveGradient&&!grayscaleTarget?["mode"]:undefined} values={toolOptions} disabled={busy} presets={state?.presets} selectPattern={pattern=>command("pattern.presets.select",{pattern})} change={values=>setPaintOptions(current=>({...current,[tool]:sanitizePaintOptions(tool,values)}))}/></div>}<BrushBarItems tool={tool} settings={(state?.brush?.settings??{}) as BrushBarSettings} patch={patch=>command("tools.setBrush",patch)} symmetry={{current:symmetryChoice[document.id]??"",saved:state?.paths?.saved??[],hasWorkPath:!!state?.paths?.work,choose:chooseSymmetry}}/>{(tool==="paint.historyBrush"||eraseToHistory)&&<HistoryBrushSource sources={displayState?.historySources} selected={historySource} disabled={busy} change={setHistorySource}/>}
+      {tool==="crop"&&document&&<CropRatioFields values={toolOptions} ratios={CROP_RATIOS} original={[document.width,document.height]} resolution={imagePpi} disabled={busy} apply={cropToRatio} applySize={cropToSize} clear={()=>cropOptions({style:"normal"})}/>}
+      {tool==="paint.gradient"&&<><select aria-label="Gradient mode" disabled={grayscaleTarget} value={grayscaleTarget||!liveGradient?"classic":"live"} onChange={event=>setLiveGradient(event.target.value==="live")}><option value="live">Gradient</option><option value="classic">Classic gradient</option></select>{state?.presets&&<GradientToolPick current={state.presets.gradient} live={liveGradient&&!grayscaleTarget} foreground={paintColor} background={background} disabled={busy} select={params=>command("gradient.presets.select",params)}/>}<GradientTypeIcons value={gradientStyle} change={setGradientStyle}/></>}
+      {toolFields&&tool!=="crop"&&<div className="xd-ps-tool-options"><PaintToolOptions tool={tool} lead={opacitySlider} hide={tool==="paint.gradient"&&liveGradient&&!grayscaleTarget?["mode"]:undefined} before={tool==="paint.gradient"?{dither:<label><input type="checkbox" checked={gradientReverse} onChange={event=>setGradientReverse(event.target.checked)}/>Reverse</label>,method:(grayscaleTarget||!liveGradient)&&<label><input type="checkbox" aria-label="Gradient transparency" checked={gradientTransparency} onChange={event=>setGradientTransparency(event.target.checked)}/>Transparency</label>}:undefined} values={toolOptions} disabled={busy} presets={state?.presets} selectPattern={pattern=>command("pattern.presets.select",{pattern})} change={values=>setPaintOptions(current=>({...current,[tool]:sanitizePaintOptions(tool,values)}))}/></div>}<BrushBarItems tool={tool} settings={(state?.brush?.settings??{}) as BrushBarSettings} patch={patch=>command("tools.setBrush",patch)} symmetry={{current:symmetryChoice[document.id]??"",saved:state?.paths?.saved??[],hasWorkPath:!!state?.paths?.work,choose:chooseSymmetry}}/>{(tool==="paint.historyBrush"||eraseToHistory)&&<HistoryBrushSource sources={displayState?.historySources} selected={historySource} disabled={busy} change={setHistorySource}/>}
       {(nativeStrokeTool||tool==="paint.patch")&&<MenuButton label="Brush options" icon={GearIcon} iconOnly items={[{label:"Native feedback",checked:nativeFeedback&&feedbackAvailable,disabled:!feedbackAvailable,run:()=>setNativeFeedback(value=>!value)}]}/>}
       {tool==="move"&&<><label><input type="checkbox" aria-label="Auto-Select" checked={autoSelect} onChange={event=>setAutoSelect(event.target.checked)}/>Auto-Select:</label><select aria-label="Auto-Select target" disabled={!autoSelect} value={autoSelectTarget} onChange={event=>setAutoSelectTarget(event.target.value as "layer"|"group")}><option value="layer">Layer</option><option value="group">Group</option></select>
         <label><input type="checkbox" aria-label="Show Transform Controls" checked={transformControls} onChange={event=>setTransformControls(event.target.checked)}/>Show Transform Controls</label>
@@ -1596,14 +1677,15 @@ export function PhotoStudio() {
       {tool==="zoom"&&<label><input type="checkbox" aria-label="Scrubby Zoom" checked={scrubbyZoom} onChange={event=>setScrubbyZoom(event.target.checked)}/>Scrubby Zoom</label>}
       {(tool==="hand"||tool==="zoom")&&<><button onClick={()=>zoomAt(()=>1)}>100%</button><button onClick={fit}>Fit Screen</button><button onClick={fill}>Fill Screen</button></>}
       {selectionTool&&<>{["select.object","select.quick","select.magicWand"].includes(tool)&&<button disabled={busy} onClick={()=>command("select.subject")}>Select Subject</button>}<button disabled={busy||!hasSelection} onClick={()=>setSelectionDialog("refine")}>Select and Mask…</button></>}
-      {tool==="paint.gradient"&&<><label>Mode<select aria-label="Gradient mode" disabled={grayscaleTarget} value={grayscaleTarget||!liveGradient?"classic":"live"} onChange={event=>setLiveGradient(event.target.value==="live")}><option value="live">Gradient</option><option value="classic">Classic Gradient</option></select></label>{state?.presets&&<GradientPresetSelect current={state.presets.gradient} groups={state.presets.gradients} foreground={paintColor} background={background} disabled={busy} select={(preset,group)=>command("gradient.presets.select",{preset,group})}/>}<GradientTypeIcons value={gradientStyle} change={setGradientStyle}/><label><input type="checkbox" checked={gradientReverse} onChange={event=>setGradientReverse(event.target.checked)}/>Reverse</label><label><input type="checkbox" aria-label="Gradient transparency" checked={gradientTransparency} onChange={event=>setGradientTransparency(event.target.checked)}/>Transparency</label><button onClick={()=>openPanel("Gradients")}>Gradients</button></>}
-      {tool==="crop"&&<button type="button" aria-label="Straighten crop" title="Draw a line along the horizon to level the crop" aria-pressed={cropStraighten} disabled={busy} onClick={()=>setCropStraighten(value=>!value)}>Straighten</button>}
+      {tool==="crop"&&<button type="button" aria-label="Straighten crop" title="Draw a line along the horizon to level the crop" aria-pressed={cropStraighten} disabled={busy} onClick={()=>setCropStraighten(value=>!value)}><Ruler size={14}/>Straighten</button>}
+      {tool==="crop"&&<MenuButton label="Crop overlay" icon={CROP_GUIDES[0]![2]} iconOnly items={[...CROP_GUIDES.map(([value,label,icon])=>({label,icon,radio:true,checked:cropGuide===value,run:()=>setCropGuide(value)})),"-",...CROP_OVERLAY_SHOWS.map(([value,label])=>({label,radio:true,checked:cropOverlayShow===value,run:()=>setCropOverlayShow(value)})),"-",{label:"Cycle Overlay",run:cycleCropGuide},{label:"Cycle Orientation",disabled:cropGuide!=="triangle"&&cropGuide!=="spiral",run:turnCropGuide}]}/>}
       {tool==="crop"&&<MenuButton label="Crop options" icon={GearIcon} iconOnly items={[{label:"Show Cropped Area",shortcut:"H",checked:cropShowCropped,run:()=>setCropShowCropped(value=>!value)},"-",{label:"Enable Crop Shield",checked:cropShield,run:()=>setCropShield(value=>!value)},{label:"Shield Opacity",disabled:!cropShield,items:[.25,.5,.75,1].map(value=>({label:`${value*100}%`,radio:true,checked:cropShieldOpacity===value,run:()=>setCropShieldOpacity(value)}))}]}/>}
-      {tool==="crop"&&<label>Overlay:<select aria-label="Crop overlay" value={cropGuide} onChange={event=>setCropGuide(event.target.value as CropGuide)}>{CROP_GUIDES.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>}
-      {tool==="crop"&&cropBox&&<><button disabled={busy} onClick={commitCrop}>Apply crop</button><button onClick={()=>{setCropBox(null);setCropAngle(0);}}>Cancel crop</button></>}
+      {tool==="crop"&&<div className="xd-ps-tool-options"><PaintToolOptions tool="crop" values={toolOptions} disabled={busy} change={values=>setPaintOptions(current=>({...current,crop:sanitizePaintOptions("crop",values)}))}/></div>}
+      {tool==="crop"&&<CropFillField value={String(toolOptions.fill)} deleteCroppedPixels={toolOptions.deleteCroppedPixels===true} disabled={busy} change={fill=>cropOptions({fill})}/>}
       {selectionBox&&<><button disabled={busy} onClick={commitSelectionTransform}>Apply transform</button><button onClick={()=>setSelectionBox(null)}>Cancel transform</button></>}
       <FreeTransformBar untilShown={untilShown}/>
       {tool==="crop"&&<button disabled={busy||!currentState?.features?.perspectiveCrop} onClick={openPerspectiveCrop}>Perspective Crop…</button>}
+      {tool==="crop"&&cropBox&&<div role="group" aria-label="Crop actions" className="xd-ps-icon-cluster"><button aria-label="Reset crop" title="Reset the crop box and rotation" disabled={busy} onClick={resetCrop}><RotateCcw size={16}/></button>{!cropUntouched&&<><button aria-label="Cancel crop" title="Cancel the current crop (Esc)" onClick={resetCrop}><Ban size={16}/></button><button aria-label="Apply crop" title="Commit the current crop (Enter)" disabled={busy} onClick={commitCrop}><Check size={16}/></button></>}</div>}
     </div>
     <div className="xd-ps-doctabs" inert={geometryActive}>
       <div className="xd-ps-doctab" role="tab" aria-selected="true" title={`${document.width} × ${document.height} px`}><span>{document.name} @ {Math.round(zoom*100)}% ({docTabDetail(state,currentLayer)})</span><button type="button" aria-label="Close image" title="Close" disabled={busy} onClick={()=>{if(smartTrail.length)attempt(finishSmartContents(true));else usePhotoWorkspace.getState().close();}}><X size={11}/></button></div>
@@ -1620,11 +1702,11 @@ export function PhotoStudio() {
         <button className="xd-editor-icon-button" aria-label="Screen Mode" title={`${SCREEN_MODES[screenMode]} (F)`} onClick={()=>chooseScreenMode((screenMode+1)%3)}><Maximize size={17}/></button>
       </EditorToolRail>
       <div className="xd-ps-canvas" onPointerDownCapture={()=>{if(flyout)setFlyout(null);}}>
-    <div ref={stage} className="xd-photo-stage" tabIndex={0} aria-label="Image canvas" onScroll={()=>{clearCloneMarker();placeBrushTip();previewStroke();scheduleView();}}><div className="xd-photo-scroll-space"><div ref={image} className="xd-photo-image" style={{width:`${document.width*zoom}px`,height:`${document.height*zoom}px`}}>
+    <div ref={stage} className="xd-photo-stage" tabIndex={0} aria-label="Image canvas" onScroll={()=>{clearCloneMarker();placeBrushTip();previewStroke();scheduleView();}}><div className="xd-photo-scroll-space" style={cropShifted?{overflow:"clip"}:undefined}><div ref={image} className="xd-photo-image" style={{width:`${document.width*zoom}px`,height:`${document.height*zoom}px`,...(cropShifted?{transform:`translate(${cropShift[0]*zoom}px, ${cropShift[1]*zoom}px)`}:{})}}>
       <img className="xd-photo-preview-source" src={viewPreview.active?viewPreview.url??undefined:convertFileSrc(document.previewPath)} hidden={viewPreview.active&&!viewPreview.url} alt="" draggable={false} onLoad={event=>{void surface.show(event.currentTarget).then(shown=>{if(shown)imageShown();});}}/>
       <canvas ref={surface.attach} className="xd-photo-preview" role="img" aria-label={viewPreview.active?`${document.name} · ${editTarget}`:document.name} hidden={viewPreview.active&&!viewPreview.url}/>
       <PhotoTiles key={`${document.id}/${displayState?.viewKey}`} document={document} projectId={projectId} zoom={zoom} hasSelection={!!displayState?.hasSelection} selectionDisplay={selectionDisplay} edges={selectionEdgesVisible(aids)} viewKey={displayState?.viewKey} stage={stage} image={image} status={setPreviewStatus} surface={tileSurface}/>
-      <CanvasDraftPreview document={document} draft={layerPropsDraft(layerDraft)} canvas={image.current}/>
+      <CanvasDraftPreview document={document} draft={fillDraft??layerPropsDraft(layerDraft)} canvas={image.current}/>
       {tool==="magneticLasso"&&!geometryActive&&<MagneticLassoOverlay key={`${projectId}/${document.id}/${document.version}/${displayState?.viewKey}`} document={document} projectId={projectId} viewKey={displayState?.viewKey} options={toolOptions} mode={selectionMode} zoom={zoom} ready={stateVersion===document.version&&(!viewPreview.active||!!viewPreview.url)} changeWidth={width=>setPaintOptions(current=>({...current,magneticLasso:{...current.magneticLasso,width}}))}/> }
       {viewPreview.active&&!viewPreview.url&&<div className="xd-photo-view-loading" role="status">{viewPreview.error?<button onClick={viewPreview.retry}>Retry image view</button>:"Rendering image view…"}</div>}
       <canvas ref={overlay} width={document.previewWidth} height={document.previewHeight} tabIndex={geometryActive?-1:0} inert={geometryActive} aria-label="Paint and select image" className={spacePan||tool==="hand"?"xd-photo-pan":tool==="zoom"?(altHeld!==zoomOut?"xd-photo-zoom-out":"xd-photo-zoom"):springReady||springMove.current?"xd-photo-arrow":showTip&&(tipSize>=6||resizeReadout)?"xd-photo-brush":precise?"xd-photo-precise":PEN_DRAFT_TOOLS.includes(tool)?(!polygonDraft.current?"xd-photo-pen-new":draftClosing?"xd-photo-pen-close":"xd-photo-pen"):tool==="polygonLasso"&&polygonDraft.current&&draftClosing?"xd-photo-polygon-lasso-close":TOOL_CURSORS[tool]} onContextMenu={openCanvasMenu} onPointerDown={pointerDown} onPointerLeave={()=>{clearCloneMarker();tipPointer.current=null;placeBrushTip();useInfoCursor.getState().set(null);}} onPointerMove={pointerMove} onPointerUp={finish} onDoubleClick={()=>{if(polygonDraft.current)finishPolygon();}} onPointerCancel={event=>{if(scrub.current&&scrub.current.pointerId===event.pointerId)scrub.current=null;if(sampleDrag.current&&sampleDrag.current.pointerId===event.pointerId){sampleDrag.current=null;setRing(null);}if(heldStroke.current&&heldStroke.current.pointerId===event.pointerId)heldStroke.current=null;if(brushResize.current?.pointerId===event.pointerId)endBrushResize();if(panDrag.current?.pointerId===event.pointerId)panDrag.current=null;if(polygonDraft.current||strokePointer.current===event.pointerId||patchDrag.current?.pointerId===(event.pointerId??1))resetStroke();}} onLostPointerCapture={event=>{if(heldStroke.current&&heldStroke.current.pointerId===event.pointerId&&!heldStroke.current.up)heldStroke.current=null;if(brushResize.current?.pointerId===event.pointerId)endBrushResize();if(panDrag.current?.pointerId===event.pointerId)panDrag.current=null;if(strokePointer.current===event.pointerId||patchDrag.current?.pointerId===(event.pointerId??1))resetStroke();}}/>
@@ -1634,7 +1716,8 @@ export function PhotoStudio() {
       {resizeReadout&&<div className="xd-photo-brush-readout" role="status" style={{left:resizeReadout.x+16,top:resizeReadout.y+18}}><span>Diameter:</span><span>{tool==="select.quick"?Number(toolOptions.size):size} px</span>{tool!=="select.quick"&&<><span>Hardness:</span><span>{Math.round(hardness*100)}%</span></>}</div>}
       {currentLayer&&(state?.selectedLayers?.length??1)<=1&&<MoveDragPreview key={`move/${document.id}/${currentLayer.id}`} document={document} layer={currentLayer.id} bind={movePreview} redraw={()=>redrawStroke.current?.()}/>}
       {(tool==="move"&&transformControls||freeTransforming)&&!geometryActive&&shownLayer&&<ImageTransformOverlay key={`${document.id}/${shownLayer.id}`} document={document} layer={shownLayer} zoom={zoom} untilShown={untilShown} autoSelect={tool==="move"&&autoSelect}/>}
-      {tool==="crop"&&cropBox&&!cropStraighten&&!geometryActive&&<CropOverlay shade={cropShield} shadeOpacity={cropShieldOpacity} hideOutside={!cropShowCropped} width={document.width} height={document.height} zoom={zoom} box={cropBox} change={box=>setCropBox(snapBox(cropAngle?null:snapContext(document.id,document.width,document.height,zoom,state?.resolution),box,cropBox))} angle={cropAngle} rotate={setCropAngle} guide={cropGuide} orientation={cropOrientation} menu={at=>{if(!busy)setContextMenu({...at,kind:"crop"});}}/>}
+      {tool==="crop"&&cropBox&&!cropStraighten&&!geometryActive&&<CropOverlay shade={cropShield} shadeOpacity={cropShieldOpacity} hideOutside={!cropShowCropped} width={document.width} height={document.height} zoom={zoom} box={cropBox} ratio={cropRatio} change={box=>setCropBox(snapCrop(box,cropBox))} angle={cropAngle} rotate={setCropAngle} guide={cropOverlayShow==="never"?"none":cropGuide} autoGuide={cropOverlayShow==="auto"} orientation={cropOrientation} menu={at=>{if(!busy)setContextMenu({...at,kind:"crop"});}} movable={!cropUntouched} pan={panCrop}/>}
+      {editPath&&!PATH_SELECT_TOOLS.includes(tool)&&!geometryActive&&targetPathVisible(aids)&&<TargetPathOverlay width={document.width} height={document.height} zoom={zoom} path={editPath.path}/>}
       {editPath&&PATH_SELECT_TOOLS.includes(tool)&&!geometryActive&&<PathEditOverlay width={document.width} height={document.height} zoom={zoom} path={editPath.path} direct={tool==="path.direct"}
         commit={path=>editPath.layer!==undefined?command("shape.edit",{layer:editPath.layer,path}):command("path.set",{name:editPath.name,path})}
         move={(dx,dy)=>editPath.layer!==undefined?command("shape.edit",{layer:editPath.layer,move:[dx,dy]}):command("path.transform",{name:editPath.name,translateX:dx,translateY:dy})}/>}
@@ -1642,11 +1725,14 @@ export function PhotoStudio() {
       {textWarp&&textLayer&&document&&<PhotoTextGeometryDialog key={`${textLayer.id}/warp`} kind="warp" document={document} layer={textLayer} close={()=>setTextWarp(false)}/>}
       {selectionBox&&!geometryActive&&<CropOverlay label="Selection" shade={false} width={document.width} height={document.height} zoom={zoom} box={selectionBox.box} change={box=>setSelectionBox(current=>current&&{...current,box})}/>}</div></div></div>
     <ViewAids stage={stage} image={image} docId={document.id} width={document.width} height={document.height} zoom={zoom} resolution={state?.resolution} moveTool={tool==="move"}/>
-      {!geometryActive&&!cropBox&&!selectionBox&&!canvasText&&<div className="xd-ps-taskbar" role="toolbar" aria-label="Contextual Task Bar" inert={busy}>
+      {tool==="crop"&&cropBox&&!geometryActive&&<ContextualTaskBar place={taskBar} change={placeTaskBar} busy={busy} anchor={()=>image.current?.querySelector('svg[aria-label="Crop box"] .xd-photo-crop-area')} trailing={!cropUntouched&&<><button onClick={resetCrop}>Cancel</button><button onClick={commitCrop}>Done</button></>}>
+        <CropRatioSelect values={toolOptions} ratios={CROP_RATIOS} original={[document.width,document.height]} resolution={imagePpi} disabled={busy} apply={cropToRatio} applySize={cropToSize} clear={()=>cropOptions({style:"normal"})}/>
+        <button aria-label="Straighten crop" title="Draw a line along the horizon to level the crop" aria-pressed={cropStraighten} onClick={()=>setCropStraighten(value=>!value)}><Ruler size={14}/></button>
+      </ContextualTaskBar>}
+      {!geometryActive&&!cropBox&&!selectionBox&&!canvasText&&<ContextualTaskBar place={taskBar} change={placeTaskBar} busy={busy}>
         {currentState?.hasSelection?<><button onClick={()=>command("select.inverse")}>Invert selection</button><button disabled={!currentLayer} onClick={()=>command("layer.layerMask.revealSelection")}>Create mask</button><button onClick={()=>openCommand(FILL)}>Fill selection</button><button disabled={!currentState.selectionBounds} onClick={startSelectionTransform}>Transform selection</button><button onClick={()=>command("select.deselect")}>Deselect</button></>:
           <><button onClick={()=>command("select.subject")}>Select subject</button><button disabled={!currentLayer} onClick={removeBackground}>Remove background</button><button onClick={()=>openPanel("Adjustments")}>Adjust colors</button></>}
-        <button aria-label="More image actions" title="Search all image actions" onClick={()=>setCommandsOpen(true)}><Ellipsis size={14}/></button>
-      </div>}
+      </ContextualTaskBar>}
       </div>
       <aside id={panels.rightId} className="xd-ps-dock xd-editor-panel xd-editor-panel-right" aria-label="Panels" hidden={!panels.left&&!panels.right} style={{width:panels.rightWidth+STRIP_WIDTH}}>
         {flyout&&<div className="xd-ps-flyout" role="region" aria-label={`${flyout} panel`}><header><strong>{flyout}</strong><span className="xd-ps-spacer"/><MenuButton label={`${flyout} panel options`} icon={Menu} iconOnly align="end" className="xd-ps-panel-menu" items={panelMenu(flyout)}/><button type="button" className="xd-editor-icon-button" aria-label="Collapse panel" title="Collapse to icon" onClick={()=>setFlyout(null)}><ChevronsRight size={13}/></button></header><div className="xd-ps-flyout-body">
@@ -1677,7 +1763,7 @@ export function PhotoStudio() {
             <TransformSection layer={currentLayer} disabled={busy}/><AlignSection layers={state?.selectedLayers?.length??1} hasSelection={!!state?.hasSelection} disabled={busy}/>
             <InspectorSection title="Quick Actions" defaultOpen><div className="xd-photo-action-list"><button disabled={busy} onClick={()=>startFreeTransform()}>Transform</button>{([["warp","Warp"],["puppet","Puppet Warp"],["perspective","Perspective Warp"]] as const).map(([kind,label])=><button key={kind} disabled={busy} onClick={()=>openGeometry(kind)}>{label}</button>)}<button disabled={busy} onClick={()=>command("layer.arrange.bringForward")}>Forward</button><button disabled={busy} onClick={()=>command("layer.arrange.sendBackward")}>Backward</button><button disabled={busy} onClick={()=>command(currentLayer.clipped?"layer.releaseClippingMask":"layer.createClippingMask")}>{currentLayer.clipped?"Unclip":"Clip to below"}</button><button disabled={busy} onClick={()=>command("layer.new.group")}>New group</button>{currentLayer.smartObject?<button disabled={busy} onClick={()=>attempt(openSmartContents(currentLayer.id))}>Edit contents</button>:<button disabled={busy} onClick={()=>command("layer.smartObjects.convertToSmartObject")}>Smart object</button>}{currentLayer.text&&<button disabled={busy} onClick={()=>{setTextPoint(undefined);setImageDialog("text");}}>Edit text</button>}</div>
             </InspectorSection></>}
-            {currentLayer.gradientFill&&<InspectorSection title="Gradient fill" defaultOpen><button disabled={busy} onClick={()=>setImageDialog("gradient")}>Edit gradient fill</button><p className="xd-photo-section-help">Live gradient handles, colors, transparency and midpoints.</p></InspectorSection>}
+            {currentLayer.gradientFill&&<InspectorSection title="Gradient fill" defaultOpen><button disabled={busy} onClick={()=>setImageDialog("gradient")}>Edit gradient fill</button><p className="xd-photo-section-help">Gradient, style, angle, scale and Method. Drag the image to move the gradient.</p></InspectorSection>}
             {currentLayer.text&&<InspectorSection title="Typography" defaultOpen><ImageTypographyPanel key={currentLayer.id} layer={currentLayer} document={document}/></InspectorSection>}
             {currentLayer.smartObject&&<InspectorSection title="Smart object & filters" defaultOpen><SmartFilters layer={currentLayer} document={document} canvas={image.current}/></InspectorSection>}
             <MaskSection layer={currentLayer} view={state?.layerMaskView?.layer===currentLayer.id?state.layerMaskView.mode:"off"} hasSelection={!!state?.hasSelection} disabled={busy} refine={()=>setSelectionDialog("refine")} colorRange={()=>setSelectionDialog("color")}/>
@@ -1691,8 +1777,8 @@ export function PhotoStudio() {
               <LayerFilterRow filter={layerFilter} change={setLayerFilter}/>
               <div className="xd-photo-layer-controls"><select aria-label="Layer blend mode" disabled={busy||!currentLayer} value={currentLayer?.blend??"Normal"} onChange={event=>command("layer.setProps",{blend:event.target.value})}>{(currentLayer?.children?["Pass Through",...BLEND_MODES]:BLEND_MODES).map(mode=><option key={mode}>{mode}</option>)}</select>{layerSlider("opacity","Opacity:")}</div>
               <div className="xd-ps-lock-row"><span>Lock:</span>{([["transparency","Lock transparent pixels",Grid2x2],["pixels","Lock image pixels",Brush],["position","Lock position",Move],["all","Lock all attributes",Lock]] as const).map(([key,label,Icon])=><button key={key} type="button" className="xd-ps-lock" aria-label={label} title={label} aria-pressed={!!currentLayer?.locks?.[key]} disabled={busy||!currentLayer} onClick={()=>command("layer.lockLayers",{[key]:!currentLayer?.locks?.[key]})}><Icon size={12}/></button>)}<span className="xd-ps-spacer"/>{layerSlider("fill","Fill:")}</div>
-              <div className="xd-photo-layer-list" ref={layerList}>{state&&<LayerRows layers={filterLayerTree(state.layers,layerFilter)} active={state.activeLayer} busy={busy} editMask={editMask} editingMask={mask} selectPixels={()=>setMask(false)} menu={openLayerMenu} thumbnails={thumbnails} masks={maskThumbnails} openStyle={(layer,pane)=>setLayerStyle({layer:layer.id,pane})} openProperties={()=>openPanel("Properties")} folds={[folds,fold]}/>}</div>
-              <div className="xd-photo-layer-actions xd-ps-layer-actions"><button aria-label="Link layers" title="Link layers" disabled={busy||!currentLayer} onClick={()=>command("layer.linkLayers")}><Link2 size={14}/></button><button aria-label="Add a layer style" title="Add a layer style" aria-haspopup="menu" disabled={busy||!styleable} onClick={event=>{const r=event.currentTarget.getBoundingClientRect();setContextMenu({x:r.left,y:r.top,kind:"fx"});}}><span className="xd-ps-fx">fx</span></button><button aria-label="Add a mask" title="Add a mask" disabled={busy||!currentLayer} onClick={()=>command("layer.layerMask.revealAll")}><SquareDashed size={14}/></button><button aria-label="Create new fill or adjustment layer" title="Create new fill or adjustment layer" aria-haspopup="menu" disabled={busy} onClick={event=>{const r=event.currentTarget.getBoundingClientRect();setContextMenu({x:r.left,y:r.top,kind:"adjustment"});}}><Contrast size={14}/></button><button aria-label="Create a new group" title="Create a new group" disabled={busy||!currentLayer} onClick={()=>command("layer.groupLayers")}><Folder size={14}/></button><button aria-label="Create a new layer" title="Create a new layer" disabled={busy} onClick={()=>command("layer.new.layer")}><Plus size={14}/></button><button aria-label="Delete layer" title="Delete layer" disabled={busy||!currentLayer} onClick={()=>command("layer.delete")}><Trash2 size={14}/></button></div>
+              <div className="xd-photo-layer-list" ref={layerList}>{state&&<LayerRows layers={filterLayerTree(state.layers,layerFilter)} active={state.activeLayer} busy={busy} editMask={editMask} editingMask={mask} selectPixels={()=>setMask(false)} menu={openLayerMenu} thumbnails={thumbnails} masks={maskThumbnails} openStyle={(layer,pane)=>setLayerStyle({layer:layer.id,pane})} openProperties={()=>openPanel("Properties")} openFill={()=>setImageDialog("gradient")} folds={[folds,fold]}/>}</div>
+              <div className="xd-photo-layer-actions xd-ps-layer-actions"><button aria-label="Link layers" title="Link layers" disabled={busy||!currentLayer} onClick={()=>command("layer.linkLayers")}><Link2 size={14}/></button><button aria-label="Add a layer style" title="Add a layer style" aria-haspopup="menu" disabled={busy||!styleable} onClick={event=>{const r=event.currentTarget.getBoundingClientRect();setContextMenu({x:r.left,y:r.top,kind:"fx"});}}><span className="xd-ps-fx">fx</span></button><button aria-label="Add a mask" title="Add a mask" disabled={busy||!currentLayer} onClick={()=>command("layer.layerMask.revealAll")}><SquareDashed size={14}/></button><button aria-label="Create new fill or adjustment layer" title="Create new fill or adjustment layer" aria-haspopup="menu" disabled={busy} onClick={event=>{const r=event.currentTarget.getBoundingClientRect();setContextMenu({x:r.left,y:r.top,kind:"adjustment"});}}><Contrast size={14}/></button><button aria-label="Create a new group" title="Create a new group" disabled={busy||!currentLayer} onClick={()=>command("layer.groupLayers")}><Folder size={14}/></button><button aria-label="Create a new layer" title="Create a new layer" disabled={busy} onClick={event=>{if(event.altKey)newLayer();else void command("layer.new.layer");}}><Plus size={14}/></button><button aria-label="Delete layer" title="Delete layer" disabled={busy||!currentLayer} onClick={()=>command("layer.delete")}><Trash2 size={14}/></button></div>
             </>)}
           </section>
         </div>
@@ -1714,13 +1800,14 @@ export function PhotoStudio() {
     {dialog&&<PhotoActionDialog document={document} canvas={image.current} key={`${dialog.action.id}/${dialog.layer?.id??"new"}`} action={dialog.action} adjustment={dialog.adjustment} layer={dialog.layer} onClose={()=>setDialog(null)}/>}
     {state&&(imageDialog==="size"||imageDialog==="canvas")&&<ImageSizeDialog state={state} document={document} canvas={imageDialog==="canvas"} close={()=>setImageDialog(null)}/>}
     {state&&imageDialog==="trim"&&<ImageTrimDialog state={state} close={()=>setImageDialog(null)}/>}
+    {newLayerDialog&&<NewLayerDialog {...newLayerDialog} close={()=>setNewLayerDialog(null)}/>}
     {state&&imageDialog==="duotone"&&<DuotoneDialog close={()=>setImageDialog(null)}/>}
     {state&&imageDialog==="colorTable"&&<ColorTableDialog close={()=>setImageDialog(null)}/>}
     {imageDialog==="text"&&<ImageTextDialog layer={textPoint?undefined:currentLayer?.text?currentLayer:undefined} point={textPoint} close={()=>{setImageDialog(null);setTextPoint(undefined);}}/>}
-    {imageDialog==="gradient"&&currentLayer?.gradientFill&&<GradientFillDialog document={document} layer={currentLayer} close={()=>setImageDialog(null)}/>}
+    {(imageDialog==="gradient"||imageDialog==="newGradient")&&currentLayer?.gradientFill&&<GradientFillDialog document={document} layer={currentLayer} canvas={image.current} close={()=>setImageDialog(null)} cancel={imageDialog==="newGradient"?()=>{setImageDialog(null);const base=newFillBase.current;if(base===undefined)undo();else void command("history.select",{index:base,discardRedo:true});}:undefined}/>}
     {commandDialog&&<ImageCommandDialog key={commandDialog.command.id} document={document} canvas={image.current} command={commandDialog.command} initial={commandDialog.initial} close={()=>setCommandDialog(null)}/>}
     {exportOpen&&<ImageExportDialog name={document.name} choose={exportTo} close={()=>setExportOpen(false)}/>}
-    {picker&&<ColorPickerDialog addToSwatches={addImageSwatch} title={picker==="fillLayer"?"Color Picker (Solid Color)":`Color Picker (${picker==="foreground"?"Foreground":"Background"} Color)`} color={picker==="background"?background:picker==="foreground"?paintColor:color} close={()=>setPicker(null)} choose={hex=>{if(picker==="fillLayer")command("layer.newFillLayer.solidColor",{color:hex});else chooseColor(picker,hex);setPicker(null);}}/>}
+    {picker&&<ColorPickerDialog addToSwatches={addImageSwatch} title={picker==="fillLayer"?"Color Picker (Solid Color)":`Color Picker (${picker==="foreground"?"Foreground":"Background"} Color)`} color={picker==="background"?background:picker==="foreground"?paintColor:color} preview={picker==="fillLayer"?hex=>setFillDraft(solidFill(hex)):undefined} close={()=>{setPicker(null);setFillDraft(null);}} choose={hex=>{if(picker==="fillLayer"){setFillDraft(solidFill(hex,true));void untilShown(withLayerOptions(()=>runPhotoCommand("layer.newFillLayer.solidColor",{color:hex}),solidFillOptions.current??{},"New Color Fill Layer")).then(()=>setFillDraft(previous=>previous?.committing?null:previous));}else chooseColor(picker,hex);setPicker(null);}}/>}
     <GuideDialogs docId={document.id} width={document.width} height={document.height}/>
   </section>;
 }

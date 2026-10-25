@@ -52,6 +52,7 @@ import { ensureVideo, drawVideoFrame, dropVideo, dropAllVideos } from "./fxVideo
 import { toast as fxToast } from "@/store/toastStore";
 import { FX_CUSTOM_ID, customCodeOf } from "./fxModel";
 import { useFxStore } from "./fxStore";
+import { fxHistoryShortcut } from "./fxHistoryKeys";
 import { createCompositor, type FxCompositor } from "./compositor";
 import {
   resolveDpi,
@@ -1357,7 +1358,25 @@ function FxTimelineBar() {
 export function FxEditor() {
   const showPerf = useFxStore((s) => s.showPerf);
   return (
-    <div className="xd-fx-shell">
+    <div
+      className="xd-fx-shell"
+      // Focusable so ⌘Z works after clicking the canvas or a layer row, where
+      // nothing else would hold focus. Interactive children keep their own.
+      tabIndex={-1}
+      style={{ outline: "none" }}
+      onPointerDownCapture={(e) => {
+        if (!(e.target as Element).closest("input, textarea, select, button, [contenteditable]")) {
+          e.currentTarget.focus({ preventScroll: true });
+        }
+      }}
+      onKeyDown={(e) => {
+        const action = fxHistoryShortcut(e.nativeEvent);
+        if (!action) return;
+        e.preventDefault();
+        e.stopPropagation();
+        useFxStore.getState()[action]();
+      }}
+    >
       <FxLayersPanel />
       <div className="xd-fx-stage">
         <FxToolbar />

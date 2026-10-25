@@ -1,0 +1,62 @@
+/* Photoshop's Gradient Editor: presets box, Name/Type rows, the bar with opacity stops above and colour stops below, and
+   the Stops group. Fills use the closest --xd-* tokens (no new tokens). */
+.xd-photo .xd-ge-dialog { width:min(560px,100%); }
+.xd-ge-box { margin-bottom:10px;border:1px solid var(--xd-border);border-radius:var(--r-sm);background:var(--xd-bg); }
+.xd-ge-head { display:flex;align-items:center;justify-content:space-between;padding:3px 6px;border-bottom:1px solid var(--xd-border);color:var(--xd-text-2); }
+.xd-ge-gear { position:relative; }
+.xd-photo .xd-ps-dialog .xd-ge-gear > button { display:flex;align-items:center;gap:1px;padding:2px 4px;border:0;background:transparent; }
+.xd-photo .xd-ps-dialog .xd-ge-menu { top:100%;right:0;bottom:auto;left:auto;min-width:220px;padding:4px 0; }
+.xd-photo .xd-ps-dialog .xd-ge-menu button { position:relative;justify-content:flex-start;padding:3px 12px 3px 24px;text-align:left; }
+.xd-ge-menu [aria-checked=true]::before { content:"✓";position:absolute;left:8px; }
+.xd-ge-menu [role=separator] { margin:4px 0;border-top:1px solid var(--xd-border); }
+.xd-ge-presets { height:150px;overflow:auto;padding:2px 0; }
+.xd-photo :is(.xd-ps-dialog,.xd-ge-pick-presets) .xd-ge-folder { display:flex;align-items:center;justify-content:flex-start;gap:4px;width:100%;padding:3px 6px;border:0;border-radius:0;background:transparent;text-align:left; }
+.xd-ge-items { display:flex;flex-wrap:wrap;gap:4px;padding:2px 6px 6px 22px; }
+.xd-photo :is(.xd-ps-dialog,.xd-ge-pick-presets) .xd-ge-preset { display:flex;align-items:center;justify-content:flex-start;gap:6px;padding:0;border:1px solid var(--xd-border);border-radius:2px;background:transparent;overflow:hidden; }
+.xd-photo :is(.xd-ps-dialog,.xd-ge-pick-presets) .xd-ge-preset:hover:not(:disabled) { border-color:var(--xd-accent);background:transparent; }
+.xd-ge-preset > i { display:block;width:32px;height:32px;flex:none;background-size:auto,8px 8px; }
+.xd-ge-presets.is-large .xd-ge-preset > i { width:64px;height:64px; }
+.xd-ge-presets:is(.is-text,.is-smallList,.is-largeList) .xd-ge-items { flex-direction:column;flex-wrap:nowrap;gap:0; }
+.xd-photo :is(.xd-ps-dialog,.xd-ge-pick-presets) .xd-ge-presets:is(.is-text,.is-smallList,.is-largeList) .xd-ge-preset { width:100%;padding:2px 4px;border:0;border-radius:0; }
+.xd-ge-presets.is-smallList .xd-ge-preset > i { width:16px;height:16px; }
+.xd-ge-line { display:flex;align-items:center;gap:6px;margin-bottom:8px; }
+.xd-ge-line > span:first-child { width:76px;flex:none;text-align:right; }
+.xd-photo .xd-ps-dialog .xd-ge-line > input[type=text] { flex:1;min-width:0; }
+.xd-photo .xd-ps-dialog .xd-ge-line > input[type=number] { width:56px; }
+.xd-ge-bar { margin:4px 6px 12px; }
+.xd-ge-ramp { display:block;height:26px;border:1px solid var(--xd-border);background-size:auto,10px 10px; }
+.xd-ge-strip { position:relative;height:16px;cursor:pointer;touch-action:none; }
+.xd-ge-stop { position:absolute;top:1px;width:11px;height:14px;margin-left:-5.5px; }
+.xd-ge-stop > svg { display:block;width:100%;height:100%;overflow:visible; }
+.xd-ge-stop path { fill:var(--xd-raised);stroke:var(--xd-text-2); }
+.xd-ge-stop[aria-pressed=true] path { fill:var(--xd-text); }
+.xd-ge-stop rect { stroke:var(--xd-border); }
+.xd-ge-stop.is-leaving { opacity:.3; }
+.xd-ge-stop:focus-visible { outline:none; }
+.xd-ge-stop:focus-visible path { stroke:var(--xd-accent); }
+.xd-ge-row { display:grid;grid-template-columns:52px 56px 12px 72px 56px 12px 28px;gap:6px;align-items:center;margin-bottom:6px; }
+.xd-ge-row:last-child { margin-bottom:0; }
+.xd-ge-row > span:is(:nth-child(1),:nth-child(4)) { text-align:right; }
+.xd-photo .xd-ps-dialog button.xd-ge-swatch { width:56px;height:20px;padding:0; }
+.xd-photo .xd-ps-dialog .xd-ge-row > button:last-child { display:grid;place-items:center;padding:2px 4px; }
+
+/* The gradient swatch with its presets arrow, in dialogs and in Properties. */
+.xd-ge-pick { position:relative;display:flex;flex:1;min-width:0; }
+.xd-photo .xd-ge-pick > button { height:22px;border:1px solid var(--xd-border);background-color:var(--xd-raised); }
+/* The checker size is inline because the dialogs' button hover resets the background shorthand. */
+.xd-photo .xd-ge-pick > button.xd-ge-pick-swatch { flex:1;min-width:120px;padding:0;border-radius:var(--r-sm) 0 0 var(--r-sm); }
+.xd-photo .xd-ge-pick > button.xd-ge-pick-more { display:grid;place-items:center;padding:0 3px;border-left:0;border-radius:0 var(--r-sm) var(--r-sm) 0; }
+.xd-photo .xd-ge-pick > button:hover:not(:disabled) { background-color:var(--xd-hover); }
+.xd-ge-pick-presets { position:absolute;z-index:60;width:280px;border:1px solid var(--xd-border);background:var(--xd-bg);box-shadow:var(--shadow-window); }
+/* Keeps the portaled Gradient Editor out of its opener's layout. */
+.xd-ge-portal { display:contents; }
+
+/* Gradient Fill: Photoshop's label column, with each row's controls side by side in the field column. */
+.xd-photo .xd-ps-dialog .xd-gf-field { grid-column:2/-1;display:flex;align-items:center;gap:8px; }
+.xd-photo .xd-ps-dialog .xd-gf-field > label { margin:0; }
+.xd-photo .xd-ps-dialog .xd-gf-field > label + label { margin-left:16px; }
+.xd-photo .xd-ps-dialog .xd-gf-field > input[type=number] { width:80px;text-align:left; }
+.xd-photo .xd-ps-dialog .xd-gf-field > .xd-ls-dial { width:36px;height:36px; }
+.xd-photo .xd-ps-dialog .xd-gf-field .xd-ps-scrub { display:none; }
+.xd-photo .xd-ps-dialog .xd-gf-field button.xd-ps-chevron { width:16px;height:22px;padding:0;border-color:transparent;background:transparent; }
+.xd-photo .xd-ps-dialog.xd-gf-dialog .xd-ps-dialog-field > select { min-width:96px; }

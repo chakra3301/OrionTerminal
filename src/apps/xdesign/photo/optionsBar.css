@@ -9,11 +9,17 @@
 .xd-ps-scrub { cursor: ew-resize; user-select: none; touch-action: none; }
 .xd-ps-unit { color: var(--xd-text-2); }
 .xd-ps-number { box-sizing: border-box; width: 44px; height: 20px; padding: 0 4px; border: 1px solid var(--xd-border); border-radius: var(--r-sm); background: var(--xd-raised); color: var(--xd-text); font: inherit; font-size: 11px; }
+.xd-ps-number.is-length { width: 64px; }
 .xd-ps-chevron { width: 16px; height: 20px; }
 .xd-ps-chevron[aria-expanded="true"], .xd-ps-brush-trigger[aria-expanded="true"] { background: var(--xd-hover); color: var(--xd-text); }
 
 .xd-ps-popover { position: fixed; z-index: 60; box-sizing: border-box; padding: 6px; background: var(--xd-panel); border: 1px solid var(--xd-border); border-radius: var(--r-sm); box-shadow: var(--shadow-window); color: var(--xd-text); font-size: 11px; white-space: nowrap; }
 .xd-ps-popover input[type="range"] { accent-color: var(--xd-accent); width: 140px; }
+.xd-ps-note { display: grid; gap: 6px; width: 280px; padding: 10px 12px; white-space: normal; line-height: 1.4; }
+.xd-ps-note > h4 { margin: 0; font-size: 12px; }
+.xd-ps-note > p { margin: 0; color: var(--xd-text-2); }
+.xd-ps-note > p > b { color: var(--xd-text); }
+.xd-ps-note > button { justify-self: end; min-width: 56px; background: var(--xd-accent); color: var(--t-on-accent); border-color: transparent; }
 
 .xd-ps-brush-trigger { flex-direction: column; width: 34px; height: 26px; gap: 0; color: var(--xd-text); }
 .xd-ps-brush-tip { display: block; flex: none; border-radius: 50%; }
@@ -30,9 +36,9 @@
 .xd-ps-label { font-size: 11px; color: var(--xd-text-2); margin-right: 3px; }
 .xd-ps-segmented { gap: 1px; }
 .xd-ps-segmented > button { width: auto; padding: 0 7px; font-size: 11px; }
+.xd-ps-options .xd-ge-pick { flex: none; }
+.xd-photo .xd-ps-options .xd-ge-pick > button.xd-ge-pick-swatch { width: 72px; min-width: 0; }
 .xd-ps-more { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 1px solid transparent; background: transparent; color: var(--xd-text-2); }
-.xd-ps-gradient-pick { display: inline-flex; align-items: center; gap: 3px; }
-.xd-ps-gradient-swatch { width: 48px; height: 18px; border: 1px solid var(--xd-border); border-radius: var(--r-sm); }
 
 .xd-ps-toggle { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; color: var(--xd-text-2); cursor: default; }
 .xd-ps-toggle:hover:not(:disabled) { background: var(--xd-hover); color: var(--xd-text); }

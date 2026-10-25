@@ -1,7 +1,11 @@
 import { AlignCenter, AlignHorizontalDistributeCenter, AlignHorizontalDistributeEnd, AlignHorizontalDistributeStart, AlignHorizontalSpaceAround, AlignLeft, AlignRight, AlignVerticalDistributeCenter, AlignVerticalDistributeEnd, AlignVerticalDistributeStart, AlignVerticalSpaceAround, ArrowDownUp, Brush, Ellipsis, FlipHorizontal2, Gauge, Settings2, SprayCan, Type as TypeIcon, type LucideIcon } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { MenuButton } from "../EditorMenus";
+import { DeleteCropPresetDialog, NewCropPresetDialog, applyCropPreset, matchingCropPreset, useCropPresets } from "./CropPresets";
 import type { MenuEntry } from "../menuModel";
+import { InfoNote } from "./OptionsBarControls";
+import { GradientEditorDialog, GradientPick, gradientCss, type EditedGradient } from "./GradientEditorDialog";
 
 export const TYPE_STYLES = ["Regular", "Italic", "Bold", "Bold Italic"] as const;
 export const TYPE_ANTIALIAS = ["none", "sharp", "crisp", "strong", "smooth"] as const;
@@ -50,18 +54,106 @@ export function PathOpSelect({ value, change }: { value: PathOp; change: (value:
   return <select aria-label="Path operation" title="Path operations" value={value} onChange={event => change(event.target.value as PathOp)}>{PATH_OPS.map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select>;
 }
 
-export type CropRatio = Partial<{ style: unknown; ratioWidth: unknown; ratioHeight: unknown }>;
+export type CropRatio = Partial<Record<"style" | "ratioWidth" | "ratioHeight" | "sizeWidth" | "sizeWidthUnit" | "sizeHeight" | "sizeHeightUnit" | "resolution" | "resolutionUnit", unknown>>;
+export type CropSizeValues = Partial<Record<"style" | "sizeWidthUnit" | "sizeHeightUnit" | "resolutionUnit", string> & Record<"sizeWidth" | "sizeHeight" | "resolution", number>>;
+// Photoshop's W x H x Resolution presets, listed after Front Image.
+const CROP_SIZE_PRESETS: [string, number, number, string, number][] = [["4 x 5 in 300 ppi", 4, 5, "in", 300], ["8.5 x 11 in 300 ppi", 8.5, 11, "in", 300], ["1024 x 768 px 92 ppi", 1024, 768, "px", 92], ["1280 x 800 px 113 ppi", 1280, 800, "px", 113], ["1366 x 768 px 135 ppi", 1366, 768, "px", 135]];
+export const CROP_SIZES = ["Front Image", ...CROP_SIZE_PRESETS.map(([name]) => name)];
+const PER_INCH: Record<string, number> = { in: 1, cm: 2.54, mm: 25.4 };
+const LENGTH = /^\s*(\d*\.?\d+)\s*(px|in|cm|mm)?\s*$/i;
+const decimals = (value: number) => Number(value.toFixed(2));
+/** The pixels and ppi a W x H x Resolution crop resamples to, or null until both sides have a size. */
+export function cropSizePixels(values: CropRatio, documentPpi: number) {
+  const width = Number(values.sizeWidth), height = Number(values.sizeHeight), set = Number(values.resolution);
+  if (values.style !== "size" || !(width > 0) || !(height > 0)) return null;
+  const ppi = set > 0 ? values.resolutionUnit === "cm" ? decimals(set * 2.54) : set : documentPpi;
+  const pixels = (value: number, unit: unknown) => Math.max(1, Math.round(typeof unit === "string" && unit in PER_INCH ? value / PER_INCH[unit]! * ppi : value));
+  return { width: pixels(width, values.sizeWidthUnit), height: pixels(height, values.sizeHeightUnit), ppi };
+}
+/** The Ratio menu's entry for a size, or "size" when it matches no preset. */
+export function cropSizeName(values: CropRatio) {
+  return CROP_SIZE_PRESETS.find(([, w, h, unit, ppi]) => values.sizeWidth === w && values.sizeHeight === h && values.sizeWidthUnit === unit && values.sizeHeightUnit === unit && values.resolution === ppi && values.resolutionUnit !== "cm")?.[0] ?? "size";
+}
+/** Choosing a size from the Ratio menu or the crop context menu; Front Image takes the image's own. */
+export function cropSizeChoice(name: string, original: [number, number], resolution: number): CropSizeValues | null {
+  if (name === "Front Image") return { style: "size", sizeWidth: original[0], sizeWidthUnit: "px", sizeHeight: original[1], sizeHeightUnit: "px", resolution, resolutionUnit: "in" };
+  const preset = CROP_SIZE_PRESETS.find(([label]) => label === name);
+  return preset ? { style: "size", sizeWidth: preset[1], sizeWidthUnit: preset[3], sizeHeight: preset[2], sizeHeightUnit: preset[3], resolution: preset[4], resolutionUnit: "in" } : null;
+}
 // Photoshop's Ratio dropdown with its W : H pair and swap; `apply` refits the crop box like the context menu does.
-export function CropRatioFields({ values, ratios, original, disabled, apply, clear }: { values: CropRatio; ratios: readonly (readonly [string, number, number])[]; original: [number, number]; disabled: boolean; apply: (width: number, height: number) => void; clear: () => void }) {
+type CropRatioProps = { values: CropRatio; ratios: readonly (readonly [string, number, number])[]; original: [number, number]; resolution: number; disabled: boolean; apply: (width: number, height: number) => void; applySize: (values: CropSizeValues) => void; clear: () => void };
+// Saved presets follow the sizes, as in Photoshop, and win the label over a built-in entry with the same values.
+export function CropRatioSelect({ values, ratios, original, resolution, disabled, apply, applySize, clear }: CropRatioProps) {
+  const presets = useCropPresets(), saved = matchingCropPreset(presets, values), [dialog, setDialog] = useState<"new" | "delete" | null>(null), anchor = useRef<HTMLSelectElement>(null);
   const fixed = values.style === "fixedRatio", w = Number(values.ratioWidth), h = Number(values.ratioHeight);
-  const known = fixed ? w * original[1] === h * original[0] ? "original" : ratios.find(([, rw, rh]) => rw * h === rh * w)?.[0] ?? "custom" : "none";
+  const known = saved ? `preset:${saved.name}` : values.style === "size" ? cropSizeName(values) : fixed ? w * original[1] === h * original[0] ? "original" : ratios.find(([, rw, rh]) => rw * h === rh * w)?.[0] ?? "custom" : "none";
+  const close = () => setDialog(null), host = anchor.current?.closest(".xd-photo");
+  const open = dialog === "new" ? <NewCropPresetDialog values={values} close={close} /> : dialog === "delete" ? <DeleteCropPresetDialog presets={presets} close={close} /> : null;
+  return <><select ref={anchor} aria-label="Crop ratio" disabled={disabled} value={known} onChange={event => {
+    const value = event.target.value, size = cropSizeChoice(value, original, resolution), preset = value.startsWith("preset:") && presets.find(item => `preset:${item.name}` === value);
+    if (value === "new" || value === "delete") setDialog(value); else if (preset) applyCropPreset(preset.values, { apply, applySize, clear });
+    else if (value === "none") clear(); else if (value === "size") applySize({ style: "size", sizeWidth: 0, sizeHeight: 0, resolution: 0 }); else if (size) applySize(size); else if (value === "original") apply(...original);
+    else { const ratio = ratios.find(([name]) => name === value); if (ratio) apply(ratio[1], ratio[2]); }
+  }}>
+    <option value="none">Ratio</option><option value="size">W x H x Resolution</option><option value="original">Original Ratio</option>{ratios.map(([name]) => <option key={name} value={name}>{name}</option>)}{known === "custom" && <option value="custom">Custom</option>}
+    {CROP_SIZES.map(name => <option key={name} value={name}>{name}</option>)}
+    {presets.map(preset => <option key={preset.name} value={`preset:${preset.name}`}>{preset.name}</option>)}
+    <option value="new">New Crop Preset…</option><option value="delete" disabled={!presets.length}>Delete Crop Preset…</option></select>
+    {open && (host ? createPortal(open, host) : open)}</>;
+}
+// Photoshop's length fields read "4 in" or "1024 px", applying what was typed on Enter or blur; a bare number keeps the field's unit.
+function CropLength({ label, value, unit, disabled, commit }: { label: string; value: number; unit: string; disabled: boolean; commit: (value: number, unit: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null), shown = value > 0 ? `${decimals(value)} ${unit}` : "";
+  const finish = () => {
+    if (draft === null) return; setDraft(null);
+    const match = LENGTH.exec(draft);
+    if (!draft.trim()) commit(0, unit); else if (match) commit(Number(match[1]), match[2]?.toLowerCase() ?? unit);
+  };
+  return <input aria-label={label} className="xd-ps-number is-length" type="text" disabled={disabled} value={draft ?? shown} onChange={event => setDraft(event.target.value)} onBlur={finish}
+    onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); event.currentTarget.blur(); } else if (event.key === "Escape") { event.stopPropagation(); setDraft(null); } }} />;
+}
+function CropSizeFields({ values, disabled, applySize }: CropRatioProps) {
+  const width = Number(values.sizeWidth) || 0, height = Number(values.sizeHeight) || 0, resolution = Number(values.resolution) || 0;
+  const widthUnit = String(values.sizeWidthUnit ?? "px"), heightUnit = String(values.sizeHeightUnit ?? "px"), resolutionUnit = values.resolutionUnit === "cm" ? "cm" : "in";
   return <>
-    <label>Ratio<select aria-label="Crop ratio" disabled={disabled} value={known} onChange={event => { const value = event.target.value; if (value === "none") clear(); else if (value === "original") apply(...original); else { const preset = ratios.find(([name]) => name === value); if (preset) apply(preset[1], preset[2]); } }}>
-      <option value="none">Unconstrained</option><option value="original">Original Ratio</option>{ratios.map(([name]) => <option key={name} value={name}>{name}</option>)}{known === "custom" && <option value="custom">Custom</option>}</select></label>
-    {fixed && <><input aria-label="Crop ratio width" className="xd-ps-number" type="number" min="0.01" max="100000" disabled={disabled} value={w} onChange={event => event.target.valueAsNumber > 0 && apply(event.target.valueAsNumber, h)} />
-      <button aria-label="Swap crop ratio" title="Swap width and height" disabled={disabled} onClick={() => apply(h, w)}>⇄</button>
-      <input aria-label="Crop ratio height" className="xd-ps-number" type="number" min="0.01" max="100000" disabled={disabled} value={h} onChange={event => event.target.valueAsNumber > 0 && apply(w, event.target.valueAsNumber)} /></>}
-    <button aria-label="Clear crop ratio" title="Clear the ratio" disabled={disabled || !fixed} onClick={clear}>Clear</button>
+    <CropLength label="Crop width" value={width} unit={widthUnit} disabled={disabled} commit={(sizeWidth, sizeWidthUnit) => applySize({ sizeWidth, sizeWidthUnit })} />
+    <button aria-label="Swap crop size" title="Swap width and height" disabled={disabled} onClick={() => applySize({ sizeWidth: height, sizeWidthUnit: heightUnit, sizeHeight: width, sizeHeightUnit: widthUnit })}>⇄</button>
+    <CropLength label="Crop height" value={height} unit={heightUnit} disabled={disabled} commit={(sizeHeight, sizeHeightUnit) => applySize({ sizeHeight, sizeHeightUnit })} />
+    <input aria-label="Crop resolution" className="xd-ps-number" type="number" min="0" max="100000" disabled={disabled} value={resolution > 0 ? resolution : ""} onChange={event => applySize({ resolution: Number.isFinite(event.target.valueAsNumber) && event.target.valueAsNumber > 0 ? event.target.valueAsNumber : 0 })} />
+    <select aria-label="Crop resolution unit" disabled={disabled} value={resolutionUnit} onChange={event => { const unit = event.target.value; applySize({ resolution: Number((unit === "cm" ? resolution / 2.54 : resolution * 2.54).toFixed(3)), resolutionUnit: unit }); }}><option value="in">px/in</option><option value="cm">px/cm</option></select>
+    <button aria-label="Clear crop size" title="Clear the width, height and resolution" disabled={disabled || !width && !height && !resolution} onClick={() => applySize({ sizeWidth: 0, sizeHeight: 0, resolution: 0 })}>Clear</button>
+  </>;
+}
+// Unconstrained, Photoshop shows the pair empty and only constrains the box once both sides have a value.
+export function CropRatioFields(props: CropRatioProps) {
+  const { values, disabled, apply, clear } = props, fixed = values.style === "fixedRatio";
+  const [pending, setPending] = useState<[number, number]>([NaN, NaN]);
+  const [w, h] = fixed ? [Number(values.ratioWidth), Number(values.ratioHeight)] : pending;
+  const set = (next: [number, number]) => { if (next[0] > 0 && next[1] > 0) { setPending([NaN, NaN]); apply(...next); } else if (!fixed) setPending(next); };
+  const field = (value: number) => Number.isFinite(value) ? value : "";
+  if (values.style === "size") return <><CropRatioSelect {...props} /><CropSizeFields {...props} /></>;
+  return <>
+    <CropRatioSelect {...props} />
+    <input aria-label="Crop ratio width" className="xd-ps-number" type="number" min="0.01" max="100000" disabled={disabled} value={field(w)} onChange={event => set([event.target.valueAsNumber, h])} />
+    <button aria-label="Swap crop ratio" title="Swap width and height" disabled={disabled} onClick={() => set([h, w])}>⇄</button>
+    <input aria-label="Crop ratio height" className="xd-ps-number" type="number" min="0.01" max="100000" disabled={disabled} value={field(h)} onChange={event => set([w, event.target.valueAsNumber])} />
+    <button aria-label="Clear crop ratio" title="Clear the ratio" disabled={disabled || !fixed && !Number.isFinite(w) && !Number.isFinite(h)} onClick={() => { setPending([NaN, NaN]); if (fixed) clear(); }}>Clear</button>
+  </>;
+}
+
+// Generative Expand stays listed but off: the engine has no generative model to expand with.
+export function CropFillField({ value, deleteCroppedPixels, disabled, change }: { value: string; deleteCroppedPixels: boolean; disabled: boolean; change: (fill: string) => void }) {
+  return <>
+    <label>Fill:<select aria-label="Crop fill" disabled={disabled} value={value} onChange={event => change(event.target.value)}>
+      <option value="background">{deleteCroppedPixels ? "Background (default)" : "Transparent (default)"}</option>
+      <option value="generativeExpand" disabled>Generative Expand</option>
+      <option value="contentAware">Content-Aware Fill</option>
+    </select></label>
+    <InfoNote label="Fill options">
+      <p><b>Background (default):</b> Fill the expanded area with your background color or transparent pixels</p>
+      <p><b>Generative expand:</b> Generate high-quality new content to fill expanded space, with or without a text prompt</p>
+      <p><b>Content-aware fill:</b> Sample content from part of the image and use it to fill a small area</p>
+    </InfoNote>
   </>;
 }
 
@@ -75,13 +167,18 @@ export function DistributeMenu({ disabled, run }: { disabled: boolean; run: (com
 }
 
 type Gradient = { name: string; stops: [number, string][]; transparency: [number, number][] };
-export const gradientCss = (gradient: Gradient, foreground: string, background: string) => `linear-gradient(90deg, ${gradient.stops.map(([at, color]) => `${color === "foreground" ? foreground : color === "background" ? background : color} ${Math.round(at * 100)}%`).join(", ")})`;
-export function GradientPresetSelect({ current, groups, foreground, background, disabled, select }: { current: Gradient; groups: { name: string; presets: Gradient[] }[]; foreground: string; background: string; disabled: boolean; select: (preset: string, group: string) => void }) {
-  const owner = groups.find(group => group.presets.some(item => item.name === current.name));
-  return <span className="xd-ps-gradient-pick"><span className="xd-ps-gradient-swatch" aria-hidden style={{ background: gradientCss(current, foreground, background) }} />
-    <select aria-label="Gradient preset" disabled={disabled} value={owner ? `${owner.name}/${current.name}` : current.name} onChange={event => { const [group, ...name] = event.target.value.split("/"); select(name.join("/"), group!); }}>
-      {!owner && <option value={current.name}>{current.name}</option>}
-      {groups.map(group => <optgroup key={group.name} label={group.name}>{group.presets.map(item => <option key={`${group.name}/${item.name}`} value={`${group.name}/${item.name}`}>{item.name}</option>)}</optgroup>)}</select></span>;
+/** The Gradient tool's swatch. Classic gradient edits it in the Gradient Editor (the swatch previews each edit, OK keeps it); the live Gradient tool picks presets from it, as in Photoshop. */
+export function GradientToolPick({ current, live, foreground, background, disabled, select }: { current: Gradient; live: boolean; foreground: string; background: string; disabled: boolean; select: (params: Record<string, unknown>) => void }) {
+  const [editing, setEditing] = useState<{ root: Element; draft: EditedGradient<string> | null } | null>(null);
+  const hex = (color: string) => color === "foreground" ? foreground : color === "background" ? background : color;
+  const gradient = { stops: current.stops, opacity: current.transparency.map(([at, alpha]): [number, number] => [at, alpha / 100]) }, shown = editing?.draft ?? gradient;
+  // A classic gradient paints pixels, so it leaves a selected Gradient Fill layer alone.
+  const target = live ? {} : { applyToLayer: false };
+  return <>
+    <GradientPick css={gradientCss(shown.stops, shown.opacity, hex)} disabled={disabled} edit={live ? undefined : event => setEditing({ root: event.currentTarget.closest(".xd-photo") ?? document.body, draft: null })} choose={(_, preset, group) => select({ preset, group, ...target })}/>
+    {editing && createPortal(<GradientEditorDialog<string> gradient={gradient} name={current.name} hex={hex} color={value => value} preview={draft => setEditing(open => open && { ...open, draft })}
+      choose={(next, name) => { setEditing(null); select({ name, stops: next.stops, transparency: next.opacity.map(([at, alpha]) => [at, Math.round(alpha * 100)]), ...target }); }} close={() => setEditing(null)}/>, editing.root)}
+  </>;
 }
 
 // Which brush-bar controls Photoshop shows per painting tool; each reads and writes the engine's BrushSettings.

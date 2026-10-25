@@ -44,4 +44,4 @@ const MIXER_TRACKS: Record<string, string> = { red: "linear-gradient(90deg,#3a08
 const SELECTIVE_TRACKS: Record<string, string> = { cyan: "linear-gradient(90deg,#ff3a3a,#3affff)", magenta: "linear-gradient(90deg,#3aff3a,#ff3aff)", yellow: "linear-gradient(90deg,#3a3aff,#ffff3a)", black: "linear-gradient(90deg,#fff,#000)" };
 export const psTrack = (id: string, key: string): string | undefined => (id === "channelMixer" ? MIXER_TRACKS : id === "selectiveColor" ? SELECTIVE_TRACKS : {})[key];
 /** The dialogs laid out like Photoshop 2026; the lead switches more over by adding their ids. */
-export const PS_SLIDER_ACTIONS = new Set(["brightnessContrast", "exposure", "hueSaturation", "blackWhite", "channelMixer", "selectiveColor"]);
+export const PS_SLIDER_ACTIONS = new Set(["brightnessContrast", "exposure", "hueSaturation", "blackWhite", "channelMixer", "selectiveColor", "gradientMap"]);

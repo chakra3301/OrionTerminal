@@ -12,6 +12,7 @@ import type { PhotoCloneSources, PhotoDocument, PhotoLayer, PhotoState } from ".
 import { useViewAids } from "./viewGuides";
 import { PAINT_TOOL_PREFERENCES_KEY } from "./paintToolPreferences";
 import { IMAGE_TOOL_GROUPS } from "../editorTools";
+import { unbaked } from "./gradientMethod";
 
 const command = vi.hoisted(() => vi.fn(async (_id:string,_params:Record<string,unknown>={}) => undefined));
 const colors=vi.hoisted(()=>vi.fn(async(_colors:Record<string,string>)=>undefined));
@@ -148,7 +149,7 @@ describe("Image workspace layout", () => {
     expect(command).toHaveBeenLastCalledWith("layer.setExpanded",{all:true,expanded:false});
     expect(names()).toEqual(["Group 1","Background"]);
     await act(async()=>container.querySelector('.xd-photo-layer-list [data-layer="1"]')!.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true})));
-    expect(items()[collapseAll()-1]!.textContent).toBe("Group from Layers");
+    expect(items()[collapseAll()-1]!.textContent).toBe("Group from Layers…");
     await act(async()=>document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true})));
 
     const list=container.querySelector<HTMLElement>(".xd-photo-layer-list")!;let scrolled=0;
@@ -186,6 +187,13 @@ describe("Image workspace layout", () => {
     await choose(["View","Show"],"Selection Edges");expect(edges()).toBe("true");
     const editor=container.querySelector('[aria-label="Image editor"]')!,hide=()=>act(async()=>editor.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,key:"h",metaKey:true})));
     await hide();expect(edges()).toBe("false");await hide();expect(edges()).toBe("true");
+  });
+  it("lists Target Path under View > Show after Selection Edges, like Photoshop", async () => {
+    await menu("View","Show");
+    expect([...document.querySelectorAll('[role="menu"]')].at(-1)!.querySelectorAll('[role^="menuitem"]')[1]!.textContent).toContain("Target Path");
+    expect(row("Target Path").getAttribute("aria-checked")).toBe("true");
+    await act(async()=>row("Target Path").click());expect(useViewAids.getState().flags.targetPath).toBe(false);
+    await choose(["View","Show"],"Target Path");expect(useViewAids.getState().flags.targetPath).toBe(true);
   });
   it("drags layers above, below and into groups with pointer events, never below the Background", async () => {
     const layer=(id:number,name:string,extra:Partial<PhotoLayer>={}):PhotoLayer=>({id,name,kind:"Raster",visible:true,opacity:1,fill:1,blend:"Normal",clipped:false,hasMask:false,...extra});
@@ -305,7 +313,7 @@ describe("Image workspace layout", () => {
     const ctx={clearRect:vi.fn(),beginPath:vi.fn(),arc:vi.fn(),stroke:vi.fn(),setLineDash:vi.fn(),lineTo:vi.fn()};vi.mocked(canvas.getContext).mockReturnValue(ctx as never);
     const samples=(start:number,count:number)=>Array.from({length:count},(_,offset)=>{const index=start+offset;return {clientX:30+index%700,clientY:30+Math.floor(index/700),pressure:.7,pointerType:"pen",tiltX:12,tiltY:-8,twist:3,timeStamp:index+1};});
     await act(async()=>canvas.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:20,clientY:25})));await act(async()=>new Promise(resolve=>setTimeout(resolve,120)));
-    const version=usePhotoWorkspace.getState().stateVersion;for(const [start,count] of [[0,2000],[2000,2000],[4000,1000],[5000,1000]] as const)await act(async()=>{const points=samples(start,count),last=points.at(-1)!;const move=new MouseEvent("pointermove",{bubbles:true,clientX:last.clientX,clientY:last.clientY});Object.defineProperty(move,"getCoalescedEvents",{value:()=>points});canvas.dispatchEvent(move);});expect(command).not.toHaveBeenCalled();expect(usePhotoWorkspace.getState().stateVersion).toBe(version);const previewsAtCap=native.invoke.mock.calls.filter(call=>call[0]==="xdesign_photo_stroke_preview_pixels").length;expect(previewsAtCap).toBeGreaterThanOrEqual(1);expect(previewsAtCap).toBeLessThanOrEqual(2);expect(ctx.arc).toHaveBeenCalled();expect(ctx.lineTo).not.toHaveBeenCalled();
+    const version=usePhotoWorkspace.getState().stateVersion;for(const [start,count] of [[0,2000],[2000,2000],[4000,1000],[5000,1000]] as const)await act(async()=>{const points=samples(start,count),last=points.at(-1)!;const move=new MouseEvent("pointermove",{bubbles:true,clientX:last.clientX,clientY:last.clientY});Object.defineProperty(move,"getCoalescedEvents",{value:()=>points});canvas.dispatchEvent(move);});expect(command).not.toHaveBeenCalled();expect(usePhotoWorkspace.getState().stateVersion).toBe(version);const previewsAtCap=native.invoke.mock.calls.filter(call=>call[0]==="xdesign_photo_stroke_preview_pixels").length;expect(previewsAtCap).toBeGreaterThanOrEqual(1);for(const call of native.invoke.mock.calls.filter(call=>call[0]==="xdesign_photo_stroke_preview_pixels"))expect(((call[1] as {params:{points:unknown[]}}).params.points).length).toBeLessThanOrEqual(4096);expect(ctx.arc).toHaveBeenCalled();expect(ctx.lineTo).not.toHaveBeenCalled();
     await act(async()=>canvas.dispatchEvent(new MouseEvent("pointerup",{bubbles:true,button:0,clientX:429,clientY:38})));
     expect(native.invoke.mock.calls.filter(call=>call[0]==="xdesign_photo_stroke_preview_pixels")).toHaveLength(previewsAtCap);expect(command).toHaveBeenCalledTimes(1);const points=command.mock.calls[0]![1]!.points as number[][];expect(points).toHaveLength(6001);expect(points[1]).toEqual([30,30,.7,12,-8,3,expect.any(Number)]);expect(points.at(-1)?.slice(0,2)).toEqual([429,38]);expect(usePhotoWorkspace.getState().busy).toBe(false);
   });
@@ -851,7 +859,8 @@ describe("Image workspace layout", () => {
     await click("Levels");
     expect(command).toHaveBeenCalledWith("layer.newAdjustmentLayer.levels", {});
     expect(container.querySelector('[role="dialog"]')).toBeNull(); expect(button("Properties").getAttribute("aria-selected")).toBe("true");
-    await menu("Layer", "New Adjustment Layer", "Curves…"); expect(command).toHaveBeenLastCalledWith("layer.newAdjustmentLayer.curves", {}); expect(container.querySelector('[role="dialog"]')).toBeNull();
+    await menu("Layer", "New Adjustment Layer", "Curves…"); expect(container.querySelector('[role="dialog"][aria-label="New Layer"]')).not.toBeNull();
+    await click("OK"); expect(command).toHaveBeenLastCalledWith("layer.newAdjustmentLayer.curves", {}); expect(container.querySelector('[role="dialog"]')).toBeNull();
     await menu("Image", "Adjustments", "Curves…"); expect(container.querySelector('[role="dialog"][aria-label="Curves"]')).toBeTruthy();
   });
   it("enters a Transform mode from Edit > Transform and asks Image > Trim… before trimming", async () => {
@@ -925,6 +934,25 @@ describe("Image workspace layout", () => {
     await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,layers:s.state!.layers.map(layer=>({...layer,gradientFill:{style:"radial",angle:0,scale:80,offset:[0,0],reverse:true,dither:true,align:false,from:[20,20],to:[200,20],stops:[[0,"#000000"],[1,"#ffffff"]],transparency:[],midpoints:[]}}))}})));
     command.mockClear();await drag();const call=command.mock.calls.find(([name])=>name==="gradient.fill.set")!;expect(call[1]).toMatchObject({layer:1,from:[20,20],to:[200,20],style:"radial",reverse:true});expect(call[1]).not.toHaveProperty("stops");
   });
+  it("remembers the Method of a live gradient layer so its Gradient Fill dialog reopens with it",async()=>{
+    await chooseTool("paint.gradient");await pick("Gradient mode","live");await pick("Tool Method","perceptual");
+    const canvas=gestureCanvas();command.mockClear();await drag(canvas);
+    const call=command.mock.calls.find(([name])=>name==="gradient.fill.create")!;expect(unbaked((call[1] as {stops:[number,string][]}).stops)).toEqual({method:"perceptual",stops:[[0,"#ff3ea5"],[1,"#ffffff"]]});
+  });
+  it("opens the Gradient Fill dialog from a fill layer's thumbnail and Layer Content Options, as Photoshop does",async()=>{
+    await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,layers:s.state!.layers.map(layer=>({...layer,gradientFill:{style:"linear",angle:0,scale:100,offset:[0,0],reverse:false,dither:true,align:true,from:[0,0],to:[100,0],stops:[[0,"#000000"],[1,"#ffffff"]],transparency:[],midpoints:[]}}))}})));
+    const dialog=()=>container.querySelector('form[aria-label="Edit gradient fill"]');
+    await act(async()=>container.querySelector(".xd-photo-layer-thumb-button")!.dispatchEvent(new MouseEvent("dblclick",{bubbles:true})));expect(dialog()).not.toBeNull();
+    await click("Cancel");expect(dialog()).toBeNull();
+    await menu("Layer","Layer Content Options…");expect(dialog()).not.toBeNull();
+  });
+  it("drops a new gradient fill layer, with nothing to redo, when its dialog is cancelled but keeps an existing one, as Photoshop does",async()=>{
+    command.mockImplementation(async(id:string)=>{if(id==="layer.newFillLayer.gradient")usePhotoWorkspace.setState(s=>({state:{...s.state!,canUndo:true,layers:s.state!.layers.map(layer=>({...layer,gradientFill:{style:"linear",angle:90,scale:100,offset:[0,0],reverse:false,dither:false,align:true,from:[0,0],to:[0,100],stops:[[0,"#000000"],[1,"#ffffff"]],transparency:[],midpoints:[]}}))}}));});
+    const dialog=()=>container.querySelector('form[aria-label="Edit gradient fill"]');
+    await menu("Layer","New Fill Layer","Gradient…");await click("OK");expect(dialog()).not.toBeNull();
+    command.mockClear();await click("Cancel");expect(dialog()).toBeNull();expect(command).toHaveBeenCalledWith("history.select",{index:1,discardRedo:true});
+    await menu("Layer","Layer Content Options…");command.mockClear();await click("Cancel");expect(dialog()).toBeNull();expect(command).not.toHaveBeenCalledWith("history.select",expect.anything());
+  });
   it("keeps classic pixel gradients available for direct mask painting",async()=>{
     await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,layers:s.state!.layers.map(layer=>({...layer,hasMask:true}))}})));await click("Edit mask of Portrait layer");await chooseTool("paint.gradient");
     const mode=container.querySelector<HTMLSelectElement>('[aria-label="Gradient mode"]')!;expect(mode.disabled).toBe(true);expect(mode.value).toBe("classic");
@@ -991,6 +1019,36 @@ describe("Image workspace layout", () => {
     expect(command).toHaveBeenCalledWith("paint.gradient",expect.objectContaining({style:"radial",stops:[[0,"#ff3ea5"],[1,"#00ff00"]],transparency:[[0,0],[1,100]]}));
     const call=command.mock.calls.find(([name])=>name==="paint.gradient")!;expect(call[1]).not.toHaveProperty("colors");
     await click("Gradients");await click("Use gradient Sunset");expect(command).toHaveBeenCalledWith("gradient.presets.select",{preset:"Sunset",group:"Custom"});
+  });
+  const sunsetAndBasics=()=>act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,presets:{gradient:{name:"Sunset",stops:[[0,"foreground"],[1,"#00ff00"]],transparency:[[0,0],[1,100]]},gradients:[{name:"Basics",presets:[{name:"Black, White",stops:[[0,"#000000"],[1,"#ffffff"]],transparency:[]}]}],styles:[]}}})));
+  it("edits the Classic Gradient tool's gradient in the Gradient Editor from its swatch, previewing on the swatch until OK",async()=>{
+    await sunsetAndBasics();await chooseTool("paint.gradient");await pick("Gradient mode","classic");
+    const swatch=()=>button("Edit gradient").style.backgroundImage,before=swatch(),editor=()=>container.querySelector<HTMLElement>('[aria-label="Gradient Editor"]');
+    const inEditor=async(label:string)=>{await act(async()=>[...editor()!.querySelectorAll("button")].find(element=>element.getAttribute("aria-label")===label||element.textContent===label)!.click());};
+    expect(before).toContain("rgba(255,62,165,0) 0%");
+    await click("Edit gradient");expect(editor()).not.toBeNull();expect(editor()!.querySelector<HTMLInputElement>('[aria-label="Gradient name"]')!.value).toBe("Sunset");
+    await inEditor("Basics");await inEditor("Black, White");expect(swatch()).toContain("rgba(0,0,0,1) 0%");
+    await inEditor("Cancel");expect(editor()).toBeNull();expect(swatch()).toBe(before);expect(command).not.toHaveBeenCalledWith("gradient.presets.select",expect.anything());
+    await click("Edit gradient");await inEditor("Basics");await inEditor("Black, White");await inEditor("OK");expect(editor()).toBeNull();
+    expect(command).toHaveBeenLastCalledWith("gradient.presets.select",{name:"Black, White",stops:[[0,"#000000"],[1,"#ffffff"]],transparency:[],applyToLayer:false});
+  });
+  it("orders the Gradient tool bar as Photoshop does: Mode, Opacity, Reverse, Dither, Transparency, Method, with no Gradients button",async()=>{
+    await chooseTool("paint.gradient");await pick("Gradient mode","classic");
+    const bar=container.querySelector(".xd-photo-options")!,all=[...bar.querySelectorAll("*")];
+    const reverse=[...bar.querySelectorAll("label")].find(label=>label.textContent==="Reverse")!;
+    const order=['[aria-label="Tool Blend"]','[aria-label="Brush opacity"]',reverse,'[aria-label="Tool Dither"]','[aria-label="Gradient transparency"]','[aria-label="Tool Method"]'].map(target=>all.indexOf(typeof target==="string"?bar.querySelector(target)!:target));
+    expect(order.every(index=>index>=0)).toBe(true);expect(order).toEqual([...order].sort((a,b)=>a-b));
+    expect([...bar.querySelectorAll("button")].some(element=>element.textContent==="Gradients")).toBe(false);
+  });
+  it("opens the gradient presets from the live Gradient tool's swatch, with Transparency for Classic Gradient only",async()=>{
+    await sunsetAndBasics();await chooseTool("paint.gradient");
+    expect(button("Edit gradient").compareDocumentPosition(container.querySelector('[aria-label="Tool Dither"]')!)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector('[aria-label="Gradient transparency"]')).toBeNull();
+    await click("Edit gradient");expect(container.querySelector('[aria-label="Gradient Editor"]')).toBeNull();expect(container.querySelector(".xd-ge-pick-presets")).not.toBeNull();
+    await click("Basics");await click("Black, White");expect(command).toHaveBeenLastCalledWith("gradient.presets.select",{preset:"Black, White",group:"Basics"});expect(container.querySelector(".xd-ge-pick-presets")).toBeNull();
+    await pick("Gradient mode","classic");await act(async()=>container.querySelector<HTMLInputElement>('[aria-label="Gradient transparency"]')!.click());
+    await click("Gradient presets");await click("Basics");await click("Black, White");expect(command).toHaveBeenLastCalledWith("gradient.presets.select",{preset:"Black, White",group:"Basics",applyToLayer:false});
+    await pick("Gradient mode","live");command.mockClear();await drag(gestureCanvas());expect(command).toHaveBeenLastCalledWith("gradient.fill.create",expect.objectContaining({transparency:[[0,0],[1,100]]}));
   });
   it("applies style presets to the selected layer with Shift adding effects",async()=>{
     await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,presets:{gradient:{name:"Default",stops:[[0,"foreground"],[1,"background"]],transparency:[]},gradients:[],styles:[{name:"Custom",presets:[{name:"Shadow",effects:["Drop Shadow"]}]}]}}})));

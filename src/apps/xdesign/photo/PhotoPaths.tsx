@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Circle, CircleDashed, Plus, Spline, Square, Trash2 } from "lucide-react";
+import { create } from "zustand";
 import { ContextMenu } from "../EditorMenus";
 import type { MenuEntry } from "../menuModel";
 import { runPhotoCommand } from "./runtime";
@@ -9,11 +10,16 @@ import { pathCurve, type PathData } from "./PathEditOverlay";
 const run=(id:string,params:Record<string,unknown>)=>void runPhotoCommand(id,params).catch(()=>{});
 const pathRows=(state:PhotoState)=>[...(state.paths?.work?[{name:"work",label:"Work Path"}]:[]),...(state.paths?.saved??[]).map(name=>({name,label:name}))];
 const nextName=(saved:string[])=>{let index=saved.length+1;while(saved.includes(`Path ${index}`))index++;return `Path ${index}`;};
+// Clicking the panel's empty space deselects every path, which hides the target path.
+export const NO_PATH="";
+// Photoshop saves the path target with the document, so reopening an image keeps its path deselected or targeted.
+export const usePathTargets=create<Record<string,string|null>>(()=>({}));
 // Like Photoshop, a freshly drawn work path is the selected path until another row is chosen.
-export const selectedPath=(state:PhotoState,active:string|null)=>pathRows(state).some(row=>row.name===active)?active:state.paths?.work?"work":null;
+export const selectedPath=(state:PhotoState,active:string|null)=>active===NO_PATH?null:pathRows(state).some(row=>row.name===active)?active:state.paths?.work?"work":null;
 
 // Photoshop's New Path makes an empty "Path N"; Save Path stands in for it while the work path is selected.
 const createPath=(saved:string[],select?:(name:string)=>void)=>{const name=nextName(saved);run("path.set",{name,path:{subpaths:[]}});select?.(name);};
+const makeWorkPath=(select?:(name:string)=>void)=>{run("select.toWorkPath",{tolerance:2});select?.("work");};
 const savePath=(saved:string[],select?:(name:string)=>void)=>{const name=nextName(saved);run("path.rename",{name:"work",to:name});select?.(name);};
 const duplicatePath=(saved:string[],path:string,select?:(name:string)=>void)=>{
   const base=path==="work"?nextName(saved):`${path} copy`;let name=base,index=2;while(saved.includes(name))name=`${base} ${index++}`;
@@ -27,7 +33,7 @@ export function pathsPanelMenu(state:PhotoState,path:string|null,disabled:boolea
     {label:"Duplicate Path…",disabled:disabled||!path,run:()=>duplicatePath(saved,path!,select)},
     {label:"Delete Path",disabled:disabled||!path,run:()=>run("path.delete",{name:path})},
     "-",
-    {label:"Make Work Path…",disabled:disabled||!state.hasSelection,run:()=>run("select.toWorkPath",{tolerance:2})},
+    {label:"Make Work Path…",disabled:disabled||!state.hasSelection,run:()=>makeWorkPath(select)},
     {label:"Make Selection…",disabled:disabled||!path,run:()=>run("path.toSelection",{name:path})},
     {label:"Fill Path…",disabled:disabled||!path||!state.activeLayer,run:()=>run("path.fill",{name:path})},
     {label:"Stroke Path…",disabled:disabled||!path||!state.activeLayer,run:()=>run("path.stroke",{name:path})},
@@ -53,7 +59,7 @@ export function PhotoPaths({state,disabled,active,select,version}:{state:PhotoSt
   const [renaming,setRenaming]=useState<string|null>(null),[menu,setMenu]=useState<{x:number;y:number}|null>(null);
   const saved=state.paths?.saved??[],path=selectedPath(state,active);
   return <>
-    <div className="xd-photo-layer-list"><div role="list" aria-label="Paths">{pathRows(state).map(row=><div key={row.name} role="listitem" className={`xd-photo-path${row.name===path?" selected":""}`}
+    <div className="xd-photo-layer-list" onClick={event=>{if(!disabled&&!(event.target as Element).closest(".xd-photo-path"))select(NO_PATH);}}><div role="list" aria-label="Paths">{pathRows(state).map(row=><div key={row.name} role="listitem" className={`xd-photo-path${row.name===path?" selected":""}`}
       onContextMenu={event=>{event.preventDefault();if(disabled)return;select(row.name);setMenu({x:event.clientX,y:event.clientY});}}>
       <svg className="xd-photo-path-thumb" viewBox={`0 0 ${state.width} ${state.height}`} aria-hidden="true"><path d={shapes[row.name]??""}/></svg>
       {renaming===row.name?<input autoFocus className="xd-photo-channel-rename" aria-label={`Name of ${row.label}`} defaultValue={row.label}
@@ -66,7 +72,7 @@ export function PhotoPaths({state,disabled,active,select,version}:{state:PhotoSt
       <button aria-label="Fill path with foreground color" title="Fill path with foreground color" disabled={disabled||!path||!state.activeLayer} onClick={()=>run("path.fill",{name:path})}><Circle size={14} fill="currentColor"/></button>
       <button aria-label="Stroke path with brush" title="Stroke path with brush" disabled={disabled||!path||!state.activeLayer} onClick={()=>run("path.stroke",{name:path})}><Circle size={14}/></button>
       <button aria-label="Load path as a selection" title="Load path as a selection" disabled={disabled||!path} onClick={()=>run("path.toSelection",{name:path})}><CircleDashed size={14}/></button>
-      <button aria-label="Make work path from selection" title="Make work path from selection" disabled={disabled||!state.hasSelection} onClick={()=>run("select.toWorkPath",{tolerance:2})}><Spline size={14}/></button>
+      <button aria-label="Make work path from selection" title="Make work path from selection" disabled={disabled||!state.hasSelection} onClick={()=>makeWorkPath(select)}><Spline size={14}/></button>
       <button aria-label="Add a mask" title="Add a mask" disabled={disabled||!path||!state.activeLayer} onClick={()=>run("layer.vectorMask.fromPath",{name:path})}><Square size={14}/></button>
       <button aria-label="Create new path" title="Create new path" disabled={disabled} onClick={()=>createPath(saved,select)}><Plus size={14}/></button>
       <button aria-label="Delete current path" title="Delete current path" disabled={disabled||!path} onClick={()=>run("path.delete",{name:path})}><Trash2 size={14}/></button>

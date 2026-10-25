@@ -1,9 +1,8 @@
-import { useId, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import { HUE_RANGES } from "./adjustmentSettings";
 import { ToneSlider } from "./toneControls";
 
 type Settings = Record<string, unknown>;
-export type GradientStop = [number, string];
 
 // Slider tracks show the colours they move between, as Photoshop's do, so they are literal content colours rather than theme tokens.
 const BALANCE_COLORS: Record<string, string> = { Cyan: "#00ffff", Red: "#ff0000", Magenta: "#ff00ff", Green: "#00ff00", Yellow: "#ffff00", Blue: "#0000ff" };
@@ -92,71 +91,6 @@ export function HueBars({ values, range, locked, anyStep, commit }: { values: Se
     </div>}
     <div className="xd-photo-hue-spectrum" style={{ background: spectrum(origin, deg => hueSaturationColor(turn(deg), values)) }}/>
     <div className="xd-photo-hue-range-fields">{[0, 2].map(from => range === "master" ? <span key={from}>0° / 0°</span> : <span key={from} className="xd-photo-hue-readout">{[from, from + 1].map(i => <label key={i} title={RANGE_LABELS[i]}><input aria-label={`Adjustment ${RANGE_LABELS[i]}`} type="number" required min={-720} max={720} step={anyStep ? "any" : 1} value={typeof raw[i] === "number" && Number.isFinite(raw[i]) ? raw[i] : ""} disabled={locked} onChange={event => commit(RANGE_LABELS.map((_, at) => at === i ? event.target.valueAsNumber : raw[at] ?? frame[at]!))}/><span>°</span></label>).reduce<ReactNode[]>((parts, part, at) => at ? [...parts, " / ", part] : [part], [])}</span>)}</div>
-  </div>;
-}
-
-const hexRgb = (hex: string) => [1, 3, 5].map(at => parseInt(hex.slice(at, at + 2), 16) || 0);
-function colorAt(stops: GradientStop[], position: number, hex: (color: unknown) => string): string {
-  const after = stops.findIndex(([at]) => at >= position);
-  if (after <= 0) return hex(stops[after < 0 ? stops.length - 1 : 0]![1]);
-  const [p0, c0] = stops[after - 1]!, [p1, c1] = stops[after]!, t = p1 > p0 ? (position - p0) / (p1 - p0) : 0, a = hexRgb(hex(c0)), b = hexRgb(hex(c1));
-  return "#" + a.map((value, i) => Math.round(value + (b[i]! - value) * t).toString(16).padStart(2, "0")).join("");
-}
-
-/** Photoshop's Gradient Editor bar: click under it to add a colour stop, drag a stop to move it or down off the bar to delete it. */
-export function GradientStops({ stops, shown = stops, locked, change, hex }: { stops: GradientStop[]; shown?: GradientStop[]; locked: boolean; change: (stops: GradientStop[]) => void; hex: (color: unknown) => string }) {
-  const [selected, setSelected] = useState(0), [leaving, setLeaving] = useState(-1);
-  const drag = useRef<{ index: number; pointer: number; offset: number; off: boolean } | null>(null);
-  const index = clamp(selected, 0, stops.length - 1), current = stops[index];
-  const place = (at: number, position: number) => {
-    if (!stops[at] || !Number.isFinite(position)) return at;
-    const moved: GradientStop = [clamp(Math.round(position * 1000) / 1000, 0, 1), stops[at]![1]];
-    if (moved[0] === stops[at]![0]) return at;
-    const next = stops.map((stop, i) => i === at ? moved : stop).sort((a, b) => a[0] - b[0]);
-    change(next); setSelected(next.indexOf(moved));
-    return next.indexOf(moved);
-  };
-  const remove = (at: number) => { if (locked || stops.length <= 2) return; change(stops.filter((_, i) => i !== at)); setSelected(Math.max(0, at - 1)); };
-  const x = (event: PointerEvent<HTMLDivElement>) => { const rect = event.currentTarget.getBoundingClientRect(); return rect.width > 0 && Number.isFinite(event.clientX) ? { x: clamp((event.clientX - rect.left) / rect.width, 0, 1), below: event.clientY - rect.bottom } : null; };
-  const finish = (event: PointerEvent<HTMLDivElement>) => {
-    const current = drag.current; if (current?.pointer !== event.pointerId) return;
-    drag.current = null; setLeaving(-1);
-    if (current.off && event.type === "pointerup") remove(current.index);
-  };
-  return <div className="xd-photo-gradient-editor">
-    <div className="xd-photo-adjustment-gradient" role="img" aria-label="Gradient map colors" style={{ background: `linear-gradient(90deg,${shown.map(([position, color]) => `${hex(color)} ${position * 100}%`).join(",")})` }}/>
-    <div className="xd-photo-gradient-stops" onPointerDown={event => {
-      if (locked || event.button !== 0 || drag.current) return;
-      const grabbed = event.target instanceof Element ? event.target.closest("[data-stop-index]") : null, point = x(event);
-      let at = grabbed ? Number(grabbed.getAttribute("data-stop-index")) : -1;
-      if (at >= 0) setSelected(at);
-      if (!point) return;
-      if (at < 0) {
-        if (stops.length >= 64) return;
-        const added: GradientStop = [Math.round(point.x * 1000) / 1000, colorAt(stops, point.x, hex)], next = [...stops, added].sort((a, b) => a[0] - b[0]);
-        change(next); at = next.indexOf(added); setSelected(at);
-      }
-      drag.current = { index: at, pointer: event.pointerId, offset: grabbed ? stops[at]![0] - point.x : 0, off: false };
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-    }} onPointerMove={event => {
-      const current = drag.current; if (locked || current?.pointer !== event.pointerId) return;
-      const point = x(event); if (!point) return;
-      current.off = point.below > 24 && stops.length > 2; setLeaving(current.off ? current.index : -1);
-      if (!current.off) current.index = place(current.index, point.x + current.offset);
-    }} onPointerUp={finish} onPointerCancel={finish} onLostPointerCapture={finish}>
-      {stops.map(([position, color], i) => <span key={i} data-stop-index={i} role="button" tabIndex={locked ? -1 : 0} aria-label={`Color stop ${i + 1}`} aria-pressed={i === index} className={`xd-photo-gradient-stop${leaving === i ? " is-leaving" : ""}`} style={{ left: `${position * 100}%` }} onKeyDown={event => {
-        if (locked) return;
-        const step = event.shiftKey ? .1 : .01, delta = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
-        if (delta) { event.preventDefault(); place(i, position + delta); }
-        if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); remove(i); }
-        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(i); }
-      }}><svg viewBox="0 0 11 14" aria-hidden="true"><path d="M5.5 .5L10.5 5V13.5H.5V5Z"/><rect x="2.5" y="6.5" width="6" height="5" fill={hex(color)}/></svg></span>)}
-    </div>
-    {current && <fieldset className="xd-ps-dialog-group xd-photo-gradient-stop-fields"><legend>Stops</legend>
-      <label><span>Color:</span><input aria-label={`Adjustment stop ${index + 1} color`} type="color" disabled={locked} value={hex(current[1])} onChange={event => change(stops.map((stop, at): GradientStop => at === index ? [stop[0], event.target.value] : stop))}/></label>
-      <label><span>Location:</span><input aria-label={`Adjustment Stop ${index + 1} position (%)`} type="number" required min={0} max={100} step={.1} disabled={locked} value={Math.round(current[0] * 1000) / 10} onChange={event => { place(index, event.target.valueAsNumber / 100); }}/><span>%</span></label>
-      <button type="button" disabled={locked || stops.length <= 2} onClick={() => remove(index)}>Delete</button>
-    </fieldset>}
   </div>;
 }
 

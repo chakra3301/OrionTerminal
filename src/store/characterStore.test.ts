@@ -10,7 +10,7 @@ vi.mock("@/lib/log", () => ({ log: { warn: vi.fn() } }));
 
 const custom: CustomCharacter = { id: "custom-existing", name: "My upload", filePath: "/saved/character.glb", custom: true };
 beforeEach(() => {
-  useCharacterStore.setState({ selectedId: DEFAULT_CHARACTER_ID, custom: [] });
+  useCharacterStore.setState({ selectedId: DEFAULT_CHARACTER_ID, custom: [], showInApps: false });
   vi.clearAllMocks();
 });
 
@@ -43,7 +43,7 @@ it("falls back to R.O.S.I.E when removing the selected upload and persists subse
   useCharacterStore.getState().hydrate({ selectedId: custom.id, custom: [custom] });
   await useCharacterStore.getState().removeCustom(custom.id);
   expect(ipc.characterClearFile).toHaveBeenCalledWith(custom.filePath);
-  expect(setAppState).toHaveBeenLastCalledWith("characters", { selectedId: DEFAULT_CHARACTER_ID, custom: [] });
+  expect(setAppState).toHaveBeenLastCalledWith("characters", { selectedId: DEFAULT_CHARACTER_ID, custom: [], showInApps: false });
   useCharacterStore.getState().setSelected("suki");
-  expect(setAppState).toHaveBeenLastCalledWith("characters", { selectedId: "suki", custom: [] });
+  expect(setAppState).toHaveBeenLastCalledWith("characters", { selectedId: "suki", custom: [], showInApps: false });
 });

@@ -107,7 +107,7 @@
 .xd-pencil-buttons button{border-color:var(--border-subtle,rgba(127,127,127,.2));font-size:10px}
 .xd-pencil footer{padding:6px 10px;border-top:1px solid var(--border-subtle,rgba(127,127,127,.2));color:var(--t-secondary);font-size:10px}
 .xd-pencil-dialog{position:absolute;inset:0;background:rgba(0,0,0,.4);display:grid;place-items:center;z-index:30}
-.xd-pencil-dialog form{width:500px;max-width:90%;max-height:90%;overflow:auto;background:var(--bg-1);border:1px solid var(--border-subtle,rgba(127,127,127,.2));border-radius:var(--r-lg);padding:18px;font-size:12px}
+.xd-pencil-dialog form,.xd-pencil-dialog>.xd-pencil-libraries{width:500px;max-width:90%;max-height:90%;overflow:auto;background:var(--bg-1);border:1px solid var(--border-subtle,rgba(127,127,127,.2));border-radius:var(--r-lg);padding:18px;font-size:12px}
 .xd-pencil-dialog header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .xd-pencil-dialog input,.xd-pencil-dialog select,.xd-pencil-dialog textarea{display:block;width:100%;margin-bottom:10px}
 .xd-pencil-dialog textarea{height:120px;font-family:var(--font-mono)}

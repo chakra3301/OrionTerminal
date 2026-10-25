@@ -30,6 +30,19 @@ describe("PhotoHistory",()=>{
     await show(make());expect(container.querySelector(".xd-photo-history-redo")?.textContent).toBe("Fill");
     for(const tip of ["Create new document from current state","Create new snapshot","Delete current state"]){const [b]=btn(tip);expect(b!.disabled).toBe(true);expect(b!.title).toBe(tip);}
   });
+  it("scrolls its panel to the current state when it changes, like Photoshop",async()=>{
+    container.style.overflowY="auto";
+    const rect=vi.spyOn(HTMLElement.prototype,"getBoundingClientRect").mockImplementation(function(this:HTMLElement){
+      if(this.classList.contains("xd-photo-history-actions"))return {top:80,bottom:100} as DOMRect;
+      const top=this===container?0:({Brush:300,Blur:-60} as Record<string,number>)[this.textContent??""]??0;return {top,bottom:top+(this===container?100:20)} as DOMRect;
+    });
+    try{
+      await show(make());expect(container.scrollTop).toBe(240);
+      const back=make([src("a",0,"Open"),src("b",1,"Blur",true)],["Brush"]);
+      container.scrollTop=100;await show(back);expect(container.scrollTop).toBe(40);
+      container.scrollTop=0;await show({...back});expect(container.scrollTop).toBe(0);
+    }finally{rect.mockRestore();}
+  });
   it("keeps the smart-object and empty messages",async()=>{
     await show(make(),{contents:true});expect(container.textContent).toContain("smart-object contents");await show(make([],[]));expect(container.textContent).toContain("Reopen the image");
   });

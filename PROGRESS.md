@@ -1,3 +1,427 @@
+## 2026-10-25 — XDesign: remaining gaps closed, release build smoke-tested (design, photo, FX), PSD and FIG round trips
+
+Branch: `validation/alpha-2026-09-14`. **Committed** in one commit, together with the uncommitted work of the two 2026-10-24 entries below. Not pushed. Owner: "lets try to close all the gapes then step 2-4 once thats all done we commit". Step 2 is the release build and smoke test, step 3 is `npm run verify`, and step 4 is real PSD and .fig files opened, edited, saved and reopened.
+
+- Cargo.toml is unchanged, so no licence refresh.
+- Live checks used only a scratch-HOME release instance (`HOME=/tmp/xd-release-home CFFIXED_USER_HOME=/tmp/xd-release-home`) and copies under `/tmp/xd-roundtrip/`.
+- Photoshop opened scratch docs only; pfp.psd was not touched.
+- `/Applications/Orion Terminal.app` was not replaced.
+
+Changed (each behaviour change has a test that failed first):
+1. **Photoshop's New Layer dialog** (new `NewLayerDialog.tsx`, `photoDialog.css`, `PhotoStudio.tsx`).
+   - It has Name, "Use previous layer to create clipping mask", and Mode and Opacity on one row, plus "Fill with neutral color" for modes that have one.
+   - Opened by Layer › New › Layer…, Group… and Group from Layers…, by Option-click on the panel's new-layer button, and by the fill and adjustment layer items. New Fill Layer › Gradient… opens the Gradient Fill dialog after OK.
+2. **Gradient Fill Scale in Photoshop's units** (`GradientFillDialog.tsx`).
+   - 100% is the document's short side, and every style but Linear is halved. Fit to document reads 133% at 0° on 800×600.
+   - The engine stores 10–150%, and the field clamps to that.
+3. **PSD gradient fills saved at 0° open at 0°** (`xdesign_photo_smart.rs` `restore_omitted_fill_angles`).
+   - Photoshop leaves `Angl` out of a fill's `GdFl` at 0°, and photocraft-io read the gap as 90°. Export reuses the raw block, so the fix writes `Angl` into the kept block too.
+   - A Gradient Overlay effect is unaffected, because Photoshop always writes its `Angl`.
+4. **Layer Style Method** starts at Smooth for new overlays and gradient strokes, as in Photoshop.
+5. **Gradient tool bar:** Reverse comes before Dither, and Transparency before Method.
+6. **History names Properties edits after the layer**, e.g. "Modify Levels Layer" (`xdesign_photo_history.rs`).
+7. **Paths:** the target path is kept per document across remounts, so the Work Path no longer reappears after a dialog closes. Make Work Path targets the new path.
+8. **FX undo/redo** (`fxStore.ts`, new `fxHistoryKeys.ts`, `FxEditor.tsx`, `FxCanvasOverlay.tsx`, `src/shell/menus.ts`).
+   - Whole-scene snapshots, up to 100 steps. Same-target edits within 800 ms merge into one step, and a gizmo drag is one step.
+   - ⌘Z and ⇧⌘Z work after clicking the canvas or a layer row. Text fields, selects and the shader editor keep their own undo.
+   - The shell's Edit › Undo/Redo goes to the FX history when an FX project is active.
+9. **Design Libraries…** (new `LibrariesDialog.tsx`; `PencilStudio.tsx` File menu and ⌥⌘O). It shows the assets panel as a dialog. The Assets sidebar tab stays out.
+10. **FIG export under Tauri** (`scripts/open-pencil-vite.mjs`, new `scripts/open-pencil-vite.test.mjs`).
+    - Found in the release build: Export › FIG failed with "Command build_fig_file not found". OpenPencil's `export.js` packs .fig through its own native command under Tauri, and Orion doesn't register it, so the export also failed in `tauri dev`.
+    - The vite plugin turns that branch off, so packing runs in the export worker, as in the browser build. It throws if a dependency upgrade moves the code.
+11. **⇧⌘N after opening an image** (`PhotoStudio.tsx`, found in the release build).
+    - Opening a PSD from the studio's File menu left focus on that menu's button, outside the editor. The global `mod+shift+n` (Archives Quick Capture) then won over New Layer.
+    - The editor now takes focus when a document opens, unless a text field has it.
+12. **Tests only:**
+    - `characterStore.test.ts` expects `showInApps: false`, which the store persists since checkpoint commit 346e9ce.
+    - The Background Eraser preview test asserts the per-frame cap, not timing.
+
+Release build and live checks (`npm run tauri build -- --bundles app`, no DMG):
+- **Boot:** welcome skipped, XDesign home.
+- **Design:** blank canvas, rectangle drawn, inspector edits.
+- **Photo, real PSD** (`bbp-copy.psd`, a copy of a 27-layer Photoshop file):
+  - opened, New Layer dialog, brush stroke on Layer 1, ⌘S saved ("Saved bbp-copy.psd", sha256 fe6e0687… → 1510d84d…);
+  - Photoshop reads 27 top-level layers with Layer 1 at [12,309,147,532];
+  - reopening in XDesign keeps Layer 1 at 135×223 (12,309).
+- **Photo, `ps-grad0.psd`** (a Photoshop gradient fill at 0°): opens as a horizontal gradient, dark on the left.
+- **FX:** scene loads, Angle 45 → 350 renders live, ⌘Z returns to 45 in one step, ⇧⌘Z restores 350.
+- **Rebuilt release with items 10–11:**
+  - ⇧⌘N: after opening `ps-grad0.psd` from the studio File menu, focus is on the image editor, and ⇧⌘N opens the New Layer dialog.
+  - FIG round trip:
+    - Export › FIG wrote `rt-design.fig` (1.68 MB zip: `canvas.fig` with the fig-kiwi header, thumbnail, meta and 4 images).
+    - Open Figma / Pencil reopened it with the same 6 layers.
+    - A 66×75 rectangle was drawn at (77,454) and exported again as `rt-design2.fig`.
+    - Reopening that file shows 7 layers, with the rectangle at the same size and position.
+
+Verify (before items 10–11):
+- `npm run verify`: typecheck clean, vitest 571 files / 5578 tests passed, bridges 259/0, build OK.
+- Native under `verify`'s parallel threads: 1359 passed, 31 failed. All 31 are photo stroke, brush-completion, clone-source and preview-slot tests: the known parallel-load race.
+- `cargo test --lib -- --test-threads=1`: 1390 passed, 0 failed, 20 ignored.
+
+After items 10–11:
+- `scripts/open-pencil-vite.test.mjs` failed before the patch and passes after.
+- The photo tests (100 files, 1443 tests), `npm run typecheck` and `npm run test:bridges` (260/0) pass.
+- One full photo run had a single failure in the unmodified `commandPreview.cancel.test.tsx`. It passed alone three times and in a second full run, so it's a load flake.
+
+Open / known limits:
+- **New Layer dialog:** no Color row and no separators in the Mode list. Default naming against Photoshop is unchecked.
+- **Previews:** the Solid Color draft preview ignores the dialog's blend and opacity.
+- **Layer menu:** Duplicate Layer… duplicates directly, with no dialog.
+- **Gradient Fill:** Radial Scale tops out at the engine's 150%.
+- **Gradient tool:** the bar shows Opacity before Mode (Photoshop: Mode first).
+- **Gradient Editor:** no midpoints, Smoothness, Noise or .grd export.
+- **Layer Style:**
+  - Reset to Default restores Classic;
+  - Make Default isn't applied to new effects;
+  - Method is kept for the session only.
+- **Naming:** Vibrance's menu name differs from Photoshop's.
+- **Engine-limited:** filters, geometry and retouch get no live preview above 16 MP.
+- **Native tests:** the parallel race above still makes `npm run verify` exit non-zero.
+- **No Figma-made .fig was available.** The FIG round trip used Orion's own export.
+
+Blocked (owner, hardware or service needed):
+- **Engine and data:** Generative Expand, the 258-file PSD corpus, large-file stress, saved Smart Warp.
+- **Services and platform:** collaboration and cloud, signing.
+- **Hardware and input:** tablet, IME and accessibility passes.
+- **Other:** media mute, and the dev-only Spotlight HMR import cycle.
+
+## 2026-10-24 (night) — XDesign photo: the late-evening gaps closed (Layer Style history, Solid Color preview, Paths deselect, crop taskbar and options bar, image pan, W x H x Resolution crops, crop Fill, large-image adjustment previews)
+
+Branch: `validation/alpha-2026-09-14`. **Uncommitted**, on top of the late-evening entry's uncommitted work. Nothing is pushed. Changes are under `src/apps/xdesign/photo/` and `src-tauri/src/xdesign_photo{,_history,_preview}.rs`, plus a "Second follow-up" section in `docs/architecture/xdesign/photoshop-parity/live-test-2026-10-24.md`. Cargo.toml is unchanged, so no licence refresh. Live probing used the scratch project ("Untitled design", `xd-ps-test.png`) and Photoshop scratch docs only.
+
+Owner: "okay do recommended but get thru them all", then "lets keep going": the "Open questions / next" list of the entry below.
+
+Changed (each behaviour change has a test that failed first):
+1. **Layer Style history** (`xdesign_photo_history.rs` `fold`, `xdesign_photo.rs`, `LayerStyleDialog.tsx`).
+   - `history.select` takes `discardRedo`. Cancel uses it, so a cancelled style leaves nothing for ⇧⌘Z.
+   - New `history.fold {from,label}` merges the dialog's steps into one "Layer Style" step, as Photoshop records it. Undo returns to the opening state.
+   - Cancel, OK and Reset wait for an edit that is still committing (a field's blur when OK is clicked), because host commands refuse to overlap.
+2. **Layer Style gradient bar shows the draft** (`LayerStyleDialog.tsx` `GradientEditor`): the stop being typed or picked, until the committed gradient lands.
+3. **Solid Color fill layer previews while picked** (`PhotoStudio.tsx`, via `CanvasDraftPreview` and `layer.newFillLayer.solidColor`). Cancel removes it and adds no layer.
+4. **Paths-panel deselect** (`PhotoPaths.tsx` `NO_PATH`). Clicking empty panel space deselects every path and hides the target path. A new pen path re-targets the Work Path (`PhotoStudio.tsx`).
+5. **Crop context menu in Photoshop's order** (`PhotoStudio.tsx`).
+   - Clear Ratio, Reset Crop, Rotate Crop Box; Use Front Image / Crop Box Aspect Ratio; the Size & Resolution items; ratios; preset sizes. There is no Crop item.
+   - The Size & Resolution items and preset sizes are disabled: the engine has no width × height × resolution crop.
+6. **Crop contextual taskbar** (`PhotoStudio.tsx`, `toolBars.tsx` `CropRatioSelect`).
+   - It holds ratio, Straighten, ⋯ (command search) and Cancel/Done once the box is edited.
+   - Generative Expand is left out because the engine can't do it.
+7. **Dragging inside an edited crop box moves the image** (`CropOverlay.tsx` `pan`, `PhotoStudio.tsx` `cropShift` and `panCrop`).
+   - This is Photoshop's non-classic mode: the box stays put on screen while the image moves under it.
+   - The pan snaps the image edge to the box.
+   - The scroll space clips while the image is shifted, so no scrollbar appears and re-centres the box.
+8. **Crop options bar ends with Photoshop's ↺ ⊘ ✓ icons** (`PhotoStudio.tsx`). ⊘ and ✓ appear once the box is edited. They replace the "Apply crop" and "Cancel crop" text buttons.
+9. **Adjustments preview live above 16 MP** (`xdesign_photo_preview.rs` `reducible`, `reduced_copy`; `PhotoActionDialog.tsx`).
+   - Covers Image › Adjustments, new adjustment layers and `layer.setAdjustment`. They render on a copy reduced by `image.imageSize` (bilinear) to the preview's own size, so the frame matches what a full render would show.
+   - The copy is cached against a weak pointer to the source, so slider drags reuse it until the image changes.
+   - Filters, Shadows/Highlights, Replace Color, Match Color, geometry and retouch still refuse above 16 MP, because they measure in pixels.
+10. **Camera Raw spinner gap:** stale. Its number fields have no spinners. No change.
+11. **Contextual Task Bar chrome** (new `ContextualTaskBar.tsx`, `photoshop.css`, `PhotoStudio.tsx`).
+    - Photoshop's grip drags the bar. Its ⋯ is now More options: Hide bar, Reset bar position (enabled once moved) and Pin bar position.
+    - Window › Contextual Task Bar shows or hides it.
+12. **Crop options bar in Photoshop's order** (`PhotoStudio.tsx`, `toolBars.tsx` `CropRatioFields`).
+    - Ratio ▾, W ⇄ H, Clear, Straighten, Overlay, gear, Delete Cropped Pixels, then Perspective Crop… and ↺ ⊘ ✓.
+    - The menu's first entry reads "Ratio", not "Unconstrained". Unconstrained, the W and H fields stay visible and empty; the box is constrained once both sides are typed.
+    - Straighten has its ruler icon.
+13. **Crop Overlay icon menu** (`CropOverlay.tsx` `CROP_GUIDES`, `CROP_OVERLAY_SHOWS`; replaces the Overlay `<select>`).
+    - Photoshop's guide glyphs (frame plus guide lines), Auto / Always / Never Show Overlay, Cycle Overlay and Cycle Orientation (enabled only for Triangle and Golden Spiral).
+    - Auto Show draws the guide only while the box is dragged. Never hides it.
+14. **Options-bar checkboxes come before their label** (`PaintToolOptions.tsx`), as in Photoshop. This applies to every tool's boolean option.
+15. **Crop handle drags hold the ratio** (`CropOverlay.tsx` `ratio`).
+    - With a ratio set, a corner drag holds it from the opposite corner, and a side drag grows the other side about the centre.
+    - Shift keeps the box's own shape, and Option resizes from the centre.
+16. **W x H x Resolution crops** (`toolBars.tsx` `cropSizePixels`, `CropSizeFields`, `CROP_SIZES`; `PaintToolOptions.tsx` crop schema; `PhotoStudio.tsx` `cropToSize`, `commitCrop`).
+    - It has the menu entry, Front Image and Photoshop's five presets. The context menu adds Use Front Image / Crop Box Size & Resolution and Clear W x H x Resolution, all enabled now.
+    - The bar has W ⇄ H length fields (px, in, cm or mm), a resolution field and px/in or px/cm. Converting the unit rescales the value.
+    - Picking a size refits the box. Handle drags and a newly drawn box keep the size's shape.
+    - Done runs `image.crop`, then `image.imageSize` to the size (Preserve Details when enlarging, Lanczos when reducing), then `history.fold` into one "Crop" step. A failed resample undoes the crop.
+    - A size equal to the image's at the same ppi counts as untouched, as Front Image does in Photoshop.
+    - The crop tests clear the saved tool options in `beforeEach`. Size options persisted between tests otherwise.
+17. **New Crop Preset… and Delete Crop Preset…** (new `CropPresets.tsx`; `toolBars.tsx` `CropRatioSelect`; `PhotoStudio.tsx` crop context menu; `photoDialog.css`).
+    - New Crop Preset… opens Photoshop's dialog with the name pre-filled and selected ("16 : 9", "800 x 600 px 72 ppi", "4 in x 600 px 28.346 ppcm", "Unconstrained"). An empty name shows "You must specify a name for the crop preset." Saving under an existing name replaces that preset.
+    - Saved presets follow the size presets in the Ratio menu, the taskbar select and the right-click menu. A selected preset shows its name and wins over a built-in entry with the same values.
+    - Delete Crop Preset… (disabled with no presets) lists the presets plus All Crop Presets, then asks "Do you really want to delete the crop preset '<name>'?" with Yes/No.
+    - Presets live in localStorage (`orion.xdesign.crop-presets.v1`) and sync across selects with an `orion:crop-presets` event, as Swatches do.
+    - px/in ↔ px/cm now keeps 3 decimals (72 → 28.346), as Photoshop does.
+18. **The crop taskbar follows the box** (`ContextualTaskBar.tsx` `anchor`; `PhotoStudio.tsx`; `photoshop.css`).
+    - Checked in Photoshop first: the bar sits centred about 8 pt under the crop box and moves with it. Past the view's bottom it is clamped inside the view, over the image. Once dragged it stays at that spot.
+    - `TaskBarPlace.offset` became `at`, the dragged centre and top in the canvas's pixels. Until then the bar measures the box's `.xd-photo-crop-area` on every render, stage scroll and canvas resize. The default (no-crop) bar keeps its bottom-centre home.
+    - The ⋯ More options menu was clipped to the bar and never showed live: the bar's `transform` makes it the fixed popup's containing block, and its `overflow-x: auto` clipped it. The tools now scroll in an inner `.xd-ps-taskbar-items`, and the bar itself doesn't clip.
+19. **Escape and tool keys reach the document after a menu bar choice** (`PhotoStudio.tsx` keydown). Focus returns to the menu bar title (Window, …), and plain keys from it were dropped, so Esc didn't cancel a crop until the canvas was clicked. Menu bar titles now pass letters and Escape through, as flyout triggers already did; Space, Enter and arrows stay with the menu bar.
+20. **Crop Fill menu and its ⓘ note** (`toolBars.tsx` `CropFillField`; `OptionsBarControls.tsx` `InfoNote`; `CropOverlay.tsx` `cropAddedCanvas`; `PaintToolOptions.tsx` crop schema `fill`; `PhotoStudio.tsx` `commitCrop`; `optionsBar.css` `.xd-ps-note`).
+    - Checked in Photoshop first. The bar reads Delete Cropped Pixels ☑ | Fill: ▾ | ⓘ.
+    - The menu has three items:
+      - "Background (default)", which reads "Transparent (default)" while Delete is off;
+      - Generative Expand, listed but disabled because the engine has no generative model;
+      - Content-Aware Fill.
+    - ⓘ opens Photoshop's "Fill options" note with its three lines; OK closes it.
+    - On Done, when the box (rotated or not) adds canvas, the added area is filled:
+      - Content-Aware Fill fills it on any pixel layer;
+      - Background fills it with the background colour, only on a Background layer with Delete Cropped Pixels on. Otherwise it stays transparent, as before.
+    - The fill runs as lasso the image's corners in the new canvas, then inverse, `edit.fill`, deselect. It folds with the crop (and any size resample) into one "Crop" step. A failed fill undoes the crop.
+21. **Photoshop's Gradient Editor for Layer Style** (new `GradientEditorDialog.tsx` and `gradientEditor.css`; `LayerStyleDialog.tsx` `GradientEditor`, `gradientAt`; `layerStyleDialog.css`; `PresetPanels.tsx` exports `importPreset`).
+    - Laid out against Photoshop 2026's editor (scratch doc "xd-grad-probe", closed unsaved).
+    - The pane's Gradient row is now Photoshop's: a swatch that opens the editor, a ▾ that drops down the preset folders (picking one applies it at once), and an inline Reverse. The old stop number fields are gone.
+    - The editor has:
+      - a Presets box of collapsed folders from `state.presets.gradients`, where foreground and background resolve to the tool colours;
+      - a gear menu with Text Only, Small/Large Thumbnail and Small/Large List (remembered for the session), Append Default Gradients…, Import Gradients… and Export Selected Gradients… (disabled);
+      - Name with New (`gradient.presets.new`);
+      - Type, with Noise disabled;
+      - Smoothness, disabled at 100;
+      - the bar, with opacity stops above it and colour stops below;
+      - the Stops group: Opacity and Location, Color and Location, each with Delete;
+      - OK, Cancel, Import… (`gradient.presets.importGrd`) and Export… (disabled).
+    - Stops:
+      - clicking a strip adds a stop there, with the colour or opacity sampled at that point;
+      - stops can be dragged, and dragging one more than 24 px off the strip deletes it (it fades while it would go), never below two;
+      - with focus on a stop, ←/→ move it 1% (10% with Shift), Delete removes it, and Enter or Space selects it. Focus follows a stop the arrows move past its neighbour, and goes to the previous stop after Delete;
+      - opacity stops are drawn black when opaque and white when clear, as in Photoshop;
+      - the Opacity and Location fields can be emptied while typing, and each number typed previews at once.
+    - The Color swatch opens the Color Picker as "Color Picker (Stop Color)" over the editor.
+    - Every change previews on the canvas as a draft. OK commits it as one edit; Cancel and Escape drop it.
+    - Transparent parts of the bar, thumbnails and pane swatch show over a checkerboard.
+22. **Method for Layer Style gradients** (`gradientMethod.ts` `bakeRemembered` and `unbaked`, now shared with Gradient Map; `LayerStyleDialog.tsx` `unbake`, `bake` and `GradientEditor withMethod`).
+    - Photoshop 2026 has Method (Perceptual, Linear, Classic, Smooth, Stripes) under Scale for Gradient Overlay and for a Stroke with Fill Type: Gradient. Glows have none. Checked on scratch doc "xd-grad-probe", closed unsaved.
+    - Ours now has the same row in both places.
+    - The engine blends effect stops linearly, so any method but Classic goes to it as baked stops, as Gradient Map does. Classic goes as is.
+    - A session memory gives back the stops and Method the user set. So the pane, the ▾ presets and the Gradient Editor all work on the user's own stops, and a preset or an editor edit keeps the Method.
+23. **Gradient Map uses Photoshop's Gradient Editor** (`GradientEditorDialog.tsx` new `GradientPick`; `psAdjustControls.tsx` `GradientMapGradient`; `actionControls.tsx`; `psSliders.ts`; `AdjustmentProperties.tsx` `hold`; `LayerStyleDialog.tsx`; CSS in `gradientEditor.css`).
+    - The Image › Adjustments › Gradient Map… dialog now has Photoshop's two groups: "Gradient Used for Grayscale Mapping" (the swatch and ▾) and "Gradient Options" (Dither, Reverse, Method). Properties keeps them ungrouped, as Photoshop does.
+    - The swatch opens the Gradient Editor with no opacity stops, since Gradient Map has no transparency. Each edit previews on the canvas; OK keeps it and Cancel puts back the gradient the editor opened with. The Gradient Map dialog stays open either way.
+    - The ▾ drops down the preset folders, and a pick applies at once. The old Gradient Map preset select and the stop number fields are gone.
+    - `GradientPick` (swatch plus ▾) is now shared by Gradient Map and Layer Style. Its preset list is placed in the workspace root, so a dialog's scrolling can't clip it. Clicking the swatch closes the list.
+    - In Properties, the commit is held while the editor is open. OK commits once ("Modify Adjustment"); Cancel puts the opening values back and commits nothing.
+    - The editor is portaled out of the dialog. React still bubbles its events through the dialog's tree, so its submit, keys and focus are stopped at the portal; otherwise its OK would also submit the Gradient Map dialog.
+24. **The Gradient tool's swatch works as in Photoshop** (`toolBars.tsx` new `GradientToolPick`, replacing `GradientPresetSelect`; `GradientEditorDialog.tsx` `GradientPick` `edit` optional, `choose` gets the preset's name and group, the editor takes and returns a Name; `PhotoStudio.tsx`; `optionsBar.css`).
+    - Checked in Photoshop 2026 first (scratch doc "xd-grad-probe", closed unsaved):
+      - with Classic gradient, the swatch opens the Gradient Editor, named after the current gradient;
+      - with the live Gradient mode, the swatch opens the presets;
+      - Transparency is in the bar only for Classic gradient;
+      - the bar starts type ▾, swatch ▾, style icons.
+    - Ours now does the same. The bar starts mode ▾ ("Gradient" / "Classic gradient"), swatch ▾, style icons. The rest keeps our order: Opacity/Mode, Dither, Method, Reverse, Transparency, Gradients.
+    - Classic: each editor change previews on the bar swatch. OK sends `gradient.presets.select` with the edited stops, opacity and Name, plus `applyToLayer: false`, since a classic gradient paints pixels and must leave a selected Gradient Fill layer alone. Cancel sends nothing.
+    - The ▾ presets (and the live swatch) send `{preset, group}`, so foreground and background stops stay live. Classic adds `applyToLayer: false`.
+    - Transparency no longer overrides a live gradient's opacity stops; it only applies to Classic.
+    - Limit: a preset picked inside the editor reaches OK as hex colours, so its foreground and background stops become fixed colours.
+25. **Photoshop's Gradient Fill dialog** (`GradientFillDialog.tsx` rebuilt, new `fitToDocument`; `PhotoStudio.tsx` `openFill`, `newFillBase`, the Gradient tool's Method; `gradientEditor.css` `.xd-gf-field`).
+    - Checked in Photoshop 2026 first (scratch docs, closed unsaved; s413ps–s426ps):
+      - the rows are Gradient (swatch ▾), Style, Angle (dial and number), Scale (% with a popup slider), Reverse and Dither, Align with layer, Reset Alignment and Fit to document, Method. OK and Cancel sit at the top right;
+      - there is no Preview checkbox, preview pane, offset field or stop field. Dragging the image moves the gradient;
+      - Reset Alignment resets only the offset. Fit to document resets the offset, keeps the angle and spans the document through its centre.
+    - Ours now has the same rows. The old preview pane with its from/to handles, the Preview checkbox, Offset X/Y and the stop and transparency fields are gone.
+    - The swatch opens the Gradient Editor and the ▾ the preset folders, as in Layer Style and Gradient Map. Editor Cancel puts back the gradient it opened with.
+    - Every change previews on the canvas (`gradient.fill.set` through `usePhotoCommandPreview`). OK commits once; Cancel and Esc drop it. Alt turns Cancel into Reset.
+    - Dragging the image through the dialog's scrim moves the gradient, in document pixels.
+    - The Angle and Scale fields can be emptied while typing; only numbers in range reach the gradient.
+    - Method bakes the stops, as in Layer Style, and a baked gradient reopens with its Method. A live Gradient tool drag with a Method other than Classic now bakes too, so its fill layer reopens with that Method.
+    - It opens from a fill layer's thumbnail double-click and Layer › Layer Content Options…, as in Photoshop, as well as Properties. The Properties help text now reads "Gradient, style, angle, scale and Method. Drag the image to move the gradient."
+    - Layer › New Fill Layer › Gradient… opens it on the new layer. Cancel and Esc go back to the History state it opened from with `discardRedo`, so the layer is dropped with nothing to redo, as Photoshop does. Cancel on an existing fill layer only closes.
+    - The angle dial is one row tall and its number left-aligned, as in Photoshop.
+26. **Layer Style: dragging the image moves the effect again** (`LayerStyleDialog.tsx`, using `documentUnder` from `ColorRangeDialog.tsx`).
+    - The dialog's scrim lies over the stage, so a press on the image never reached the drag, and Drop Shadow's Angle and Distance didn't move.
+    - A press on the scrim now counts when the visible document is under it. This covers every movable effect: Drop Shadow, Inner Shadow, Satin, Pattern Overlay and Gradient Overlay. A press beside the image does nothing.
+
+Verified live (scratch doc, `/tmp/pstest/shots/live2/` s163–s184):
+- Layer Style OK makes one step, and Cancel leaves no redo.
+- Solid Color preview and Cancel.
+- Paths deselect.
+- Crop:
+  - the context menu and the taskbar;
+  - an image pan of 100 px with the box held at the same screen position;
+  - a drag back to 5 px short snaps the image flush with the box;
+  - ↺ resets to 1200×800 with nothing committed.
+- The large-image preview was not live-checked: the scratch project has no image over 16 MP. The Rust test fakes 6000×4000.
+- Taskbar and crop options bar (s185–s199): the grip drag, Hide bar and the Window item, the Overlay menu against Photoshop's (scratch doc "xd-crop-probe", closed unsaved), and the final bar order.
+- W x H x Resolution (s216–s224):
+  - "1024 x 768 px 92 ppi" refits the box to 1067 × 800, and the bar reads 1024 px ⇄ 768 px | 92 | px/in.
+  - Done gives a 1024 × 768 (92 ppi) image and one "Crop" History step.
+  - One Undo restores 1200 × 800 (72 ppi). The ratio menu was set back to Ratio.
+- Crop presets (s225–s248):
+  - The New dialog opened pre-filled "1366 x 768 px 135 ppi", selected. Saved as "XD Probe", which showed in the options bar, the taskbar, after the sizes in the Ratio menu and checked at the end of the right-click menu.
+  - Delete → confirm text → No returned to the Delete dialog; Yes closed both and the label fell back to "1366 x 768 px 135 ppi". Delete Crop Preset… was disabled again, so no test preset is left. The ratio was set back to Ratio.
+  - px/cm showed 53.15 for 135 ppi.
+- Taskbar follow (s249–s273):
+  - clamped at the view's bottom when the box fills the image;
+  - centred about 8 px under a shrunk box;
+  - follows a zoom and a 150 px stage scroll;
+  - after a grip drag, resizing the box left the bar put;
+  - ⋯ now opens (it was clipped before the CSS change, s260–s262). Reset bar position snapped the bar back under the box and is then disabled; Hide bar and Window › Contextual Task Bar brought it back.
+  - With focus on the Window title after two Window menu choices, Esc cancelled a 988×648 edit back to 1200×800.
+  - The crop was cancelled and the view set back to Fit.
+- Crop Fill (s280–s291):
+  - The bar read "Delete Cropped Pixels | Fill: Transparent (default) | ⓘ".
+  - The ⓘ note showed its title and three lines, and OK closed it.
+  - The native menu listed Transparent (default) ✓, Generative Expand (greyed) and Content-Aware Fill.
+  - With Content-Aware Fill picked, the box was dragged out to 1345 × 800. Done filled the 145 px strip with sampled pink, and History showed one "Crop" step.
+  - Undo restored 1200 × 800, and Fill was set back to Transparent (default).
+- Gradient Editor (s299–s325, Layer › Layer Style › Gradient Overlay…):
+  - Dragging a colour stop moved the Location field and the canvas together (38.1%).
+  - A click above the bar added an opacity stop at 50%. Opacity 0 showed through on the canvas and as checkerboard in the bar.
+  - The Color swatch opened the picker, and a field click previewed red on the canvas; picker OK kept it.
+  - Basics › Foreground to Transparent applied live and filled in the name.
+  - The gear menu showed its eight items with ✓ on the current view. Small List showed a swatch and name per row.
+  - Editor OK committed to the pane swatch.
+  - The pane ▾ opened the folders, and a Blues preset applied at once.
+  - Black, White previewed, then editor Cancel put the committed blue back.
+  - Layer Style Cancel removed the overlay that opening from the menu had added.
+  - Not live-checked: New, because it writes to the app-wide preset library, and Import…, because it opens a native file dialog. Unit tests cover both.
+  - An earlier HMR reload mid-dialog had left an orphan "Layer Style: Gradient Overlay" step. It was stepped back in History, so the scratch layer is back to its opening effects.
+  - After the review fixes (s328–s331): the opacity stops were black, and Opacity 0 on the right stop turned it white and faded the bar into the token-grey checkerboard, live on the canvas. Editor Cancel and Layer Style Cancel left History ending at "Deselect", as before.
+- Method (s332–s336):
+  - A fresh overlay read Classic, and the menu matched Photoshop's order.
+  - Perceptual darkened the canvas mid-ramp (117 → 89 grey) and read back as Perceptual from the engine.
+  - The Gradient Editor opened on the two original stops, not 64.
+  - Editor Cancel and Layer Style Cancel left History ending at "Deselect".
+- Gradient Map (s354–s387):
+  - The dialog showed Photoshop's two groups. The swatch opened the editor with no opacity stops.
+  - Basics › Black, White turned the canvas and the swatch grey live; editor Cancel put the teal gradient back, with the dialog still open.
+  - The ▾ list sat right under the swatch and over the dialog's edge (it was clipped, then offset, before it moved to the workspace root). A Basics pick applied at once, and the dialog's Cancel restored the image.
+  - Layer Style › Gradient Overlay: the same swatch and ▾. Clicking the swatch with the list open left the list over the editor; fixed, and checked again (s376).
+  - Properties, on a new Gradient Map layer: the editor previewed Black, White live. Cancel left History ending at "New Gradient Map Layer"; OK added one "Modify Adjustment" step. History was stepped back to "Deselect", so the test layer is gone.
+- Gradient tool (Photoshop s389–s395; ours s401–s413):
+  - The bar read mode ▾, swatch ▾, icons. The live swatch opened the presets under it, and Basics › Black, White applied.
+  - Classic showed Mode, Opacity and Transparency. Its swatch opened the Gradient Editor named "Black, White".
+  - Reds › Red 02 previewed on the bar swatch; Cancel put Black, White back, and OK kept Red 02.
+  - Set back to Basics › Foreground to Background and the live mode, then the original tool. Photoshop was left with only pfp.psd open, the Brush tool and the Gradient mode.
+- Gradient Fill (s427–s453, s463–s468, Layer › New Fill Layer › Gradient…):
+  - The dialog matched Photoshop's rows (s431c against s414ps).
+  - Typing 45 turned the canvas gradient at once. A 160 px image drag shifted it (sampled pixels darkened along the row), Fit to document put it back on the centre, and so did Reset Alignment after a second drag.
+  - Scale 50 and the popup slider's thumb each changed the canvas while typed or dragged.
+  - The swatch opened the Gradient Editor. Reds previewed on the canvas, and editor Cancel put the teal back.
+  - Stripes Method showed on the canvas. OK added one "Edit Gradient Fill" step, and a thumbnail double-click reopened the dialog with 45°, 120% and Stripes (s446).
+  - Layer Content Options… opened it too (s450). Cancel on that existing layer kept it.
+  - New Fill Layer › Gradient… → Cancel first left a greyed "New Gradient Fill Layer" redo step (s452). After the `discardRedo` fix, History ended at "Deselect" with the redo arrow disabled and "Background copy" current (s467–s468).
+  - The dial and the left-aligned angle matched Photoshop's (s463c against s414psc).
+- Layer Style drag (s455–s462, Layer › Layer Style › Drop Shadow…):
+  - Before: an 80 px drag left Angle 120° and Distance 5 px (s456, s458).
+  - After (the dialog reopened, since a mounted dialog keeps its old code across a hot update): the same drag at 55% zoom gave Angle 135° and Distance 210 px, as the math predicts. The style sample showed the shadow offset (s461).
+  - Cancel left History ending at "Deselect" (s462).
+- The scratch doc was left at "Deselect" with "Background copy" and no fill layer. Photoshop wasn't touched for these checks after s426ps.
+
+Tests:
+- Rust: `cargo test --lib xdesign_photo -- --test-threads=1`: 801 passed, 0 failed, 1 ignored (254.85 s). New tests: history fold and discardRedo; large-image adjustment previews on a reused reduced copy, with filters still refused.
+- vitest: PhotoActionDialog and its blur file, 210 passed. AdjustmentProperties, LayerStyleDialog, PerspectiveCropDialog, PhotoPaths, PhotoStudio.layout, PhotoStudio.tools and toolBars, 257 passed. The jsdom "getContext not implemented" stack is the usual noise.
+- After items 11–14: PhotoStudio.tools, PhotoStudio.layout, toolBars and PaintToolOptions, 234 passed. `npm run typecheck`: clean.
+- After items 15–16: CropOverlay, PhotoStudio.tools, PhotoStudio.layout, toolBars and PaintToolOptions, 243 passed. `npm run typecheck`: clean.
+- After item 17: the same five files, 248 passed; after the last dialog tweak, toolBars and PhotoStudio.tools, 68 passed. `npm run typecheck`: clean.
+- After items 18–19: PhotoStudio.tools (new: the follow test and the menu bar keys test), PhotoStudio.layout and toolBars, 226 passed. `npm run typecheck`: clean.
+- After item 20: PhotoStudio.tools (new: the Fill menu and note test, and the fill-on-Done test), CropOverlay (new: `cropAddedCanvas`), PhotoStudio.layout, toolBars, PaintToolOptions and paintToolPreferences, 263 passed. `npm run typecheck`: clean.
+- After item 21: GradientEditorDialog (new, 8 tests) and LayerStyleDialog (its three gradient tests rewritten for the swatch, ▾ presets and editor), 30 passed. `npm run typecheck`: clean.
+  - A Sonnet review found: focus lost when an arrow key re-sorts a stop or Delete removes it; number fields that couldn't be emptied; literal checker hex. I also found the opacity-stop fill was inverted. All fixed. The first three and the fill have failing-first tests (GradientEditorDialog now 12), and the checker now uses `--xd-text-3`/`--xd-text-2`. With LayerStyleDialog: 34 passed. `npm run typecheck`: clean.
+  - Skipped from the review: CSS for an empty stop list, which the two-stop minimum makes unreachable; Enter in Name commits the editor, which is what Photoshop does.
+- After item 22: LayerStyleDialog (new: Method round trip; Method kept for presets and editor edits; Method on Stroke but not Outer Glow), gradientMethod and GradientEditorDialog, 41 passed. PhotoActionDialog and AdjustmentProperties, which use the shared Gradient Map memory, 173 passed. `npm run typecheck`: clean.
+- After item 23: GradientEditorDialog, colorControls (new: the Gradient Map editor's Cancel and OK, the ▾ preset, and the list closing when the swatch is clicked), AdjustmentProperties (new: the held commit), PhotoActionDialog (new: the two groups and the ▾ presets) and LayerStyleDialog, 226 passed. `npm run typecheck`: clean.
+- After item 24: PhotoStudio.layout (new: the Classic swatch's editor with swatch preview, Cancel and OK; the live swatch's presets, Transparency for Classic only and no override of live gradients), toolBars (the `GradientPresetSelect` test removed with it), GradientEditorDialog (two tests now expect the Name), LayerStyleDialog, colorControls, PhotoActionDialog and AdjustmentProperties, 398 passed. `npm run typecheck`: clean.
+- After item 25: ImageContent (9 Gradient Fill tests, rewritten for the new layout: the rows, live preview, image drag, Reset Alignment, Fit to document, typed fields with Alt-Reset, the editor, ▾ presets and Method), 14 passed. PhotoStudio.layout (new: the tool's Method on a live fill, the thumbnail and Layer Content Options opening the dialog, Cancel dropping a new fill with nothing to redo), 161 passed. `npm run typecheck`: clean.
+- After item 26: LayerStyleDialog (new: a drag through the scrim moves the shadow, but not from beside the image), 27 passed.
+- Together, with GradientEditorDialog: 215 passed. `npm run typecheck`: clean.
+- One unfiltered `npx vitest run` happened by mistake (an empty file filter): 5,489 passed, 2 failed.
+  - `src/store/characterStore.test.ts` "falls back to R.O.S.I.E when removing the selected upload…" also fails alone. It's not from this work: the expected payload lacks `showInApps: false`, and both files are clean against HEAD. Not fixed.
+  - `commandPreview.cancel.test.tsx` "does not cancel region-only pans…" passes alone, so it's a load flake.
+- Temporary Rust timing logs were added and then removed. None remain.
+
+Open questions / next (seen, not fixed):
+- **Crop:**
+  - Generative Expand is listed but disabled (no generative model). Perspective Crop… is an extra button; Photoshop keeps it as a separate tool.
+- **Dev only:** a hot update to a photo module such as `toolBars.tsx` can crash the shell at `Spotlight.tsx:75`. The update travels PhotoStudio → XDesign plugin → builtinApps → pluginManagerStore, which is an import cycle, so `usePluginManager` is read before it's initialised. The error screen's Reload doesn't recover; `touch src/main.tsx` or `touch index.html` forces a full reload. Not fixed.
+- **Pre-existing test failure:** `characterStore.test.ts` (see Tests).
+- **Gradient Editor:**
+  - It has no midpoint diamonds, Smoothness or Noise type, because the engine's sampler is linear between stops with no midpoints.
+  - Method (item 22):
+    - Photoshop starts new overlays and gradient strokes at Smooth. Ours read Classic, which is the engine's own blend, until a Method is picked. Defaulting to Smooth would mean baking the engine's default stops when the effect is added.
+    - The Method lives only in session memory. After a restart, a baked gradient reopens as its 64 stops and Classic, as Gradient Map already does. Keeping it would need an engine field.
+    - The editor's bar blends stops linearly; the canvas and the pane swatch show the Method.
+  - Photoshop's gradient Stroke also has Dither and Reset Alignment. The engine's `StrokeFx` has no dither, and stroke gradients aren't draggable on the canvas here.
+  - Export Selected Gradients… and Export… are disabled: there is no .grd writer.
+  - Layer Style, Gradient Map, the Gradient tool and Gradient Fill (item 25) all use it now.
+  - Gradient tool bar: Photoshop puts Mode and Opacity before Reverse, Dither, Transparency and Method; ours keeps Opacity/Mode, Dither, Method, Reverse, Transparency, Gradients.
+  - A Gradient Map change in Properties is recorded as "Modify Adjustment"; Photoshop names it "Modify Gradient Map Layer".
+- **Gradient Fill (item 25):**
+  - Photoshop asks for a name in its New Layer dialog before the Gradient Fill dialog. Ours makes "Gradient Fill 1" straight away.
+  - Scale reads in different units. Photoshop's 100% is the document's short side, so its Fit to document reads 133% at 0° on 800×600 (154% at 30°, 142% at 45°, 116% at 60°, 100% at 90°). The engine's 100% is the chord through the centre, so ours reads 100% for the same result.
+  - Method bakes only stops that are all plain hex colours. Midpoints are dropped when the Method or a preset changes.
+  - After Reset or Cancel, the canvas can show the last native preview frame for a moment before the committed layer redraws.
+- **Work Path showing on the canvas** (was "seen once, not reproduced"): seen again after New Fill Layer › Gradient… → Cancel (s447, s469). Likely cause: the target path is React state in `PhotoStudio.tsx` (`activePath`). It starts as `null`, and `selectedPath` treats `null` as the Work Path. So whenever PhotoStudio mounts (re-entering photo mode, or every hot update here), the Work Path is targeted again. It seems to show only once a `path.info` call succeeds, which would explain why it appeared as the dialog closed. Not fixed and not checked against Photoshop. Starting from `NO_PATH` would also need Make Work Path and similar commands to target the new path.
+- **Dev only, more often now:** every TSX hot update this session hit the `Spotlight.tsx:75` crash above, and a reload mid-dialog leaves the dialog's history steps behind.
+- **Preview limits:**
+  - Filters, geometry and retouch get no live preview above 16 MP.
+  - The 100 ms first-frame wait in `commandPreview.ts` is kept on purpose: only the first frame waits.
+- **Live-check** a large-image adjustment preview once a scratch image over 16 MP exists.
+
+## 2026-10-24 (late evening) — XDesign photo: crop/target-path/History gaps, then a live-preview pass over the dialogs
+
+Branch: `validation/alpha-2026-09-14`. **Uncommitted.** The earlier commits (`c6ff015` and the checkpoint) are unchanged and nothing is pushed. All changes are under `src/apps/xdesign/photo/`, plus an appended section in `docs/architecture/xdesign/photoshop-parity/live-test-2026-10-24.md`. Live probing used the scratch project ("Untitled design", `xd-ps-test.png`) only.
+
+Owner: "yea lets do it", meaning the quick gaps from the entry below, then a check that every dialog previews live while it is being adjusted ("everything should show real time edits as you are adjusting").
+
+Changed (each behaviour change has a test that failed first):
+1. **Crop box on the canvas edges when Crop is picked** (`PhotoStudio.tsx`, `CropOverlay.tsx`).
+   - Photoshop shows the box at once; ours appeared only after a drag.
+   - An untouched full box shows no Apply/Cancel, and Enter does nothing.
+   - Drags inside it fall through to the canvas (new `movable` prop), so a new box can be drawn.
+   - Escape and Cancel crop reset to the edges instead of removing the box.
+   - Straighten still fits its own box when the box is untouched.
+2. **Target path always drawn** (`PathEditOverlay.tsx` `TargetPathOverlay`, `viewGuides.ts` `targetPath` and `targetPathVisible`, `photo.css` `.xd-photo-path-knot`).
+   - The selected path (outline plus anchor squares) shows whatever tool is active. `pathTarget` now follows the Paths-panel selection.
+   - Added View › Show › Target Path (⇧⌘H) after Selection Edges, the order in Photoshop's menu. Extras governs it.
+3. **History scrolls to the current state** (`PhotoHistory.tsx`).
+   - It scrolls only when the current state changes, so the list can still be browsed.
+   - It scrolls manually instead of with `scrollIntoView`, so shell ancestors don't move and the sticky footer is allowed for.
+4. **Live preview: Layer Style colour picker** (`ColorPickerDialog.tsx` gains an optional `preview(hex)`; `LayerStyleDialog.tsx`).
+   - Each draft colour goes to the canvas as a draft before OK. The picker's Cancel drops it.
+5. **Live preview: Layer Style gradient stops** (`LayerEffects.tsx` `EffectSettings` gains an optional `live`; `GradientEditor`).
+   - Stop position and colour inputs draft on change and commit on blur. Unchanged values end the draft.
+6. **Live preview: Camera Raw arrow keys** (`DevelopDialog.tsx`).
+   - ↑/↓ in a number field (and the region boundaries) apply at once, by the slider step or ten with Shift, as in Camera Raw.
+   - Typed text still waits for Enter or blur, which is also Camera Raw's behaviour.
+7. **Layer Style gradient pane: clipped number fields** (CSS-only, `layerStyleDialog.css`).
+   - `photo.css`'s legacy `.xd-photo-dialog label` grid (a 70 px column) beat `.xd-photo-effect-field`'s flex, so the 104 px inputs spilled past the pane and hid their values.
+   - Pre-existing; found live.
+
+Verified live (scratch doc, screenshots in `/tmp/pstest/shots/live2/`, s85–s120):
+- Crop box on picking the tool.
+- Target path with other tools, and ⇧⌘H.
+- History scroll.
+- Mid-drag preview: Levels and Hue/Saturation.
+- Layer Style:
+  - picker hue drag previews while the button is still down, and Cancel restores the overlay;
+  - typing a stop position previews before blur;
+  - Cancel restores the image.
+- Camera Raw: Shift+↑ ×2 brightens at once, and Cancel restores the image.
+- Perspective Crop: the grid moves live and the result shows on commit, as in Photoshop. Left unchanged.
+
+Tests:
+- `npx vitest run`, 6 files, 304 passed: ColorPickerDialog, LayerStyleDialog, GeometryDialog, PhotoHistory, PhotoStudio.tools, PhotoStudio.layout. The jsdom "getContext not implemented" stack is the usual noise.
+- New tests:
+  - picker draft reporting;
+  - Layer Style picker preview and Cancel;
+  - gradient stop drafts and commit on blur;
+  - Camera Raw arrow nudges;
+  - History scroll;
+  - Target Path in View › Show;
+  - crop box on tool pick;
+  - target path with other tools, ⇧⌘H and Extras.
+- `npm run typecheck`: clean.
+- No Rust or Cargo.toml changes, so no timing logs and no license refresh.
+
+Open questions / next (seen, not fixed):
+- **Layer Style Cancel leaves redo states.**
+  - Interim steps (e.g. the "add" step from Layer › Layer Style › Color Overlay…) are reverted with `history.select`, so ⇧⌘Z can re-apply a cancelled style. Photoshop leaves nothing to redo.
+  - Fixing it needs an engine command to drop redo states; there is none today.
+- **Layer Style pane:**
+  - its Gradient bar shows the committed gradient, not the draft;
+  - there is no Photoshop Gradient Editor; stops are number fields.
+- **Solid Color fill layer:** created only on OK, so its picker has no live preview (Photoshop previews).
+- **Camera Raw:** spinner clicks on number fields don't preview until blur.
+- **Preview limits** (suspected, unverified):
+  - the first frame waits at least 100 ms (`commandPreview.ts`);
+  - images over 16 MP get no live preview.
+- **Paths:** no Paths-panel deselect. How shape paths show with other tools is unverified against Photoshop.
+- **Crop:**
+  - the context-menu order differs from Photoshop;
+  - there is no crop taskbar;
+  - dragging inside an edited box moves the box, while Photoshop moves the image.
+- **Live-driving note:** after a held drag (`/tmp/pstest/hold.sh`), the next click can be swallowed. Click again.
+
 ## 2026-10-24 (evening) — XDesign photo: live pass of the panel-internals round, eleven fixes
 
 Branch: `validation/alpha-2026-09-14`. **Committed, not pushed** (owner: "okay lets commit"), as two commits:

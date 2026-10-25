@@ -29,10 +29,10 @@
 .xd-photo .xd-ls-dialog .xd-ls-tick { display:flex;margin:0 0 6px 116px; }
 .xd-photo .xd-ls-dialog .xd-ls-inline > .xd-ls-tick { margin:0;white-space:nowrap; }
 .xd-photo .xd-ls-dialog .xd-ls-row > input[type=range] { grid-column:auto;margin:0; }
+.xd-photo .xd-ls-dialog .xd-photo-effect-field { display:flex; }
 .xd-ls-swatch { width:22px;height:18px;padding:0;flex:none; }
 .xd-ls-dial { width:28px;height:28px;stroke:var(--xd-text);fill:none;cursor:pointer;touch-action:none; }
 .xd-ls-curve { width:28px;height:28px;flex:none;border:1px solid var(--xd-border);fill:none;stroke:var(--xd-text); }
-.xd-ls-gradient { display:block;height:16px;border:1px solid var(--xd-border); }
 .xd-ls-hint { margin:0 0 8px;color:var(--xd-text-2);font-size:11px; }
 .xd-ls-error { color:var(--xd-text-2); }
 .xd-ls-styles { display:grid;grid-template-columns:repeat(auto-fill,40px);gap:4px; }

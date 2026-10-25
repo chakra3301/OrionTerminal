@@ -144,6 +144,34 @@ pub(super) const ADJUSTMENTS: [&str; 16] = [
 /// Pixel adjustments with their own engine parameters; they preview but do not use the shared adjustment-layer path.
 const PIXEL_ADJUSTMENTS: [&str; 3] = ["shadowsHighlights", "replaceColor", "matchColor"];
 
+/// Images above this render each preview frame too slowly to follow a drag.
+const FULL_PREVIEW_PIXELS: u64 = 16_777_216;
+
+/// Adjustments work pixel by pixel, so they look the same on a smaller copy; edits measured in pixels need the full image.
+fn reducible(command: &str) -> bool {
+    command == "layer.setAdjustment"
+        || ["image.adjustments.", "layer.newAdjustmentLayer."].iter().filter_map(|prefix| command.strip_prefix(prefix)).any(|kind| ADJUSTMENTS.contains(&kind))
+}
+
+/// The image reduced to the size its previews display at. It is kept for the next frame; holding the source weakly
+/// keeps its allocation, so a matching pointer means the same unchanged image rather than a reused address.
+fn reduced_copy(doc: &std::sync::Arc<photocraft_engine::doc::Document>) -> Result<std::sync::Arc<photocraft_engine::doc::Document>, String> {
+    use std::sync::{Arc, Mutex, Weak};
+    type Reduced = Option<(Weak<photocraft_engine::doc::Document>, Arc<photocraft_engine::doc::Document>)>;
+    static REDUCED: Mutex<Reduced> = Mutex::new(None);
+    let mut cached = REDUCED.lock().map_err(|_| "Image preview cache needs to be restarted")?;
+    if let Some((source, copy)) = cached.as_ref() {
+        if std::ptr::eq(source.as_ptr(), Arc::as_ptr(doc)) { return Ok(copy.clone()); }
+    }
+    let factor = doc.size.width.max(doc.size.height).div_ceil(2048).max(1);
+    let mut engine = Session::new();
+    engine.add_document((**doc).clone(), None);
+    engine.execute("image.imageSize", serde_json::json!({"width": doc.size.width.div_ceil(factor), "height": doc.size.height.div_ceil(factor), "resample": "bilinear"})).map_err(|error| error.to_string())?;
+    let copy = engine.active().ok_or("No preview image")?.doc.clone();
+    *cached = Some((Arc::downgrade(doc), copy.clone()));
+    Ok(copy)
+}
+
 // Embed a selected LUT before engine parsing. The bounded read also avoids
 // rereading a changing file while this preview or edit is being composed.
 pub(super) fn lut_params(command: &str, mut params: Value) -> Result<Value, String> {
@@ -568,6 +596,7 @@ fn render_using_cache_repeat(state:&DocState,color:Option<&super::color_views::S
             "type.warpText",
             "gradient.fill.set",
             "gradient.fill.create",
+            "layer.newFillLayer.solidColor",
             "layer.setAdjustment",
             "layer.setProps",
             "layer.layerStyle.editEffect",
@@ -595,7 +624,9 @@ fn render_using_cache_repeat(state:&DocState,color:Option<&super::color_views::S
     if !params.is_object() || params.to_string().len() > parameter_limit {
         return Err("Invalid preview parameters".into());
     }
-    if !["image.applyImage", "image.calculations", "select.loadSelection"].contains(&command) && u64::from(state.doc.size.width) * u64::from(state.doc.size.height) > 16_777_216 {
+    let large = u64::from(state.doc.size.width) * u64::from(state.doc.size.height) > FULL_PREVIEW_PIXELS;
+    let reduce = large && reducible(command);
+    if large && !reduce && !["image.applyImage", "image.calculations", "select.loadSelection"].contains(&command) {
         return Err(
             "Preview is unavailable for this image size. Apply the edit to render it.".into(),
         );
@@ -619,7 +650,8 @@ fn render_using_cache_repeat(state:&DocState,color:Option<&super::color_views::S
     }
     let mut engine = Session::new();
     engine.add_document((*state.doc).clone(), None);
-    let draft = super::snapshot::capture(state,super::snapshot::HistoryPolicy::Discard);
+    let mut draft = super::snapshot::capture(state,super::snapshot::HistoryPolicy::Discard);
+    if reduce { draft.doc = reduced_copy(&state.doc)?; }
     *engine.active_mut().ok_or("No preview image")? = draft;
     if let Some(color)=color{color.install(&mut engine)?;}
     if edited_filter.is_some_and(|filter| BASIC_FILTER_EDITS.contains(&filter.command.as_str())) {
@@ -1514,6 +1546,30 @@ mod tests {
         let mut state = source.active().unwrap().clone();
         std::sync::Arc::make_mut(&mut state.doc).size = photocraft_engine::doc::Size::new(4097, 4096);
         assert!(render_with_color_regions(&state, &color, "filter.blurGallery.fieldBlur", json!({"blur":10}), None, Some(&[PreviewRegion { x:0, y:0, width:32, height:24, scale:1 }])).err().unwrap().contains("image size"));
+    }
+
+    #[test]
+    fn large_images_preview_adjustments_on_a_reused_reduced_copy_but_still_refuse_filters() {
+        let mut engine = Session::new();
+        engine.execute("file.new", json!({"width":24,"height":24})).unwrap();
+        engine.execute("paint.stroke", json!({"points":[[12,12,1]],"size":30,"color":"#4080b0","seed":101})).unwrap();
+        let pixels = engine.active().unwrap().active_layer;
+        engine.execute("layer.newAdjustmentLayer.levels", json!({})).unwrap();
+        let levels = engine.active().unwrap().active_layer.unwrap().0;
+        let mut state = engine.active().unwrap().clone();
+        state.active_layer = pixels;
+        std::sync::Arc::make_mut(&mut state.doc).size = photocraft_engine::doc::Size::new(6000, 4000);
+        let before = state.doc.clone();
+        for (command, params) in [("image.adjustments.curves", json!({"points":[[0,0],[128,180],[255,255]]})), ("layer.newAdjustmentLayer.invert", json!({})), ("layer.setAdjustment", json!({"layer":levels,"inBlack":15}))] {
+            let preview = render(&state, command, params).unwrap();
+            assert_eq!((preview.width, preview.height), (2000, 1334), "{command} renders at the usual preview size");
+        }
+        assert!(std::sync::Arc::ptr_eq(&before, &state.doc));
+        assert_eq!(state.doc.size, photocraft_engine::doc::Size::new(6000, 4000));
+        assert!(std::sync::Arc::ptr_eq(&reduced_copy(&state.doc).unwrap(), &reduced_copy(&state.doc).unwrap()), "an unchanged image reuses its reduced copy");
+        for (command, params) in [("filter.blur.gaussianBlur", json!({"radius":2})), ("image.adjustments.shadowsHighlights", json!({}))] {
+            assert!(render(&state, command, params).err().unwrap().contains("image size"), "{command} depends on pixel distances");
+        }
     }
 
     #[test]
@@ -2570,6 +2626,20 @@ mod tests {
             &source,
             &engine.active().unwrap().doc
         ));
+        assert_eq!(engine.active().unwrap().history.entries(), history);
+    }
+    #[test]
+    fn solid_color_fill_layer_previews_the_picked_color_without_adding_the_layer() {
+        let mut engine = Session::new();
+        engine.execute("file.new", json!({"width":32,"height":32})).unwrap();
+        let state = engine.active().unwrap();
+        let (source, history) = (state.doc.clone(), state.history.entries().to_vec());
+        let preview = render(state, "layer.newFillLayer.solidColor", json!({"color":"#ff0000"})).unwrap();
+        let bytes = base64::engine::general_purpose::STANDARD.decode(&preview.png).unwrap();
+        let image = photocraft_codecs::decode(&bytes).unwrap();
+        let pixels = image.as_u8().unwrap();
+        assert!(pixels[0] > 240 && pixels[1] < 10 && pixels[2] < 10);
+        assert!(std::sync::Arc::ptr_eq(&source, &engine.active().unwrap().doc));
         assert_eq!(engine.active().unwrap().history.entries(), history);
     }
 }

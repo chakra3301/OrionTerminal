@@ -8,6 +8,8 @@ import { useXDProjects } from "../projectsStore";
 import { usePhotoWorkspace } from "./runtime";
 import { PhotoStudio } from "./PhotoStudio";
 import { IMAGE_SWATCHES_KEY } from "./PhotoSwatches";
+import { PAINT_TOOL_PREFERENCES_KEY } from "./paintToolPreferences";
+import { CROP_PRESETS_KEY, saveCropPreset } from "./CropPresets";
 import type { PhotoDocument, PhotoState } from "./types";
 
 const command=vi.hoisted(()=>vi.fn(async(_id:string,_params:Record<string,unknown>={}):Promise<unknown>=>undefined));
@@ -37,7 +39,7 @@ beforeEach(async()=>{
   useViewAids.setState(state=>({flags:{...state.flags,snap:false}}));
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);
   vi.stubGlobal("ResizeObserver",class{observe(){}disconnect(){}});
-  native.enabled=false;native.invoke.mockReset();localStorage.removeItem(IMAGE_SWATCHES_KEY);command.mockClear();colors.mockClear();sample.mockClear();useXDesign.getState().hydrate(null);
+  native.enabled=false;native.invoke.mockReset();localStorage.removeItem(IMAGE_SWATCHES_KEY);localStorage.removeItem(PAINT_TOOL_PREFERENCES_KEY);localStorage.removeItem(CROP_PRESETS_KEY);command.mockClear();colors.mockClear();sample.mockClear();useXDesign.getState().hydrate(null);
   const id=ulid(),version=ulid();
   const doc:PhotoDocument={id,version,name:"Portrait",width:800,height:600,previewWidth:800,previewHeight:600,bundlePath:`/assets/${version}.pcraft`,previewPath:`/assets/${version}.png`,originalPath:null};
   const placement=useXDesign.getState().applyPhotoDocument(doc);
@@ -82,6 +84,20 @@ describe("Image workspace Photoshop tools",()=>{
     await act(async()=>root.unmount());root=createRoot(container);design.focus();
     await act(async()=>root.render(<PhotoStudio/>));
     expect(document.activeElement).toBe(editor());shell.remove();
+  });
+  it("takes focus from the studio File menu that opened the image, so ⇧⌘N reaches New Layer instead of Quick Capture",async()=>{
+    vi.spyOn(document,"hasFocus").mockReturnValue(true);
+    const file=document.createElement("button");document.body.append(file);
+    await act(async()=>root.unmount());root=createRoot(container);file.focus();
+    await act(async()=>root.render(<PhotoStudio/>));
+    expect(document.activeElement).toBe(editor());file.remove();
+  });
+  it("leaves a text field outside the editor focused when an image opens",async()=>{
+    vi.spyOn(document,"hasFocus").mockReturnValue(true);
+    const field=document.createElement("textarea");document.body.append(field);
+    await act(async()=>root.unmount());root=createRoot(container);field.focus();
+    await act(async()=>root.render(<PhotoStudio/>));
+    expect(document.activeElement).toBe(field);field.remove();
   });
   it("steps brush size and hardness with brackets, sets opacity and flow with number keys and hides panels with Tab",async()=>{
     await key("b");const size=()=>button("Brush preset picker").textContent;
@@ -234,15 +250,44 @@ describe("Image workspace Photoshop tools",()=>{
     await click("Paths panel options");await act(async()=>row("Save Path…").click());expect(command).toHaveBeenLastCalledWith("path.rename",{name:"work",to:"Path 2"});
     await click("Path 1");await click("Delete current path");expect(command).toHaveBeenLastCalledWith("path.delete",{name:"Path 1"});
   });
+  it("names a new layer and sets its options in Photoshop's New Layer dialog first, recorded as one step",async()=>{
+    const dialog=(label="New Layer")=>container.querySelector<HTMLFormElement>(`[role="dialog"][aria-label="${label}"]`);
+    const field=(label:string,form="New Layer")=>dialog(form)!.querySelector<HTMLInputElement&HTMLSelectElement>(`[aria-label="${label}"]`)!;
+    const type=(label:string,value:string)=>act(async()=>{const input=field(label);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,value);input.dispatchEvent(new Event("input",{bubbles:true}));});
+    const choose=(label:string,value:string,form?:string)=>act(async()=>{const select=field(label,form);select.value=value;select.dispatchEvent(new Event("change",{bubbles:true}));});
+    await menu("Layer","New","Layer…");expect(command).not.toHaveBeenCalled();
+    expect(field("Name").value).toBe("Layer 1");expect(field("Mode").value).toBe("Normal");expect(field("Opacity").value).toBe("100");expect(field("Fill with neutral color").disabled).toBe(true);
+    await type("Name","Sky");await choose("Mode","Multiply");await type("Opacity","50");await act(async()=>field("Use previous layer to create clipping mask").click());
+    await click("OK");expect(dialog()).toBeNull();
+    expect(command.mock.calls).toEqual([["layer.new.layer",{name:"Sky"}],["layer.setProps",{clipped:true,blend:"Multiply",opacity:.5}],["history.fold",{from:1,label:"New Layer"}]]);
+    command.mockClear();await key("n",{metaKey:true,shiftKey:true});expect(field("Name").value).toBe("Layer 1");await click("OK");
+    expect(command.mock.calls).toEqual([["layer.new.layer",{name:"Layer 1"}]]);
+    // Overlay's neutral colour is 50% gray, and Photoshop fills the whole layer with it whatever is selected.
+    command.mockClear();await setState({hasSelection:true,selectionBounds:[10,10,40,40]});await menu("Layer","New","Layer…");await choose("Mode","Overlay");await act(async()=>field("Fill with neutral color").click());await click("OK");
+    expect(command.mock.calls).toEqual([["layer.newFillLayer.solidColor",{color:"#808080"}],["layer.rasterize.fillContent",{}],["layer.setProps",{name:"Layer 1",blend:"Overlay"}],["history.fold",{from:1,label:"New Layer"}]]);
+    command.mockClear();await click("Create a new layer");expect(dialog()).toBeNull();
+    await click("Create a new layer",{altKey:true});expect(field("Name").value).toBe("Layer 1");await click("Cancel");expect(command.mock.calls).toEqual([["layer.new.layer",{}]]);
+    command.mockClear();await menu("Layer","New","Group…");
+    expect(field("Name","New Group").value).toBe("Group 1");expect(field("Mode","New Group").value).toBe("Pass Through");expect(dialog("New Group")!.querySelector('input[type="checkbox"]')).toBeNull();
+    await choose("Mode","Normal","New Group");await click("OK");
+    expect(command.mock.calls).toEqual([["layer.new.group",{name:"Group 1"}],["layer.setProps",{blend:"Normal"}],["history.fold",{from:1,label:"New Group"}]]);
+    command.mockClear();await menu("Layer","New Adjustment Layer","Curves…");expect(field("Name").value).toBe("Curves 1");expect(dialog()!.querySelector('[aria-label="Fill with neutral color"]')).toBeNull();
+    await type("Name","Tone");await click("OK");
+    expect(command.mock.calls).toEqual([["layer.newAdjustmentLayer.curves",{}],["layer.setProps",{name:"Tone"}],["history.fold",{from:1,label:"New Curves Layer"}]]);
+    expect(button("Properties").getAttribute("aria-selected")).toBe("true");
+    command.mockClear();await menu("Layer","New Fill Layer","Solid Color…");expect(field("Name").value).toBe("Color Fill 1");await type("Name","Tint");await click("OK");
+    expect(command).not.toHaveBeenCalled();await click("OK");
+    expect(command.mock.calls).toEqual([["layer.newFillLayer.solidColor",{color:expect.any(String)}],["layer.setProps",{name:"Tint"}],["history.fold",{from:1,label:"New Color Fill Layer"}]]);
+  });
   it("opens Photoshop's panel menus and right-click menus",async()=>{
     const items=()=>[...container.querySelectorAll("[role=menu] > *")].map(element=>element.getAttribute("role")==="separator"?"-":element.textContent);
     const rightClick=async(target:Element,init:MouseEventInit={})=>{await act(async()=>target.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,button:2,clientX:100,clientY:50,...init})));};
     await click("Layers panel options");
-    expect(items()).toEqual(["New Layer","Duplicate Layer","Delete Layer","Delete Hidden Layers","-","New Group","New Group from Layers","Collapse All Groups","-","Rename Layer…","Hide Layers","Lock Layers","-","Convert to Smart Object","Edit Contents","-","Blending Options…","-","Create Clipping Mask","-","Link Layers","Select Linked Layers","-","Merge Down","Merge Visible","Flatten Image","-","Collapse Panel Group"]);
-    expect(row("New Layer").dataset.shortcut).toBeTruthy();
-    await act(async()=>row("New Layer").click());expect(command).toHaveBeenLastCalledWith("layer.new.layer",{});
+    expect(items()).toEqual(["New Layer…","Duplicate Layer","Delete Layer","Delete Hidden Layers","-","New Group…","New Group from Layers…","Collapse All Groups","-","Rename Layer…","Hide Layers","Lock Layers","-","Convert to Smart Object","Edit Contents","-","Blending Options…","-","Create Clipping Mask","-","Link Layers","Select Linked Layers","-","Merge Down","Merge Visible","Flatten Image","-","Collapse Panel Group"]);
+    expect(row("New Layer…").dataset.shortcut).toBeTruthy();
+    await act(async()=>row("New Layer…").click());await click("OK");expect(command).toHaveBeenLastCalledWith("layer.new.layer",{name:"Layer 1"});
     await rightClick(button("Portrait layer").closest(".xd-photo-layer")!);
-    expect(items()).toEqual(["Blending Options…","-","Duplicate Layer","Delete Layer","Group from Layers","Collapse All Groups","-","Convert to Smart Object","-","Add Layer Mask","Create Clipping Mask","-","Link Layers","Select Linked Layers","-","Copy Layer Style","Paste Layer Style","Clear Layer Style","-","Merge Down","Merge Visible","Flatten Image"]);
+    expect(items()).toEqual(["Blending Options…","-","Duplicate Layer","Delete Layer","Group from Layers…","Collapse All Groups","-","Convert to Smart Object","-","Add Layer Mask","Create Clipping Mask","-","Link Layers","Select Linked Layers","-","Copy Layer Style","Paste Layer Style","Clear Layer Style","-","Merge Down","Merge Visible","Flatten Image"]);
     expect(row("Merge Down").dataset.shortcut).toBeUndefined();
     await act(async()=>row("Add Layer Mask").click());expect(command).toHaveBeenLastCalledWith("layer.layerMask.revealAll",{});
     await key("m");await rightClick(canvas());
@@ -288,19 +333,29 @@ describe("Image workspace Photoshop tools",()=>{
     expect(command).not.toHaveBeenCalled();expect(container.textContent).toContain("200 × 200 px");
     const guides=()=>[...container.querySelectorAll('.xd-photo-crop-guide line')].map(line=>[line.getAttribute("x1"),line.getAttribute("y1"),line.getAttribute("x2"),line.getAttribute("y2")].map(Number).map(Math.round).join(" "));
     expect(guides()).toEqual(["167 50 167 250","233 50 233 250","100 117 300 117","100 183 300 183"]);
-    const overlay=async(value:string)=>{await act(async()=>{const select=container.querySelector<HTMLSelectElement>('[aria-label="Crop overlay"]')!;select.value=value;select.dispatchEvent(new Event("change",{bubbles:true}));});};
-    await overlay("diagonal");expect(guides()).toEqual(["100 50 300 250","300 50 100 250"]);
-    await overlay("none");expect(container.querySelector(".xd-photo-crop-guide")).toBeNull();await overlay("thirds");
-    await overlay("triangle");expect(guides()).toEqual(["100 50 300 250","300 50 200 150","100 250 200 150"]);
+    const overlay=async(label:string)=>{await click("Crop overlay");await act(async()=>row(label).click());};
+    const chosen=async()=>{await click("Crop overlay");const on=[...container.querySelectorAll("[role=menu] > [aria-checked=true]")].map(item=>item.textContent);await click("Crop overlay");return on;};
+    expect(await chosen()).toEqual(["Rule of Thirds","Always Show Overlay"]);
+    await click("Crop overlay");expect([...container.querySelectorAll("[role=menu] > *")].map(item=>item.textContent||"-")).toEqual(["Rule of Thirds","Grid","Diagonal","Triangle","Golden Ratio","Golden Spiral","-","Auto Show Overlay","Always Show Overlay","Never Show Overlay","-","Cycle Overlay","Cycle Orientation"]);
+    expect(row("Cycle Orientation").disabled).toBe(true);expect(row("Golden Spiral").querySelector("svg")).not.toBeNull();await click("Crop overlay");
+    await overlay("Diagonal");expect(guides()).toEqual(["100 50 300 250","300 50 100 250"]);
+    await overlay("Never Show Overlay");expect(container.querySelector(".xd-photo-crop-guide")).toBeNull();await overlay("Always Show Overlay");await overlay("Rule of Thirds");
+    await overlay("Triangle");expect(guides()).toEqual(["100 50 300 250","300 50 200 150","100 250 200 150"]);
     await key("O",{shiftKey:true});expect(guides()).toEqual(["300 50 100 250","100 50 200 150","300 250 200 150"]);
-    await overlay("spiral");expect(guides()).toHaveLength(10);expect(guides()[0]).toBe("176 50 176 250");
+    await overlay("Golden Spiral");expect(guides()).toHaveLength(10);expect(guides()[0]).toBe("176 50 176 250");
     expect(container.querySelector(".xd-photo-crop-guide path")!.getAttribute("d")!.match(/ A/g)).toHaveLength(10);
-    await key("o");expect(container.querySelector<HTMLSelectElement>('[aria-label="Crop overlay"]')!.value).toBe("thirds");expect(container.querySelector('svg[aria-label="Crop box"]')).not.toBeNull();
-    await key("o");expect(container.querySelector<HTMLSelectElement>('[aria-label="Crop overlay"]')!.value).toBe("grid");await overlay("thirds");
+    await overlay("Cycle Orientation");expect(guides()[0]).toBe("224 250 224 50");
+    await key("o");expect(await chosen()).toEqual(["Rule of Thirds","Always Show Overlay"]);expect(container.querySelector('svg[aria-label="Crop box"]')).not.toBeNull();
+    await overlay("Cycle Overlay");expect(await chosen()).toEqual(["Grid","Always Show Overlay"]);await overlay("Rule of Thirds");
+    const straighten=button("Straighten crop");expect(straighten.textContent).toBe("Straighten");expect(straighten.querySelector("svg")).not.toBeNull();
+    expect(straighten.compareDocumentPosition(button("Crop overlay"))&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();expect(button("Crop overlay").compareDocumentPosition(button("Crop options"))&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();expect(button("Crop options").compareDocumentPosition(container.querySelector('[aria-label="Tool Delete Cropped Pixels"]')!)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const box=container.querySelector<SVGSVGElement>('svg[aria-label="Crop box"]')!;box.getBoundingClientRect=()=>({left:0,top:0,width:800,height:600}) as DOMRect;box.setPointerCapture=vi.fn();box.hasPointerCapture=()=>false;
     const handle=async(label:string,from:[number,number],to:[number,number])=>{await act(async()=>container.querySelector(`[aria-label="${label}"]`)!.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:from[0],clientY:from[1]})));await act(async()=>box.dispatchEvent(new MouseEvent("pointermove",{bubbles:true,clientX:to[0],clientY:to[1]})));await act(async()=>box.dispatchEvent(new MouseEvent("pointerup",{bubbles:true,clientX:to[0],clientY:to[1]})));};
     await handle("Crop handle right",[300,150],[350,150]);await handle("Move crop box",[200,150],[190,140]);
     expect(container.textContent).toContain("250 × 200 px");
+    await overlay("Auto Show Overlay");expect(container.querySelector(".xd-photo-crop-guide")).toBeNull();
+    await act(async()=>container.querySelector('[aria-label="Move crop box"]')!.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:200,clientY:150})));expect(container.querySelector(".xd-photo-crop-guide")).not.toBeNull();
+    await act(async()=>box.dispatchEvent(new MouseEvent("pointerup",{bubbles:true,clientX:200,clientY:150})));expect(container.querySelector(".xd-photo-crop-guide")).toBeNull();await overlay("Always Show Overlay");
     const showCropped=async()=>{await click("Crop options");await act(async()=>[...container.querySelectorAll<HTMLButtonElement>("[role=menu] > button")].find(element=>element.textContent?.startsWith("Show Cropped Area"))!.click());};
     const shade=()=>container.querySelector<SVGPathElement>(".xd-photo-crop-shade")!;
     expect(shade().hasAttribute("data-hidden")).toBe(false);await showCropped();expect(shade().hasAttribute("data-hidden")).toBe(true);await showCropped();expect(shade().hasAttribute("data-hidden")).toBe(false);
@@ -309,12 +364,24 @@ describe("Image workspace Photoshop tools",()=>{
     await key("h",{},gear);expect(shade().hasAttribute("data-hidden")).toBe(true);await key("h",{},gear);expect(shade().hasAttribute("data-hidden")).toBe(false);
     await key("/");expect(container.querySelector(".xd-photo-crop-shade")).toBeNull();await key("/");expect(shade()).toBeTruthy();
     await key("x");expect(container.textContent).toContain("200 × 250 px");await key("x");expect(container.textContent).toContain("250 × 200 px");
-    await key("Enter");expect(command).toHaveBeenLastCalledWith("image.crop",{x:90,y:40,width:250,height:200,deleteCroppedPixels:false});
+    await key("Enter");expect(command).toHaveBeenLastCalledWith("image.crop",{x:110,y:60,width:250,height:200,deleteCroppedPixels:false});
     expect(container.querySelector('svg[aria-label="Crop box"]')).toBeNull();
     await pointer("pointerdown",{clientX:100,clientY:50});await pointer("pointermove",{clientX:300,clientY:250});await pointer("pointerup",{clientX:300,clientY:250});
-    await key("Escape",{},container.querySelector('[aria-label="Crop options"]')!);expect(container.querySelector('svg[aria-label="Crop box"]')).toBeNull();expect(command).toHaveBeenCalledTimes(1);expect(usePhotoWorkspace.getState().shapeId).not.toBeNull();
+    await key("Escape",{},container.querySelector('[aria-label="Crop options"]')!);expect(container.querySelector('svg[aria-label="Crop box"]')).not.toBeNull();expect(container.textContent).toContain("800 × 600 px");expect(command).toHaveBeenCalledTimes(1);expect(usePhotoWorkspace.getState().shapeId).not.toBeNull();
     const trigger=container.querySelector<HTMLButtonElement>('[aria-label="Crop options"]')!;trigger.focus();vi.spyOn(document,"hasFocus").mockReturnValue(true);
     await key("v",{},trigger);expect(container.querySelector('[aria-label="Crop options"]')).toBeNull();expect(document.activeElement).toBe(editor());
+  });
+  it("puts the crop box on the canvas edges as soon as the Crop tool is picked, like Photoshop",async()=>{
+    const box=()=>container.querySelector('svg[aria-label="Crop box"]'),mover=()=>container.querySelector('[aria-label="Move crop box"]');
+    const drag=async(from:[number,number],to:[number,number])=>{await pointer("pointerdown",{clientX:from[0],clientY:from[1]});await pointer("pointermove",{clientX:to[0],clientY:to[1]});await pointer("pointerup",{clientX:to[0],clientY:to[1]});};
+    await key("c");expect(box()).not.toBeNull();expect(container.textContent).toContain("800 × 600 px");expect(mover()).toBeNull();
+    await key("Enter");expect(command).not.toHaveBeenCalled();expect(box()).not.toBeNull();
+    await drag([100,50],[300,250]);expect(container.textContent).toContain("200 × 200 px");expect(mover()).not.toBeNull();
+    await key("Escape");expect(container.textContent).toContain("800 × 600 px");expect(command).not.toHaveBeenCalled();
+    await drag([100,50],[300,250]);await key("Enter");expect(command).toHaveBeenLastCalledWith("image.crop",{x:100,y:50,width:200,height:200,deleteCroppedPixels:false});expect(box()).toBeNull();
+    await drag([400,300],[400,300]);expect(box()).not.toBeNull();expect(container.textContent).toContain("800 × 600 px");
+    await key("b");expect(box()).toBeNull();await key("c");expect(box()).not.toBeNull();
+    await click("Straighten crop");await drag([100,100],[400,130]);expect(container.textContent).toContain("709 × 532 px");
   });
   it("transforms the selection with a box, navigates the view and opens Content-Aware Scale",async()=>{
     await setState({hasSelection:true,selectionBounds:[10,10,40,40]});
@@ -346,21 +413,184 @@ describe("Image workspace Photoshop tools",()=>{
     expect(container.textContent).toContain("90.0°");
     await click("Apply crop");expect(command).toHaveBeenLastCalledWith("image.cropRotated",{x:100,y:50,width:200,height:200,angle:90,deleteCroppedPixels:false});
   });
-  it("offers Photoshop's crop context menu: ratios refit the box, Rotate Crop Box swaps it and Crop applies",async()=>{
+  it("offers Photoshop's crop context menu: ratios refit the box, Rotate Crop Box swaps it and Enter applies",async()=>{
     const items=()=>[...container.querySelectorAll("[role=menu] > *")].map(element=>element.getAttribute("role")==="separator"?"-":element.textContent);
     const rightClick=async(target:Element)=>{await act(async()=>target.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,button:2,clientX:100,clientY:50})));};
     await key("c");await rightClick(canvas());
-    expect(items()).toEqual(["Original Ratio","1 : 1 (Square)","4 : 5 (8 : 10)","5 : 7","2 : 3 (4 : 6)","16 : 9","-","Reset Crop","Rotate Crop Box","-","Crop"]);
-    expect([row("Rotate Crop Box").disabled,row("Crop").disabled]).toEqual([true,true]);
+    expect(items()).toEqual(["Clear Ratio","Reset Crop","Rotate Crop Box","-","Use Front Image Aspect Ratio","Use Crop Box Aspect Ratio","-","Use Front Image Size & Resolution","Use Crop Box Size & Resolution","-",
+      "Original Ratio","1 : 1 (Square)","4 : 5 (8 : 10)","5 : 7","2 : 3 (4 : 6)","16 : 9","-","Front Image","4 x 5 in 300 ppi","8.5 x 11 in 300 ppi","1024 x 768 px 92 ppi","1280 x 800 px 113 ppi","1366 x 768 px 135 ppi"]);
+    expect([row("Clear Ratio").disabled,row("Rotate Crop Box").disabled,row("Use Crop Box Size & Resolution").disabled,row("Front Image").disabled]).toEqual([true,false,false,false]);
     await act(async()=>row("1 : 1 (Square)").click());expect(container.textContent).toContain("600 × 600 px");
     await rightClick(container.querySelector('svg[aria-label="Crop box"]')!);expect(row("1 : 1 (Square)").getAttribute("aria-checked")).toBe("true");
     await act(async()=>row("4 : 5 (8 : 10)").click());expect(container.textContent).toContain("480 × 600 px");
     await rightClick(canvas());await act(async()=>row("Rotate Crop Box").click());
     expect(container.textContent).toContain("600 × 480 px");expect([container.querySelector<HTMLInputElement>('[aria-label="Crop ratio width"]')!.value,container.querySelector<HTMLInputElement>('[aria-label="Crop ratio height"]')!.value]).toEqual(["5","4"]);
     await rightClick(canvas());expect(row("4 : 5 (8 : 10)").getAttribute("aria-checked")).toBe("false");
-    await act(async()=>row("Crop").click());expect(command).toHaveBeenLastCalledWith("image.crop",{x:100,y:60,width:600,height:480,deleteCroppedPixels:false});
+    await act(async()=>row("Use Crop Box Aspect Ratio").click());expect([container.querySelector<HTMLInputElement>('[aria-label="Crop ratio width"]')!.value,container.querySelector<HTMLInputElement>('[aria-label="Crop ratio height"]')!.value]).toEqual(["600","480"]);
+    await rightClick(canvas());await act(async()=>row("Clear Ratio").click());expect(container.querySelector<HTMLInputElement>('[aria-label="Crop ratio width"]')!.value).toBe("");expect(container.textContent).toContain("600 × 480 px");
+    await key("Enter");expect(command).toHaveBeenLastCalledWith("image.crop",{x:100,y:60,width:600,height:480,deleteCroppedPixels:false});
     await rightClick(canvas());await act(async()=>row("Reset Crop").click());expect(container.textContent).toContain("800 × 600 px");
     expect(command).toHaveBeenCalledTimes(1);
+  });
+  it("lists saved crop presets at the end of the crop context menu and applies them",async()=>{
+    act(()=>saveCropPreset("Square-ish",{style:"fixedRatio",ratioWidth:1,ratioHeight:1}));
+    const items=()=>[...container.querySelectorAll("[role=menu] > *")].map(element=>element.getAttribute("role")==="separator"?"-":element.textContent);
+    const rightClick=async()=>{await act(async()=>canvas().dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,button:2,clientX:100,clientY:50})));};
+    await key("c");await rightClick();
+    expect(items().slice(-3)).toEqual(["1366 x 768 px 135 ppi","-","Square-ish"]);
+    await act(async()=>row("Square-ish").click());expect(container.textContent).toContain("600 × 600 px");
+    expect(container.querySelector<HTMLSelectElement>('[aria-label="Crop ratio"]')!.selectedOptions[0]!.textContent).toBe("Square-ish");
+    await rightClick();expect([row("Square-ish").getAttribute("aria-checked"),row("1 : 1 (Square)").getAttribute("aria-checked")]).toEqual(["true","false"]);
+  });
+  it("crops to Photoshop's W x H x Resolution sizes: Enter crops, resamples and records one Crop step",async()=>{
+    const rightClick=async()=>{await act(async()=>canvas().dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,button:2,clientX:100,clientY:50})));};
+    const fields=()=>["Crop width","Crop height","Crop resolution"].map(label=>container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!.value);
+    await key("c");await rightClick();await act(async()=>row("1024 x 768 px 92 ppi").click());
+    expect(container.querySelector<HTMLSelectElement>('[aria-label="Crop ratio"]')!.value).toBe("1024 x 768 px 92 ppi");expect(fields()).toEqual(["1024 px","768 px","92"]);
+    expect(container.textContent).toContain("800 × 600 px");await rightClick();expect(row("Clear W x H x Resolution").disabled).toBe(false);expect(row("1024 x 768 px 92 ppi").getAttribute("aria-checked")).toBe("true");await act(async()=>row("Reset Crop").click());
+    await key("Enter");await act(async()=>{});
+    expect(command.mock.calls).toEqual([["image.crop",{x:0,y:0,width:800,height:600,deleteCroppedPixels:false}],["image.imageSize",{width:1024,height:768,resolution:92,resample:"preserveDetails"}],["history.fold",{from:1,label:"Crop"}]]);
+    command.mockClear();await rightClick();await act(async()=>row("4 x 5 in 300 ppi").click());expect(container.textContent).toContain("480 × 600 px");expect(fields()).toEqual(["4 in","5 in","300"]);
+    await key("Enter");await act(async()=>{});
+    expect(command.mock.calls).toEqual([["image.crop",{x:160,y:0,width:480,height:600,deleteCroppedPixels:false}],["image.imageSize",{width:1200,height:1500,resolution:300,resample:"preserveDetails"}],["history.fold",{from:1,label:"Crop"}]]);
+    command.mockClear();await rightClick();await act(async()=>row("Use Front Image Size & Resolution").click());
+    expect(fields()).toEqual(["800 px","600 px","72"]);expect(container.querySelector<HTMLSelectElement>('[aria-label="Crop ratio"]')!.selectedOptions[0]!.textContent).toBe("W x H x Resolution");
+    await key("Enter");expect(command).not.toHaveBeenCalled();
+    await rightClick();await act(async()=>row("Clear W x H x Resolution").click());expect(fields()).toEqual(["","",""]);
+  });
+  it("holds the chosen ratio or size while a crop handle is dragged or a new box is drawn",async()=>{
+    await key("c");
+    const choose=async(value:string)=>{await act(async()=>{const select=container.querySelector<HTMLSelectElement>('[aria-label="Crop ratio"]')!;select.value=value;select.dispatchEvent(new Event("change",{bubbles:true}));});};
+    const svg=()=>{const box=container.querySelector<SVGSVGElement>('svg[aria-label="Crop box"]')!;box.getBoundingClientRect=()=>({left:0,top:0,width:800,height:600}) as DOMRect;box.setPointerCapture=vi.fn();box.hasPointerCapture=()=>false;return box;};
+    const handle=async(from:[number,number],to:[number,number])=>{const box=svg();await act(async()=>container.querySelector('[aria-label="Crop handle bottom right"]')!.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:from[0],clientY:from[1]})));
+      await act(async()=>box.dispatchEvent(new MouseEvent("pointermove",{bubbles:true,clientX:to[0],clientY:to[1]})));await act(async()=>box.dispatchEvent(new MouseEvent("pointerup",{bubbles:true,clientX:to[0],clientY:to[1]})));};
+    await choose("16 : 9");expect(container.textContent).toContain("800 × 450 px");await handle([800,525],[640,400]);expect(container.textContent).toContain("640 × 360 px");
+    await choose("1280 x 800 px 113 ppi");expect(container.textContent).toContain("800 × 500 px");await handle([800,550],[640,420]);expect(container.textContent).toContain("640 × 400 px");
+    await key("Escape");for(const [type,x,y] of [["pointerdown",100,50],["pointermove",300,250],["pointerup",300,250]] as const)await pointer(type,{clientX:x,clientY:y});
+    expect(container.textContent).toContain("320 × 200 px");
+  });
+  it("shows Photoshop's crop taskbar, which adds Cancel and Done once the box is edited",async()=>{
+    await key("c");
+    const bar=container.querySelector('[aria-label="Contextual Task Bar"]')!,labels=()=>[...bar.querySelectorAll("button,select")].map(element=>element.getAttribute("aria-label")??element.textContent);
+    expect(labels()).toEqual(["Crop ratio","Straighten crop","More options"]);
+    await act(async()=>{const select=bar.querySelector<HTMLSelectElement>("select")!;select.value="1 : 1 (Square)";select.dispatchEvent(new Event("change",{bubbles:true}));});
+    expect(container.textContent).toContain("600 × 600 px");expect(labels()).toEqual(["Crop ratio","Straighten crop","More options","Cancel","Done"]);
+    await act(async()=>[...bar.querySelectorAll("button")].find(element=>element.textContent==="Done")!.click());
+    expect(command).toHaveBeenLastCalledWith("image.crop",{x:100,y:0,width:600,height:600,deleteCroppedPixels:false});
+  });
+  it("keeps the crop taskbar centred just under the crop box until it is dragged, as Photoshop does",async()=>{
+    const rect=(left:number,top:number,width:number,height:number)=>({left,top,width,height,right:left+width,bottom:top+height,x:left,y:top,toJSON(){}}) as DOMRect;
+    let area=rect(100,50,800,500);
+    const measure=vi.spyOn(Element.prototype,"getBoundingClientRect").mockImplementation(function(this:Element){
+      if(this.classList.contains("xd-ps-canvas"))return rect(0,0,1000,800);
+      if(this.classList.contains("xd-photo-crop-area"))return area;
+      if(this.classList.contains("xd-ps-taskbar")){const style=(this as HTMLElement).style;return rect((parseFloat(style.left)||500)-150,parseFloat(style.top)||752,300,34);}
+      return rect(0,0,0,0);
+    });
+    try{
+      await key("c");
+      const bar=()=>container.querySelector<HTMLElement>('[aria-label="Contextual Task Bar"]')!,at=()=>[bar().style.left,bar().style.top];
+      const choose=async(value:string)=>{await act(async()=>{const select=bar().querySelector("select")!;select.value=value;select.dispatchEvent(new Event("change",{bubbles:true}));});};
+      expect(at()).toEqual(["500px","558px"]);
+      area=rect(300,100,400,400);await choose("1 : 1 (Square)");expect(at()).toEqual(["500px","508px"]);
+      area=rect(0,100,600,690);await choose("16 : 9");expect(at()).toEqual(["300px","752px"]);
+      area=rect(-300,100,600,300);await choose("4 : 5 (8 : 10)");expect(at()).toEqual(["162px","408px"]);
+      for(const [type,x,y] of [["pointerdown",200,500],["pointermove",240,470],["pointerup",240,470]] as const)await act(async()=>bar().querySelector(".xd-ps-taskbar-grip")!.dispatchEvent(new MouseEvent(type,{bubbles:true,clientX:x,clientY:y})));
+      expect(at()).toEqual(["202px","378px"]);
+      area=rect(300,100,400,400);await choose("1 : 1 (Square)");expect(at()).toEqual(["202px","378px"]);
+      await click("More options");await act(async()=>row("Reset bar position").click());expect(at()).toEqual(["500px","508px"]);
+    }finally{measure.mockRestore();}
+  });
+  it("drags, resets, pins and hides the contextual task bar from Photoshop's More options menu",async()=>{
+    await key("c");
+    const bar=()=>container.querySelector<HTMLElement>('[aria-label="Contextual Task Bar"]'),at=()=>[bar()!.style.left,bar()!.style.top],moved=["40px","-30px"];
+    const drag=async()=>{for(const [type,x,y] of [["pointerdown",200,500],["pointermove",240,470],["pointerup",240,470]] as const)await act(async()=>bar()!.querySelector(".xd-ps-taskbar-grip")!.dispatchEvent(new MouseEvent(type,{bubbles:true,clientX:x,clientY:y})));};
+    const more=async(label:string)=>{await click("More options");expect([...container.querySelectorAll("[role=menu] > button")].map(item=>item.textContent)).toEqual(["Hide bar","Reset bar position","Pin bar position"]);await act(async()=>row(label).click());};
+    await drag();expect(at()).toEqual(moved);
+    await more("Reset bar position");expect(at()).not.toEqual(moved);
+    await drag();await key("v");expect(at()).toEqual(["",""]);
+    await drag();await more("Pin bar position");await key("c");expect(at()).toEqual(moved);
+    await more("Hide bar");expect(bar()).toBeNull();await key("v");expect(bar()).toBeNull();
+    await menu("Window");expect(row("Contextual Task Bar").getAttribute("aria-checked")).toBe("false");await act(async()=>row("Contextual Task Bar").click());expect(bar()).not.toBeNull();
+  });
+  it("hands Escape and tool keys to the document after a menu bar choice, as Photoshop does",async()=>{
+    await key("c");
+    await act(async()=>{const select=container.querySelector<HTMLSelectElement>('[aria-label="Contextual Task Bar"] select')!;select.value="1 : 1 (Square)";select.dispatchEvent(new Event("change",{bubbles:true}));});
+    expect(container.textContent).toContain("600 × 600 px");
+    await menu("Window","Contextual Task Bar");await menu("Window","Contextual Task Bar");
+    const trigger=[...container.querySelectorAll("[role=menubar] > button")].find(element=>element.textContent==="Window")!;
+    await key("Escape",{},trigger);expect(container.textContent).toContain("800 × 600 px");
+    await key("v",{},trigger);expect(container.querySelector('svg[aria-label="Crop box"]')).toBeNull();
+  });
+  it("ends the crop options bar with Photoshop's reset, cancel and commit icons",async()=>{
+    await key("c");
+    const options=container.querySelector(".xd-ps-options")!,icons=()=>["Reset crop","Cancel crop","Apply crop"].map(label=>options.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`));
+    expect(icons()[0]!.querySelector("svg")).not.toBeNull();expect(icons().slice(1)).toEqual([null,null]);
+    await act(async()=>{const select=container.querySelector<HTMLSelectElement>('[aria-label="Contextual Task Bar"] select')!;select.value="1 : 1 (Square)";select.dispatchEvent(new Event("change",{bubbles:true}));});
+    expect(icons().map(button=>[button!.textContent,!!button!.querySelector("svg")])).toEqual([["",true],["",true],["",true]]);
+    await act(async()=>icons()[0]!.click());expect(container.textContent).toContain("800 × 600 px");expect(icons().slice(1)).toEqual([null,null]);
+    expect(command).not.toHaveBeenCalledWith("image.crop",expect.anything());
+  });
+  it("snaps the image edge to the crop box while dragging the image, keeping the box still on screen",async()=>{
+    useViewAids.setState(state=>({flags:{...state.flags,snap:true}}));
+    await key("1",{metaKey:true});await key("c");
+    await act(async()=>{const select=container.querySelector<HTMLSelectElement>('[aria-label="Contextual Task Bar"] select')!;select.value="1 : 1 (Square)";select.dispatchEvent(new Event("change",{bubbles:true}));});
+    const box=container.querySelector<SVGSVGElement>('svg[aria-label="Crop box"]')!;box.getBoundingClientRect=()=>({left:0,top:0,width:800,height:600}) as DOMRect;box.setPointerCapture=vi.fn();box.hasPointerCapture=()=>false;
+    const area=container.querySelector('[aria-label="Move crop box"]')!;
+    await act(async()=>area.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:400,clientY:300})));await act(async()=>box.dispatchEvent(new MouseEvent("pointermove",{bubbles:true,clientX:495,clientY:300})));
+    expect(area.getAttribute("x")).toBe("0");expect(container.querySelector<HTMLElement>(".xd-photo-image")!.style.transform).toBe("translate(100px, 0px)");
+  });
+  it("drags the image under an edited crop box like Photoshop, past the canvas edge, until Escape puts it back",async()=>{
+    await key("c");
+    await act(async()=>{const select=container.querySelector<HTMLSelectElement>('[aria-label="Contextual Task Bar"] select')!;select.value="1 : 1 (Square)";select.dispatchEvent(new Event("change",{bubbles:true}));});
+    const box=container.querySelector<SVGSVGElement>('svg[aria-label="Crop box"]')!;box.getBoundingClientRect=()=>({left:0,top:0,width:800,height:600}) as DOMRect;box.setPointerCapture=vi.fn();box.hasPointerCapture=()=>false;
+    const area=()=>container.querySelector('[aria-label="Move crop box"]')!,image=()=>container.querySelector<HTMLElement>(".xd-photo-image")!;
+    const drag=async(from:[number,number],to:[number,number])=>{await act(async()=>area().dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:from[0],clientY:from[1]})));await act(async()=>box.dispatchEvent(new MouseEvent("pointermove",{bubbles:true,clientX:to[0],clientY:to[1]})));await act(async()=>box.dispatchEvent(new MouseEvent("pointerup",{bubbles:true,clientX:to[0],clientY:to[1]})));};
+    await drag([400,300],[450,320]);
+    expect([area().getAttribute("x"),area().getAttribute("y")]).toEqual(["50","-20"]);expect(image().style.transform).toMatch(/^translate\(\d/);expect(container.textContent).toContain("600 × 600 px");
+    expect(container.querySelector<HTMLElement>(".xd-photo-scroll-space")!.style.overflow).toBe("clip");
+    await drag([400,300],[400,300]);expect([area().getAttribute("x"),area().getAttribute("y")]).toEqual(["50","-20"]);
+    await key("Escape");expect(image().style.transform).toBe("");expect(container.querySelector<HTMLElement>(".xd-photo-scroll-space")!.style.overflow).toBe("");expect(container.textContent).toContain("800 × 600 px");
+    await act(async()=>{const select=container.querySelector<HTMLSelectElement>('[aria-label="Contextual Task Bar"] select')!;select.value="1 : 1 (Square)";select.dispatchEvent(new Event("change",{bubbles:true}));});
+    await drag([400,300],[450,320]);await key("Enter");
+    expect(command).toHaveBeenLastCalledWith("image.crop",{x:50,y:-20,width:600,height:600,deleteCroppedPixels:false});expect(image().style.transform).toBe("");
+  });
+  it("offers Photoshop's crop Fill menu after Delete Cropped Pixels, with its Fill options note",async()=>{
+    await key("c");
+    const fill=()=>container.querySelector<HTMLSelectElement>('[aria-label="Crop fill"]')!,deleting=()=>container.querySelector<HTMLInputElement>('[aria-label="Tool Delete Cropped Pixels"]')!;
+    expect([...fill().options].map(option=>[option.textContent,option.disabled])).toEqual([["Transparent (default)",false],["Generative Expand",true],["Content-Aware Fill",false]]);
+    expect(fill().closest("label")!.textContent).toMatch(/^Fill:/);expect(deleting().compareDocumentPosition(fill())&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await act(async()=>deleting().click());expect(fill().selectedOptions[0]!.textContent).toBe("Background (default)");
+    const note=()=>container.querySelector('[role=dialog][aria-label="Fill options"]');
+    await click("Fill options");expect(note()!.querySelector("h4")!.textContent).toBe("Fill options");
+    expect([...note()!.querySelectorAll("p")].map(line=>line.textContent)).toEqual(["Background (default): Fill the expanded area with your background color or transparent pixels","Generative expand: Generate high-quality new content to fill expanded space, with or without a text prompt","Content-aware fill: Sample content from part of the image and use it to fill a small area"]);
+    await click("OK");expect(note()).toBeNull();
+  });
+  it("fills the canvas a crop adds with Content-Aware Fill, or the background color on a Background layer, in one Crop step",async()=>{
+    const choose=async(select:HTMLSelectElement,value:string)=>{await act(async()=>{select.value=value;select.dispatchEvent(new Event("change",{bubbles:true}));});};
+    const settle=async()=>{for(let turn=0;turn<8;turn++)await act(async()=>{});};
+    const expand=async()=>{
+      await key("b");await key("c");await choose(container.querySelector<HTMLSelectElement>('[aria-label="Contextual Task Bar"] select')!,"1 : 1 (Square)");
+      const box=container.querySelector<SVGSVGElement>('svg[aria-label="Crop box"]')!;box.getBoundingClientRect=()=>({left:0,top:0,width:800,height:600}) as DOMRect;box.setPointerCapture=vi.fn();box.hasPointerCapture=()=>false;
+      await act(async()=>container.querySelector('[aria-label="Move crop box"]')!.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:400,clientY:300})));
+      await act(async()=>box.dispatchEvent(new MouseEvent("pointermove",{bubbles:true,clientX:450,clientY:320})));await act(async()=>box.dispatchEvent(new MouseEvent("pointerup",{bubbles:true,clientX:450,clientY:320})));
+      await key("Enter");await settle();
+    };
+    const image=[["select.lasso",{points:[[-50,20],[750,20],[750,620],[-50,620]]}],["select.inverse",{}]];
+    await key("c");await choose(container.querySelector<HTMLSelectElement>('[aria-label="Crop fill"]')!,"contentAware");
+    await expand();expect(command.mock.calls).toEqual([["image.crop",{x:50,y:-20,width:600,height:600,deleteCroppedPixels:false}],...image,["edit.fill",{contents:"contentAware"}],["select.deselect",{}],["history.fold",{from:1,label:"Crop"}]]);
+    command.mockClear();await key("b");await key("c");
+    await pointer("pointerdown",{clientX:100,clientY:50});await pointer("pointermove",{clientX:300,clientY:250});await pointer("pointerup",{clientX:300,clientY:250});await key("Enter");await settle();
+    expect(command.mock.calls).toEqual([["image.crop",{x:100,y:50,width:200,height:200,deleteCroppedPixels:false}]]);
+    await setState({layers:[{id:1,name:"Background",kind:"Raster",visible:true,opacity:1,fill:1,blend:"Normal",clipped:false,hasMask:false,locks:{transparency:true,pixels:false,position:true,all:false}}]});
+    command.mockClear();await choose(container.querySelector<HTMLSelectElement>('[aria-label="Crop fill"]')!,"background");await expand();
+    expect(command.mock.calls).toEqual([["image.crop",{x:50,y:-20,width:600,height:600,deleteCroppedPixels:false}]]);
+    command.mockClear();await act(async()=>container.querySelector<HTMLInputElement>('[aria-label="Tool Delete Cropped Pixels"]')!.click());await expand();
+    expect(command.mock.calls).toEqual([["image.crop",{x:50,y:-20,width:600,height:600,deleteCroppedPixels:true}],...image,["edit.fill",{contents:"background",layer:1}],["select.deselect",{}],["history.fold",{from:1,label:"Crop"}]]);
+    command.mockClear();await choose(container.querySelector<HTMLSelectElement>('[aria-label="Crop fill"]')!,"contentAware");
+    command.mockImplementation(async id=>{if(id==="edit.fill")throw new Error("Content-Aware fill needs a pixel layer");});
+    try{await expand();}finally{command.mockImplementation(async()=>undefined);}
+    expect(command.mock.calls.at(-1)).toEqual(["history.select",{index:1,discardRedo:true}]);expect(command.mock.calls.some(([id])=>id==="history.fold")).toBe(false);
   });
   it("paints Shift-click lines from the last stroke, locks Shift-drags to 45° steps and snaps Shift gradients",async()=>{
     const points=()=>(command.mock.lastCall![1]!.points as number[][]).map(([x,y])=>[Math.round(x!),Math.round(y!)]);
@@ -503,6 +733,51 @@ describe("Image workspace Photoshop tools",()=>{
     await drag("Path 1 point 2 out handle",[220,120],[240,120],{altKey:true});
     expect(command).toHaveBeenLastCalledWith("path.set",{name:"work",path:{subpaths:[{closed:false,knots:[corner,{anchor:[200,100],in:[180,80],out:[240,120],smooth:false}]}]}});
   });
+  it("keeps the target path on the canvas whatever tool is active, hidden with Shift+Mod+H or Extras, like Photoshop",async()=>{
+    const corner=(x:number,y:number)=>({anchor:[x,y],in:[x,y],out:[x,y],smooth:false});
+    command.mockImplementation(async(id:string)=>id==="path.info"?{path:{subpaths:[{closed:true,knots:[corner(100,100),corner(400,100),corner(400,300)]}]}}:undefined);
+    await setState({paths:{saved:[],work:true}});await key("b");
+    const target=()=>container.querySelector('svg[aria-label="Target path"]');
+    expect(target()?.querySelector("path")?.getAttribute("d")).toBe("M100 100C100 100 400 100 400 100C400 100 400 300 400 300C400 300 100 100 100 100Z");
+    expect(target()!.querySelectorAll("rect")).toHaveLength(3);expect(container.querySelector('[aria-label="Move path"]')).toBeNull();
+    await key("H",{metaKey:true,shiftKey:true});expect(target()).toBeNull();
+    await key("H",{metaKey:true,shiftKey:true});expect(target()).not.toBeNull();
+    await key("h",{metaKey:true});expect(target()).toBeNull();
+    await key("h",{metaKey:true});expect(target()).not.toBeNull();
+    await key("a");expect(target()).toBeNull();expect(container.querySelector('svg[aria-label="Path editor"]')).not.toBeNull();
+  });
+  it("hides the target path when the Paths panel's empty space is clicked, until a new pen path targets it again",async()=>{
+    const corner=(x:number,y:number)=>({anchor:[x,y],in:[x,y],out:[x,y],smooth:false});
+    command.mockImplementation(async(id:string)=>id==="path.info"?{path:{subpaths:[{closed:true,knots:[corner(100,100),corner(400,100),corner(400,300)]}]}}:undefined);
+    await setState({paths:{saved:[],work:true}});await click("Paths");
+    const target=()=>container.querySelector('svg[aria-label="Target path"]');
+    expect(target()).not.toBeNull();
+    await act(async()=>container.querySelector<HTMLElement>(".xd-photo-layer-list")!.click());expect(target()).toBeNull();
+    const tap=async(x:number,y:number)=>{await pointer("pointerdown",{clientX:x,clientY:y});await pointer("pointerup",{clientX:x,clientY:y});};
+    await key("p");await tap(100,100);await tap(200,100);await tap(102,102);
+    expect(command).toHaveBeenCalledWith("path.set",{name:"work",path:{subpaths:[{closed:true,knots:[[100,100],[200,100]]}]}});
+    await key("b");expect(target()).not.toBeNull();
+  });
+  it("keeps a deselected target path hidden when the image is reopened, as Photoshop saves the path target",async()=>{
+    const corner=(x:number,y:number)=>({anchor:[x,y],in:[x,y],out:[x,y],smooth:false});
+    command.mockImplementation(async(id:string)=>id==="path.info"?{path:{subpaths:[{closed:true,knots:[corner(100,100),corner(400,100),corner(400,300)]}]}}:undefined);
+    await setState({paths:{saved:[],work:true}});await click("Paths");
+    const target=()=>container.querySelector('svg[aria-label="Target path"]');
+    await act(async()=>container.querySelector<HTMLElement>(".xd-photo-layer-list")!.click());expect(target()).toBeNull();
+    await act(async()=>root.unmount());root=createRoot(container);await act(async()=>root.render(<PhotoStudio/>));
+    expect(target()).toBeNull();
+  });
+  it.each(["Paths panel button","Paths panel menu","selection context menu"])("targets the new Work Path after Make Work Path from the %s, like Photoshop",async where=>{
+    const corner=(x:number,y:number)=>({anchor:[x,y],in:[x,y],out:[x,y],smooth:false});
+    command.mockImplementation(async(id:string)=>id==="path.info"?{path:{subpaths:[{closed:true,knots:[corner(100,100),corner(400,100),corner(400,300)]}]}}:undefined);
+    await setState({paths:{saved:[],work:true},hasSelection:true,selectionBounds:[100,100,400,300]});await click("Paths");
+    const target=()=>container.querySelector('svg[aria-label="Target path"]');
+    await act(async()=>container.querySelector<HTMLElement>(".xd-photo-layer-list")!.click());expect(target()).toBeNull();
+    if(where==="Paths panel button")await click("Make work path from selection");
+    else if(where==="Paths panel menu"){await click("Paths panel options");await act(async()=>row("Make Work Path…").click());}
+    else{await key("m");await act(async()=>canvas().dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,button:2,clientX:100,clientY:50})));await act(async()=>row("Make Work Path").click());}
+    expect(command).toHaveBeenCalledWith("select.toWorkPath",{tolerance:2});expect(target()).not.toBeNull();
+  });
   it("shows layer locks and links and toggles individual locks",async()=>{
     await setState({layers:[{id:1,name:"Portrait layer",kind:"Raster",visible:true,opacity:1,fill:1,blend:"Normal",clipped:false,hasMask:false,locks:{transparency:false,pixels:true,position:false,all:false},linkGroup:3}]});
     expect(container.querySelector('[aria-label="Portrait layer is locked"]')).not.toBeNull();expect(container.querySelector('[aria-label="Portrait layer is linked"]')).not.toBeNull();
@@ -522,6 +797,20 @@ describe("Image workspace Photoshop tools",()=>{
     const labels=[...document.querySelectorAll('[role="menu"] [role="menuitem"]')].map(item=>item.textContent);
     expect(labels.slice(0,5)).toEqual(["Solid Color…","Gradient…","Pattern…","Brightness/Contrast…","Levels…"]);
     expect(container.querySelector('[aria-label="Add a mask"]')).not.toBeNull();expect(container.querySelector('[aria-label="Select filter type"]')).not.toBeNull();
+  });
+  it("previews a new Solid Color fill layer on the canvas while its colour is picked and adds it only on OK",async()=>{
+    vi.stubGlobal("URL",class extends URL{static override createObjectURL(){return "blob:fill";}static override revokeObjectURL(){}});
+    native.invoke.mockResolvedValue({width:800,height:600,png:"AA=="});
+    const fills=()=>native.invoke.mock.calls.filter(([name,args])=>name==="xdesign_photo_command_preview"&&args.command==="layer.newFillLayer.solidColor").map(([,args])=>args.params.color);
+    const shown=()=>container.querySelector(".xd-photo-canvas-preview")?.getAttribute("src");
+    const settle=()=>act(async()=>{await new Promise(resolve=>setTimeout(resolve,150));});
+    const open=async()=>{await click("Create new fill or adjustment layer");await act(async()=>[...document.querySelectorAll<HTMLElement>('[role="menu"] [role="menuitem"]')].find(item=>item.textContent==="Solid Color…")!.click());await settle();};
+    const hex=(value:string)=>act(async()=>{const field=container.querySelector<HTMLInputElement>('[aria-label="Hex color"]')!;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(field,value);field.dispatchEvent(new Event("input",{bubbles:true}));field.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true,cancelable:true}));});
+    await open();expect(fills()).toHaveLength(1);expect(shown()).toBe("blob:fill");
+    await hex("FF0000");await settle();expect(fills().at(-1)).toBe("#ff0000");expect(command).not.toHaveBeenCalledWith("layer.newFillLayer.solidColor",expect.anything());
+    await click("Cancel");expect(shown()).toBeUndefined();expect(command).not.toHaveBeenCalledWith("layer.newFillLayer.solidColor",expect.anything());
+    await open();await hex("00FF00");await settle();await click("OK");
+    expect(command).toHaveBeenLastCalledWith("layer.newFillLayer.solidColor",{color:"#00ff00"});
   });
   it("sets the layer opacity and fill with number keys when a non-painting tool is active",async()=>{
     const layer=(name:string)=>({id:1,name,kind:"Raster",visible:true,opacity:1,fill:1,blend:"Normal",clipped:false,hasMask:false});

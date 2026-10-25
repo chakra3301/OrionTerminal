@@ -11,7 +11,7 @@ import { create } from "zustand";
 export type GuideAxis = "h" | "v";
 export type Guide = { id: number; axis: GuideAxis; pos: number };
 export type SnapTargets = { guides: boolean; grid: boolean; bounds: boolean };
-export type ViewFlags = { rulers: boolean; grid: boolean; extras: boolean; guides: boolean; selectionEdges: boolean; lockGuides: boolean; snap: boolean; snapTo: SnapTargets };
+export type ViewFlags = { rulers: boolean; grid: boolean; extras: boolean; guides: boolean; selectionEdges: boolean; targetPath: boolean; lockGuides: boolean; snap: boolean; snapTo: SnapTargets };
 export type GuideDialog = "new" | "layout" | null;
 
 export const RULER_SIZE = 18;
@@ -20,7 +20,7 @@ export const SNAP_PX = 6;
 /** Photoshop's default grid is one inch with 4 subdivisions; one inch is `resolution` pixels (72 by default). */
 export const GRID_SUBDIVISIONS = 4;
 
-export const DEFAULT_FLAGS: ViewFlags = { rulers: false, grid: false, extras: true, guides: true, selectionEdges: true, lockGuides: false, snap: true, snapTo: { guides: true, grid: true, bounds: true } };
+export const DEFAULT_FLAGS: ViewFlags = { rulers: false, grid: false, extras: true, guides: true, selectionEdges: true, targetPath: true, lockGuides: false, snap: true, snapTo: { guides: true, grid: true, bounds: true } };
 
 type Store = {
   flags: ViewFlags;
@@ -71,6 +71,7 @@ export const documentGuides = (document: string) => useViewAids.getState().docum
 export const gridVisible = (flags: ViewFlags) => flags.extras && flags.grid;
 export const guidesVisible = (flags: ViewFlags) => flags.extras && flags.guides;
 export const selectionEdgesVisible = (flags: ViewFlags) => flags.extras && flags.selectionEdges;
+export const targetPathVisible = (flags: ViewFlags) => flags.extras && flags.targetPath;
 
 // ---- Rulers ----
 

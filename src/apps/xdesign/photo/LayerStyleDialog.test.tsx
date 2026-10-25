@@ -8,6 +8,7 @@ const native = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => false, invoke: native.invoke, convertFileSrc: (path: string) => path }));
 vi.mock("./runtime", () => ({ runPhotoCommand: run, usePhotoWorkspace: Object.assign((select: (s: { state: unknown; projectId: string }) => unknown) => select({ state: store.state, projectId: "project" }), { getState: () => ({ state: store.state, projectId: "project" }) }) }));
 import { LayerStyleDialog } from "./LayerStyleDialog";
+import { bakeGradient, type GradientMethod } from "./gradientMethod";
 import type { PhotoDocument } from "./types";
 
 const shadow = { type: "DropShadow", enabled: true, colors: {}, settings: { common: { enabled: true, blend: "Multiply", opacity: 0.75 }, color: { mode: "Rgb", c: [0, 0, 0, 0], alpha: 1 }, angle: 120, use_global_light: false, distance: 5, spread: 0, size: 5, noise: 0, anti_alias: false, contour: "Linear", knocks_out: true } };
@@ -73,11 +74,137 @@ describe("LayerStyleDialog", () => {
     await act(async () => shown()); expect(image()).toBeNull();
   });
 
-  it("Cancel returns to the opening history step and closes", () => {
+  it("shows a colour being picked on the canvas before OK and drops it on Cancel", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("URL", class extends URL { static override createObjectURL() { return "blob:style"; } static override revokeObjectURL() {} });
+    native.invoke.mockReset().mockResolvedValue({ width: 100, height: 100, png: "AA==" });
+    const photo: PhotoDocument = { id: "photo", version: "v1", name: "Image", width: 100, height: 100, previewWidth: 100, previewHeight: 100, bundlePath: "", previewPath: "original.png", originalPath: null };
+    const canvas = document.createElement("div"), image = () => canvas.querySelector("img")?.getAttribute("src") ?? null;
+    withState([shadow]); act(() => root.render(<LayerStyleDialog layerId={7} initial="dropShadow" onClose={vi.fn()} document={photo} canvas={canvas}/>));
+    click(byLabel("Set color of shadow"));
+    const hex = document.querySelector<HTMLInputElement>('[aria-label="Hex color"]')!;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(hex, "FF8000"); hex.dispatchEvent(new Event("input", { bubbles: true })); hex.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+    expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_command_preview", expect.objectContaining({ command: "layer.layerStyle.editEffect", params: { layer: 7, index: 0, path: ["color"], value: { mode: "Rgb", c: [1, 128 / 255, 0, 0], alpha: 1 } } }));
+    expect(image()).toBe("blob:style"); expect(run).not.toHaveBeenCalled();
+    click([...document.querySelectorAll<HTMLButtonElement>('[aria-label="Set color of shadow"][role=dialog] button')].find(b => b.textContent === "Cancel")!);
+    expect(run).not.toHaveBeenCalled(); expect(image()).toBeNull();
+  });
+
+  it("Gradient opens Photoshop's Gradient Editor, which shows stop edits on the canvas and commits them once on OK", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("URL", class extends URL { static override createObjectURL() { return "blob:style"; } static override revokeObjectURL() {} });
+    native.invoke.mockReset().mockResolvedValue({ width: 100, height: 100, png: "AA==" });
+    const photo: PhotoDocument = { id: "photo", version: "v1", name: "Image", width: 100, height: 100, previewWidth: 100, previewHeight: 100, bundlePath: "", previewPath: "original.png", originalPath: null };
+    const black = { mode: "Rgb", c: [0, 0, 0, 0], alpha: 1 }, white = { mode: "Rgb", c: [1, 1, 1, 0], alpha: 1 };
+    const gradient = { stops: [[0, black], [1, white]], opacity_stops: [], style: "Linear", angle: 90, scale: 1, reverse: false, align: true, offset: [0, 0] };
+    const overlay = { type: "GradientOverlay", enabled: true, colors: {}, settings: { common: { enabled: true, blend: "Normal", opacity: 1 }, gradient, dither: false } };
+    const canvas = document.createElement("div"), image = () => canvas.querySelector("img")?.getAttribute("src") ?? null;
+    withState([overlay]); act(() => root.render(<LayerStyleDialog layerId={7} initial="gradientOverlay" onClose={vi.fn()} document={photo} canvas={canvas}/>));
+    expect(container.querySelector('[aria-label="Stop 2 position"]')).toBeNull();
+    click(byLabel("Edit gradient"));
+    const editor = q('[role=dialog][aria-label="Gradient Editor"]');
+    click(byLabel("Color stop 2"));
+    await act(async () => { const location = byLabel("Color stop location") as HTMLInputElement; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(location, "60"); location.dispatchEvent(new Event("input", { bubbles: true })); await vi.advanceTimersByTimeAsync(100); });
+    const edited = { ...gradient, stops: [[0, black], [0.6, white]] };
+    expect(native.invoke).toHaveBeenLastCalledWith("xdesign_photo_command_preview", expect.objectContaining({ params: { layer: 7, index: 0, path: ["gradient"], value: edited } }));
+    expect(image()).toBe("blob:style"); expect(run).not.toHaveBeenCalled();
+    await act(async () => [...editor.querySelectorAll("button")].find(b => b.textContent === "OK")!.click());
+    expect(run).toHaveBeenCalledOnce(); expect(run).toHaveBeenCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: ["gradient"], value: edited });
+    expect(container.querySelector('[aria-label="Gradient Editor"]')).toBeNull();
+  });
+
+  it("the ▾ beside Gradient applies a preset in one step", async () => {
+    const red = { mode: "Rgb", c: [1, 0, 0, 0], alpha: 1 };
+    const gradient = { stops: [[0, red], [1, red]], opacity_stops: [], style: "Linear", angle: 90, scale: 1, reverse: false, align: true, offset: [0, 0] };
+    const overlay = { type: "GradientOverlay", enabled: true, colors: {}, settings: { common: { enabled: true, blend: "Normal", opacity: 1 }, gradient, dither: false } };
+    withState([overlay]);
+    (store.state as { presets: Record<string, unknown> }).presets.gradients = [{ name: "Basics", presets: [{ name: "Black, White", stops: [[0, "#000000"], [1, "#ffffff"]], transparency: [[0, 100], [1, 100]] }] }];
+    container.classList.add("xd-photo"); render("gradientOverlay" as "dropShadow");
+    click(byLabel("Gradient presets"));
+    click([...container.querySelectorAll<HTMLElement>(".xd-ge-presets button")].find(b => b.textContent === "Basics")!);
+    await act(async () => byLabel("Black, White").click());
+    expect(run).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: ["gradient"], value: { ...gradient, stops: [[0, { mode: "Rgb", c: [0, 0, 0, 0], alpha: 1 }], [1, { mode: "Rgb", c: [1, 1, 1, 0], alpha: 1 }]], opacity_stops: [] } });
+    expect(container.querySelector(".xd-ge-presets")).toBeNull();
+  });
+
+  const rgb = (hex: string) => ({ mode: "Rgb", c: [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).concat(0), alpha: 1 });
+  const baked = (stops: [number, string][], method: GradientMethod) => bakeGradient(stops, method).map(([t, hex]): [number, unknown] => [t, rgb(hex)]);
+  const overlayOf = (gradient: unknown) => ({ type: "GradientOverlay", enabled: true, colors: {}, settings: { common: { enabled: true, blend: "Normal", opacity: 1 }, gradient, dither: false } });
+  const choose = (label: string, value: string) => act(async () => { const pick = byLabel(label) as HTMLSelectElement; pick.value = value; pick.dispatchEvent(new Event("change", { bubbles: true })); });
+  // The engine keeps positions as f32.
+  const stored = (gradient: { stops: [number, unknown][] }) => ({ ...gradient, stops: gradient.stops.map(([t, color]) => [Math.fround(t), color]) });
+
+  it("Method sends the overlay's stops baked, as the engine blends stops linearly, and reopens with the stops and Method the user set", async () => {
+    const gradient = { stops: [[0, rgb("#000000")], [1, rgb("#ffffff")]] as [number, unknown][], opacity_stops: [], style: "Linear", angle: 90, scale: 1, reverse: false, align: true, offset: [0, 0] };
+    withState([overlayOf(gradient)]); render("gradientOverlay" as "dropShadow");
+    expect((byLabel("Method") as HTMLSelectElement).value).toBe("classic");
+    await choose("Method", "perceptual");
+    const sent = { ...gradient, stops: baked([[0, "#000000"], [1, "#ffffff"]], "perceptual") };
+    expect(run).toHaveBeenCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: ["gradient"], value: sent });
+    withState([overlayOf(stored(sent))]); render("gradientOverlay" as "dropShadow");
+    expect((byLabel("Method") as HTMLSelectElement).value).toBe("perceptual");
+    click(byLabel("Edit gradient"));
+    expect(container.querySelector('[aria-label="Color stop 2"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Color stop 3"]')).toBeNull();
+  });
+
+  it("keeps the Method for a preset from ▾ and for Gradient Editor edits", async () => {
+    const gradient = { stops: [[0, rgb("#ff0000")], [1, rgb("#0000ff")]] as [number, unknown][], opacity_stops: [], style: "Linear", angle: 90, scale: 1, reverse: false, align: true, offset: [0, 0] };
+    withState([overlayOf(gradient)]); render("gradientOverlay" as "dropShadow");
+    await choose("Method", "linear");
+    withState([overlayOf(stored({ ...gradient, stops: baked([[0, "#ff0000"], [1, "#0000ff"]], "linear") }))]);
+    (store.state as { presets: Record<string, unknown> }).presets.gradients = [{ name: "Basics", presets: [{ name: "Black, White", stops: [[0, "#000000"], [1, "#ffffff"]], transparency: [[0, 100], [1, 100]] }] }];
+    container.classList.add("xd-photo"); render("gradientOverlay" as "dropShadow"); run.mockClear();
+    click(byLabel("Gradient presets"));
+    click([...container.querySelectorAll<HTMLElement>(".xd-ge-presets button")].find(b => b.textContent === "Basics")!);
+    await act(async () => byLabel("Black, White").click());
+    expect(run).toHaveBeenLastCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: ["gradient"], value: { ...gradient, stops: baked([[0, "#000000"], [1, "#ffffff"]], "linear"), opacity_stops: [] } });
+    click(byLabel("Edit gradient")); click(byLabel("Color stop 2"));
+    act(() => { const location = byLabel("Color stop location") as HTMLInputElement; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(location, "60"); location.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => [...q('[role=dialog][aria-label="Gradient Editor"]').querySelectorAll("button")].find(b => b.textContent === "OK")!.click());
+    expect(run).toHaveBeenLastCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: ["gradient"], value: { ...gradient, stops: baked([[0, "#ff0000"], [0.6, "#0000ff"]], "linear") } });
+  });
+
+  it.each([
+    ["Stroke", "stroke", { size: 3, position: "Outside" }, true],
+    ["Outer Glow", "outerGlow", { noise: 0, technique: "Softer", spread: 0, size: 5, contour: "Linear", anti_alias: false, range: 0.5, jitter: 0 }, false],
+  ] as const)("%s with a gradient fill shows Method only where Photoshop does", (_, key, settings, shown) => {
+    const gradient = { stops: [[0, rgb("#000000")], [1, rgb("#ffffff")]], opacity_stops: [], style: "Linear", angle: 90, scale: 1, reverse: false, align: true, offset: [0, 0] };
+    withState([{ type: key === "stroke" ? "Stroke" : "OuterGlow", enabled: true, colors: {}, settings: { common: { enabled: true, blend: "Normal", opacity: 1 }, paint: { Gradient: gradient }, ...settings } }]);
+    render(key as "dropShadow");
+    expect(container.querySelector('[aria-label="Method"]') !== null).toBe(shown);
+  });
+
+  it("starts a new Gradient Overlay at Photoshop's Smooth Method", async () => {
+    const gradient = { stops: [[0, rgb("#000000")], [1, rgb("#ffffff")]], opacity_stops: [], style: "Linear", angle: 90, scale: 1, reverse: false, align: true, offset: [0, 0] };
+    withState([]);
+    run.mockImplementation(async command => { if (command === "layer.layerStyle.gradientOverlay") withState([overlayOf(gradient)]); return {}; });
+    try { await act(async () => { render("gradientOverlay" as "dropShadow"); }); } finally { run.mockImplementation(async () => ({})); }
+    expect(run).toHaveBeenLastCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: ["gradient"], value: { ...gradient, stops: baked([[0, "#000000"], [1, "#ffffff"]], "smooth") } });
+  });
+
+  it("a stroke switched to Gradient starts at Photoshop's Smooth Method", () => {
+    const yellow = { mode: "Rgb", c: [1, 1, 0.75, 0], alpha: 1 };
+    withState([{ type: "Stroke", enabled: true, colors: {}, settings: { common: { enabled: true, blend: "Normal", opacity: 1 }, paint: { Color: yellow }, size: 3, position: "Outside" } }]); render("stroke" as "dropShadow");
+    act(() => { const pick = byLabel("Fill Type") as HTMLSelectElement; pick.value = "Gradient"; pick.dispatchEvent(new Event("change", { bubbles: true })); });
+    expect(run).toHaveBeenCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: ["paint"], value: { Gradient: { stops: baked([[0, "#ffffbf"], [1, "#ffffbf"]], "smooth"), opacity_stops: [[0, 1], [1, 0]], style: "Linear", angle: 90, scale: 1, reverse: false, align: true, offset: [0, 0] } } });
+  });
+
+  it("a glow switched to Gradient fades its colour to transparent with opacity stops, as the engine ignores colour alpha", () => {
+    const glow = { type: "OuterGlow", enabled: true, colors: {}, settings: { common: { enabled: true, blend: "Screen", opacity: 0.75 }, paint: { Color: { mode: "Rgb", c: [1, 1, 0.75, 0], alpha: 1 } }, noise: 0, technique: "Softer", spread: 0, size: 5, contour: "Linear", anti_alias: false, range: 0.5, jitter: 0 } };
+    withState([glow]); render("outerGlow" as "dropShadow");
+    act(() => { const pick = byLabel("Fill Type") as HTMLSelectElement; pick.value = "Gradient"; pick.dispatchEvent(new Event("change", { bubbles: true })); });
+    const yellow = { mode: "Rgb", c: [1, 1, 0.75, 0], alpha: 1 };
+    expect(run).toHaveBeenCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: ["paint"], value: { Gradient: { stops: [[0, yellow], [1, yellow]], opacity_stops: [[0, 1], [1, 0]], style: "Linear", angle: 90, scale: 1, reverse: false, align: true, offset: [0, 0] } } });
+  });
+
+  it("Cancel returns to the opening history step, leaving nothing to redo, and closes", async () => {
     withState([]); const onClose = render();
     store.state = { ...(store.state as object), historySources: [{ index: 5, current: true }] };
-    click([...container.querySelectorAll("button")].find(b => b.textContent === "Cancel")!);
-    expect(run).toHaveBeenCalledWith("history.select", { index: 3 });
+    await act(async () => [...container.querySelectorAll("button")].find(b => b.textContent === "Cancel")!.click());
+    expect(run).toHaveBeenCalledWith("history.select", { index: 3, discardRedo: true });
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -92,6 +219,26 @@ describe("LayerStyleDialog", () => {
     click(q("button[type=submit]"));
     expect(run).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("OK records the dialog's edits as one Layer Style history step", async () => {
+    withState([]); const onClose = render();
+    store.state = { ...(store.state as object), historySources: [{ index: 5, current: true }] };
+    await act(async () => q("button[type=submit]").click());
+    expect(run.mock.calls).toEqual([["history.fold", { from: 3, label: "Layer Style" }]]);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("OK with Preview off brings the edits back before folding them", async () => {
+    withState([]); render();
+    store.state = { ...(store.state as object), historySources: [{ index: 5, current: true }] };
+    const box = [...container.querySelectorAll(".xd-ps-dialog-buttons label")].find(label => label.textContent === "Preview")!.querySelector("input")!;
+    await act(async () => box.click());
+    store.state = { ...(store.state as object), historySources: [{ index: 3, current: true }] };
+    run.mockImplementation(async (command, params) => { if (command === "history.select") store.state = { ...(store.state as object), historySources: [{ index: params!.index, current: true }] }; return {}; });
+    await act(async () => q("button[type=submit]").click());
+    expect(run.mock.calls).toEqual([["history.select", { index: 3 }], ["history.select", { index: 5 }], ["history.fold", { from: 3, label: "Layer Style" }]]);
+    run.mockImplementation(async () => ({}));
   });
 
   it("names the first list row Blending Options and offers + on every multi-instance effect", () => {
@@ -146,6 +293,25 @@ describe("LayerStyleDialog", () => {
     await act(async () => { window.dispatchEvent(new MouseEvent("pointerup")); });
     canvas.remove();
     expect(run).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: [], value: { ...shadow.settings, angle: 161, distance: 13 } });
+  });
+
+  it("dragging the image through the dialog's scrim moves the shadow, but not from beside the image", async () => {
+    vi.stubGlobal("URL", class extends URL { static override createObjectURL() { return "blob:style"; } static override revokeObjectURL() {} });
+    native.invoke.mockReset().mockResolvedValue({ width: 100, height: 100, png: "AA==" });
+    const photo: PhotoDocument = { id: "photo", version: "v1", name: "Image", width: 100, height: 100, previewWidth: 100, previewHeight: 100, bundlePath: "", previewPath: "original.png", originalPath: null };
+    const canvas = document.createElement("div"); document.body.append(canvas);
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0, toJSON() {} });
+    withState([shadow]); act(() => root.render(<LayerStyleDialog layerId={7} initial="dropShadow" onClose={vi.fn()} document={photo} canvas={canvas}/>));
+    const scrim = q(".xd-ps-dialog-scrim");
+    await act(async () => { scrim.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 150, clientY: 10 })); });
+    await act(async () => { window.dispatchEvent(new MouseEvent("pointermove", { clientX: 160, clientY: 10 })); });
+    await act(async () => { window.dispatchEvent(new MouseEvent("pointerup")); });
+    expect(run).not.toHaveBeenCalled();
+    await act(async () => { scrim.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 50, clientY: 50 })); });
+    await act(async () => { window.dispatchEvent(new MouseEvent("pointermove", { clientX: 60, clientY: 50 })); });
+    await act(async () => { window.dispatchEvent(new MouseEvent("pointerup")); });
+    canvas.remove();
     expect(run).toHaveBeenCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: [], value: { ...shadow.settings, angle: 161, distance: 13 } });
   });
 

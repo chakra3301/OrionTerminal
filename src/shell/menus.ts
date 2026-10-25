@@ -8,7 +8,9 @@ import { useXDesign } from "@/apps/xdesign/store";
 import {
   useXDProjects,
   flushActive as flushActiveXDProject,
+  projectKind,
 } from "@/apps/xdesign/projectsStore";
+import { useFxStore } from "@/apps/xdesign/fx/fxStore";
 import { toast } from "@/store/toastStore";
 import { useHermes } from "@/store/hermesStore";
 
@@ -122,9 +124,11 @@ function xdesignEdit(): MenuItem[] {
   const x = useXDesign.getState();
   const selIds = () => [...useXDesign.getState().selection];
   const hasSel = x.selection.size > 0;
+  const xp = useXDProjects.getState();
+  const history = projectKind(xp.registry.find((m) => m.id === xp.activeId)) === "fx" ? useFxStore : useXDesign;
   return [
-    { label: "Undo", hint: "⌘Z", onClick: () => useXDesign.getState().undo() },
-    { label: "Redo", hint: "⌘⇧Z", onClick: () => useXDesign.getState().redo() },
+    { label: "Undo", hint: "⌘Z", onClick: () => history.getState().undo() },
+    { label: "Redo", hint: "⌘⇧Z", onClick: () => history.getState().redo() },
     sep,
     { label: "Copy", hint: "⌘C", disabled: !hasSel, onClick: () => useXDesign.getState().copy(selIds()) },
     { label: "Paste", hint: "⌘V", onClick: () => useXDesign.getState().paste() },

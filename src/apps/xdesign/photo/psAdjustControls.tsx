@@ -1,12 +1,11 @@
-import { useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
+import { useState, type CSSProperties, type Dispatch, type SetStateAction, type SyntheticEvent } from "react";
 import { createPortal } from "react-dom";
 import { Pointer } from "lucide-react";
 import { isTauri } from "@tauri-apps/api/core";
-import { GradientPresetSelect } from "./toolBars";
+import { GradientEditorDialog, GradientPick, gradientCss } from "./GradientEditorDialog";
 import { useHistogram, type HistogramSource } from "./toneControls";
 import { useToneSampler } from "./toneSampler";
 import { autoBrightnessContrast, exposureSamplePatch, type ExposureTone } from "./psAdjustMath";
-import { usePhotoWorkspace } from "./runtime";
 import "./layerStyleDialog.css";
 
 type Settings = Record<string, unknown>;
@@ -51,20 +50,19 @@ export function AutoBrightnessContrast({ slot, source, legacy, locked, setValues
   return slot ? createPortal(<button type="button" disabled={locked || !patch} onClick={() => { if (patch) setValues(current => ({ ...current, ...patch })); }}>Auto</button>, slot) : null;
 }
 
-const HEX = /^#[\da-f]{6}/i;
-const toHex = (value: unknown, fallback: string) => Array.isArray(value) && value.length >= 3 ? "#" + value.slice(0, 3).map(part => Math.round(Math.max(0, Math.min(1, Number(part))) * 255).toString(16).padStart(2, "0")).join("") : fallback;
-/** Gradient Map's preset picker: the Gradient tool's presets, with foreground and background resolved to the current colours. */
-export function GradientMapPresets({ stops, locked, choose }: { stops: [number, string][]; locked: boolean; choose: (stops: [number, string][]) => void }) {
-  const presets = usePhotoWorkspace(state => state.state?.presets), tools = usePhotoWorkspace(state => state.state?.tools), [picked, setPicked] = useState<{ name: string; stops: string } | null>(null);
-  if (!presets?.gradients.length) return null;
-  const foreground = toHex(tools?.foreground, "#000000"), background = toHex(tools?.background, "#ffffff");
-  const key = JSON.stringify(stops), current = { name: picked && picked.stops === key ? picked.name : "Custom", stops, transparency: [] as [number, number][] };
-  return <div className="xd-ps-dialog-row"><GradientPresetSelect current={current} groups={presets.gradients} foreground={foreground} background={background} disabled={locked} select={(name, group) => {
-    const preset = presets.gradients.find(item => item.name === group)?.presets.find(item => item.name === name);
-    if (!preset) return;
-    const next = preset.stops.map(([at, color]): [number, string] => [at, color === "foreground" ? foreground : color === "background" ? background : HEX.test(color) ? color.slice(0, 7) : "#000000"]);
-    setPicked({ name, stops: JSON.stringify(next) }); choose(next);
-  }}/></div>;
+const stop = (event: SyntheticEvent) => event.stopPropagation();
+/** Gradient Map's gradient: the swatch opens Photoshop's Gradient Editor, with no opacity stops, and the arrow beside it the presets. */
+export function GradientMapGradient({ stops, shown, hex, locked, change, hold }: { stops: [number, unknown][]; shown: [number, string][]; hex: (value: unknown) => string; locked: boolean; change: (stops: [number, unknown][]) => void; hold?: (state: "open" | "ok" | "cancel") => void }) {
+  const [editing, setEditing] = useState<{ before: [number, unknown][]; root: Element } | null>(null);
+  return <>
+    <div className="xd-ps-dialog-row"><GradientPick css={gradientCss(shown, [], color => color)} disabled={locked} edit={event => { hold?.("open"); setEditing({ before: stops, root: event.currentTarget.closest(".xd-photo") ?? document.body }); }} choose={gradient => change(gradient.stops.map(([at, color]) => [at, hex(color)]))}/></div>
+    {/* Events bubble out of a portal through the React tree, so without this the editor's OK would submit the Gradient Map dialog and its fields would hold the Properties commit. */}
+    {editing && createPortal(<div className="xd-ge-portal" onSubmit={stop} onKeyDown={stop} onFocus={stop} onBlur={stop}>
+      <GradientEditorDialog<unknown> transparency={false} gradient={{ stops: editing.before, opacity: [] }} hex={hex} color={value => value}
+        preview={next => change(next.stops)} choose={next => { change(next.stops); setEditing(null); hold?.("ok"); }}
+        close={() => { change(editing.before); setEditing(null); hold?.("cancel"); }}/>
+    </div>, editing.root)}
+  </>;
 }
 
 /** The dial beside an Angle field; 0° points right and angles turn counter-clockwise, as in Layer Style. */

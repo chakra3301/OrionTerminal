@@ -92,8 +92,8 @@ function paintField(canvas: HTMLCanvasElement, channel: Channel, draft: Draft) {
 
 const parseInteger = (text: string) => text.trim() !== "" && Number.isFinite(Number(text)) ? Math.round(Number(text)) : null;
 
-export function ColorPickerDialog({ title, color, close, choose, addToSwatches }: {
-  title: string; color: string; close: () => void; choose: (hex: string) => void; addToSwatches?: (hex: string) => void;
+export function ColorPickerDialog({ title, color, close, choose, addToSwatches, preview }: {
+  title: string; color: string; close: () => void; choose: (hex: string) => void; addToSwatches?: (hex: string) => void; preview?: (hex: string) => void;
 }) {
   const original = useRef(color);
   const start = (): Draft => ({ hsb: rgbToHsb(hexToRgb(original.current)), hex: original.current });
@@ -106,6 +106,8 @@ export function ColorPickerDialog({ title, color, close, choose, addToSwatches }
   const [cx, cy] = axesOf(channel), info = CHANNELS[channel];
   const fixed = valueOf(draft, channel);
   useEffect(() => { if (channel !== "h" && canvas.current) paintField(canvas.current, channel, draft); }, [channel, fixed]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shown = useRef(draft.hex);
+  useEffect(() => { if (draft.hex !== shown.current) { shown.current = draft.hex; preview?.(draft.hex); } }, [draft.hex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const edit = (changes: [Channel, number][]) => setDraft(current => withChannels(current, changes, webOnly));
   const setHex = (hex: string) => setDraft(current => fromRgb(hexToRgb(hex), current.hsb, webOnly));

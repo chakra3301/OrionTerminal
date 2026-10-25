@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { PhotoPaths, pathsPanelMenu } from "./PhotoPaths";
+import { NO_PATH, PhotoPaths, pathsPanelMenu, selectedPath } from "./PhotoPaths";
 import type { PhotoState } from "./types";
 const native=vi.hoisted(()=>({run:vi.fn()}));
 vi.mock("./runtime",async original=>({...await original<typeof import("./runtime")>(),runPhotoCommand:native.run}));
@@ -36,4 +36,12 @@ it("orders the flyout like Photoshop and maps its commands",async()=>{
   expect(item("Panel Options…").disabled).toBe(true);
   const work=pathsPanelMenu(state({saved:[],work:true}),"work",false);
   expect(labels(work)[0]).toBe("Save Path…");expect((work.find(entry=>typeof entry!=="string"&&entry.label==="Clipping Path…") as {disabled:boolean}).disabled).toBe(true);
+});
+it("deselects the path when the panel's empty space is clicked, as Photoshop does",async()=>{
+  const select=vi.fn();await render({saved:["Path 1"],work:true},"Path 1",select);
+  await act(async()=>container.querySelector<HTMLElement>(".xd-photo-layer-list")!.click());expect(select).toHaveBeenLastCalledWith(NO_PATH);
+  await render({saved:["Path 1"],work:true},NO_PATH,select);
+  expect(selectedPath(state({saved:["Path 1"],work:true}),NO_PATH)).toBeNull();
+  expect(container.querySelector(".xd-photo-path.selected")).toBeNull();expect(button("Fill path with foreground color").disabled).toBe(true);
+  select.mockClear();await act(async()=>container.querySelector<HTMLButtonElement>(".xd-photo-path-name")!.click());expect(select.mock.calls).toEqual([["work"]]);
 });

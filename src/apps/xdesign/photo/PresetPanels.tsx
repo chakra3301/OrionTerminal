@@ -9,7 +9,7 @@ export function gradientPaintParams(gradient:GradientPreset,foreground:PhotoColo
   return {stops:gradient.stops.map(([position,color])=>[position,color==="foreground"?foreground:color==="background"?background:color]),transparency:gradient.transparency};
 }
 const attempt=(work:Promise<unknown>)=>{void work.catch(()=>{});};
-function importPreset(extension:string,command:string) {
+export function importPreset(extension:string,command:string) {
   return (async()=>{const path=await open({multiple:false,filters:[{name:`Photoshop .${extension} presets`,extensions:[extension]}]});if(typeof path==="string")await runPhotoCommand(command,{path});})();
 }
 export function GradientPresetsPanel({state,foreground,background="#ffffff",foregroundValue,backgroundValue}:{state:PhotoState;foreground:string;background?:string;foregroundValue?:PhotoColor;backgroundValue?:PhotoColor}) {

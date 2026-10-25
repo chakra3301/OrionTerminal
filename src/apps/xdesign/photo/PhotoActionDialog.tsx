@@ -9,7 +9,7 @@ import { convertFileSrc, isTauri } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useDesignDialog } from "../useDesignDialog";
 import { PhotoDialog } from "./photoDialog";
-import { type PhotoAction } from "./controls";
+import { ADJUSTMENTS, type PhotoAction } from "./controls";
 import { FilterThumbnail } from "./FilterThumbnail";
 import { AdjustmentPresetRow } from "./AdjustmentPresetRow";
 import { AdjustmentControls, controlKit, CurveEditor, rgbHex } from "./actionControls";
@@ -73,7 +73,9 @@ export function PhotoActionDialog({ action, adjustment, layer, document, canvas 
   });
   const [values, setValues] = useState<Settings>(() => structuredClone(opening));
   const [channel, setChannel] = useState(""), [range, setRange] = useState(action.id === "colorBalance" ? "midtones" : action.id === "hueSaturation" ? "master" : "reds");
-  const [live, setLive] = useState(isTauri() && document.width * document.height <= 16_777_216), [localError, setLocalError] = useState(""), [loadingFile, setLoadingFile] = useState(false);
+  // The native preview reduces large images for adjustments, which look the same smaller; filters measure in pixels.
+  const previewAllowed = document.width * document.height <= 16_777_216 || ADJUSTMENTS.some(entry => entry.id === action.id);
+  const [live, setLive] = useState(isTauri() && previewAllowed), [localError, setLocalError] = useState(""), [loadingFile, setLoadingFile] = useState(false);
   const command = adjustmentCommand(action, adjustment, layer?.id), params: Settings = { ...Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)), ...(layer ? { layer: layer.id } : {}) };
   const blurMode = blurGeometryMode(action), blurReady = !blurMode || !!readBlurGeometry(blurMode, values);
   if (action.id === "channelMixer" && !values.monochrome) delete params.gray;
@@ -87,7 +89,7 @@ export function PhotoActionDialog({ action, adjustment, layer, document, canvas 
   const channelTarget = params.target === "quickMask" || params.target !== null && typeof params.target === "object" && typeof (params.target as Record<string, unknown>).channel === "number" || params.target === undefined && (imageState?.channels?.target?.kind === "alpha" || (imageState?.channels?.target?.kind ?? "composite") === "composite" && (!!imageState?.quickMask || !!imageState?.channels?.quickMask));
   const smartPixels = smartTarget && !maskTarget && !channelTarget;
   const interpolationReady = action.structured !== "wide" || !smartPixels || values.interpolation === "bicubic";
-  const valid = finite && mapReady && galleryReady && geometryReady && interpolationReady && blurReady, previewAllowed = document.width * document.height <= 16_777_216;
+  const valid = finite && mapReady && galleryReady && geometryReady && interpolationReady && blurReady;
   const ordinarySmartBlur = !!blurMode && smartPixels;
   const galleryIdentity = JSON.stringify([projectId, document.id, document.version, document.width, document.height, action.id, layer?.id ?? imageState?.activeLayer, imageState?.viewKey, params.target, imageState?.channels?.target, imageState?.layerMaskView, imageState?.quickMask, imageState?.channels?.quickMask, imageState?.hasSelection, imageState?.selectionBounds, ordinarySmartBlur]);
   const capturedGallery = useRef(galleryIdentity), currentGallery = useRef(galleryIdentity), guardedGallery = useRef(false), submitting = useRef(false), mounted = useRef(true);

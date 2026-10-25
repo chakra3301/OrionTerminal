@@ -41,6 +41,7 @@ import { useAuth } from "@/features/auth/authStore";
 import { ProjectNameInput } from "../ProjectNameInput";
 const SharingDialog=lazy(()=>import("./SharingDialog").then(module=>({default:module.SharingDialog})));
 const RemoteAssetsDialog=lazy(()=>import("./RemoteAssetsDialog").then(module=>({default:module.RemoteAssetsDialog})));
+const LibrariesDialog=lazy(()=>import("./LibrariesDialog").then(module=>({default:module.LibrariesDialog})));
 const ScriptDialog=lazy(()=>import("./ScriptDialog").then(module=>({default:module.ScriptDialog})));
 const TOOL_GROUPS = DESIGN_TOOL_GROUPS.map(group => ({ ...group, tools: group.tools.map(tool => ({ ...tool, shortcut: Object.entries(TOOL_SHORTCUTS).find(([,value]) => value === tool.id)?.[0].replace(/^Key/, "") })) }));
 function Actions({close}:{close:()=>void}) {
@@ -60,7 +61,7 @@ function Actions({close}:{close:()=>void}) {
 }
 const NAV_WIDTH = 52;
 export function PencilStudio() {
-  const element=useRef<HTMLDivElement>(null);const [loading,setLoading]=useState(true);const [actions,setActions]=useState(false);const [scripts,setScripts]=useState(false);const [resources,setResources]=useState(false);
+  const element=useRef<HTMLDivElement>(null);const [loading,setLoading]=useState(true);const [actions,setActions]=useState(false);const [scripts,setScripts]=useState(false);const [resources,setResources]=useState(false);const [libraries,setLibraries]=useState(false);
   const [sharing,setSharing]=useState(false),[roomSession,setRoomSession]=useState<CanvasRoomSession|null>(null),[roomState,setRoomState]=useState<RoomUiState|null>(null);
   const readOnly=usePencilWorkspace(s=>s.readOnly);
   const editor=usePencilWorkspace(s=>s.editor);usePencilWorkspace(s=>s.version);const error=usePencilWorkspace(s=>s.error);const busy=usePencilWorkspace(s=>s.busy);
@@ -122,6 +123,7 @@ export function PencilStudio() {
     "separator",
     {label:"Design actions…",disabled:!editor||readOnly,onSelect:()=>setActions(true)},
     {label:"Scripts…",disabled:!editor||busy||readOnly,onSelect:()=>setScripts(true)},
+    {label:"Libraries…",hint:"⌥⌘O",disabled:!editor||busy,onSelect:()=>setLibraries(true)},
     {label:"Resources…",disabled:!editor||busy||readOnly,onSelect:()=>setResources(true)},
     {label:"Import video…",disabled:!editor||busy||readOnly,onSelect:()=>videoInput.current?.click()},
     "separator",
@@ -140,6 +142,7 @@ export function PencilStudio() {
     if(!e.metaKey&&!e.ctrlKey&&e.code==='KeyC'){e.preventDefault();e.stopPropagation();comments.toggle();return;}
     if(e.key==='Escape'&&comments.mode){e.preventDefault();e.stopPropagation();comments.cancel();return;}
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.stopPropagation();performCanvasHistory(editor,roomSession,e.shiftKey?'redo':'undo');return;}
+    if(e.metaKey&&e.altKey&&!e.ctrlKey&&!e.shiftKey&&e.code==='KeyO'){e.preventDefault();e.stopPropagation();setLibraries(true);return;}
     if(readOnly){if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="c"){e.preventDefault();void copyPencilSelection(editor).catch(report);}if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="a"){e.preventDefault();editor.selectAll();}return;}
     if((e.metaKey||e.ctrlKey)&&!e.altKey&&e.key.toLowerCase()==="v"){e.stopPropagation();if(!e.repeat)catchPaste(e.currentTarget,data=>{if(data)void pastePencilData(editor,{html:data.getData("text/html"),text:data.getData("text/plain"),files:Array.from(data.files)}).catch(report);},()=>{});return;}
     if(e.metaKey||e.ctrlKey){if(["c","x"].includes(e.key.toLowerCase())){e.preventDefault();void copyPencilSelection(editor,e.key.toLowerCase()==="x").catch(report);}if(e.key.toLowerCase()==="g"){e.preventDefault();if(e.shiftKey)editor.ungroupSelected();else editor.groupSelected();}if(e.key.toLowerCase()==="d"){e.preventDefault();editor.duplicateSelected();}if(e.key.toLowerCase()==="a"){e.preventDefault();editor.selectAll();}return;}
@@ -206,6 +209,6 @@ export function PencilStudio() {
       </aside>
     </div>
     <input ref={videoInput} hidden type="file" accept="video/mp4,video/webm,video/ogg,.mp4,.webm,.ogv" aria-label="Video file" onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file)void placePencilVideo(file).catch(report);}}/>
-    {actions&&<Actions close={()=>setActions(false)}/>} {resources&&<Suspense fallback={<div className="xd-pencil-dialog" role="status">Loading resources…</div>}><RemoteAssetsDialog close={()=>setResources(false)}/></Suspense>} {scripts&&<Suspense fallback={<div className="xd-pencil-dialog" role="status">Loading scripts…</div>}><ScriptDialog close={()=>setScripts(false)}/></Suspense>} {sharing&&<Suspense fallback={<div className="xd-pencil-dialog" role="status">Loading sharing…</div>}><SharingDialog session={roomSession} close={()=>setSharing(false)}/></Suspense>} {present&&<PrototypePreviewDialog close={()=>setPresent(false)}/>}
+    {actions&&<Actions close={()=>setActions(false)}/>} {resources&&<Suspense fallback={<div className="xd-pencil-dialog" role="status">Loading resources…</div>}><RemoteAssetsDialog close={()=>setResources(false)}/></Suspense>} {libraries&&<Suspense fallback={<div className="xd-pencil-dialog" role="status">Loading libraries…</div>}><LibrariesDialog room={roomSession} roomState={roomState} close={()=>setLibraries(false)}/></Suspense>} {scripts&&<Suspense fallback={<div className="xd-pencil-dialog" role="status">Loading scripts…</div>}><ScriptDialog close={()=>setScripts(false)}/></Suspense>} {sharing&&<Suspense fallback={<div className="xd-pencil-dialog" role="status">Loading sharing…</div>}><SharingDialog session={roomSession} close={()=>setSharing(false)}/></Suspense>} {present&&<PrototypePreviewDialog close={()=>setPresent(false)}/>}
   </section></CanvasPreviewContext.Provider>;
 }

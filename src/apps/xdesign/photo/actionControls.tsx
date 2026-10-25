@@ -6,12 +6,12 @@ import type { PhotoLayer } from "./types";
 import { autoLevels, channelColor, CurveEditor, histogramIndex, histogramSpace, LevelsEditor, ThresholdEditor, useHistogram, type CurvePoint, type HistogramSource } from "./toneControls";
 import { ToneAdjustment } from "./ToneTools";
 import { smoothCurve } from "./curveTools";
-import { balanceSlider, blackWhiteTrack, GradientStops, hueSaturationTrack, PhotoFilterUse, trackStyle } from "./colorControls";
+import { balanceSlider, blackWhiteTrack, hueSaturationTrack, PhotoFilterUse, trackStyle } from "./colorControls";
 import { HueSaturationLayout } from "./hueSaturationControls";
 import { BlackWhiteLayout } from "./blackWhiteControls";
 import { psSlider, psTrack } from "./psSliders";
 import { bakeGradient, GRADIENT_METHODS } from "./gradientMethod";
-import { AngleDial, AutoBrightnessContrast, ExposureEyedroppers, GradientMapPresets, MIXER_SWATCHES, SELECTIVE_SWATCHES, SwatchRow } from "./psAdjustControls";
+import { AngleDial, AutoBrightnessContrast, ExposureEyedroppers, GradientMapGradient, MIXER_SWATCHES, SELECTIVE_SWATCHES, SwatchRow } from "./psAdjustControls";
 import "./actionControls.css";
 
 export { CurveEditor };
@@ -65,8 +65,10 @@ export type AdjustmentControlsProps = {
   toolSlot?: HTMLElement | null;
   /** Photoshop 2026's slider layout; Properties keeps the compact one. */
   psSliders?: boolean;
+  /** Properties holds its commit while a modal editor such as the Gradient Editor is open. */
+  hold?: (state: "open" | "ok" | "cancel") => void;
 };
-export function AdjustmentControls({ action, values, setValues, change, locked, mode, layer, fields = action.fields ?? [], anyStep, channel, setChannel, range, setRange, loadingFile, setLoadingFile, setLocalError, source, canvas, toolSlot, psSliders = false }: AdjustmentControlsProps): ReactNode {
+export function AdjustmentControls({ action, values, setValues, change, locked, mode, layer, fields = action.fields ?? [], anyStep, channel, setChannel, range, setRange, loadingFile, setLoadingFile, setLocalError, source, canvas, toolSlot, psSliders = false, hold }: AdjustmentControlsProps): ReactNode {
   const { number, numericFields, toggle, selector } = controlKit({ action, values, change, locked, anyStep, ps: psSliders });
   const channels = toneChannels(mode, values), toneChannel = channel || (channels[0] === "lightness" ? "lightness" : "composite");
   const tones = toneChannel === "composite" ? values : object(values[toneChannel]);
@@ -113,8 +115,10 @@ export function AdjustmentControls({ action, values, setValues, change, locked, 
     colorize={toggle("colorize", "Colorize", value => { setRange("master"); setValues(current => ({ ...current, colorize: value, hue: value ? (Number(current.hue) % 360 + 360) % 360 : Math.max(-180, Math.min(180, Number(current.hue))), saturation: value ? Math.max(0, Number(current.saturation)) : current.saturation })); })}/>;
   else if (action.id === "gradientMap") {
     const method = GRADIENT_METHODS.find(([id]) => id === values.method)?.[0] ?? "classic";
-    controls = <><GradientMapPresets stops={stops} locked={locked} choose={next => change("stops", next)}/><GradientStops stops={stops} shown={method === "classic" ? undefined : bakeGradient(stops.map(([at, color]) => [at, rgbHex(color, "#000000")]), method)} locked={locked} change={next => change("stops", next)} hex={value => rgbHex(value, "#000000")}/>
-      {selector("Method", method, GRADIENT_METHODS.map(([id]) => id), value => change("method", value), { show: value => GRADIENT_METHODS.find(([id]) => id === value)![1] })}{toggle("dither", "Dither")}{toggle("reverse", "Reverse")}</>;
+    const hexStops = stops.map(([at, color]): [number, string] => [at, rgbHex(color, "#000000")]);
+    const gradient = <GradientMapGradient stops={stops} shown={method === "classic" ? hexStops : bakeGradient(hexStops, method)} hex={value => rgbHex(value, "#000000")} locked={locked} change={next => change("stops", next)} hold={hold}/>;
+    const options = <>{toggle("dither", "Dither")}{toggle("reverse", "Reverse")}{selector("Method", method, GRADIENT_METHODS.map(([id]) => id), value => change("method", value), { show: value => GRADIENT_METHODS.find(([id]) => id === value)![1] })}</>;
+    controls = psSliders ? <><fieldset className="xd-ps-dialog-group"><legend>Gradient Used for Grayscale Mapping</legend>{gradient}</fieldset><fieldset className="xd-ps-dialog-group"><legend>Gradient Options</legend>{options}</fieldset></> : <>{gradient}{options}</>;
   }
   else if (action.id === "colorLookup") controls = <><div role="radiogroup" aria-label="Lookup type" className="xd-photo-lookup">
     <div className="xd-ps-dialog-row"><label className="xd-ps-dialog-check"><input type="radio" name="colorLookup.type" aria-label="3DLUT File" checked readOnly disabled={locked}/>3DLUT File</label><select aria-label="Adjustment Look" disabled={locked || loadingFile} value={lookup} onChange={event => event.target.value === "load" ? loadLookup() : setValues(current => { const next = { ...current }; delete next.file; delete next.data; delete next.fileName; if (event.target.value === "current") delete next.lut; else next.lut = event.target.value; return next; })}>{layer && <option value="current">Current embedded look{nativeLookup.name ? ` · ${String(nativeLookup.name)}` : ""}</option>}{lookup === "file" && <option value="file">{String(values.file).split(/[\\/]/).at(-1)}</option>}{COLOR_LOOKS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}<option value="load">{loadingFile ? "Loading…" : "Load 3D LUT…"}</option></select></div>

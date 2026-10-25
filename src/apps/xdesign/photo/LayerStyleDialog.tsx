@@ -3,9 +3,12 @@ import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { PhotoDialog } from "./photoDialog";
 import { useDesignDialog } from "../useDesignDialog";
 import { ColorPickerDialog } from "./ColorPickerDialog";
+import { GradientEditorDialog, GradientPick, gradientCss } from "./GradientEditorDialog";
 import { PresetPreview } from "./PresetPreview";
-import { BLENDS, ContourEditor, EffectSettings } from "./LayerEffects";
+import { BLENDS, ContourEditor } from "./LayerEffects";
 import { CanvasDraftPreview, type CanvasDraft } from "./CanvasDraftPreview";
+import { documentUnder } from "./ColorRangeDialog";
+import { GRADIENT_METHODS, bakeRemembered, unbaked, type GradientMethod } from "./gradientMethod";
 import { runPhotoCommand, usePhotoWorkspace } from "./runtime";
 import type { PhotoDocument, PhotoLayer, PhotoState } from "./types";
 import "./layerStyleDialog.css";
@@ -30,7 +33,7 @@ type Sel = { pane: LayerStylePane; nth: number };
 type Settings = Record<string, unknown>;
 type Fx = {
   s: Settings; colors: Record<string, string>; global?: { angle: number; altitude: number }; patterns: { id: string; name: string }[];
-  set: (path: string[], value: unknown) => Promise<void>; setGlobal: (patch: { angle?: number; altitude?: number }) => Promise<void>; pick: (path: string[], title: string) => void;
+  set: (path: string[], value: unknown) => Promise<void>; setGlobal: (patch: { angle?: number; altitude?: number }) => Promise<void>; pick: (path: string[], title: string) => void; editGradient: (path: string[]) => void;
   preview: (path: string[], value: unknown) => void; previewGlobal: (patch: { angle?: number; altitude?: number }) => void; endPreview: () => void;
 };
 type Draft = (command: string | null, params?: Record<string, unknown>) => void;
@@ -44,6 +47,16 @@ const historyIndex = (state: PhotoState | null | undefined) => state?.historySou
 const hexOf = (color: unknown) => { const c = (color as { c?: number[] } | undefined)?.c ?? [0, 0, 0]; return `#${c.slice(0, 3).map(v => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0")).join("")}`; };
 const cssOf = (color: unknown, opacity = 1) => { const c = (color as { c?: number[]; alpha?: number } | undefined) ?? {}, [r, g, b] = (c.c ?? [0, 0, 0]).map(v => Math.round(Math.max(0, Math.min(1, v)) * 255)); return `rgba(${r},${g},${b},${(c.alpha ?? 1) * opacity})`; };
 const rgbColor = (hex: string, alpha: number) => ({ mode: "Rgb", c: [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).concat(0), alpha });
+type Gradient = Settings & { stops: [number, unknown][]; opacity_stops?: [number, number][] };
+/** A stored gradient as the user set it, with its Method. The engine blends stops linearly, so other methods reach it baked. */
+const unbake = (gradient: Gradient): { gradient: Gradient; method: GradientMethod } => {
+  const found = unbaked(gradient.stops.map(([t, color]) => [t, hexOf(color)]));
+  return found ? { gradient: { ...gradient, stops: found.stops.map(([t, hex]) => [t, rgbColor(hex, 1)]) }, method: found.method } : { gradient, method: "classic" };
+};
+const bake = (gradient: Gradient, method: GradientMethod): Gradient => {
+  const stops = bakeRemembered(gradient.stops.map(([t, color]) => [t, hexOf(color)]), method);
+  return stops ? { ...gradient, stops: stops.map(([t, hex]) => [t, rgbColor(hex, 1)]) } : gradient;
+};
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
 
 /** Photoshop keeps one default per effect kind (shared by every instance); the engine has no store for it, so it lives in the browser. */
@@ -168,36 +181,37 @@ function Contour({ path, antiAlias, label = "Contour" }: { path: string[]; antiA
 }
 
 const GRADIENT_STYLES: [string, string][] = ["Linear", "Radial", "Angle", "Reflected", "Diamond"].map(style => [style, style]);
-function GradientEditor({ path, scaleRange = [10, 150], movable = false }: { path: string[]; scaleRange?: [number, number]; movable?: boolean }) {
-  const fx = useContext(Ctx), gradient = at(fx.s, path) as { stops: [number, unknown][] } | undefined;
-  if (!gradient) return null;
-  const bar = `linear-gradient(90deg,${gradient.stops.map(([position, color]) => `${cssOf(color)} ${position * 100}%`).join(",")})`;
+function GradientEditor({ path, scaleRange = [10, 150], movable = false, withMethod = false }: { path: string[]; scaleRange?: [number, number]; movable?: boolean; withMethod?: boolean }) {
+  const fx = useContext(Ctx), stored = at(fx.s, path) as Gradient | undefined;
+  if (!stored) return null;
+  const { gradient, method } = unbake(stored);
   return <>
-    <div className="xd-ls-row is-wide"><span className="xd-ls-label">Gradient:</span><span className="xd-ls-gradient" style={{ background: bar }} role="img" aria-label="Gradient"/></div>
-    <EffectSettings value={gradient.stops} path={[...path, "stops"]} commit={fx.set} colors={fx.colors} effectType="Gradient"/>
-    <EffectSettings value={at(fx.s, [...path, "opacity_stops"])} path={[...path, "opacity_stops"]} commit={fx.set} colors={fx.colors} effectType="Gradient"/>
-    <Tick label="Reverse" path={[...path, "reverse"]}/>
+    <div className="xd-ls-row is-wide"><span className="xd-ls-label">Gradient:</span><span className="xd-ls-inline">
+      <GradientPick css={gradientCss(stored.stops, stored.opacity_stops ?? [], hexOf)} edit={() => fx.editGradient(path)} choose={preset => void fx.set(path, bake({ ...gradient, stops: preset.stops.map(([t, c]) => [t, rgbColor(c, 1)]), opacity_stops: preset.opacity }, method))}/>
+      <Tick label="Reverse" path={[...path, "reverse"]}/>
+    </span></div>
     <Pick label="Style" value={String(at(fx.s, [...path, "style"]))} options={GRADIENT_STYLES} onValue={value => void fx.set([...path, "style"], value)}/>
     <Tick label="Align with Layer" path={[...path, "align"]}/>
     {movable && <button type="button" className="xd-ls-snap" onClick={() => void fx.set([...path, "offset"], [0, 0])}>Reset Alignment</button>}
     <Num label="Angle" path={[...path, "angle"]} unit="°" min={-180} max={180} dial/>
     <Num label="Scale" path={[...path, "scale"]} unit="%" min={scaleRange[0]} max={scaleRange[1]} scale={100}/>
+    {withMethod && <Pick label="Method" value={method} options={GRADIENT_METHODS} onValue={next => void fx.set(path, bake(gradient, next as GradientMethod))}/>}
   </>;
 }
 
 /** Strokes and glows hold either a colour or a gradient under `paint`; Photoshop's Fill Type / colour-or-gradient choice. */
-function Paint({ label = "Fill Type", gradientScale }: { label?: string; gradientScale?: [number, number] }) {
+function Paint({ label = "Fill Type", gradientScale, withMethod }: { label?: string; gradientScale?: [number, number]; withMethod?: boolean }) {
   const fx = useContext(Ctx), paint = fx.s.paint as Record<string, unknown>, kind = Object.keys(paint ?? {})[0] ?? "Color";
   const color = kind === "Color" ? paint.Color : (paint[kind] as { stops?: [number, unknown][] }).stops?.[0]?.[1] ?? rgbColor("#ffffbe", 1);
   const to = (next: string) => {
     if (next === kind) return;
-    const base = color as { alpha?: number };
-    void fx.set(["paint"], next === "Color" ? { Color: color } : { Gradient: { stops: [[0, color], [1, { ...base, alpha: 0 }]], opacity_stops: [], style: "Linear", angle: 90, scale: 1, reverse: false, align: true, offset: [0, 0] } });
+    const gradient: Gradient = { stops: [[0, color], [1, color]], opacity_stops: [[0, 1], [1, 0]], style: "Linear", angle: 90, scale: 1, reverse: false, align: true, offset: [0, 0] };
+    void fx.set(["paint"], next === "Color" ? { Color: color } : { Gradient: withMethod ? bake(gradient, "smooth") : gradient });
   };
   return <>
     <Pick label={label} value={kind} options={[["Color", "Color"], ["Gradient", "Gradient"], ...(kind === "Pattern" ? [["Pattern", "Pattern"] as [string, string]] : [])]} onValue={to}/>
     {kind === "Color" && <div className="xd-ls-row is-wide"><span className="xd-ls-label">Color:</span><Swatch path={["paint", "Color"]} title="Select color"/></div>}
-    {kind === "Gradient" && <GradientEditor path={["paint", "Gradient"]} scaleRange={gradientScale}/>}
+    {kind === "Gradient" && <GradientEditor path={["paint", "Gradient"]} scaleRange={gradientScale} withMethod={withMethod}/>}
   </>;
 }
 
@@ -305,7 +319,7 @@ function Stroke() {
       <Pick label="Position" value={String(fx.s.position)} options={[["Outside", "Outside"], ["Inside", "Inside"], ["Center", "Center"]]} onValue={value => void fx.set(["position"], value)}/>
       <Blend/>
       {COMMON_OPACITY}
-      <Paint/>
+      <Paint withMethod/>
     </Group>
   </>;
 }
@@ -411,18 +425,20 @@ const TEXTURE = (id: string, name: string) => ({ name, id, scale: 1, depth: 1, i
 
 const settle = (work: Promise<unknown>) => work.then(() => {}, () => {});
 
-/** Photoshop's Layer Style dialog. Edits run as real engine commands so the canvas previews them; Cancel returns to the history state it opened at. */
+/** Photoshop's Layer Style dialog. Edits run as real engine commands so the canvas previews them; Cancel returns to the history state it opened at and OK folds them into one Layer Style step. */
 export function LayerStyleDialog({ layerId, initial = "blending", onClose, document, canvas = null, untilShown = settle }: { layerId: number; initial?: LayerStylePane; onClose: () => void; document?: PhotoDocument; canvas?: HTMLElement | null; untilShown?: (work: Promise<unknown>) => Promise<void> }) {
   const state = usePhotoWorkspace(s => s.state), layer = state ? find(state.layers, layerId) : undefined;
   const [sel, setSel] = useState<Sel>({ pane: initial, nth: 0 }), [preview, setPreview] = useState(true), [menu, setMenu] = useState(false), [naming, setNaming] = useState(false), [error, setError] = useState("");
-  const [picking, setPicking] = useState<{ path: string[]; title: string } | null>(null), [live, setLive] = useState<CanvasDraft | null>(null);
+  const [picking, setPicking] = useState<{ path: string[]; title: string } | null>(null), [gradientAt, setGradientAt] = useState<string[] | null>(null), [live, setLive] = useState<CanvasDraft | null>(null);
   const opened = useRef({ base: historyIndex(state), reset: historyIndex(state), top: null as number | null, started: false });
+  const pending = useRef<Promise<unknown>>(Promise.resolve());
   const items = layer?.effects?.items ?? [];
   const current = () => { const next = usePhotoWorkspace.getState().state; return next ? find(next.layers, layerId) : undefined; };
   // A slider's drag shows on the canvas as a preview and commits once on release; the last frame stays until that commit is shown.
   const draft: Draft = (command, params = {}) => setLive(command ? { command, params: { layer: layerId, ...params } } : null);
   const run = (command: string, params: Record<string, unknown> = {}) => {
     const work = runPhotoCommand(command, { layer: layerId, ...params }).then(() => setError(""), failure => { setError(message(failure)); });
+    pending.current = work;
     setLive(current => current && { ...current, committing: true });
     void untilShown(work).then(() => setLive(current => current?.committing ? null : current));
     return work;
@@ -431,17 +447,24 @@ export function LayerStyleDialog({ layerId, initial = "blending", onClose, docum
   const enabledPath = (type: string) => type === "BevelEmboss" ? ["enabled"] : ["common", "enabled"];
   const edit = (index: number, path: string[], value: unknown) => run("layer.layerStyle.editEffect", { index, path, value });
 
+  /** Photoshop starts a new Gradient Overlay at the Smooth Method. */
+  const addEffect = async (def: (typeof FX)[number]) => {
+    const before = current()?.effects?.items.length ?? 0;
+    await run(`layer.layerStyle.${def.key}`, { add: true });
+    const made = current()?.effects?.items[before];
+    if (def.type === "GradientOverlay" && made?.type === "GradientOverlay") await edit(before, ["gradient"], bake((made.settings as Settings).gradient as Gradient, "smooth"));
+  };
   const add = (key: LayerStyleEffect, more = false) => {
     const def = FX.find(entry => entry.key === key)!, count = instances(def.type).length;
     setMenu(false);
     if (count && !more) { setSel({ pane: key, nth: 0 }); return Promise.resolve(); }
     setSel({ pane: key, nth: count });
-    return run(`layer.layerStyle.${key}`, { add: true });
+    return addEffect(def);
   };
   useEffect(() => {
     if (opened.current.started || !layer) return; opened.current.started = true;
     const def = FX.find(entry => entry.key === initial);
-    if (def && !instances(def.type).length) void run(`layer.layerStyle.${def.key}`, { add: true }).then(() => { opened.current.reset = historyIndex(usePhotoWorkspace.getState().state); });
+    if (def && !instances(def.type).length) void addEffect(def).then(() => { opened.current.reset = historyIndex(usePhotoWorkspace.getState().state); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!layer) onClose(); }, [layer]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -508,7 +531,9 @@ export function LayerStyleDialog({ layerId, initial = "blending", onClose, docum
     if (!canvas || !host || !document || !preview || !MOVABLE.includes(moving)) return;
     const onDown = (event: globalThis.PointerEvent) => {
       const target = event.target;
-      if (event.button !== 0 || !(target instanceof Element) || !host.contains(target) || target.closest("[role=dialog]")) return;
+      // The dialog's scrim lies over the stage, so a press on it counts when the visible document is under it.
+      const onImage = target instanceof Element && (host.contains(target) || target.matches(".xd-ps-dialog-scrim") && !!documentUnder(canvas, event.clientX, event.clientY));
+      if (event.button !== 0 || !onImage || target.closest("[role=dialog]")) return;
       const { selected: effect, light, edit: commit, run: runCommand, draft: show, bounds } = moveRef.current;
       if (!effect) return;
       event.preventDefault(); event.stopPropagation();
@@ -543,15 +568,26 @@ export function LayerStyleDialog({ layerId, initial = "blending", onClose, docum
     return () => window.removeEventListener("pointerdown", onDown, true);
   }, [canvas, document, preview, moving]);
 
-  const revert = (to: number | null) => { const now = historyIndex(usePhotoWorkspace.getState().state); if (to !== null && now !== to) void runPhotoCommand("history.select", { index: to }).catch(() => {}); };
-  const cancel = () => { revert(opened.current.base); onClose(); };
+  // Host commands refuse to overlap, so these wait for an edit still committing (a field's blur when OK is clicked).
+  const revert = (to: number | null, discardRedo = false) => pending.current.then(() => {
+    const now = historyIndex(usePhotoWorkspace.getState().state);
+    if (to !== null && now !== to) return runPhotoCommand("history.select", discardRedo ? { index: to, discardRedo } : { index: to });
+  }).catch(() => {});
+  const cancel = () => { void revert(opened.current.base, true); onClose(); };
   const form = useDesignDialog<HTMLFormElement>(cancel);
-  const ok = () => { if (!preview && opened.current.top !== null) revert(opened.current.top); onClose(); };
-  const reset = () => { revert(opened.current.reset); setError(""); setPreview(true); };
+  const ok = () => {
+    const { base, top } = opened.current;
+    void (preview ? pending.current : revert(top)).then(() => {
+      const now = historyIndex(usePhotoWorkspace.getState().state);
+      if (base !== null && now !== null && now > base) return runPhotoCommand("history.fold", { from: base, label: "Layer Style" });
+    }).catch(() => {});
+    onClose();
+  };
+  const reset = () => { void revert(opened.current.reset); setError(""); setPreview(true); };
   const togglePreview = (on: boolean) => {
     setPreview(on);
-    if (!on) { opened.current.top = historyIndex(usePhotoWorkspace.getState().state); revert(opened.current.base); }
-    else revert(opened.current.top);
+    if (!on) { opened.current.top = historyIndex(usePhotoWorkspace.getState().state); void revert(opened.current.base); }
+    else void revert(opened.current.top);
   };
   const create = (name: string, includeEffects: boolean, includeBlending: boolean) => { setNaming(false); void run("style.presets.new", { name, includeEffects, includeBlending }); };
 
@@ -564,10 +600,12 @@ export function LayerStyleDialog({ layerId, initial = "blending", onClose, docum
     set: (path, value) => edit(effect.index, path, value),
     setGlobal: patch => run("layer.layerStyle.globalLight", { ...light, ...patch }),
     pick: (path, picker) => setPicking({ path, title: picker }),
+    editGradient: setGradientAt,
     preview: (path, value) => draft("layer.layerStyle.editEffect", { index: effect.index, path, value }),
     previewGlobal: patch => draft("layer.layerStyle.globalLight", { ...light, ...patch }),
     endPreview: () => draft(null),
   });
+  const stored = selected && gradientAt ? at(selected.effect.settings, gradientAt) as Gradient | undefined : undefined, editing = stored && unbake(stored);
   const body = (() => {
     if (sel.pane === "styles") return <StylesPane state={state} apply={(preset, group, addToStyle) => void run("style.presets.apply", { preset, group, add: addToStyle })}/>;
     if (sel.pane === "blending") return <Blending layer={layer} state={state} run={run} draft={draft}/>;
@@ -578,7 +616,7 @@ export function LayerStyleDialog({ layerId, initial = "blending", onClose, docum
       : sel.pane === "texture" ? (settings.texture ? <BevelTexture pattern={(id, name) => pickTexture(selected.index, id, name)}/> : <p className="xd-ls-hint">Tick Texture to add a pattern to the bevel.</p>)
       : ({ DropShadow: <Shadow inner={false}/>, InnerShadow: <Shadow inner/>, OuterGlow: <Glow inner={false}/>, InnerGlow: <Glow inner/>, Stroke: <Stroke/>, Satin: <Satin/>,
         ColorOverlay: <Group title="Color"><Blend color={["color"]} colorTitle="Select overlay color"/>{COMMON_OPACITY}</Group>,
-        GradientOverlay: <Group title="Gradient"><Blend/><Tick label="Dither" path={["dither"]}/>{COMMON_OPACITY}<GradientEditor path={["gradient"]} movable/></Group>,
+        GradientOverlay: <Group title="Gradient"><Blend/><Tick label="Dither" path={["dither"]}/>{COMMON_OPACITY}<GradientEditor path={["gradient"]} movable withMethod/></Group>,
         PatternOverlay: <PatternOverlay choose={id => chooseOverlayPattern(selected.index, id)}/>, BevelEmboss: <Bevel/> } as Record<string, ReactNode>)[selected.effect.type];
     const effectPane = FX.some(entry => entry.key === sel.pane);
     return <><Ctx.Provider value={fx}>{pane}</Ctx.Provider>
@@ -620,6 +658,10 @@ export function LayerStyleDialog({ layerId, initial = "blending", onClose, docum
     </PhotoDialog>
     {document && <CanvasDraftPreview document={document} draft={preview ? live : null} canvas={canvas}/>}
     {naming && <NewStyle close={() => setNaming(false)} create={create}/>}
-    {picking && selected && <ColorPickerDialog title={picking.title} color={fxFor(selected).colors[`/${picking.path.join("/")}`] ?? hexOf(at(selected.effect.settings, picking.path))} close={() => setPicking(null)} choose={hex => { const base = at(selected.effect.settings, picking.path) as { alpha?: number } | undefined; void edit(selected.index, picking.path, rgbColor(hex, base?.alpha ?? 1)); setPicking(null); }}/>}
+    {selected && gradientAt && editing && <GradientEditorDialog<unknown> gradient={{ stops: editing.gradient.stops, opacity: editing.gradient.opacity_stops ?? [] }} hex={hexOf} color={(hex, from) => rgbColor(hex, (from as { alpha?: number } | undefined)?.alpha ?? 1)}
+      preview={next => fxFor(selected).preview(gradientAt, bake({ ...editing.gradient, stops: next.stops, opacity_stops: next.opacity }, editing.method))}
+      choose={next => { void edit(selected.index, gradientAt, bake({ ...editing.gradient, stops: next.stops, opacity_stops: next.opacity }, editing.method)); setGradientAt(null); }}
+      close={() => { draft(null); setGradientAt(null); }}/>}
+    {picking && selected && <ColorPickerDialog title={picking.title} color={fxFor(selected).colors[`/${picking.path.join("/")}`] ?? hexOf(at(selected.effect.settings, picking.path))} close={() => { draft(null); setPicking(null); }} preview={hex => fxFor(selected).preview(picking.path, rgbColor(hex, (at(selected.effect.settings, picking.path) as { alpha?: number } | undefined)?.alpha ?? 1))} choose={hex => { const base = at(selected.effect.settings, picking.path) as { alpha?: number } | undefined; void edit(selected.index, picking.path, rgbColor(hex, base?.alpha ?? 1)); setPicking(null); }}/>}
   </>;
 }

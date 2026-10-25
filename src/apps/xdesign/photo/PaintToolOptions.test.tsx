@@ -50,6 +50,7 @@ describe("image tool controls and command units",()=>{
     for(const tool of ["paint.stroke","paint.spotHealing","paint.historyBrush"]){expect(sanitizePaintOptions(tool,transform)).toEqual({});expect(strokeParameters(tool,[[1,2]],20,1,1,"#ff0000",1,null,sanitizePaintOptions(tool,transform),false,null,null)).not.toHaveProperty("scale");}
   });
 
+  it("puts each checkbox before its label, as Photoshop's options bar does",async()=>{await act(async()=>root.render(<Harness tool="crop"/>));const box=container.querySelector<HTMLInputElement>('[aria-label="Tool Delete Cropped Pixels"]')!;expect(box.parentElement!.firstChild).toBe(box);expect(box.parentElement!.textContent).toBe("Delete Cropped Pixels");});
   it("renders native History Brush blend labels without changing their command values",async()=>{await act(async()=>root.render(<Harness tool="paint.historyBrush"/>));const select=container.querySelector<HTMLSelectElement>('[aria-label="Tool Blend"]')!;expect(select.options[0]!.textContent).toBe("Normal");expect([...select.options].find(option=>option.value==="Linear Dodge (Add)")?.textContent).toBe("Linear Dodge (Add)");});
   it("edits dodge tone range/exposure and preserves protection independently",async()=>{
     await act(async()=>root.render(<Harness tool="paint.dodge"/>));

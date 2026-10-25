@@ -25,6 +25,14 @@ function dragKnot(knot:PathKnot,part:Part,dx:number,dy:number,alt:boolean):PathK
   return {...knot,[part]:moved,[other]:mirrored};
 }
 
+export function TargetPathOverlay({width,height,zoom,path}:{width:number;height:number;zoom:number;path:PathData}) {
+  const size=5/zoom;
+  return <svg className="xd-photo-path-edit" viewBox={`0 0 ${width} ${height}`} aria-label="Target path">
+    <path className="xd-photo-path-line" d={pathCurve(path)} vectorEffect="non-scaling-stroke"/>
+    {path.subpaths.map((subpath,s)=>subpath.knots.map((knot,k)=><rect key={`${s}/${k}`} className="xd-photo-path-knot" x={knot.anchor[0]-size/2} y={knot.anchor[1]-size/2} width={size} height={size}/>))}
+  </svg>;
+}
+
 export function PathEditOverlay({width,height,zoom,path,direct,commit,move}:{width:number;height:number;zoom:number;path:PathData;direct:boolean;commit:(path:PathData)=>Promise<unknown>|void;move:(dx:number,dy:number)=>Promise<unknown>|void}) {
   const svg=useRef<SVGSVGElement>(null),drag=useRef<Drag|null>(null),committing=useRef(false),[draft,setDraft]=useState<PathData|null>(null);
   const shown=draft??path,size=7/zoom;

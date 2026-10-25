@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Info } from "lucide-react";
 import { positionPopup } from "../EditorMenus";
 import { PresetPreview } from "./PresetPreview";
 import "./optionsBar.css";
@@ -111,6 +111,17 @@ export function PopupSlider({ label, ariaLabel, value, min, max, unit, disabled,
         onChange={event => change(Number(event.target.value))}
         onPointerUp={event => settle(Number(event.currentTarget.value))} onKeyUp={event => settle(Number(event.currentTarget.value))} />
     </div>}
+  </span>;
+}
+
+/** Photoshop's ⓘ button: a short titled note in a popover that OK closes. */
+export function InfoNote({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const close = (refocus: boolean) => { setOpen(false); if (refocus) anchor.current?.focus(); };
+  const { anchor, pop, rootProps } = usePopover<HTMLSpanElement>(open, close);
+  return <span className="xd-ps-info" {...rootProps}>
+    <button ref={anchor} type="button" aria-label={label} title={label} aria-expanded={open} onClick={() => { if (open) close(false); else setOpen(true); }}><Info size={14} /></button>
+    {open && <div ref={pop} className="xd-ps-popover xd-ps-note" role="dialog" aria-label={label}><h4>{label}</h4>{children}<button type="button" onClick={() => close(true)}>OK</button></div>}
   </span>;
 }
 

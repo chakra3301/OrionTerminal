@@ -131,22 +131,6 @@
 .xd-photo .xd-photo-bw-tint { min-width:0;margin:0;padding:0;border:0; }
 .xd-photo .xd-photo-bw-tint:disabled { opacity:.5; }
 
-/* Gradient Map: the Gradient Editor's bar, colour stops under it and the selected stop's settings. */
-.xd-photo .xd-photo-gradient-editor { display:flex;flex-direction:column;width:100%; }
-.xd-photo .xd-photo-gradient-editor > .xd-photo-adjustment-gradient { margin:0 6px; }
-.xd-photo .xd-photo-gradient-stops { position:relative;height:16px;margin:0 6px 6px;cursor:copy;touch-action:none; }
-.xd-photo .xd-photo-gradient-stop { position:absolute;top:1px;width:11px;height:14px;margin-left:-5.5px;cursor:ew-resize; }
-.xd-photo .xd-photo-gradient-stop svg { display:block;width:11px;height:14px; }
-.xd-photo .xd-photo-gradient-stop path { fill:var(--xd-panel);stroke:var(--xd-text-2);stroke-width:1; }
-.xd-photo .xd-photo-gradient-stop[aria-pressed=true] path { fill:var(--xd-text);stroke:var(--xd-text); }
-.xd-photo .xd-photo-gradient-stop.is-leaving { opacity:.3; }
-.xd-photo .xd-photo-gradient-stop:focus-visible { outline:none; }
-.xd-photo .xd-photo-gradient-stop:focus-visible path { stroke:var(--xd-accent);stroke-width:2; }
-.xd-photo .xd-photo-gradient-stop-fields { display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px; }
-.xd-photo .xd-photo-gradient-stop-fields label { display:flex;align-items:center;gap:4px;margin:0; }
-.xd-photo .xd-photo-gradient-stop-fields input[type=number] { width:56px;box-sizing:border-box;text-align:right; }
-.xd-photo .xd-photo-gradient-stop-fields button { margin-left:auto; }
-
 /* Photo Filter's Use group: each choice with its control beside it. */
 .xd-photo .xd-photo-filter-use [role=radiogroup] { display:grid;grid-template-columns:auto 1fr;gap:6px 8px;align-items:center; }
 .xd-photo .xd-photo-filter-use select { min-width:0;width:100%; }

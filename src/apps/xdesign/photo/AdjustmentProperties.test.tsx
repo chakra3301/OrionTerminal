@@ -83,6 +83,29 @@ describe("adjustment layer properties", () => {
     await act(async () => shown()); expect(canvas.querySelector("img")).toBeNull();
   });
 
+  it("holds a Gradient Map edit while the Gradient Editor is open and commits it once on OK", async () => {
+    container.classList.add("xd-photo");
+    await render(make("gradientMap", { stops: [[0, "#000000"], [1, "#ffffff"]] }));
+    await act(async () => by("Edit gradient").click());
+    await act(async () => (by("Color stop 2") as HTMLElement).click()); await slide("Color stop location", "40"); await slide("Color stop location", "60");
+    await act(async () => { by("Color stop location").dispatchEvent(new FocusEvent("focusin", { bubbles: true })); });
+    await settle();
+    expect(native.run).not.toHaveBeenCalled();
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Gradient Editor"] button[type=submit]')!.click()); await settle();
+    expect(native.run).toHaveBeenCalledOnce();
+    expect(native.run).toHaveBeenCalledWith("layer.setAdjustment", expect.objectContaining({ layer: 7, stops: [[0, "#000000"], [.6, "#ffffff"]] }));
+  });
+
+  it("commits nothing when the Gradient Editor is cancelled", async () => {
+    container.classList.add("xd-photo");
+    await render(make("gradientMap", { stops: [[0, "#000000"], [1, "#ffffff"]] }));
+    await act(async () => by("Edit gradient").click());
+    await act(async () => (by("Color stop 2") as HTMLElement).click()); await slide("Color stop location", "60");
+    await act(async () => [...container.querySelectorAll<HTMLButtonElement>('[aria-label="Gradient Editor"] button')].find(button => button.textContent === "Cancel")!.click()); await settle();
+    expect(native.run).not.toHaveBeenCalled();
+    expect(container.querySelector('[aria-label="Gradient Editor"]')).toBeNull();
+  });
+
   it("keeps the controls enabled while a quiet edit runs", async () => {
     usePhotoWorkspace.setState({ busy: true, quiet: true });
     await render(make("brightnessContrast", { brightness: 0, contrast: 0 }));

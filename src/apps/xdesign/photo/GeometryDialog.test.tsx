@@ -255,6 +255,15 @@ describe('Develop scalar numeric drafts',()=>{
     await scalarDraft('exposure','-1.5');await developAction('Cancel');expect(close).toHaveBeenCalledOnce();expect(native.run).not.toHaveBeenCalled();expect(original.exposure).toBe(.5);
   });
 
+  it('applies arrow-key nudges at once, by the slider step or ten with Shift, like Camera Raw',async()=>{
+    await develop();const input=scalarInput('exposure'),slider=scalarInput('exposure slider'),split=splitInput(1);await act(async()=>{input.closest('details')?.setAttribute('open','');input.focus();});
+    const nudge=(target:HTMLInputElement,key:string,shiftKey=false)=>act(async()=>{const event=new KeyboardEvent('keydown',{key,shiftKey,bubbles:true,cancelable:true});target.dispatchEvent(event);expect(event.defaultPrevented).toBe(true);});
+    await nudge(input,'ArrowUp');expect(slider.valueAsNumber).toBe(.1);expect(input.value).toBe('0.1');
+    await nudge(input,'ArrowDown',true);expect(slider.valueAsNumber).toBe(-.9);expect(input.value).toBe('-0.9');
+    await nudge(split,'ArrowUp',true);expect(splitInput(1,true).valueAsNumber).toBe(60);
+    await developAction('OK');expect(native.run).toHaveBeenCalledWith('filter.cameraRaw',{layer:1,exposure:-.9,curveSplits:[25,60,75]});
+  });
+
   it('keeps sliders live and discards late HSL or grading drafts after changing the actual channel',async()=>{
     await develop();let input=await scalarDraft('exposure','-2.5');const slider=scalarInput('exposure slider');await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(slider,'1.5');slider.dispatchEvent(new Event('input',{bubbles:true}));});expect(input.value).toBe('1.5');
     const oldHSL=await scalarDraft('hslHue-0','37.5');await chooseCurve('Develop HSL control','hslSat');await act(async()=>oldHSL.dispatchEvent(new FocusEvent('focusout',{bubbles:true})));await editDevelopNumber('hslSat-1','-10.5');input=await scalarDraft('hue','75.5');await chooseCurve('Develop grading range','gradeHighlights');await act(async()=>input.dispatchEvent(new FocusEvent('focusout',{bubbles:true})));expect(scalarInput('hue').value).toBe('0');await scalarDraft('lum','-15.5');await developAction('OK');expect(native.run).toHaveBeenCalledWith('filter.cameraRaw',{layer:1,exposure:1.5,hslSat:[0,-10.5,0,0,0,0,0,0],gradeHighlights:{hue:0,sat:0,lum:-15.5}});

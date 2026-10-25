@@ -7,7 +7,7 @@
  * rotation) so they persist and stay in sync with the inspector.
  */
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useFxStore } from "./fxStore";
 import { fxEffect } from "./fxRegistry";
 import { getSourceAspect } from "./fxSourceInfo";
@@ -47,6 +47,9 @@ export function FxCanvasOverlay({
   const rootRef = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
 
+  // Don't leave a gesture open if the overlay unmounts mid-drag.
+  useEffect(() => () => useFxStore.getState().endGesture(), []);
+
   const spec = layer ? fxEffect(layer.effectId) : undefined;
   if (!layer || spec?.category !== "source" || fitW === 0) return null;
   const box = unitBox(layer, sceneW, sceneH);
@@ -76,6 +79,8 @@ export function FxCanvasOverlay({
     e.stopPropagation();
     e.preventDefault();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    // One undo step for the whole drag, even though it writes several params.
+    useFxStore.getState().beginGesture();
     drag.current = {
       mode,
       corner,
@@ -140,6 +145,7 @@ export function FxCanvasOverlay({
     if (drag.current) {
       (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
       drag.current = null;
+      useFxStore.getState().endGesture();
     }
   };
 

@@ -44,6 +44,7 @@
 .xd-photo .xd-ps-dialog .xd-ps-dialog-field > :is(input[type=number],input[type=text],output) { width:100%; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-field > output { text-align:right;font-variant-numeric:tabular-nums; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-field > :is(select,input:not([type])) { grid-column:2/-1;min-width:140px; }
+.xd-photo .xd-ps-dialog.xd-ps-crop-preset .xd-ps-dialog-field > input { min-width:260px; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-unit { color:var(--xd-text-2); }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-grid input[type=range] { grid-column:1/-1;margin:0 0 6px; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-row > .xd-ps-dialog-check { grid-column:1/-1; }
@@ -51,6 +52,13 @@
 .xd-photo .xd-ps-dialog .xd-ps-dialog-row > .xd-ps-dialog-check.xd-ps-dialog-indent { grid-column:2/-1; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-row > .xd-ps-dialog-check.is-label { grid-column:1;justify-self:end; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-row > .is-label + select,.xd-photo .xd-ps-dialog .xd-ps-dialog-label + * { grid-column:2/-1; }
+/* New Layer: Mode and Opacity share a row, as in Photoshop. */
+.xd-photo .xd-ps-dialog.xd-nl-dialog .xd-ps-dialog-grid { grid-template-columns:auto 140px auto 56px auto; }
+.xd-photo .xd-ps-dialog.xd-nl-dialog .xd-ps-dialog-field > input:not([type]) { width:100%; }
+.xd-photo .xd-ps-dialog.xd-nl-dialog .xd-nl-mode > select { grid-column:2;width:100%; }
+.xd-photo .xd-ps-dialog.xd-nl-dialog .xd-nl-opacity > span:first-child { grid-column:3;margin-left:10px; }
+.xd-photo .xd-ps-dialog.xd-nl-dialog .xd-ps-dialog-grid > .xd-ps-dialog-check { grid-column:2/-1; }
+.xd-photo .xd-ps-dialog .xd-nl-swatch { width:20px;height:20px;box-sizing:border-box;border:1px solid var(--xd-border);border-radius:var(--r-sm); }
 /* Photoshop's titled group boxes (Blending, Shadows, New Size). */
 .xd-photo .xd-ps-dialog .xd-ps-dialog-group { margin:0 0 12px;padding:8px 10px 10px;border:1px solid var(--xd-border);border-radius:var(--r-sm);min-width:0; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-group > legend { padding:0 4px;color:var(--xd-text-2);font-size:11px; }

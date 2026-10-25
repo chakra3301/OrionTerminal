@@ -36,8 +36,27 @@ pub(super) fn import(name: &str, bytes: &[u8]) -> Result<photocraft_io::ImportRe
     // Native bundles can retain PSD provenance after an intentional mask deletion.
     if photocraft_io::is_psd(bytes) {
         restore_explicit_white_masks(&mut imported);
+        restore_omitted_fill_angles(&mut imported.document);
     }
     Ok(imported)
+}
+
+/// Photoshop leaves `Angl` out of a gradient fill's `GdFl` at 0°, which the importer reads as 90°.
+/// The kept block gains the angle too: export reuses it verbatim while it decodes to the current fill,
+/// so without it a fill later set to 90° would go back out as 0°.
+fn restore_omitted_fill_angles(document: &mut photocraft_engine::doc::Document) {
+    use photocraft_engine::doc::Fill;
+    use photocraft_psd::descriptor::{Value, VersionedDescriptor};
+    let ids: Vec<LayerId> = document.walk().into_iter().filter(|(_, _, layer)| matches!(layer.content, LayerContent::Fill(Fill::Gradient { .. }))).map(|(_, _, layer)| layer.id).collect();
+    for id in ids {
+        let Some(layer) = document.layer_mut(id) else { continue };
+        let Some(block) = layer.psd_blocks.iter_mut().find(|(key, _)| key == b"GdFl") else { continue };
+        let Ok((mut fill, _)) = VersionedDescriptor::parse_prefix(&block.1) else { continue };
+        if fill.descriptor.get("Angl").is_some() { continue; }
+        fill.descriptor = fill.descriptor.with("Angl", Value::UnitFloat { unit: *b"#Ang", value: 0.0 });
+        block.1 = std::sync::Arc::new(fill.to_bytes());
+        if let LayerContent::Fill(Fill::Gradient { angle, .. }) = &mut layer.content { *angle = 0.0; }
+    }
 }
 
 fn restore_explicit_white_masks(imported: &mut photocraft_io::ImportResult) {
@@ -620,5 +639,37 @@ mod tests {
             &before,
             &parent.engine.active().unwrap().doc
         ));
+    }
+
+    #[test]
+    fn gradient_fills_saved_without_an_angle_open_at_zero_degrees_and_export_later_edits() {
+        use photocraft_engine::doc::Fill;
+        fn angle(document: &photocraft_engine::doc::Document) -> f32 {
+            let layer = document.walk().into_iter().find(|(_, _, layer)| layer.name == "Gradient Fill 1").unwrap().2;
+            let LayerContent::Fill(Fill::Gradient { angle, .. }) = &layer.content else { panic!("fixture gradient fill") };
+            *angle
+        }
+        let pixels: Vec<u8> = [0u8, 0, 0, 255].repeat(16);
+        let mut builder = PsdBuilder::new(4, 4).compression(Compression::Raw);
+        builder.push_layer(LayerSpec::new("Gradient Fill 1", 0, 0, 4, 4, PixelData::Rgba8(pixels.clone())));
+        builder.composite(PixelData::Rgba8(pixels));
+        let mut file = PsdFile::from_bytes(&builder.to_bytes().unwrap()).unwrap();
+        // Photoshop writes no `Angl` for a 0° fill.
+        let fill = Descriptor::new("null")
+            .with("Type", Value::Enumerated { type_id: photocraft_psd::descriptor::Id::new("GrdT"), value: photocraft_psd::descriptor::Id::new("Lnr ") })
+            .with("Scl ", Value::UnitFloat { unit: *b"#Prc", value: 100.0 });
+        file.layers_mut()[0].blocks.push(TaggedBlock::new(*b"GdFl", VersionedDescriptor::new(fill).to_bytes()));
+        let bytes = file.to_bytes().unwrap();
+        assert_eq!(angle(&photocraft_io::import("fixture.psd", &bytes).unwrap().document), 90.0, "fixture must reproduce the native default");
+
+        let mut document = import("fixture.psd", &bytes).unwrap().document;
+        assert_eq!(angle(&document), 0.0);
+        let exported = photocraft_io::export(&document, "psd", &Default::default()).unwrap();
+        assert_eq!(angle(&import("fixture.psd", &exported.bytes).unwrap().document), 0.0);
+        let id = document.walk().into_iter().find(|(_, _, layer)| layer.name == "Gradient Fill 1").unwrap().2.id;
+        let LayerContent::Fill(Fill::Gradient { angle: edited, .. }) = &mut document.layer_mut(id).unwrap().content else { unreachable!() };
+        *edited = 90.0;
+        let exported = photocraft_io::export(&document, "psd", &Default::default()).unwrap();
+        assert_eq!(angle(&import("fixture.psd", &exported.bytes).unwrap().document), 90.0);
     }
 }

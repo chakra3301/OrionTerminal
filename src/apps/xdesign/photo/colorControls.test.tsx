@@ -5,6 +5,7 @@ import { AdjustmentControls, type Settings } from "./actionControls";
 import { adjustmentDefaults } from "./adjustmentSettings";
 import { canonicalHueRange, hueSaturationColor, hueWeight } from "./colorControls";
 import { ADJUSTMENTS } from "./controls";
+import { usePhotoWorkspace } from "./runtime";
 
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => false, invoke: vi.fn(), convertFileSrc: (path: string) => path }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
@@ -20,7 +21,7 @@ beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); changed = vi.fn();
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
 });
-afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
+afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); usePhotoWorkspace.setState({ state: null }); });
 const render = (props: Parameters<typeof Fixture>[0]) => act(async () => root.render(<Fixture {...props}/>));
 const by = <T extends Element = HTMLElement>(label: string) => container.querySelector<T>(`[aria-label="${label}"]`)!;
 const strip = (selector: string, width: number) => { const element = container.querySelector<HTMLElement>(selector)!; element.getBoundingClientRect = () => ({ left: 0, top: 0, width, height: 16, bottom: 16 } as DOMRect); element.setPointerCapture = vi.fn(); return element; };
@@ -54,30 +55,43 @@ describe("Photoshop colour adjustment controls", () => {
     expect(container.querySelector(".xd-photo-hue-range")).toBeNull(); expect(by("Adjustment Fade in")).toBeNull();
   });
 
-  it("adds, moves and drags off Gradient Map colour stops", async () => {
-    await render({ id: "gradientMap", initial: { stops: [[0, "#000000"], [1, "#ffffff"]] } });
-    const bar = strip(".xd-photo-gradient-stops", 200);
-    expect(container.querySelector<HTMLButtonElement>(".xd-photo-gradient-stop-fields button")!.disabled).toBe(true);
-    await pointer(bar, "pointerdown", 50);
-    expect(changed).toHaveBeenLastCalledWith("stops", [[0, "#000000"], [.25, "#404040"], [1, "#ffffff"]]);
-    expect(by("Color stop 2").getAttribute("aria-pressed")).toBe("true"); expect(value("Adjustment Stop 2 position (%)")).toBe("25");
-    await pointer(bar, "pointermove", 100); expect(value("Adjustment Stop 2 position (%)")).toBe("50");
-    await pointer(bar, "pointermove", 100, 60); expect(by("Color stop 2").classList.contains("is-leaving")).toBe(true);
-    await pointer(bar, "pointerup", 100, 60);
-    expect(changed).toHaveBeenLastCalledWith("stops", [[0, "#000000"], [1, "#ffffff"]]); expect(by("Color stop 3")).toBeNull();
-    await key("Color stop 2", "ArrowLeft", true); expect(changed).toHaveBeenLastCalledWith("stops", [[0, "#000000"], [.9, "#ffffff"]]);
-    const calls = changed.mock.calls.length; await key("Color stop 2", "Delete"); expect(changed).toHaveBeenCalledTimes(calls);
+  it("shows the Gradient Map as a swatch that opens the Gradient Editor without opacity stops, previewing live and restoring on Cancel", async () => {
+    container.classList.add("xd-photo");
+    await render({ id: "gradientMap", initial: { stops: [[0, "#000000"], [1, "#ffffff"]], method: "classic" } });
+    expect([...container.querySelectorAll("input[type=checkbox], select")].map(field => field.getAttribute("aria-label"))).toEqual(["Adjustment Dither", "Adjustment Reverse", "Adjustment Method"]);
+    await act(async () => by<HTMLButtonElement>("Edit gradient").click());
+    const editor = container.querySelector<HTMLElement>('[role=dialog][aria-label="Gradient Editor"]')!;
+    expect(editor).not.toBeNull(); expect(by("Opacity stops")).toBeNull();
+    await act(async () => by<HTMLElement>("Color stop 2").click()); await input("Color stop location", "60");
+    expect(changed).toHaveBeenLastCalledWith("stops", [[0, "#000000"], [.6, "#ffffff"]]);
+    await act(async () => [...editor.querySelectorAll("button")].find(button => button.textContent === "Cancel")!.click());
+    expect(changed).toHaveBeenLastCalledWith("stops", [[0, "#000000"], [1, "#ffffff"]]); expect(editor.isConnected).toBe(false);
   });
 
-  it("drags an existing stop by where it was grabbed and deletes it with the Delete button", async () => {
-    await render({ id: "gradientMap", initial: { stops: [[0, "#000000"], [.5, "#ff0000"], [1, "#ffffff"]] } });
-    const bar = strip(".xd-photo-gradient-stops", 200);
-    await pointer(by("Color stop 2"), "pointerdown", 104); await pointer(bar, "pointermove", 184); await pointer(bar, "pointerup", 184);
-    expect(changed).toHaveBeenLastCalledWith("stops", [[0, "#000000"], [.9, "#ff0000"], [1, "#ffffff"]]);
-    await input("Adjustment stop 2 color", "#00ff00"); expect(changed).toHaveBeenLastCalledWith("stops", [[0, "#000000"], [.9, "#00ff00"], [1, "#ffffff"]]);
-    await act(async () => container.querySelector<HTMLButtonElement>(".xd-photo-gradient-stop-fields button")!.click());
-    expect(changed).toHaveBeenLastCalledWith("stops", [[0, "#000000"], [1, "#ffffff"]]);
-    expect(by("Color stop 1").getAttribute("aria-pressed")).toBe("true");
+  it("keeps the Gradient Editor's stops on OK", async () => {
+    container.classList.add("xd-photo");
+    await render({ id: "gradientMap", initial: { stops: [[0, "#000000"], [1, "#ffffff"]], method: "classic" } });
+    await act(async () => by<HTMLButtonElement>("Edit gradient").click());
+    await act(async () => by<HTMLElement>("Color stop 2").click()); await input("Color stop location", "60");
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Gradient Editor"] button[type=submit]')!.click());
+    expect(changed).toHaveBeenLastCalledWith("stops", [[0, "#000000"], [.6, "#ffffff"]]); expect(container.querySelector('[aria-label="Gradient Editor"]')).toBeNull();
+  });
+
+  it("picks a Gradient Map preset from the menu beside the swatch", async () => {
+    usePhotoWorkspace.setState({ state: { tools: { foreground: [1, 0, 0, 1], background: [0, 0, 1, 1] }, presets: { gradients: [{ name: "Basics", presets: [{ name: "Mono", stops: [[0, "#102030"], [1, "#f0e0d0"]], transparency: [] }] }] } } as never });
+    container.classList.add("xd-photo"); await render({ id: "gradientMap", initial: { stops: [[0, "#000000"], [1, "#ffffff"]], method: "classic" } });
+    await act(async () => by<HTMLButtonElement>("Gradient presets").click());
+    await act(async () => [...container.querySelectorAll<HTMLButtonElement>(".xd-ge-folder")].find(folder => folder.textContent === "Basics")!.click());
+    await act(async () => by<HTMLButtonElement>("Mono").click());
+    expect(changed).toHaveBeenLastCalledWith("stops", [[0, "#102030"], [1, "#f0e0d0"]]); expect(by("Mono")).toBeNull();
+  });
+
+  it("closes the gradient presets when the swatch opens the Gradient Editor", async () => {
+    container.classList.add("xd-photo"); await render({ id: "gradientMap", initial: { stops: [[0, "#000000"], [1, "#ffffff"]], method: "classic" } });
+    await act(async () => by<HTMLButtonElement>("Gradient presets").click());
+    expect(container.querySelector(".xd-ge-pick-presets")).not.toBeNull();
+    await act(async () => by<HTMLButtonElement>("Edit gradient").click());
+    expect(container.querySelector(".xd-ge-pick-presets")).toBeNull(); expect(container.querySelector('[aria-label="Gradient Editor"]')).not.toBeNull();
   });
 
   it("picks a Photo Filter by name or any colour", async () => {

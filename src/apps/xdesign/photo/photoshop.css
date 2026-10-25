@@ -72,9 +72,12 @@
 .xd-photo[data-screen-mode="full"] .xd-ps-menubar,
 .xd-photo[data-screen-mode="full"]:not([data-full-panels]) :is(.xd-ps-options, .xd-editor-toolrail, .xd-ps-dock) { display: none; }
 .xd-photo[data-screen-mode="full"] .xd-ps-canvas > .xd-photo-stage { background: #000; }
-.xd-ps-taskbar { position: absolute; left: 50%; bottom: 14px; z-index: 6; display: flex; align-items: center; gap: 2px; max-width: calc(100% - 24px); padding: 3px; transform: translateX(-50%); background: var(--xd-panel); border: 1px solid var(--xd-border); border-radius: var(--r-md); box-shadow: 0 6px 18px -6px rgba(0, 0, 0, .5); overflow-x: auto; scrollbar-width: none; }
+.xd-ps-taskbar { position: absolute; left: 50%; bottom: 14px; z-index: 6; display: flex; align-items: center; gap: 2px; max-width: calc(100% - 24px); padding: 3px; transform: translateX(-50%); background: var(--xd-panel); border: 1px solid var(--xd-border); border-radius: var(--r-md); box-shadow: 0 6px 18px -6px rgba(0, 0, 0, .5); }
+/* The tools scroll on a narrow canvas inside their own box, so the bar never clips the More options menu. */
+.xd-ps-taskbar-items { display: flex; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .xd-photo .xd-ps-taskbar button { flex: none; height: 26px; padding: 0 10px; border-radius: var(--r-sm); color: var(--xd-text); white-space: nowrap; }
 .xd-photo .xd-ps-taskbar button:hover:not(:disabled) { background: var(--xd-hover); }
+.xd-ps-taskbar-grip { flex: none; align-self: stretch; width: 8px; margin: 2px 2px 2px 1px; cursor: grab; touch-action: none; background: radial-gradient(circle, var(--xd-text-2) 1px, transparent 1.5px) center / 4px 4px repeat-y; }
 
 /* Right dock: flyout · icon strip · panel groups */
 .xd-photo .xd-ps-dock { flex-direction: row; max-width: none; padding: 0; background: var(--xd-panel); border-left: 1px solid var(--xd-border); }

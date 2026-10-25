@@ -48,7 +48,27 @@ pub(super) fn select(engine:&mut Session,params:&Value)->Result<Value,String>{
     if target>current+state.history.redo_labels().count(){return Err(format!("History state {target} is no longer available"));}
     for _ in target..current{if !engine.undo(){return Err("Wait for the current image operation to finish".into());}}
     for _ in current..target{if !engine.redo(){return Err("Wait for the current image operation to finish".into());}}
+    if params["discardRedo"].as_bool()==Some(true){engine.active_mut().ok_or("No image document")?.history.clear_redo();}
     Ok(json!(target!=current))
+}
+// A dialog's OK records one History step, as Photoshop does, however many edits previewed it.
+pub(super) fn fold(engine:&mut Session,params:&Value)->Result<Value,String>{
+    let from=params["from"].as_u64().and_then(|index|usize::try_from(index).ok()).ok_or("History state must be a nonnegative integer")?;
+    let label=params["label"].as_str().filter(|label|!label.is_empty()).ok_or("The History step needs a name")?;
+    if engine.active_job().is_some(){return Err("Wait for the current image operation to finish".into());}
+    let state=engine.active_mut().ok_or("No image document")?;
+    let steps=state.history.past_len().checked_sub(from).ok_or_else(||format!("History state {from} is no longer available"))?;
+    if steps==0{return Ok(json!(false));}
+    for _ in 1..steps{state.history.purge_last();}
+    state.history.set_current_label(label);state.coalesce=None;
+    Ok(json!(true))
+}
+/// Photoshop names a Properties edit after the adjustment ("Modify Levels Layer"); the engine records "Modify Adjustment".
+pub(super) fn name_adjustment_edit(engine:&mut Session,layer:LayerId){
+    let Some(state)=engine.active_mut() else{return};
+    let Some(photocraft_engine::doc::LayerContent::Adjustment(adjustment))=state.doc.layer(layer).map(|layer|&layer.content) else{return};
+    let label=format!("Modify {} Layer",adjustment.label());
+    if state.history.entries().last().is_some_and(|current|current=="Modify Adjustment"){state.history.set_current_label(label);}
 }
 pub(super) fn effective_target(state:&photocraft_engine::DocState)->Value{
     use photocraft_engine::channel_cmds::ChannelTarget;
@@ -90,6 +110,32 @@ mod tests{
         let mut engine=fixture();let before=engine.active().unwrap().doc.clone();let history=engine.active().unwrap().history.past_len();let mut selected=params();selected["historySource"]=describe(&engine)[0]["id"].clone();let mut expected=fixture();expected.execute("paint.historyBrush",params()).unwrap();
         super::super::execute_view_command(&mut engine,"paint.historyBrush",selected).unwrap();assert_eq!(engine.active().unwrap().history.past_len(),history+1);assert!(engine.edit_state.fade.is_some());let last=engine.journal.last().unwrap();assert_eq!(last.0,"paint.historyBrush");assert_eq!(last.1["state"],0);assert!(last.1.get("historySource").is_none());assert_eq!(photocraft_compose::render(&engine.active().unwrap().doc,before.bounds()).px,photocraft_compose::render(&expected.active().unwrap().doc,before.bounds()).px);
         engine.execute("edit.undo",json!({})).unwrap();assert_eq!(photocraft_compose::render(&engine.active().unwrap().doc,before.bounds()).px,photocraft_compose::render(&before,before.bounds()).px);
+    }
+    #[test]
+    fn a_cancelled_dialog_returns_to_its_opening_state_with_nothing_to_redo(){
+        let mut engine=fixture();let opening=engine.active().unwrap().history.state(0).unwrap();
+        assert_eq!(super::super::execute_view_command(&mut engine,"history.select",json!({"index":0,"discardRedo":true})).unwrap(),true);
+        let state=engine.active().unwrap();assert!(Arc::ptr_eq(&state.doc,&opening));assert_eq!(state.history.past_len(),0);assert_eq!(state.history.redo_labels().count(),0);
+    }
+    #[test]
+    fn a_dialog_s_steps_fold_into_one_named_step_that_undoes_to_its_opening_state(){
+        let mut engine=fixture();let opening=engine.active().unwrap().history.state(0).unwrap();let result=engine.active().unwrap().doc.clone();engine.active_mut().unwrap().coalesce=Some("drag".into());
+        assert_eq!(super::super::execute_view_command(&mut engine,"history.fold",json!({"from":0,"label":"Layer Style"})).unwrap(),true);
+        let state=engine.active().unwrap();assert_eq!(state.history.entries(),["Open","Layer Style"]);assert!(Arc::ptr_eq(&state.doc,&result));assert_eq!(state.coalesce,None);
+        assert_eq!(super::super::execute_view_command(&mut engine,"history.fold",json!({"from":1,"label":"Layer Style"})).unwrap(),false);
+        for params in [json!({"from":2,"label":"Layer Style"}),json!({"from":-1,"label":"Layer Style"}),json!({"from":0}),json!({"from":0,"label":""})]{assert!(super::super::execute_view_command(&mut engine,"history.fold",params).is_err());}
+        assert_eq!(engine.active().unwrap().history.entries(),["Open","Layer Style"]);
+        engine.execute("edit.undo",json!({})).unwrap();assert!(Arc::ptr_eq(&engine.active().unwrap().doc,&opening));
+    }
+    #[test]
+    fn an_adjustment_edit_is_named_after_its_kind_as_photoshop_records_it(){
+        let mut engine=fixture();
+        let map=engine.execute("layer.newAdjustmentLayer.gradientMap",json!({})).unwrap()["layer"].clone();
+        engine.execute("layer.newAdjustmentLayer.levels",json!({})).unwrap();
+        super::super::execute_view_command(&mut engine,"layer.setAdjustment",json!({"gamma":1.4})).unwrap();
+        assert_eq!(engine.active().unwrap().history.entries().last().unwrap(),"Modify Levels Layer");
+        super::super::execute_view_command(&mut engine,"layer.setAdjustment",json!({"layer":map,"reverse":true})).unwrap();
+        assert_eq!(engine.active().unwrap().history.entries().last().unwrap(),"Modify Gradient Map Layer");
     }
     #[test]
     fn historical_pixel_locks_match_native_source_refusal_and_masks_remain_readable(){

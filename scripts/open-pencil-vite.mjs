@@ -27,10 +27,17 @@ export function openPencilWorkers() {
       return {code:patched+helper,map:null};
     }
     if(!/\/(?:export|client)\.js$/.test(file))return null;
-    const patched=code.replace(/new URL\("(\.\/(?:export-)?worker)\.ts", import\.meta\.url\)/g,(_match,base)=>{
+    let patched=code.replace(/new URL\("(\.\/(?:export-)?worker)\.ts", import\.meta\.url\)/g,(_match,base)=>{
       if(!fs.existsSync(path.resolve(path.dirname(file),`${base}.js`)))throw new Error(`Missing published OpenPencil worker: ${base}.js`);
       return `new URL("${base}.js", import.meta.url)`;
     });
+    // Under Tauri OpenPencil packs .fig through its own native build_fig_file command, which Orion
+    // does not register. Pack in the export worker, as the browser build does.
+    if(file.endsWith("/io/formats/fig/export.js")) {
+      const from='if (IS_TAURI) {\n\t\tconst { invoke } = await import("@tauri-apps/api/core");';
+      if(!patched.includes(from))throw new Error("OpenPencil FIG packing patch no longer applies to export.js; re-check FIG export under Tauri");
+      patched=patched.replace(from,from.replace("IS_TAURI","false"));
+    }
     return patched===code?null:{code:patched,map:null};
   }};
 }

@@ -53,6 +53,7 @@ function AdjustmentEditor({ action, layer, document, canvas, mode, untilShown }:
   const [loadingFile, setLoadingFile] = useState(false), [error, setError] = useState("");
   const [pointer, setPointer] = useState(false), [typing, setTyping] = useState(false), [peek, setPeek] = useState(false);
   const [edits, setEdits] = useState(0), [settled, setSettled] = useState(0), [acked, setAcked] = useState(0), [holding, setHolding] = useState(0);
+  const [held, setHeld] = useState(false), heldFrom = useRef<Settings | null>(null);
   const edited = useRef(0), sent = useRef(0), flight = useRef(0), latest = useRef(values); latest.current = values;
   const shown = useRef(untilShown); shown.current = untilShown;
 
@@ -66,12 +67,18 @@ function AdjustmentEditor({ action, layer, document, canvas, mode, untilShown }:
   const edit = (next: Settings | ((current: Settings) => Settings)) => { setValues(next); edited.current++; setEdits(edited.current); };
   const change = (key: string, value: unknown) => { if (!locked) edit(current => ({ ...current, [key]: value })); };
   const setAll: typeof setValues = next => { if (!locked) edit(next); };
+  // A modal editor commits once on OK; Cancel puts back what was there when it opened and commits nothing.
+  const hold = (state: "open" | "ok" | "cancel") => {
+    if (state === "open") { send(); heldFrom.current = structuredClone(latest.current); setHeld(true); return; }
+    if (state === "cancel" && heldFrom.current) { setValues(heldFrom.current); sent.current = edited.current; setAcked(edited.current); }
+    heldFrom.current = null; setHeld(false);
+  };
 
   useEffect(() => {
-    if (!edits || pointer || typing || edited.current === sent.current) return;
+    if (!edits || pointer || typing || held || edited.current === sent.current) return;
     const timer = window.setTimeout(send, SETTLE_MS);
     return () => window.clearTimeout(timer);
-  }, [edits, pointer, typing, send]);
+  }, [edits, pointer, typing, held, send]);
   // Undo, redo and engine normalisation arrive through the layer; adopt them only while no edit is pending.
   useEffect(() => {
     if (edited.current !== sent.current || flight.current || pointer || typing || stable(latest.current) === serverSignature) return;
@@ -109,7 +116,7 @@ function AdjustmentEditor({ action, layer, document, canvas, mode, untilShown }:
     <div className="xd-photo-adjustment-header"><Icon size={14} aria-hidden/><strong>{action.label}</strong><span>{layer.name}</span></div>
     <AdjustmentPresetRow action={action} mode={mode} values={values} locked={locked} apply={next => { if (!locked) edit(next); }} fail={setError}/>
     <div className="xd-ps-dialog-grid has-sliders xd-photo-action-grid">
-      <AdjustmentControls action={action} values={values} setValues={setAll} change={change} locked={locked} mode={mode} layer={layer} channel={channel} setChannel={setChannel} range={range} setRange={setRange} loadingFile={loadingFile} setLoadingFile={setLoadingFile} setLocalError={setError} source={{ document, layer: layer.id, below: true }} canvas={canvas}/>
+      <AdjustmentControls action={action} values={values} setValues={setAll} change={change} locked={locked} mode={mode} layer={layer} channel={channel} setChannel={setChannel} range={range} setRange={setRange} loadingFile={loadingFile} setLoadingFile={setLoadingFile} setLocalError={setError} source={{ document, layer: layer.id, below: true }} canvas={canvas} hold={hold}/>
     </div>
     {!hasFiniteSettings(values) && <p role="alert">Enter a number in every field.</p>}
     {error && <p role="alert">{error}</p>}

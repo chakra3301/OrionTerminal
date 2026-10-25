@@ -736,6 +736,7 @@ fn command_supported(command: &str) -> bool {
             "edit.undo",
             "edit.redo",
             "history.select",
+            "history.fold",
             "edit.contentAwareScale",
             "edit.transform",
             "edit.puppetWarp",
@@ -797,6 +798,7 @@ fn execute_view_command(
     params: Value,
 ) -> Result<Value, String> {
     if command == "history.select" { return history::select(engine, &params); }
+    if command == "history.fold" { return history::fold(engine, &params); }
     if command == "image.cropRotated" { return crop_rotated(engine, &params); }
     if command == "layer.new.layerViaCopy" { return layer_via_copy(engine, params); }
     let params = preview::prepare_lens_edit(engine, command, params)?;
@@ -868,8 +870,10 @@ fn execute_view_command(
     if let Some(result) = image_size::execute(engine, command, &params) { return result; }
     let mut params = params;
     let coverage_fade = mask_filters::prepare_paint_fade(engine, command, &mut params);
+    let adjusted = if command == "layer.setAdjustment" { params["layer"].as_u64().map(photocraft_engine::doc::LayerId).or_else(|| engine.active().and_then(|state| state.active_layer)) } else { None };
     let result = engine.execute(command, params).map_err(|e| e.to_string())?;
     mask_filters::finish_paint_fade(engine, coverage_fade);
+    if let Some(layer) = adjusted { history::name_adjustment_edit(engine, layer); }
     if layer_target.is_some() || command == "select.editInQuickMaskMode" {
         if let Some(state) = engine.active_mut() {
             let previous = state.channel_view.clone();
@@ -1451,6 +1455,7 @@ mod tests {
             "edit.redo",
             "edit.fade",
             "history.select",
+            "history.fold",
         ] {
             assert!(command_supported(command));
         }

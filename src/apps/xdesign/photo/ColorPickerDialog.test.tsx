@@ -16,9 +16,9 @@ function type(input: HTMLInputElement, value: string) {
 }
 const enter = (element: HTMLElement) => act(() => { element.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })); });
 const altKey = (type: "keydown" | "keyup", altKey: boolean) => act(() => { window.dispatchEvent(new KeyboardEvent(type, { key: "Alt", altKey })); });
-function setup(extra: { addToSwatches?: (hex: string) => void; color?: string } = {}) {
+function setup(extra: { addToSwatches?: (hex: string) => void; color?: string; preview?: (hex: string) => void } = {}) {
   const props = { close: vi.fn(), choose: vi.fn() };
-  act(() => root.render(<ColorPickerDialog title="Color Picker (Foreground Color)" color={extra.color ?? "#336699"} addToSwatches={extra.addToSwatches} {...props} />));
+  act(() => root.render(<ColorPickerDialog title="Color Picker (Foreground Color)" color={extra.color ?? "#336699"} addToSwatches={extra.addToSwatches} preview={extra.preview} {...props} />));
   return props;
 }
 const hex = () => byLabel<HTMLInputElement>("Hex color");
@@ -41,6 +41,17 @@ describe("ColorPickerDialog", () => {
     click(button("OK"));
     expect(choose).toHaveBeenCalledWith("#ff8000");
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it("reports each draft colour as it changes so the canvas can preview it before OK", () => {
+    const preview = vi.fn();
+    setup({ preview });
+    expect(preview).not.toHaveBeenCalled();
+    act(() => { byLabel("Color field").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", shiftKey: true, bubbles: true })); });
+    expect(preview).toHaveBeenCalledOnce();
+    type(hex(), "FF8000"); enter(hex());
+    expect(preview).toHaveBeenCalledTimes(2);
+    expect(preview).toHaveBeenLastCalledWith("#ff8000");
   });
 
   it("closes without choosing on Cancel", () => {

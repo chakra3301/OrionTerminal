@@ -54,6 +54,17 @@ describe("Design workspace layout", () => {
       expect(editor.graph.getNode(rectangleId)!.x).toBe(260);validatePencilDocument(useXDesign.getState().pencilDocument!);expect(useXDesign.getState().pencilDocument!.shared).toBeDefined();
     }finally{replica.dispose();}
   });
+  it('opens libraries from the main menu with publishing controls and closes on Escape or Close', async () => {
+    expect(container.querySelector('[aria-label="Libraries"]')).toBeNull();
+    await click('Main menu'); await click('Libraries…');
+    await vi.waitFor(() => expect(container.querySelector('[aria-label="Libraries"]')).not.toBeNull(), {timeout:5000});
+    const dialog = container.querySelector('[role="dialog"][aria-label="Libraries"]')!; expect(dialog).not.toBeNull(); expect(dialog.contains(button('Publish'))).toBe(true); expect(button('Publish').disabled).toBe(false);
+    await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+    expect(container.querySelector('[aria-label="Libraries"]')).toBeNull();
+    await act(async () => container.querySelector('section')!.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyO', key: 'ø', altKey: true, metaKey: true, bubbles: true })));
+    await vi.waitFor(() => expect(container.querySelector('[aria-label="Libraries"]')).not.toBeNull(), {timeout:5000});
+    await click('Close'); expect(container.querySelector('[aria-label="Libraries"]')).toBeNull();
+  });
   it("keeps the editor, graph and canvas alive as panels collapse and reopen", async () => {
     const editor = usePencilWorkspace.getState().editor, surface = container.querySelector("canvas");
     await click("Hide layers panel"); await click("Show layers panel"); await click("Hide properties panel"); await click("Show properties panel");

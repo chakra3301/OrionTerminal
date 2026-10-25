@@ -55,10 +55,29 @@ export function bakeGradient(stops: GradientStop[], method: GradientMethod, samp
   return Array.from({ length: samples + 1 }, (_, k) => { const t = k / samples; return [Math.round(t * 1e4) / 1e4, hexOf(back(evaluate(points, smooth, t)))] as GradientStop; });
 }
 
-// Session memory of baked Gradient Maps, keyed by what the engine stores, so reopening one shows the stops the user set.
-const bakedMaps = new Map<string, { at: number[]; stops: GradientStop[]; method: GradientMethod }>();
-const mapKey = (stops: GradientStop[]) => stops.map(([, color]) => color.toLowerCase()).join();
+// Session memory of baked gradients, keyed by what the engine stores, so reopening one shows the stops the user set.
+const baked = new Map<string, { at: number[]; stops: GradientStop[]; method: GradientMethod }>();
+const bakedKey = (stops: GradientStop[]) => stops.map(([, color]) => color.toLowerCase()).join();
 const hexStops = (stops: unknown): stops is GradientStop[] => Array.isArray(stops) && stops.length >= 2 && stops.every(stop => Array.isArray(stop) && typeof stop[0] === "number" && typeof stop[1] === "string" && /^#[\da-f]{6}$/i.test(stop[1]));
+
+/** `stops` baked for `method` and remembered for `unbaked`; null for Classic, which the engine draws itself, or past its 64-stop limit. */
+export function bakeRemembered(stops: GradientStop[], method: GradientMethod): GradientStop[] | null {
+  if (method === "classic") return null;
+  const result = bakeGradient(stops, method);
+  if (result.length > 64) return null;
+  baked.set(bakedKey(result), { at: result.map(([t]) => t), stops, method });
+  if (baked.size > 256) baked.delete(baked.keys().next().value!);
+  return result;
+}
+
+/** The stops and Method that stored stops were baked from this session, if they were. */
+export function unbaked(stored: GradientStop[]): { stops: GradientStop[]; method: GradientMethod } | undefined {
+  const key = bakedKey(stored), found = baked.get(key);
+  // The engine keeps positions as f32.
+  if (!found?.at.every((t, at) => Math.abs(t - stored[at]![0]) < 1e-5)) return undefined;
+  baked.delete(key); baked.set(key, found);
+  return { stops: structuredClone(found.stops), method: found.method };
+}
 
 /**
  * Gradient Map params for the engine. Classic goes as is: it is the engine's own model of a map (Classic, Smoothness 0),
@@ -66,19 +85,13 @@ const hexStops = (stops: unknown): stops is GradientStop[] => Array.isArray(stop
  */
 export function gradientMapParams(values: Record<string, unknown>): Record<string, unknown> {
   const { method, ...params } = values;
-  if (!hexStops(values.stops) || !GRADIENT_METHODS.some(([id]) => id === method) || method === "classic") return params;
-  const stops = bakeGradient(values.stops, method as GradientMethod);
-  if (stops.length > 64) return params;
-  bakedMaps.set(mapKey(stops), { at: stops.map(([t]) => t), stops: values.stops, method: method as GradientMethod });
-  if (bakedMaps.size > 256) bakedMaps.delete(bakedMaps.keys().next().value!);
-  return { ...params, stops };
+  if (!hexStops(values.stops) || !GRADIENT_METHODS.some(([id]) => id === method)) return params;
+  const stops = bakeRemembered(values.stops, method as GradientMethod);
+  return stops ? { ...params, stops } : params;
 }
 
 /** A stored Gradient Map's editable values: the stops and Method it was baked from, else its stops as Classic. */
 export function gradientMapValues(params: Record<string, unknown>): Record<string, unknown> {
-  const stored = hexStops(params.stops) ? params.stops : [], key = mapKey(stored), found = bakedMaps.get(key);
-  // The engine keeps positions as f32.
-  const source = found?.at.every((t, at) => Math.abs(t - stored[at]![0]) < 1e-5) ? found : undefined;
-  if (source) { bakedMaps.delete(key); bakedMaps.set(key, source); }
-  return source ? { ...params, stops: structuredClone(source.stops), method: source.method } : { ...params, method: "classic" };
+  const source = unbaked(hexStops(params.stops) ? params.stops : []);
+  return source ? { ...params, ...source } : { ...params, method: "classic" };
 }
