@@ -55,27 +55,43 @@ export function bakeGradient(stops: GradientStop[], method: GradientMethod, samp
   return Array.from({ length: samples + 1 }, (_, k) => { const t = k / samples; return [Math.round(t * 1e4) / 1e4, hexOf(back(evaluate(points, smooth, t)))] as GradientStop; });
 }
 
-// Session memory of baked gradients, keyed by what the engine stores, so reopening one shows the stops the user set.
+// Memory of baked gradients, keyed by what the engine stores, so reopening one shows the stops the user set.
 const baked = new Map<string, { at: number[]; stops: GradientStop[]; method: GradientMethod }>();
 const bakedKey = (stops: GradientStop[]) => stops.map(([, color]) => color.toLowerCase()).join();
 const hexStops = (stops: unknown): stops is GradientStop[] => Array.isArray(stops) && stops.length >= 2 && stops.every(stop => Array.isArray(stop) && typeof stop[0] === "number" && typeof stop[1] === "string" && /^#[\da-f]{6}$/i.test(stop[1]));
+const remember = (stops: GradientStop[], method: GradientMethod, result: GradientStop[]) => {
+  baked.set(bakedKey(result), { at: result.map(([t]) => t), stops, method });
+  if (baked.size > 256) baked.delete(baked.keys().next().value!);
+};
+
+// Saved documents keep only the baked stops, so the memory outlives the session. It stores what was baked, which rebuilds
+// each entry, and writes once baking pauses, since a gradient editor drag bakes on every move.
+const BAKED_KEY = "xdesign.photo.gradientMethods";
+let saving: ReturnType<typeof setTimeout> | undefined;
+const save = () => {
+  clearTimeout(saving);
+  saving = setTimeout(() => { try { localStorage.setItem(BAKED_KEY, JSON.stringify([...baked.values()].map(({ stops, method }) => [stops, method]))); } catch { /* still remembered this session */ } }, 500);
+};
+try {
+  for (const [stops, method] of JSON.parse(localStorage.getItem(BAKED_KEY) ?? "[]") as [unknown, GradientMethod][])
+    if (hexStops(stops) && method !== "classic" && GRADIENT_METHODS.some(([id]) => id === method)) remember(stops, method, bakeGradient(stops, method));
+} catch { /* an unreadable store starts empty */ }
 
 /** `stops` baked for `method` and remembered for `unbaked`; null for Classic, which the engine draws itself, or past its 64-stop limit. */
 export function bakeRemembered(stops: GradientStop[], method: GradientMethod): GradientStop[] | null {
   if (method === "classic") return null;
   const result = bakeGradient(stops, method);
   if (result.length > 64) return null;
-  baked.set(bakedKey(result), { at: result.map(([t]) => t), stops, method });
-  if (baked.size > 256) baked.delete(baked.keys().next().value!);
+  remember(stops, method, result); save();
   return result;
 }
 
-/** The stops and Method that stored stops were baked from this session, if they were. */
+/** The stops and Method that stored stops were baked from, if they were. */
 export function unbaked(stored: GradientStop[]): { stops: GradientStop[]; method: GradientMethod } | undefined {
   const key = bakedKey(stored), found = baked.get(key);
   // The engine keeps positions as f32.
   if (!found?.at.every((t, at) => Math.abs(t - stored[at]![0]) < 1e-5)) return undefined;
-  baked.delete(key); baked.set(key, found);
+  baked.delete(key); baked.set(key, found); save();
   return { stops: structuredClone(found.stops), method: found.method };
 }
 

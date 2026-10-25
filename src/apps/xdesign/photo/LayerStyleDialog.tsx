@@ -6,6 +6,7 @@ import { ColorPickerDialog } from "./ColorPickerDialog";
 import { GradientEditorDialog, GradientPick, gradientCss } from "./GradientEditorDialog";
 import { PresetPreview } from "./PresetPreview";
 import { BLENDS, ContourEditor } from "./LayerEffects";
+import { blendOptions } from "./blendOptions";
 import { CanvasDraftPreview, type CanvasDraft } from "./CanvasDraftPreview";
 import { documentUnder } from "./ColorRangeDialog";
 import { GRADIENT_METHODS, bakeRemembered, unbaked, type GradientMethod } from "./gradientMethod";
@@ -164,7 +165,7 @@ function Swatch({ path, title }: { path: string[]; title: string }) {
 
 function Blend({ path = ["common", "blend"], color, colorTitle, label = "Blend Mode" }: { path?: string[]; color?: string[]; colorTitle?: string; label?: string }) {
   const fx = useContext(Ctx), value = String(at(fx.s, path));
-  return <div className="xd-ls-row is-wide"><span className="xd-ls-label">{label}:</span><span className="xd-ls-inline"><select aria-label={label} value={value} onChange={event => void fx.set(path, event.target.value)}>{BLENDS.map(blend => <option key={blend} value={blend}>{blendLabel(blend)}</option>)}</select>{color && <Swatch path={color} title={colorTitle ?? "Color"}/>}</span></div>;
+  return <div className="xd-ls-row is-wide"><span className="xd-ls-label">{label}:</span><span className="xd-ls-inline"><select aria-label={label} value={value} onChange={event => void fx.set(path, event.target.value)}>{blendOptions(BLENDS, blendLabel)}</select>{color && <Swatch path={color} title={colorTitle ?? "Color"}/>}</span></div>;
 }
 
 const CURVE_POINTS = (contour: unknown) => (contour as { Custom?: { points: { input: number; output: number }[] } } | undefined)?.Custom?.points;
@@ -393,7 +394,7 @@ function Blending({ layer, state, run, draft }: { layer: PhotoLayer; state: Phot
   const channels = [{ name: "Gray", value: 0 }, ...(state.channels?.colors ?? []).map((color, index) => ({ name: color.name, value: index + 1 }))];
   return <>
     <Group title="General Blending">
-      <div className="xd-ls-row is-wide"><span className="xd-ls-label">Blend Mode:</span><select aria-label="Blend Mode" value={BLENDS.find(blend => norm(blend) === norm(layer.blend)) ?? (group ? "PassThrough" : "Normal")} onChange={event => void run("layer.layerStyle.blendingOptions", { blend: event.target.value })}>{group && <option value="PassThrough">Pass Through</option>}{BLENDS.map(blend => <option key={blend} value={blend}>{blendLabel(blend)}</option>)}</select></div>
+      <div className="xd-ls-row is-wide"><span className="xd-ls-label">Blend Mode:</span><select aria-label="Blend Mode" value={BLENDS.find(blend => norm(blend) === norm(layer.blend)) ?? (group ? "PassThrough" : "Normal")} onChange={event => void run("layer.layerStyle.blendingOptions", { blend: event.target.value })}>{group && <option value="PassThrough">Pass Through</option>}{blendOptions(BLENDS, blendLabel)}</select></div>
       {number("Opacity", opacity)}
     </Group>
     <Group title="Advanced Blending">{number("Fill Opacity", fill)}</Group>
@@ -446,13 +447,24 @@ export function LayerStyleDialog({ layerId, initial = "blending", onClose, docum
   const instances = (type: string) => items.map((effect, index) => ({ effect, index })).filter(entry => entry.effect.type === type);
   const enabledPath = (type: string) => type === "BevelEmboss" ? ["enabled"] : ["common", "enabled"];
   const edit = (index: number, path: string[], value: unknown) => run("layer.layerStyle.editEffect", { index, path, value });
+  const switched = (settings: Settings, type: string, enabled: boolean) => {
+    const next = structuredClone(settings), path = enabledPath(type);
+    let holder: Settings = next; for (const key of path.slice(0, -1)) holder = holder[key] as Settings;
+    holder[path.at(-1)!] = enabled;
+    return next;
+  };
+  // Photoshop's factory settings put a new Gradient Overlay at the Smooth Method.
+  const smooth = (settings: Settings) => ({ ...settings, gradient: bake(settings.gradient as Gradient, "smooth") });
 
-  /** Photoshop starts a new Gradient Overlay at the Smooth Method. */
+  /** A new effect starts from the default Make Default saved for its kind, else Photoshop's factory settings. */
   const addEffect = async (def: (typeof FX)[number]) => {
     const before = current()?.effects?.items.length ?? 0;
     await run(`layer.layerStyle.${def.key}`, { add: true });
     const made = current()?.effects?.items[before];
-    if (def.type === "GradientOverlay" && made?.type === "GradientOverlay") await edit(before, ["gradient"], bake((made.settings as Settings).gradient as Gradient, "smooth"));
+    if (made?.type !== def.type) return;
+    const saved = readDefaults()[def.type];
+    if (saved) await edit(before, [], switched(saved, def.type, made.enabled));
+    else if (def.type === "GradientOverlay") await edit(before, ["gradient"], smooth(made.settings as Settings).gradient);
   };
   const add = (key: LayerStyleEffect, more = false) => {
     const def = FX.find(entry => entry.key === key)!, count = instances(def.type).length;
@@ -513,13 +525,9 @@ export function LayerStyleDialog({ layerId, initial = "blending", onClose, docum
       const before = current()?.effects?.items.length ?? 0;
       await run(`layer.layerStyle.${def.key}`, { add: true });
       const made = current()?.effects?.items[before];
-      if (made) { saved = made.settings as Settings; factory.set(effect.type, saved); await run("layer.layerStyle.removeEffect", { index: before }); }
+      if (made) { saved = effect.type === "GradientOverlay" ? smooth(made.settings as Settings) : made.settings as Settings; factory.set(effect.type, saved); await run("layer.layerStyle.removeEffect", { index: before }); }
     }
-    if (!saved) return;
-    const next = structuredClone(saved), enabled = enabledPath(effect.type);
-    let holder: Settings = next; for (const key of enabled.slice(0, -1)) holder = holder[key] as Settings;
-    holder[enabled.at(-1)!] = effect.enabled;
-    await edit(index, [], next);
+    if (saved) await edit(index, [], switched(saved, effect.type, effect.enabled));
   };
 
   // Photoshop moves the selected effect when the image is dragged: distance and angle for shadows and satin, the origin for a pattern, the centre for a gradient.

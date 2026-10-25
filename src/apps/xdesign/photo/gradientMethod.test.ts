@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { bakeGradient, gradientMapParams, gradientMapValues } from "./gradientMethod";
 
 const at = (stops: [number, string][], t: number) => parseInt([...stops].sort((a, b) => Math.abs(a[0] - t) - Math.abs(b[0] - t))[0]![1].slice(1, 3), 16);
@@ -28,5 +28,17 @@ describe("gradient Method", () => {
     const stored = (sent.stops as [number, string][]).map(([at, color]) => [Math.fround(at), color]);
     expect(gradientMapValues({ stops: stored, dither: true })).toEqual({ stops, method: "linear", dither: true });
     expect(gradientMapValues({ stops: [[0, "#000000"], [1, "#ffffff"]] })).toEqual({ stops: [[0, "#000000"], [1, "#ffffff"]], method: "classic" });
+  });
+
+  it("remembers a gradient's Method after the app restarts", async () => {
+    vi.useFakeTimers();
+    try {
+      localStorage.clear(); vi.resetModules();
+      const before = await import("./gradientMethod"), stops: [number, string][] = [[0, "#ff0000"], [1, "#0000ff"]];
+      const sent = before.bakeRemembered(stops, "smooth")!;
+      vi.runAllTimers(); vi.resetModules();
+      const after = await import("./gradientMethod");
+      expect(after.unbaked(sent.map(([at, color]) => [Math.fround(at), color]))).toEqual({ stops, method: "smooth" });
+    } finally { vi.useRealTimers(); }
   });
 });

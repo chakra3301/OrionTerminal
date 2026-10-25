@@ -256,7 +256,7 @@ describe("Image workspace Photoshop tools",()=>{
     const type=(label:string,value:string)=>act(async()=>{const input=field(label);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,value);input.dispatchEvent(new Event("input",{bubbles:true}));});
     const choose=(label:string,value:string,form?:string)=>act(async()=>{const select=field(label,form);select.value=value;select.dispatchEvent(new Event("change",{bubbles:true}));});
     await menu("Layer","New","Layer…");expect(command).not.toHaveBeenCalled();
-    expect(field("Name").value).toBe("Layer 1");expect(field("Mode").value).toBe("Normal");expect(field("Opacity").value).toBe("100");expect(field("Fill with neutral color").disabled).toBe(true);
+    expect(field("Name").value).toBe("Layer 1");expect(field("Mode").value).toBe("Normal");expect([...field("Mode").querySelectorAll("hr")].map(hr=>hr.nextElementSibling!.textContent)).toEqual(["Darken","Lighten","Overlay","Difference","Hue"]);expect(field("Opacity").value).toBe("100");expect(field("Fill with neutral color").disabled).toBe(true);
     await type("Name","Sky");await choose("Mode","Multiply");await type("Opacity","50");await act(async()=>field("Use previous layer to create clipping mask").click());
     await click("OK");expect(dialog()).toBeNull();
     expect(command.mock.calls).toEqual([["layer.new.layer",{name:"Sky"}],["layer.setProps",{clipped:true,blend:"Multiply",opacity:.5}],["history.fold",{from:1,label:"New Layer"}]]);
@@ -268,7 +268,7 @@ describe("Image workspace Photoshop tools",()=>{
     command.mockClear();await click("Create a new layer");expect(dialog()).toBeNull();
     await click("Create a new layer",{altKey:true});expect(field("Name").value).toBe("Layer 1");await click("Cancel");expect(command.mock.calls).toEqual([["layer.new.layer",{}]]);
     command.mockClear();await menu("Layer","New","Group…");
-    expect(field("Name","New Group").value).toBe("Group 1");expect(field("Mode","New Group").value).toBe("Pass Through");expect(dialog("New Group")!.querySelector('input[type="checkbox"]')).toBeNull();
+    expect(field("Name","New Group").value).toBe("Group 1");expect(field("Mode","New Group").value).toBe("Pass Through");expect([...field("Mode","New Group").querySelectorAll("hr")].map(hr=>hr.nextElementSibling!.textContent)).toEqual(["Darken","Lighten","Overlay","Difference","Hue"]);expect(dialog("New Group")!.querySelector('input[type="checkbox"]')).toBeNull();
     await choose("Mode","Normal","New Group");await click("OK");
     expect(command.mock.calls).toEqual([["layer.new.group",{name:"Group 1"}],["layer.setProps",{blend:"Normal"}],["history.fold",{from:1,label:"New Group"}]]);
     command.mockClear();await menu("Layer","New Adjustment Layer","Curves…");expect(field("Name").value).toBe("Curves 1");expect(dialog()!.querySelector('[aria-label="Fill with neutral color"]')).toBeNull();
@@ -279,15 +279,35 @@ describe("Image workspace Photoshop tools",()=>{
     expect(command).not.toHaveBeenCalled();await click("OK");
     expect(command.mock.calls).toEqual([["layer.newFillLayer.solidColor",{color:expect.any(String)}],["layer.setProps",{name:"Tint"}],["history.fold",{from:1,label:"New Color Fill Layer"}]]);
   });
+  it("duplicates through Photoshop's Duplicate Layer dialog and names the copy as Photoshop does",async()=>{
+    const dialog=(label="Duplicate Layer")=>container.querySelector<HTMLFormElement>(`[role="dialog"][aria-label="${label}"]`);
+    const field=(label:string,form?:string)=>dialog(form)!.querySelector<HTMLInputElement&HTMLSelectElement>(`[aria-label="${label}"]`)!;
+    const type=(label:string,value:string)=>act(async()=>{const input=field(label);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,value);input.dispatchEvent(new Event("input",{bubbles:true}));});
+    const layer=usePhotoWorkspace.getState().state!.layers[0]!;
+    await menu("Layer","Duplicate Layer…");expect(command).not.toHaveBeenCalled();
+    expect(dialog()!.textContent).toContain("Duplicate:Portrait layer");expect(field("As").value).toBe("Portrait layer copy");
+    expect(field("Document").value).toBe("Portrait");expect(field("Name").disabled).toBe(true);
+    await click("OK");expect(dialog()).toBeNull();expect(command.mock.calls).toEqual([["layer.duplicate",{}]]);
+    command.mockClear();await menu("Layer","Duplicate Layer…");await type("As","Sky");await click("OK");
+    expect(command.mock.calls).toEqual([["layer.duplicate",{}],["layer.setProps",{name:"Sky"}],["history.fold",{from:1,label:"Duplicate Layer"}]]);
+    command.mockClear();await setState({layers:[{...layer,id:2,name:"Portrait layer copy"},layer]});
+    await menu("Layer","Duplicate Layer…");expect(field("As").value).toBe("Portrait layer copy 2");await click("Cancel");
+    await setState({activeLayer:2});await menu("Layer","Duplicate Layer…");expect(field("As").value).toBe("Portrait layer copy 2");await click("OK");
+    expect(command.mock.calls).toEqual([["layer.duplicate",{}],["layer.setProps",{name:"Portrait layer copy 2"}],["history.fold",{from:1,label:"Duplicate Layer"}]]);
+    command.mockClear();await setState({selectedLayers:[1,2]});await menu("Layer","Duplicate Layers…");
+    expect(dialog("Duplicate Layers")!.querySelector('[aria-label="As"]')).toBeNull();await click("OK");expect(command.mock.calls).toEqual([["layer.duplicate",{}]]);
+    command.mockClear();await setState({selectedLayers:[3],activeLayer:3,layers:[{...layer,id:3,name:"Group 1",kind:"Group",children:[layer]}]});
+    await menu("Layer","Duplicate Group…");expect(field("As","Duplicate Group").value).toBe("Group 1 copy");await click("Cancel");expect(command).not.toHaveBeenCalled();
+  });
   it("opens Photoshop's panel menus and right-click menus",async()=>{
     const items=()=>[...container.querySelectorAll("[role=menu] > *")].map(element=>element.getAttribute("role")==="separator"?"-":element.textContent);
     const rightClick=async(target:Element,init:MouseEventInit={})=>{await act(async()=>target.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,button:2,clientX:100,clientY:50,...init})));};
     await click("Layers panel options");
-    expect(items()).toEqual(["New Layer…","Duplicate Layer","Delete Layer","Delete Hidden Layers","-","New Group…","New Group from Layers…","Collapse All Groups","-","Rename Layer…","Hide Layers","Lock Layers","-","Convert to Smart Object","Edit Contents","-","Blending Options…","-","Create Clipping Mask","-","Link Layers","Select Linked Layers","-","Merge Down","Merge Visible","Flatten Image","-","Collapse Panel Group"]);
+    expect(items()).toEqual(["New Layer…","Duplicate Layer…","Delete Layer","Delete Hidden Layers","-","New Group…","New Group from Layers…","Collapse All Groups","-","Rename Layer…","Hide Layers","Lock Layers","-","Convert to Smart Object","Edit Contents","-","Blending Options…","-","Create Clipping Mask","-","Link Layers","Select Linked Layers","-","Merge Down","Merge Visible","Flatten Image","-","Collapse Panel Group"]);
     expect(row("New Layer…").dataset.shortcut).toBeTruthy();
     await act(async()=>row("New Layer…").click());await click("OK");expect(command).toHaveBeenLastCalledWith("layer.new.layer",{name:"Layer 1"});
     await rightClick(button("Portrait layer").closest(".xd-photo-layer")!);
-    expect(items()).toEqual(["Blending Options…","-","Duplicate Layer","Delete Layer","Group from Layers…","Collapse All Groups","-","Convert to Smart Object","-","Add Layer Mask","Create Clipping Mask","-","Link Layers","Select Linked Layers","-","Copy Layer Style","Paste Layer Style","Clear Layer Style","-","Merge Down","Merge Visible","Flatten Image"]);
+    expect(items()).toEqual(["Blending Options…","-","Duplicate Layer…","Delete Layer","Group from Layers…","Collapse All Groups","-","Convert to Smart Object","-","Add Layer Mask","Create Clipping Mask","-","Link Layers","Select Linked Layers","-","Copy Layer Style","Paste Layer Style","Clear Layer Style","-","Merge Down","Merge Visible","Flatten Image"]);
     expect(row("Merge Down").dataset.shortcut).toBeUndefined();
     await act(async()=>row("Add Layer Mask").click());expect(command).toHaveBeenLastCalledWith("layer.layerMask.revealAll",{});
     await key("m");await rightClick(canvas());
@@ -811,6 +831,11 @@ describe("Image workspace Photoshop tools",()=>{
     await click("Cancel");expect(shown()).toBeUndefined();expect(command).not.toHaveBeenCalledWith("layer.newFillLayer.solidColor",expect.anything());
     await open();await hex("00FF00");await settle();await click("OK");
     expect(command).toHaveBeenLastCalledWith("layer.newFillLayer.solidColor",{color:"#00ff00"});
+    expect(native.invoke.mock.calls.at(-1)![1].params).toEqual({color:expect.any(String)});
+    // Options taken in the New Layer dialog first show in the preview too.
+    await menu("Layer","New Fill Layer","Solid Color…");
+    await act(async()=>{const mode=container.querySelector<HTMLSelectElement>('[role="dialog"][aria-label="New Layer"] [aria-label="Mode"]')!;mode.value="Difference";mode.dispatchEvent(new Event("change",{bubbles:true}));});
+    await click("OK");await settle();expect(native.invoke.mock.calls.at(-1)![1]).toMatchObject({command:"layer.newFillLayer.solidColor",params:{color:expect.any(String),props:{blend:"Difference"}}});
   });
   it("sets the layer opacity and fill with number keys when a non-painting tool is active",async()=>{
     const layer=(name:string)=>({id:1,name,kind:"Raster",visible:true,opacity:1,fill:1,blend:"Normal",clipped:false,hasMask:false});

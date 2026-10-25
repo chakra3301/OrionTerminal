@@ -1,3 +1,42 @@
+## 2026-10-25 (night) — XDesign: Photoshop parity leftovers (step 2 of 3)
+
+Branch: `validation/alpha-2026-09-14`. **Committed**, not pushed. This is step 2 of the owner's "do 1, then 2, then 3, and commit after each"; step 3, the live checks, comes next. Cargo.toml is unchanged, so no licence refresh.
+
+Changed (each behaviour change has a test that failed first):
+1. **Blend menus have Photoshop's separators** (new `blendOptions.tsx`).
+   - An `<hr>` goes before Darken, Lighten, Overlay, Difference and Hue in every blend select: New Layer and New Group, the Layers panel, smart filters, Layer Style (Blending Options and each effect), the paint tools' options bar, and Fade.
+   - The Layers panel's "Filter by blend mode" list is unchanged.
+2. **Photoshop's Duplicate Layer… dialog** (new `DuplicateLayerDialog.tsx`, plus `copyName` in `NewLayerDialog.tsx`, wired in `PhotoStudio.tsx`).
+   - It has "Duplicate:" with the source name, an "As:" field, and a Destination box. Document lists only the open image, because the engine cannot duplicate into another document; Name is disabled, as in Photoshop until Document is New.
+   - The menu label follows the selection: Duplicate Layer…, Duplicate Group… or Duplicate Layers…, in the Layer menu, the Layers panel menu and the layer context menu. Several layers get no "As:" field.
+   - The copy is named the way Photoshop's probes showed: "{name} copy" if that is free, else the first free "copy N", counting on from a copy's own number. The engine always says "{name} copy", so any other name is set with `layer.setProps` and folded into one "Duplicate Layer" history step.
+3. **Layer Style defaults** (`LayerStyleDialog.tsx`).
+   - A new effect now starts from the default that Make Default saved for its kind, switched on.
+   - Reset to Default with no saved default now puts a Gradient Overlay back at Smooth, Photoshop's factory Method, instead of Classic.
+4. **Gradient Method survives a restart** (`gradientMethod.ts`).
+   - Documents store only baked stops, so the stops and Method the user set were remembered only for the session. The memory is now kept in localStorage (`xdesign.photo.gradientMethods`). It is saved as what was baked and rebuilt on load, and written 500 ms after baking pauses, since a gradient editor drag bakes on every move.
+   - Known limit, unchanged: the memory holds 256 gradients, and a long editor drag can push older ones out.
+5. **Solid Color fill preview shows the New Layer options** (`PhotoStudio.tsx`, `xdesign_photo_preview.rs`).
+   - The Color Picker's live preview now sends the Mode, Opacity and clipping chosen in the New Layer dialog. The native preview runs `layer.setProps` with them after the fill, which costs about 0.25 ms (timed with a temporary log, since removed).
+
+Checked, no code change:
+- New Layer's Color row is not built: the engine has no store for layer colour labels (no `lclr`).
+- Photoshop 2026 has no "Vibrance…" adjustment layer to rename to. It replaced that entry with the Camera Raw-backed "Color and vibrance…" and similar adjustments, which the engine lacks.
+- The Gradient tool bar already puts Mode before Opacity (since e58b98c). It will be confirmed live in step 3.
+- Gap noticed, not built: the Fill dialog has no Mode.
+
+Verify:
+- vitest `src/apps/xdesign/photo`: 100 files, 1451 tests passed.
+- typecheck clean.
+- `cargo test --lib`: 1391 passed, 0 failed, 20 ignored.
+
+Next, step 3 (live, scratch files only, when the owner is idle):
+- native Hide ⌘H vs View › Extras;
+- ruler strips vs the Contextual Task Bar;
+- the new canvas overlays;
+- the Gradient bar order;
+- Photoshop's Duplicate Layer dialog layout, including what its multi-layer form shows after "Duplicate:" (XDesign shows "Layers" until checked).
+
 ## 2026-10-25 (evening) — `npm run verify` green: the native parallel test race and the preview-cancel flake fixed
 
 Branch: `validation/alpha-2026-09-14`. **Committed**, not pushed. Owner approved the plan "do 1, then 2, then 3, and commit after each"; this is step 1. Step 2 is the quick Photoshop parity leftovers, step 3 the live checks.

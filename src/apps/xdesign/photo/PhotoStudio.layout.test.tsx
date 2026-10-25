@@ -171,7 +171,7 @@ describe("Image workspace layout", () => {
     const layer=(id:number,name:string,extra:Partial<PhotoLayer>={}):PhotoLayer=>({id,name,kind:"Raster",visible:true,opacity:1,fill:1,blend:"Normal",clipped:false,hasMask:false,...extra});
     await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,activeLayer:3,layers:[layer(3,"Group 1",{kind:"Group",blend:"Pass Through",children:[layer(2,"Inside")]}),layer(1,"Background")]}})));
     const blend=()=>container.querySelector<HTMLSelectElement>('[aria-label="Layer blend mode"]')!;
-    expect(blend().value).toBe("Pass Through");expect(blend().options[0]!.value).toBe("Pass Through");
+    expect(blend().value).toBe("Pass Through");expect(blend().options[0]!.value).toBe("Pass Through");expect([...blend().querySelectorAll("hr")].map(hr=>hr.nextElementSibling!.textContent)).toEqual(["Darken","Lighten","Overlay","Difference","Hue"]);
     await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,activeLayer:1}})));
     expect(blend().value).toBe("Normal");expect([...blend().options].map(option=>option.value)).not.toContain("Pass Through");
   });

@@ -15,6 +15,7 @@ import { useDesignDialog } from "../useDesignDialog";
 import { REPLACE_COLOR, type CommandField, type ImageCommand } from "./imageCommands";
 import { useFontFamilies } from "./fontFamilies";
 import { PhotoDialog } from "./photoDialog";
+import { blendOptions } from "./blendOptions";
 
 function Dialog({title,children,apply,close,reset,ok,okDisabled,...frame}:{title:string;children:ReactNode;apply:()=>Promise<unknown>;close:()=>void;reset?:()=>void;ok?:string;okDisabled?:boolean}&Pick<ComponentProps<typeof PhotoDialog>,"className"|"beside"|"scrim"|"preview"|"buttons">) {
   const busy=usePhotoWorkspace(s=>s.busy),error=usePhotoWorkspace(s=>s.error);
@@ -68,7 +69,7 @@ export function ImageCommandDialog({command,initial,document,canvas=null,close}:
     {command.sliders&&<input type="range" aria-label={`${name(field)} slider`} disabled={off(field)} min={field.min} max={field.max} step={field.step??1} value={Number.isFinite(values[field.key])?values[field.key] as number:field.value} onChange={e=>set(field.key,e.target.valueAsNumber)}/>}
   </>:field.kind==="enum"&&radios(field)?<fieldset className="xd-ps-dialog-group"><legend>{field.label}</legend><div role="radiogroup" aria-label={name(field)} className="xd-ps-dialog-radios">{field.choices.map(([value,label])=>
     <label key={value} className="xd-ps-dialog-check"><input type="radio" name={`${command.id}.${field.key}`} value={value} disabled={off(field)} checked={values[field.key]===value} onChange={()=>set(field.key,value)}/>{label}</label>)}</div></fieldset>:
-  field.kind==="enum"?<Field label={field.label}><select aria-label={name(field)} disabled={off(field)} value={values[field.key] as string} onChange={e=>set(field.key,e.target.value)}>{field.choices.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></Field>:
+  field.kind==="enum"?<Field label={field.label}><select aria-label={name(field)} disabled={off(field)} value={values[field.key] as string} onChange={e=>set(field.key,e.target.value)}>{field.key==="mode"?blendOptions(field.choices.map(([value])=>value)):field.choices.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></Field>:
   field.kind==="boolean"?<label className="xd-ps-dialog-check"><input type="checkbox" aria-label={name(field)} disabled={off(field)} checked={values[field.key] as boolean} onChange={e=>set(field.key,e.target.checked)}/>{field.label}</label>:
   field.kind==="text"?<Field label={field.label}><input aria-label={name(field)} required maxLength={255} disabled={off(field)} value={values[field.key] as string} onChange={e=>set(field.key,e.target.value)}/></Field>:
   <Field label={field.label}><input type="color" aria-label={name(field)} disabled={off(field)} value={values[field.key] as string} onChange={e=>set(field.key,e.target.value)}/></Field>;

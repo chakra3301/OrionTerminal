@@ -2,7 +2,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { humanBytes, ImageCommandDialog, ImageExportDialog, ImageSizeDialog, ImageTrimDialog, replacedColor, replacementFor } from "./ImageDialogs";
-import { matchColorCommand, REPLACE_COLOR, SHADOWS_HIGHLIGHTS, STROKE } from "./imageCommands";
+import { FADE, matchColorCommand, REPLACE_COLOR, SHADOWS_HIGHLIGHTS, STROKE } from "./imageCommands";
 import { usePhotoWorkspace } from "./runtime";
 import type { PhotoState } from "./types";
 
@@ -30,6 +30,10 @@ const click = (element: Element, init: MouseEventInit = {}) => act(async () => {
 const readouts = () => [...container.querySelectorAll(".xd-ps-dialog-readout")].map(line => line.textContent);
 
 describe("Photoshop command dialogs", () => {
+  it("separates Fade's blend modes into Photoshop's groups", async () => {
+    await act(async () => root.render(<ImageCommandDialog command={FADE} close={vi.fn()}/>));
+    expect([...field<HTMLSelectElement>("Mode").querySelectorAll("hr")].map(hr => hr.nextElementSibling!.textContent)).toEqual(["Darken", "Lighten", "Overlay", "Difference", "Hue"]);
+  });
   it("groups Stroke like Photoshop, remembers the last values and resets to them with Alt", async () => {
     const close = vi.fn();
     await act(async () => root.render(<ImageCommandDialog command={STROKE} close={close}/>));

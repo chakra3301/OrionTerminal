@@ -618,6 +618,9 @@ fn render_using_cache_repeat(state:&DocState,color:Option<&super::color_views::S
     {
         return Err("This action does not support a temporary preview".into());
     }
+    let mut params = params;
+    // A fill layer's Color Picker previews it with the New Layer options it will be made with; the engine's command takes only the colour.
+    let fill_props = if command == "layer.newFillLayer.solidColor" { params.as_object_mut().and_then(|params| params.remove("props")) } else { None };
     let detail_command=edited_filter.map(|filter|filter.command.as_str()).filter(|command|DETAIL_COMMANDS.contains(command)).unwrap_or(command);
     validate_regions(detail_command,regions,state.doc.size.width,state.doc.size.height)?;
     let parameter_limit=if super::profiles::COMMANDS.contains(&command)||super::color_views::COMMANDS.contains(&command){super::profiles::PARAMETER_BYTES}else{1024*1024};
@@ -669,6 +672,7 @@ fn render_using_cache_repeat(state:&DocState,color:Option<&super::color_views::S
         if let Some(control)=control {control.check()?;}
         super::execute_view_command(&mut engine,"filter.lastFilter",invocation.outer)?
     }else{controlled_jobs::execute(&mut engine,command,params,control)?};
+    if let Some(props) = fill_props { controlled_jobs::execute(&mut engine, "layer.setProps", props, control)?; }
     if let Some(control)=control {control.check()?;}
     let active = engine.active().ok_or("No preview image")?;
     let filtered_color=super::display::View::new(&engine.color,&active.doc)?;
@@ -2645,5 +2649,15 @@ mod tests {
         assert!(pixels[0] > 240 && pixels[1] < 10 && pixels[2] < 10);
         assert!(std::sync::Arc::ptr_eq(&source, &engine.active().unwrap().doc));
         assert_eq!(engine.active().unwrap().history.entries(), history);
+    }
+    #[test]
+    fn solid_color_fill_layer_previews_with_the_new_layer_options_it_will_be_made_with() {
+        let mut engine = Session::new();
+        engine.execute("file.new", json!({"width":32,"height":32})).unwrap();
+        let preview = render(engine.active().unwrap(), "layer.newFillLayer.solidColor", json!({"color":"#ff0000","props":{"blend":"Difference","opacity":0.5}})).unwrap();
+        let image = photocraft_codecs::decode(&base64::engine::general_purpose::STANDARD.decode(&preview.png).unwrap()).unwrap();
+        let pixels = image.as_u8().unwrap();
+        // Red in Difference over white is cyan; at 50% opacity, half of it.
+        assert!(pixels[0].abs_diff(128) < 4 && pixels[1] > 250 && pixels[2] > 250, "{:?}", &pixels[..4]);
     }
 }

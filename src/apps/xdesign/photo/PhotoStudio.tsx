@@ -5,6 +5,7 @@ import { pencilPhotoDocumentId, usePencilWorkspace } from "../pencil/runtime";
 import { useXDesign } from "../store";
 import { toast } from "@/store/toastStore";
 import { ADJUSTMENTS, BLEND_MODES, FILTERS, type PhotoAction } from "./controls";
+import { blendOptions } from "./blendOptions";
 import { AlignSection, MaskSection, TransformSection } from "./LayerProperties";
 import { DocumentProperties } from "./DocumentProperties";
 import { AdjustmentProperties, addAdjustmentLayer } from "./AdjustmentProperties";
@@ -23,7 +24,8 @@ import { findShortcut, type MenuEntry, type MenuItem, type MenuSpec } from "../m
 import { IMAGE_TOOL_GROUPS } from "../editorTools";
 import { PhotoCommandBrowser } from "./CommandBrowser";
 import { ImageCommandDialog, ImageExportDialog, ImageSizeDialog, ImageTextDialog, ImageTrimDialog } from "./ImageDialogs";
-import { NewLayerDialog, nextLayerName, type NewLayerRequest } from "./NewLayerDialog";
+import { NewLayerDialog, copyName, nextLayerName, type NewLayerRequest } from "./NewLayerDialog";
+import { DuplicateLayerDialog } from "./DuplicateLayerDialog";
 import { ARTBOARD_FROM_GROUP, ARTBOARD_FROM_LAYERS, BITMAP, COLOR_DECONTAMINATE, CONTENT_AWARE_SCALE, DEFRINGE, FADE, FILL, FLAME, HDR_TONING, INDEXED_COLOR, MEASUREMENT_SCALE, matchColorCommand, NEW_ARTBOARD, PICTURE_FRAME, REPLACE_COLOR, ROTATE_CANVAS, SCALE_EFFECTS, SCALE_MARKER, SELECTION_MODIFY, SHADOWS_HIGHLIGHTS, STROKE, TRAP, TREE, type ImageCommand } from "./imageCommands";
 import { ColorTableDialog, DuotoneDialog } from "./ModeDialogs";
 import { open as openFile } from "@tauri-apps/plugin-dialog";
@@ -368,6 +370,7 @@ export function PhotoStudio() {
   const [colorSettingsOpen,setColorSettingsOpen]=useState(false);
   const [imageDialog,setImageDialog]=useState<"size"|"canvas"|"text"|"gradient"|"newGradient"|"trim"|"duotone"|"colorTable"|null>(null),newFillBase=useRef<number>(undefined);
   const [commandDialog,setCommandDialog]=useState<{command:ImageCommand;initial?:Record<string,unknown>}|null>(null);
+  const [duplicateDialog,setDuplicateDialog]=useState<{title:string;source:string;name:string|null;document:string;create:(name:string|null)=>Promise<unknown>}|null>(null);
   const [newLayerDialog,setNewLayerDialog]=useState<{title?:string;name:string;kind:"layer"|"group"|"other";create:(request:NewLayerRequest)=>Promise<unknown>}|null>(null),solidFillOptions=useRef<Record<string,unknown>>(undefined);
   const [exportOpen,setExportOpen]=useState(false);
   const [textPoint,setTextPoint]=useState<[number,number]|undefined>();
@@ -1006,6 +1009,10 @@ export function PhotoStudio() {
     const base=usePhotoWorkspace.getState().state?.historySources?.find(source=>source.current)?.index;
     return create().then(()=>Object.keys(props).length?runPhotoCommand("layer.setProps",props).then(()=>base!==undefined?runPhotoCommand("history.fold",{from:base,label}):undefined):undefined);
   };
+  const duplicateTitle=(state?.selectedLayers?.length??1)>1?"Duplicate Layers":currentLayer?.children?"Duplicate Group":"Duplicate Layer";
+  // The engine always names a copy "{name} copy"; Photoshop numbers it when that is taken, so any other name is set as part of the same step.
+  const duplicateLayer=()=>{if(!state||!currentLayer)return;const several=(state.selectedLayers?.length??1)>1;setDuplicateDialog({title:duplicateTitle,source:several?"Layers":currentLayer.name,name:several?null:copyName(state.layers,currentLayer.name),document:state.name,
+    create:name=>name===null||name===`${currentLayer.name} copy`?runPhotoCommand("layer.duplicate",{}):withLayerOptions(()=>runPhotoCommand("layer.duplicate",{}),{name},"Duplicate Layer")});};
   const askNewLayer=(base:string,label:string,create:()=>Promise<unknown>,then?:()=>void)=>{if(state)setNewLayerDialog({name:nextLayerName(state.layers,base),kind:"other",create:({name,renamed,props})=>withLayerOptions(create,{...props,...renamed&&{name}},label).then(then)});};
   const newLayer=()=>{if(state)setNewLayerDialog({name:nextLayerName(state.layers,"Layer"),kind:"layer",create:({name,neutral,props})=>neutral
     // The engine's Fill keeps to the selection, but Photoshop fills the whole new layer, as a solid fill layer rasterised does.
@@ -1023,7 +1030,7 @@ export function PhotoStudio() {
     return actionItem(action,false,ADJUSTMENT_SHORTCUTS[id]);
   });
   // Photoshop shows the new fill layer while its colour is picked; it is only added on OK.
-  const solidFill=(hex:string,committing=false):CanvasDraft=>({command:"layer.newFillLayer.solidColor",params:{color:hex},committing});
+  const solidFill=(hex:string,committing=false):CanvasDraft=>{const props=solidFillOptions.current;return {command:"layer.newFillLayer.solidColor",params:{color:hex,...props&&Object.keys(props).length&&{props}},committing};};
   const pickSolidFill=(options?:Record<string,unknown>)=>{solidFillOptions.current=options;setPicker("fillLayer");setFillDraft(solidFill(color));};
   const newGradientFill=(options:Record<string,unknown>={})=>{const base=usePhotoWorkspace.getState().state?.historySources?.find(source=>source.current)?.index;return withLayerOptions(()=>runPhotoCommand("layer.newFillLayer.gradient",{from:color,to:background,angle:90,style:"linear"}),options,"New Gradient Fill Layer").then(()=>{newFillBase.current=base;setImageDialog("newGradient");});};
   const fillLayerItems=(ask=false):MenuItem[]=>ask?[
@@ -1173,7 +1180,7 @@ export function PhotoStudio() {
         run("Layer via Copy","layer.new.layerViaCopy",!!currentLayer,"Mod+J"),
         run("Layer via Cut","layer.new.layerViaCut",!!currentLayer&&hasSelection,"Shift+Mod+J"),
       ]},
-      run("Duplicate Layer","layer.duplicate",!!currentLayer),
+      item(`${duplicateTitle}…`,duplicateLayer,!!currentLayer),
       {label:"Delete",items:[run("Layer","layer.delete",!!currentLayer),run("Hidden Layers","layer.delete.hiddenLayers")]},
       item("Rename Layer…",renameLayer,!!currentLayer&&!isBackgroundLayer(currentLayer)),
       "-",
@@ -1383,7 +1390,7 @@ export function PhotoStudio() {
   const pathItems:MenuEntry[]=currentState?pathsPanelMenu(currentState,selectedPath(currentState,activePath),busy,setActivePath):[];
   const allGroups=state?.layers.flatMap(groupIds)??[],collapseAll=item("Collapse All Groups",()=>fold(allGroups,false,true),allGroups.length>0);
   const layersPanelMenu=():MenuEntry[]=>[
-    ...fromMenu(["Layer","New","Layer…"],"New Layer…"),...fromMenu(["Layer","Duplicate Layer"]),...fromMenu(["Layer","Delete","Layer"],"Delete Layer"),...fromMenu(["Layer","Delete","Hidden Layers"],"Delete Hidden Layers"),
+    ...fromMenu(["Layer","New","Layer…"],"New Layer…"),...fromMenu(["Layer",`${duplicateTitle}…`]),...fromMenu(["Layer","Delete","Layer"],"Delete Layer"),...fromMenu(["Layer","Delete","Hidden Layers"],"Delete Hidden Layers"),
     "-",...fromMenu(["Layer","New","Group…"],"New Group…"),...fromMenu(["Layer","New","Group from Layers…"],"New Group from Layers…"),collapseAll,
     "-",item("Rename Layer…",renameLayer,!!currentLayer&&!isBackgroundLayer(currentLayer)),currentLayer?.visible===false?run("Show Layers","layer.showLayers"):run("Hide Layers","layer.hideLayers",!!currentLayer),...fromMenu(["Layer","Lock Layers"]),
     "-",...fromMenu(["Layer","Smart Objects","Convert to Smart Object"]),...fromMenu(["Layer","Smart Objects","Edit Contents"]),
@@ -1404,7 +1411,7 @@ export function PhotoStudio() {
     const kind:MenuEntry[]=layer?.text?fromMenu(["Layer","Rasterize","Type"],"Rasterize Type"):layer?.smartObject?[...fromMenu(["Layer","Smart Objects","Edit Contents"]),...fromMenu(["Layer","Rasterize","Smart Object"],"Rasterize Layer")]:layer&&!["Pixel","Pixels","Raster","Group","Adjustment"].includes(layer.kind)?fromMenu(["Layer","Rasterize","Layer"],"Rasterize Layer"):[];
     const mask:MenuEntry[]=layer?.hasMask?[...fromMenu(["Layer","Layer Mask","Apply"],"Apply Layer Mask"),...fromMenu(["Layer","Layer Mask","Delete"],"Delete Layer Mask")]:fromMenu(["Layer","Layer Mask",hasSelection?"Reveal Selection":"Reveal All"],"Add Layer Mask");
     return [blendingOptions,
-      "-",...fromMenu(["Layer","Duplicate Layer"],multipleLayers?"Duplicate Layers":undefined),...fromMenu(["Layer","Delete","Layer"],multipleLayers?"Delete Layers":"Delete Layer"),...fromMenu(["Layer","New","Group from Layers…"]),collapseAll,
+      "-",...fromMenu(["Layer",`${duplicateTitle}…`]),...fromMenu(["Layer","Delete","Layer"],multipleLayers?"Delete Layers":"Delete Layer"),...fromMenu(["Layer","New","Group from Layers…"]),collapseAll,
       "-",...fromMenu(["Layer","Smart Objects","Convert to Smart Object"]),...kind,
       "-",...mask,clipItem,
       "-",...fromMenu(["Layer","Link Layers"]),...fromMenu(["Layer","Select Linked Layers"]),
@@ -1775,7 +1782,7 @@ export function PhotoStudio() {
             <PanelTabs label="Layer panels" tabs={LAYER_PANELS} active={layersTab} collapsed={collapsed.layers} menu={panelMenu(layersTab)} select={openPanel} toggle={()=>setCollapsed(c=>({...c,layers:!c.layers}))}/>
             {!collapsed.layers&&(layersTab==="Channels"?(state&&<PhotoChannels state={state} targetChanged={()=>setMask(false)} options={channelOptions} source={projectId&&document?{projectId,photoId:document.id,version:document.version}:null}/>):layersTab==="Paths"?(currentState&&<PhotoPaths state={currentState} disabled={busy} active={activePath} select={setActivePath} version={document?.version}/>):<>
               <LayerFilterRow filter={layerFilter} change={setLayerFilter}/>
-              <div className="xd-photo-layer-controls"><select aria-label="Layer blend mode" disabled={busy||!currentLayer} value={currentLayer?.blend??"Normal"} onChange={event=>command("layer.setProps",{blend:event.target.value})}>{(currentLayer?.children?["Pass Through",...BLEND_MODES]:BLEND_MODES).map(mode=><option key={mode}>{mode}</option>)}</select>{layerSlider("opacity","Opacity:")}</div>
+              <div className="xd-photo-layer-controls"><select aria-label="Layer blend mode" disabled={busy||!currentLayer} value={currentLayer?.blend??"Normal"} onChange={event=>command("layer.setProps",{blend:event.target.value})}>{blendOptions(currentLayer?.children?["Pass Through",...BLEND_MODES]:BLEND_MODES)}</select>{layerSlider("opacity","Opacity:")}</div>
               <div className="xd-ps-lock-row"><span>Lock:</span>{([["transparency","Lock transparent pixels",Grid2x2],["pixels","Lock image pixels",Brush],["position","Lock position",Move],["all","Lock all attributes",Lock]] as const).map(([key,label,Icon])=><button key={key} type="button" className="xd-ps-lock" aria-label={label} title={label} aria-pressed={!!currentLayer?.locks?.[key]} disabled={busy||!currentLayer} onClick={()=>command("layer.lockLayers",{[key]:!currentLayer?.locks?.[key]})}><Icon size={12}/></button>)}<span className="xd-ps-spacer"/>{layerSlider("fill","Fill:")}</div>
               <div className="xd-photo-layer-list" ref={layerList}>{state&&<LayerRows layers={filterLayerTree(state.layers,layerFilter)} active={state.activeLayer} busy={busy} editMask={editMask} editingMask={mask} selectPixels={()=>setMask(false)} menu={openLayerMenu} thumbnails={thumbnails} masks={maskThumbnails} openStyle={(layer,pane)=>setLayerStyle({layer:layer.id,pane})} openProperties={()=>openPanel("Properties")} openFill={()=>setImageDialog("gradient")} folds={[folds,fold]}/>}</div>
               <div className="xd-photo-layer-actions xd-ps-layer-actions"><button aria-label="Link layers" title="Link layers" disabled={busy||!currentLayer} onClick={()=>command("layer.linkLayers")}><Link2 size={14}/></button><button aria-label="Add a layer style" title="Add a layer style" aria-haspopup="menu" disabled={busy||!styleable} onClick={event=>{const r=event.currentTarget.getBoundingClientRect();setContextMenu({x:r.left,y:r.top,kind:"fx"});}}><span className="xd-ps-fx">fx</span></button><button aria-label="Add a mask" title="Add a mask" disabled={busy||!currentLayer} onClick={()=>command("layer.layerMask.revealAll")}><SquareDashed size={14}/></button><button aria-label="Create new fill or adjustment layer" title="Create new fill or adjustment layer" aria-haspopup="menu" disabled={busy} onClick={event=>{const r=event.currentTarget.getBoundingClientRect();setContextMenu({x:r.left,y:r.top,kind:"adjustment"});}}><Contrast size={14}/></button><button aria-label="Create a new group" title="Create a new group" disabled={busy||!currentLayer} onClick={()=>command("layer.groupLayers")}><Folder size={14}/></button><button aria-label="Create a new layer" title="Create a new layer" disabled={busy} onClick={event=>{if(event.altKey)newLayer();else void command("layer.new.layer");}}><Plus size={14}/></button><button aria-label="Delete layer" title="Delete layer" disabled={busy||!currentLayer} onClick={()=>command("layer.delete")}><Trash2 size={14}/></button></div>
@@ -1801,6 +1808,7 @@ export function PhotoStudio() {
     {state&&(imageDialog==="size"||imageDialog==="canvas")&&<ImageSizeDialog state={state} document={document} canvas={imageDialog==="canvas"} close={()=>setImageDialog(null)}/>}
     {state&&imageDialog==="trim"&&<ImageTrimDialog state={state} close={()=>setImageDialog(null)}/>}
     {newLayerDialog&&<NewLayerDialog {...newLayerDialog} close={()=>setNewLayerDialog(null)}/>}
+    {duplicateDialog&&<DuplicateLayerDialog {...duplicateDialog} close={()=>setDuplicateDialog(null)}/>}
     {state&&imageDialog==="duotone"&&<DuotoneDialog close={()=>setImageDialog(null)}/>}
     {state&&imageDialog==="colorTable"&&<ColorTableDialog close={()=>setImageDialog(null)}/>}
     {imageDialog==="text"&&<ImageTextDialog layer={textPoint?undefined:currentLayer?.text?currentLayer:undefined} point={textPoint} close={()=>{setImageDialog(null);setTextPoint(undefined);}}/>}

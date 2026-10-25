@@ -38,6 +38,11 @@ describe("LayerStyleDialog", () => {
     expect(names.at(-1)).toBe("Drop Shadow");
   });
 
+  it.each(["blending", "dropShadow"] as const)("separates the %s blend modes into Photoshop's groups", initial => {
+    withState([shadow]); render(initial);
+    expect([...q('[aria-label="Blend Mode"]').querySelectorAll("hr")].map(hr => hr.nextElementSibling!.textContent)).toEqual(["Darken", "Lighten", "Overlay", "Difference", "Hue"]);
+  });
+
   it("opens an existing effect's pane when asked", () => {
     withState([shadow]); render("dropShadow");
     expect(q(".xd-ls-pane h4").textContent).toBe("Drop Shadow");
@@ -185,6 +190,16 @@ describe("LayerStyleDialog", () => {
     expect(run).toHaveBeenLastCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: ["gradient"], value: { ...gradient, stops: baked([[0, "#000000"], [1, "#ffffff"]], "smooth") } });
   });
 
+  it("Reset to Default without a saved default puts a Gradient Overlay back at Photoshop's Smooth Method", async () => {
+    localStorage.clear();
+    const gradient = { stops: [[0, rgb("#000000")], [1, rgb("#ffffff")]], opacity_stops: [], style: "Linear", angle: 90, scale: 1, reverse: false, align: true, offset: [0, 0] };
+    const edited = overlayOf({ ...gradient, angle: 45 });
+    withState([edited]); render("gradientOverlay" as "dropShadow");
+    run.mockImplementation(async command => { if (command === "layer.layerStyle.gradientOverlay") withState([edited, overlayOf(gradient)]); if (command === "layer.layerStyle.removeEffect") withState([edited]); return {}; });
+    try { await act(async () => { [...container.querySelectorAll("button")].find(b => b.textContent === "Reset to Default")!.click(); }); } finally { run.mockImplementation(async () => ({})); }
+    expect(run).toHaveBeenLastCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: [], value: { ...overlayOf(gradient).settings, gradient: { ...gradient, stops: baked([[0, "#000000"], [1, "#ffffff"]], "smooth") } } });
+  });
+
   it("a stroke switched to Gradient starts at Photoshop's Smooth Method", () => {
     const yellow = { mode: "Rgb", c: [1, 1, 0.75, 0], alpha: 1 };
     withState([{ type: "Stroke", enabled: true, colors: {}, settings: { common: { enabled: true, blend: "Normal", opacity: 1 }, paint: { Color: yellow }, size: 3, position: "Outside" } }]); render("stroke" as "dropShadow");
@@ -280,6 +295,14 @@ describe("LayerStyleDialog", () => {
     expect(JSON.parse(localStorage.getItem("xdesign.photo.layerStyleDefaults")!).DropShadow).toEqual(shadow.settings);
     await act(async () => { [...container.querySelectorAll("button")].find(b => b.textContent === "Reset to Default")!.click(); });
     expect(run).toHaveBeenCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: [], value: shadow.settings });
+  });
+
+  it("starts a new effect from the default Make Default saved for its kind, switched on", async () => {
+    localStorage.clear(); localStorage.setItem("xdesign.photo.layerStyleDefaults", JSON.stringify({ DropShadow: { ...shadow.settings, distance: 20, common: { ...shadow.settings.common, enabled: false } } }));
+    withState([]);
+    run.mockImplementation(async command => { if (command === "layer.layerStyle.dropShadow") withState([shadow]); return {}; });
+    try { await act(async () => { render("dropShadow"); }); } finally { run.mockImplementation(async () => ({})); }
+    expect(run).toHaveBeenLastCalledWith("layer.layerStyle.editEffect", { layer: 7, index: 0, path: [], value: { ...shadow.settings, distance: 20 } });
   });
 
   it("dragging the image moves the selected shadow", async () => {

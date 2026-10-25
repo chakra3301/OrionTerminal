@@ -4,12 +4,25 @@ import { usePhotoWorkspace } from "./runtime";
 import { useDesignDialog } from "../useDesignDialog";
 import { PhotoDialog } from "./photoDialog";
 import { BLEND_MODES } from "./controls";
+import { blendOptions } from "./blendOptions";
+
+const layerNames=(layers:PhotoLayer[])=>{
+  const names=new Set<string>(),walk=(list:PhotoLayer[])=>{for(const layer of list){names.add(layer.name);if(layer.children)walk(layer.children);}};
+  walk(layers);
+  return names;
+};
 
 /** The first unused "{base} N" across every layer, groups' contents included: the engine's name for a new layer. */
 export function nextLayerName(layers:PhotoLayer[],base:string) {
-  const names=new Set<string>(),walk=(list:PhotoLayer[])=>{for(const layer of list){names.add(layer.name);if(layer.children)walk(layer.children);}};
-  walk(layers);
+  const names=layerNames(layers);
   for(let n=1;;n++)if(!names.has(`${base} ${n}`))return `${base} ${n}`;
+}
+
+/** Photoshop's name for a copy of `name`: "{name} copy" while that is free, else the first free "copy N", counting on from a copy's own number. */
+export function copyName(layers:PhotoLayer[],name:string) {
+  const names=layerNames(layers),copy=/^(.*) copy(?: (\d+))?$/.exec(name),base=copy?copy[1]!:name;
+  if(!copy&&!names.has(`${base} copy`))return `${base} copy`;
+  for(let n=copy?.[2]?Number(copy[2])+1:2;;n++)if(!names.has(`${base} copy ${n}`))return `${base} copy ${n}`;
 }
 
 // The colour each mode leaves the image unchanged with, as Photoshop fills a new layer when asked; other modes have none.
@@ -33,7 +46,7 @@ export function NewLayerDialog({title="New Layer",name,kind,create,close}:{title
     <div className="xd-ps-dialog-grid">
       <label className="xd-ps-dialog-field"><span>Name</span><input aria-label="Name" value={entry} onFocus={event=>event.target.select()} onChange={event=>setEntry(event.target.value)}/></label>
       {!group&&<label className="xd-ps-dialog-check"><input type="checkbox" aria-label="Use previous layer to create clipping mask" checked={clipped} onChange={event=>setClipped(event.target.checked)}/>Use previous layer to create clipping mask</label>}
-      <label className="xd-ps-dialog-field xd-nl-mode"><span>Mode</span><select aria-label="Mode" value={blend} onChange={event=>setBlend(event.target.value)}>{(group?["Pass Through",...BLEND_MODES]:BLEND_MODES).map(mode=><option key={mode}>{mode}</option>)}</select></label>
+      <label className="xd-ps-dialog-field xd-nl-mode"><span>Mode</span><select aria-label="Mode" value={blend} onChange={event=>setBlend(event.target.value)}>{blendOptions(group?["Pass Through",...BLEND_MODES]:BLEND_MODES)}</select></label>
       <label className="xd-ps-dialog-field xd-nl-opacity"><span>Opacity</span><input type="number" aria-label="Opacity" min="0" max="100" step="1" value={Number.isFinite(opacity)?opacity:""} onChange={event=>setOpacity(event.target.valueAsNumber)}/><span className="xd-ps-dialog-unit">%</span></label>
       {kind==="layer"&&<label className="xd-ps-dialog-check"><input type="checkbox" aria-label="Fill with neutral color" disabled={!neutral} checked={fill&&!!neutral} onChange={event=>setFill(event.target.checked)}/>Fill with neutral color<span className="xd-nl-swatch" style={neutral?{background:neutral}:undefined}/></label>}
     </div>

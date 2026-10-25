@@ -17,6 +17,10 @@ const layer=(hasFilterMask:boolean,filterMaskEnabled:boolean):PhotoLayer=>({id:4
 beforeEach(()=>{vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);runtime.run.mockReset().mockResolvedValue(undefined);editor.render.mockClear();editor.lens.mockClear();editor.blur.mockClear();editor.numeric.mockClear();runtime.busy=false;runtime.projectId='project';container=document.createElement("div");document.body.append(container);root=createRoot(container);});
 afterEach(()=>{act(()=>root.unmount());container.remove();vi.unstubAllGlobals();});
 
+it("separates a smart filter's blend modes into Photoshop's groups",async()=>{
+  await act(async()=>root.render(<SmartFilters layer={editableLayer()}/>));
+  expect([...container.querySelector('[aria-label="Smart filter 1 blend"]')!.querySelectorAll("hr")].map(hr=>hr.nextElementSibling!.textContent)).toEqual(["Darken","Lighten","Overlay","Difference","Hue"]);
+});
 it.each([[true,"enabled",true,false],[false,"disabled",false,true]] as const)("reports the filter mask as %s and sends the desired inverse state",async(enabled,label,pressed,next)=>{
   act(()=>root.render(<SmartFilters layer={layer(true,enabled)}/>));
   const button=container.querySelector<HTMLButtonElement>('[aria-label="Smart filter mask"]')!;
