@@ -67,10 +67,10 @@
 
 /* Pasteboard and contextual task bar */
 .xd-ps-canvas { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }
-.xd-photo .xd-ps-canvas > .xd-photo-stage { background: var(--xd-bg); }
+.xd-photo .xd-ps-canvas > .xd-photo-stage { background: var(--xd-ps-pasteboard, var(--xd-bg)); }
 /* Show Cropped Area off has to blend into the pasteboard with no visible canvas edge. */
-.xd-photo .xd-ps-canvas .xd-photo-crop-shade[data-hidden] { fill: var(--xd-bg); }
-.xd-photo[data-screen-mode="full"] .xd-ps-canvas .xd-photo-crop-shade[data-hidden] { fill: #000; }
+.xd-photo .xd-ps-canvas .xd-photo-crop-shade[data-hidden] { fill: var(--xd-ps-pasteboard, var(--xd-bg)); }
+.xd-photo[data-screen-mode="full"] .xd-ps-canvas .xd-photo-crop-shade[data-hidden] { fill: var(--xd-ps-pasteboard, #000); }
 /* Photoshop's screen modes (F): both full-screen modes drop the status bar and scroll bars; Full Screen Mode also drops
    the menu bar and, until Tab, the tools, options and panels, on Photoshop's black. */
 .xd-photo[data-screen-mode] .xd-ps-status { display: none; }
@@ -78,7 +78,7 @@
 .xd-photo[data-screen-mode] .xd-photo-stage::-webkit-scrollbar { display: none; }
 .xd-photo[data-screen-mode="full"] .xd-ps-menubar,
 .xd-photo[data-screen-mode="full"]:not([data-full-panels]) :is(.xd-ps-options, .xd-editor-toolrail, .xd-ps-dock) { display: none; }
-.xd-photo[data-screen-mode="full"] .xd-ps-canvas > .xd-photo-stage { background: #000; }
+.xd-photo[data-screen-mode="full"] .xd-ps-canvas > .xd-photo-stage { background: var(--xd-ps-pasteboard, #000); }
 .xd-ps-taskbar { position: absolute; left: 50%; bottom: 14px; z-index: 6; display: flex; align-items: center; gap: 2px; max-width: calc(100% - 24px); padding: 3px; transform: translateX(-50%); background: var(--xd-panel); border: 1px solid var(--xd-border); border-radius: var(--r-md); box-shadow: 0 6px 18px -6px rgba(0, 0, 0, .5); }
 /* The tools scroll on a narrow canvas inside their own box, so the bar never clips the More options menu. */
 .xd-ps-taskbar-items { display: flex; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }

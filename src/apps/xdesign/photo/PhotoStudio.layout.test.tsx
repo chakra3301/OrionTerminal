@@ -190,6 +190,30 @@ describe("Image workspace layout", () => {
     expect(rightClick(container.querySelector(".xd-photo-stage")!)).toBe(true);
     expect(rightClick(container.querySelector(".xd-photo input")!)).toBe(false);
   });
+  it("colours the pasteboard from its right-click menu, one colour per screen mode, like Photoshop", async () => {
+    await showDocument();
+    const fill=()=>container.querySelector<HTMLElement>(".xd-ps-canvas")!.style.getPropertyValue("--xd-ps-pasteboard");
+    const rightClick=(target:Element)=>act(async()=>{target.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true}));});
+    const labels=()=>[...container.querySelectorAll("[role=menu] > button")].map(item=>item.textContent);
+    try {
+      await rightClick(container.querySelector(".xd-photo-image")!);
+      expect(labels()).not.toContain("Select Custom Color…");
+      await rightClick(container.querySelector(".xd-photo-stage")!);
+      expect(labels()).toEqual(["Default","Black","Dark Gray","Medium Gray","Light Gray","Custom","Select Custom Color…"]);
+      expect(row("Default").getAttribute("aria-checked")).toBe("true");
+      expect(row("Custom").disabled).toBe(true);
+      await act(async()=>row("Dark Gray").click());
+      expect(fill()).toBe("#282828");
+      await rightClick(container.querySelector(".xd-photo-stage")!);
+      await act(async()=>row("Select Custom Color…").click());
+      await act(async()=>{const field=container.querySelector<HTMLInputElement>('[role="dialog"] [aria-label="Hex color"]')!;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(field,"123456");field.dispatchEvent(new Event("input",{bubbles:true}));field.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,key:"Enter"}));});
+      await click("OK");
+      expect(fill()).toBe("#123456");
+      expect(usePreferences.getState().pasteboard[0]).toEqual({color:"custom",custom:"#123456"});
+      await act(async()=>container.querySelector(".xd-photo")!.dispatchEvent(new KeyboardEvent("keydown",{key:"f",bubbles:true})));
+      expect(fill()).toBe("");
+    } finally { await act(async () => usePreferences.setState({ ...DEFAULT_PREFERENCES, notice: null })); }
+  });
   it("shows selections as marching ants only by default, like Photoshop", async () => {
     await showDocument();
     expect(container.querySelector<HTMLSelectElement>('[aria-label="Selection display"]')!.value).toBe("outline");

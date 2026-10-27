@@ -1,3 +1,31 @@
+## 2026-10-27 (cont.) — XDesign: no WebKit menu app-wide, Photoshop pasteboard colour menu; build 17
+
+Branch: `validation/alpha-2026-09-14`. Committed and pushed to origin with the owner's authorisation (2026-10-27). No new dependencies. No tokens were added. Photoshop was not used.
+
+Done (detail in CLAUDE_LOG_ARCHIVE.md):
+- **No WebKit menu anywhere**: `src/lib/pageMenuGuard.ts`, installed in `main.tsx`, stops WebKit's own context menu (with Back/Forward/**Reload**, which restarts the app) across the whole shell. Text fields keep Cut/Copy/Paste and selected text keeps Copy/Look Up; app-owned menus are untouched. The photo workspace now shares its `editsText` test, so checkboxes and sliders no longer count as text fields.
+- **Pasteboard colour menu**: right-clicking the pasteboard (not the image) opens Photoshop's menu: Default, Black, Dark Gray, Medium Gray, Light Gray, Custom and Select Custom Color…, which opens "Color Picker (Custom Canvas Color)". There is one colour per screen mode, saved with the preferences; Custom keeps the last picked colour.
+
+Gates:
+- `npm run typecheck` is clean.
+- pageMenuGuard, preferences, PhotoStudio.layout, PhotoStudio.tools and PhotoHistory pass 277/277.
+- `cargo test --lib` was not re-run; no Rust changed.
+
+Build 17 live (scratch-HOME release instance):
+- **No menu** on right-click on the wallpaper, the XDesign home or the design canvas.
+- The hex field still gets WebKit's editing menu, with no Reload.
+- **Pasteboard menu**:
+  - It lists the seven items. Default starts checked and Custom starts disabled.
+  - Light Gray and a custom #3a2f4c apply.
+  - Full Screen with Menus stays Default and Full Screen stays black. Standard returns to the custom colour.
+  - Right-click on the image still opens the brush picker.
+  - The scratch pasteboard was restored to Default.
+
+Open questions:
+- For Hermes: the four named greys and the picker's fallback seed (#535353) are literal Photoshop values, kept with `LINE_COLORS`, not tokens. They are the user's chosen colours, so they ignore the theme.
+
+Next: the Window/Edit menu scroll observation is still open and not requested.
+
 ## 2026-10-27 (cont.) — XDesign follow-up batch: ruler-unit Properties, snapshot thumbnails, layer right-click, tool hints; builds 15–16
 
 Branch: `validation/alpha-2026-09-14`. Committed and pushed to origin with the owner's authorisation (2026-10-27). No new dependencies. No tokens were added. Photoshop was not used.

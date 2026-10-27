@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { DEFAULT_PREFERENCES, PREFERENCES_KEY, currentPreferences, previewPreferences, sanitizePreferences, savePreferences, unitsPerPixel, usePreferences } from "./preferences";
+import { DEFAULT_PREFERENCES, PREFERENCES_KEY, currentPreferences, pasteboardFill, previewPreferences, sanitizePreferences, savePreferences, unitsPerPixel, usePreferences } from "./preferences";
 
 afterEach(() => { vi.restoreAllMocks(); localStorage.removeItem(PREFERENCES_KEY); usePreferences.setState({ ...DEFAULT_PREFERENCES, notice: null }); });
 
@@ -34,6 +34,15 @@ it("says when the save can't be read or written instead of failing silently", as
   const next = { ...DEFAULT_PREFERENCES, screenResolution: 96 };
   expect(savePreferences(next)).toBe("Preferences could not be saved; they last until XDesign closes.");
   expect(usePreferences.getState()).toMatchObject({ screenResolution: 96, notice: "Preferences could not be saved; they last until XDesign closes." });
+});
+
+it("keeps a pasteboard colour for each screen mode, as Photoshop does", () => {
+  expect(sanitizePreferences({ pasteboard: [{ color: "black", custom: "#ABCDEF" }, { color: "custom", custom: "nope" }, "x"] }).pasteboard).toEqual([
+    { color: "black", custom: "#abcdef" }, { color: "default", custom: null }, { color: "default", custom: null },
+  ]);
+  expect(DEFAULT_PREFERENCES.pasteboard.map(pasteboardFill)).toEqual([null, null, null]);
+  expect(pasteboardFill({ color: "lightGray", custom: "#123456" })).toBe("#b8b8b8");
+  expect(pasteboardFill({ color: "custom", custom: "#123456" })).toBe("#123456");
 });
 
 it("converts document pixels to each ruler unit", () => {

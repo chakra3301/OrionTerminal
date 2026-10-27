@@ -5,6 +5,9 @@ export type RulerUnit = "pixels" | "inches" | "centimeters" | "millimeters" | "p
 export type GridUnit = Exclude<RulerUnit, "percent">;
 export type LineStyle = "lines" | "dashed";
 export type GridStyle = LineStyle | "dots";
+export type PasteboardColor = "default" | "black" | "darkGray" | "mediumGray" | "lightGray" | "custom";
+/** `custom` is the last colour picked, kept while another choice is in use, as Photoshop's Custom item does. */
+export type Pasteboard = { color: PasteboardColor; custom: string | null };
 export type Preferences = {
   rulerUnit: RulerUnit;
   screenResolution: number;
@@ -13,6 +16,8 @@ export type Preferences = {
   smartGuides: { color: string };
   grid: { color: string; style: GridStyle; every: number; unit: GridUnit; subdivisions: number };
   slices: { color: string; numbers: boolean };
+  /** The canvas surround for Standard, Full Screen with Menus and Full Screen, as Photoshop keeps one per screen mode. */
+  pasteboard: [Pasteboard, Pasteboard, Pasteboard];
 };
 type Store = Preferences & { notice: string | null };
 
@@ -25,13 +30,26 @@ export const DEFAULT_PREFERENCES: Preferences = {
   guides: { color: "#00c8ff", style: "lines" }, smartGuides: { color: "#ff00ff" },
   grid: { color: "#808080", style: "lines", every: 1, unit: "inches", subdivisions: 4 },
   slices: { color: "#4a9cff", numbers: true },
+  pasteboard: [{ color: "default", custom: null }, { color: "default", custom: null }, { color: "default", custom: null }],
 };
+// Photoshop's named pasteboard greys. Like LINE_COLORS they are the user's literal choice, so they ignore the theme.
+export const PASTEBOARD_COLORS: [Exclude<PasteboardColor, "default" | "custom">, string, string][] = [["black", "Black", "#000000"], ["darkGray", "Dark Gray", "#282828"], ["mediumGray", "Medium Gray", "#535353"], ["lightGray", "Light Gray", "#b8b8b8"]];
+
+/** The chosen fill, or null for Default, which follows the theme (black in Full Screen). */
+export const pasteboardFill = ({ color, custom }: Pasteboard): string | null =>
+  color === "custom" ? custom : PASTEBOARD_COLORS.find(([name]) => name === color)?.[2] ?? null;
 
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const hex = (value: unknown, fallback: string) => typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : fallback;
 const oneOf = <T extends string>(value: unknown, options: readonly T[], fallback: T) => options.includes(value as T) ? value as T : fallback;
 const number = (value: unknown, min: number, max: number, fallback: number) => typeof value === "number" && Number.isFinite(value) && value >= min && value <= max ? value : fallback;
 const RULERS = RULER_UNITS.map(([unit]) => unit), GRID_UNITS = RULERS.filter((unit): unit is GridUnit => unit !== "percent");
+const PASTEBOARDS: PasteboardColor[] = ["default", ...PASTEBOARD_COLORS.map(([name]) => name), "custom"];
+const pasteboard = (value: unknown): Pasteboard => {
+  const saved = record(value) ? value : {}, custom = hex(saved.custom, "") || null;
+  const color = oneOf(saved.color, PASTEBOARDS, "default");
+  return { color: color === "custom" && !custom ? "default" : color, custom };
+};
 
 /** Keeps every valid field and falls back field by field, so one bad value doesn't reset the rest. */
 export function sanitizePreferences(value: unknown): Preferences {
@@ -49,6 +67,7 @@ export function sanitizePreferences(value: unknown): Preferences {
       subdivisions: Math.round(number(grid.subdivisions, 1, 100, d.grid.subdivisions)),
     },
     slices: { color: hex(slices.color, d.slices.color), numbers: typeof slices.numbers === "boolean" ? slices.numbers : d.slices.numbers },
+    pasteboard: [0, 1, 2].map(mode => pasteboard(Array.isArray(saved.pasteboard) ? saved.pasteboard[mode] : undefined)) as Preferences["pasteboard"],
   };
 }
 

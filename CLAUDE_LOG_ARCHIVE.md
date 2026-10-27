@@ -1,3 +1,35 @@
+## 2026-10-27 (cont.) — Claude / XDesign: app-wide WebKit menu guard, pasteboard colour menu; build 17
+
+Owner request: "1. yes 2. sure if its recommended and 3 lets build it". That meant (1) commit and push the previous batch (done, 96c3c2f), (2) block WebKit's menu app-wide, and (3) build Photoshop's pasteboard right-click colour menu. Items 2 and 3 were committed and pushed with the owner's authorisation.
+
+**WebKit menu guard (`src/lib/pageMenuGuard.ts`)**:
+- A document-level `contextmenu` listener calls `preventDefault` unless the target is a typing field or the click lands on selected text.
+  - Typing fields are inputs of type text, search, url, tel, email, password or number; textareas; and contenteditable areas, including `contenteditable=false` islands inside them.
+  - For selected text, the guard checks the selection range's client rects.
+- React handlers run before the document listener, so app menus still open.
+- Installed after `installPanelDragGuard()` in `main.tsx`.
+- PhotoStudio's root handler now uses the shared `editsText`. Before, `closest("input")` let checkboxes and range sliders show the page menu.
+- Tests: `pageMenuGuard.test.ts` has 4 tests. jsdom has no `getClientRects` on Range, so it is stubbed.
+
+**Pasteboard menu**:
+- `preferences.ts`:
+  - Adds `pasteboard: [Pasteboard x3]`, indexed by screen mode (Standard, Full Screen with Menus, Full Screen).
+  - Adds `PASTEBOARD_COLORS`: Black #000000, Dark Gray #282828, Medium Gray #535353 and Light Gray #b8b8b8, approximating Photoshop's greys.
+  - Adds `pasteboardFill`, which returns null for Default.
+  - Sanitising is per entry. A Custom with no valid hex falls back to Default; a valid custom hex is kept even while another colour is chosen.
+- `PhotoStudio.tsx`:
+  - The stage's `onContextMenu` ignores the image and otherwise opens a `"pasteboard"` menu.
+  - Choices are radio items. The current choice is disabled, and Custom is disabled until a colour has been picked.
+  - Select Custom Color… opens the picker as `"pasteboard"`, seeded with the custom colour, else the current fill, else #535353.
+  - `choosePasteboard` saves only the current mode's entry and reports a failed save as an error.
+  - `.xd-ps-canvas` sets `--xd-ps-pasteboard` when a colour is chosen.
+- `photoshop.css`: the stage and hidden crop-shade use `var(--xd-ps-pasteboard, var(--xd-bg))`, and `var(--xd-ps-pasteboard, #000)` in Full Screen.
+- Tests:
+  - preferences gains 1 test: sanitising and fills.
+  - PhotoStudio.layout gains 1 test: the image right-click gives no pasteboard menu; the item list and states; Dark Gray; a custom colour through the picker; and Default again after F.
+
+**Build 17 live**: covered in the PROGRESS.md entry. All checks passed, the scratch pasteboard was restored to Default, and the runner was stopped.
+
 ## 2026-10-27 (cont.) — Claude / XDesign follow-up batch: ruler-unit Properties, snapshot thumbnails, layer right-click, tool hints; builds 15–16
 
 Branch: `validation/alpha-2026-09-14`. Committed and pushed with owner authorisation.

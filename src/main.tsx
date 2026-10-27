@@ -3,6 +3,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "@/app/App";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
+import { installPageMenuGuard } from "@/lib/pageMenuGuard";
 import { installPanelDragGuard } from "@/lib/panelDragGuard";
 
 import "@fontsource/space-grotesk/300.css";
@@ -20,6 +21,7 @@ import "@/styles/themes.css";
 import "@/styles.css";
 
 installPanelDragGuard();
+installPageMenuGuard();
 
 window.addEventListener("error", (e) => {
   // eslint-disable-next-line no-console
