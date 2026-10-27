@@ -43,7 +43,7 @@ type Store = {
 const same = (a: number, b: number) => Math.abs(a - b) < 1e-3;
 type Rect = readonly [number, number, number, number];
 /** The engine's rule: a guide belongs to an artboard when it lies strictly between the artboard's edges on its own axis. */
-const inside = (guide: Guide, [x, y, w, h]: Rect) => guide.axis === "v" ? guide.pos > x && guide.pos < x + w : guide.pos > y && guide.pos < y + h;
+export const guideInside = (guide: Guide, [x, y, w, h]: Rect) => guide.axis === "v" ? guide.pos > x && guide.pos < x + w : guide.pos > y && guide.pos < y + h;
 
 export const useViewAids = create<Store>((set, get) => ({
   flags: DEFAULT_FLAGS,
@@ -61,8 +61,8 @@ export const useViewAids = create<Store>((set, get) => ({
   moveGuide: (document, id, pos) => set(state => ({ documents: { ...state.documents, [document]: (state.documents[document] ?? []).map(guide => guide.id === id ? { ...guide, pos } : guide) } })),
   deleteGuide: (document, id) => set(state => ({ documents: { ...state.documents, [document]: (state.documents[document] ?? []).filter(guide => guide.id !== id) } })),
   clearGuides: document => set(state => ({ documents: { ...state.documents, [document]: [] } })),
-  clearArtboardGuides: (document, artboard) => set(state => ({ documents: { ...state.documents, [document]: (state.documents[document] ?? []).filter(guide => !inside(guide, artboard)) } })),
-  clearCanvasGuides: (document, artboards) => set(state => ({ documents: { ...state.documents, [document]: (state.documents[document] ?? []).filter(guide => artboards.some(rect => inside(guide, rect))) } })),
+  clearArtboardGuides: (document, artboard) => set(state => ({ documents: { ...state.documents, [document]: (state.documents[document] ?? []).filter(guide => !guideInside(guide, artboard)) } })),
+  clearCanvasGuides: (document, artboards) => set(state => ({ documents: { ...state.documents, [document]: (state.documents[document] ?? []).filter(guide => artboards.some(rect => guideInside(guide, rect))) } })),
   addGuides: (document, guides, clear = false) => {
     let next = get().next;
     const list = clear ? [] : [...(get().documents[document] ?? [])];

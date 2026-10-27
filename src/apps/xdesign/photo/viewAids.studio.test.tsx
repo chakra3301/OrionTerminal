@@ -98,7 +98,7 @@ describe("View aids in the View menu", () => {
     const labels = [...rows()].map(el => el.textContent!);
     expect(labels.findIndex(text => text.startsWith("Guides"))).toBeLessThan(labels.findIndex(text => text.startsWith("Lock Slices")));
     await act(async () => row("Guides").click());
-    expect([...rows()].map(el => [el.textContent!.replace(/[^\p{L}\p{N}… ]/gu, "").trim(), el.disabled])).toEqual([["Edit Selected Guides", true], ["Lock Guides", false], ["Clear Guides", false], ["Clear Selected Guides", true], ["Clear Selected Artboard Guides", true], ["Clear Canvas Guides", false], ["New Guide…", false], ["New Guide Layout…", false], ["New Guides From Shape", false]]);
+    expect([...rows()].map(el => [el.textContent!.replace(/[^\p{L}\p{N}… ]/gu, "").trim(), el.disabled])).toEqual([["Edit Selected Guides", true], ["Lock Guides", false], ["Clear Guides", true], ["Clear Selected Guides", true], ["Clear Selected Artboard Guides", true], ["Clear Canvas Guides", true], ["New Guide…", false], ["New Guide Layout…", false], ["New Guides From Shape", false]]);
   });
   it("clears the active artboard's guides or the canvas guides, per axis, strictly inside the artboard", async () => {
     const layer = (id: number, name: string): PhotoLayer => ({ id, name, kind: "Group", visible: true, opacity: 1, fill: 1, blend: "Normal", clipped: false, hasMask: false });
@@ -111,10 +111,13 @@ describe("View aids in the View menu", () => {
     await openMenu("View", "Guides");
     await act(async () => row("Clear Selected Artboard Guides").click());
     expect(left()).toEqual([["v", 100], ["v", 550], ["v", 400], ["h", 50], ["h", 350]]);
-    guides();
     await openMenu("View", "Guides");
+    expect(["Clear Guides", "Clear Selected Artboard Guides", "Clear Canvas Guides"].map(label => row(label).disabled)).toEqual([false, true, false]);
+    await act(async () => guides());
     await act(async () => row("Clear Canvas Guides").click());
     expect(left()).toEqual([["v", 150], ["v", 550], ["h", 250], ["h", 50]]);
+    await openMenu("View", "Guides");
+    expect(["Clear Guides", "Clear Selected Artboard Guides", "Clear Canvas Guides"].map(label => row(label).disabled)).toEqual([false, false, true]);
   });
   it("treats every guide as a canvas guide when there are no artboards", async () => {
     useViewAids.getState().addGuides(docId, [{ axis: "v", pos: 150 }, { axis: "h", pos: 50 }]);

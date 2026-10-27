@@ -74,7 +74,7 @@ const methodSliders=(method:string)=>method==="localAdaptation"?[...EDGE_GLOW,..
 /** File › Automate › Merge to HDR Pro…: the source files, then Photoshop's HDR Pro options. 32-bit keeps the linear merge; 16 and 8 bit tone-map it. */
 export function MergeToHdrDialog({current,close}:{current:string;close:()=>void}) {
   const [step,setStep]=useState<"sources"|"options">("sources"),[sources,setSources]=useState(NO_SOURCES),[align,setAlign]=useState(true);
-  const [removeGhosts,setRemoveGhosts]=useState(false),[mode,setMode]=useState("16"),[method,setMethod]=useState("localAdaptation");
+  const [removeGhosts,setRemoveGhosts]=useState(false),[ghostBase,setGhostBase]=useState(""),[mode,setMode]=useState("16"),[method,setMethod]=useState("localAdaptation");
   const [values,setValues]=useState<Record<string,number>>(()=>Object.fromEntries([...EDGE_GLOW,...TONE,...ADVANCED].map(field=>[field.key,field.value])));
   if(step==="sources")return <FileDialog key="sources" title="Merge to HDR Pro" close={close} okDisabled={count(sources)<2} apply={()=>Promise.resolve()} done={()=>setStep("options")}>
     <p className="xd-ps-dialog-text">Choose two or more files from a set of exposures to merge and create a High Dynamic Range image.</p>
@@ -89,10 +89,15 @@ export function MergeToHdrDialog({current,close}:{current:string;close:()=>void}
     <input type="range" aria-label={`${field.label} slider`} min={field.min} max={field.max} step={field.step} value={Number.isFinite(values[field.key])?values[field.key]:field.value} onChange={e=>set(field.key,e.target.valueAsNumber)}/>
   </Fragment>)}</div>;
   const group=(legend:string,fields:Slider[])=><fieldset className="xd-ps-dialog-group"><legend>{legend}</legend>{sliders(fields)}</fieldset>;
-  const apply=()=>runPhotoCommand("file.automate.mergeToHdrPro",{...sourceParams(sources),align,removeGhosts,mode,...(mode==="32"?{}:{method,...Object.fromEntries(shown.map(field=>[field.key,values[field.key]]))})});
+  // The engine numbers the sources in the order they're opened: the current image, then the files.
+  const names=[...(sources.open?[current]:[]),...sources.paths.map(base)];
+  const apply=()=>runPhotoCommand("file.automate.mergeToHdrPro",{...sourceParams(sources),align,removeGhosts,...(removeGhosts&&ghostBase?{ghostBase:Number(ghostBase)}:{}),mode,...(mode==="32"?{}:{method,...Object.fromEntries(shown.map(field=>[field.key,values[field.key]]))})});
   return <FileDialog key="options" title="Merge to HDR Pro" close={close} okDisabled={!valid} apply={apply}>
     {check("Remove ghosts",removeGhosts,setRemoveGhosts)}
     <div className="xd-ps-dialog-grid">
+      <Field label="Base Image"><select aria-label="Base Image" disabled={!removeGhosts} value={ghostBase} onChange={e=>setGhostBase(e.target.value)}>
+        <option value="">Automatic</option>{names.map((name,index)=><option key={index} value={index}>{name}</option>)}
+      </select></Field>
       <Field label="Mode"><select aria-label="Mode" value={mode} onChange={e=>setMode(e.target.value)}>{MODES.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></Field>
       {mode!=="32"&&<Field label="Method"><select aria-label="Method" value={method} onChange={e=>setMethod(e.target.value)}>{METHODS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></Field>}
     </div>

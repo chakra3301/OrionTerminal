@@ -120,7 +120,7 @@ import { grayHex, sampleImageColor, sampleLayerColor } from "./eyedropper";
 import { SamplingRing } from "./SamplingRing";
 import { GRADIENT_METHODS, bakeRemembered, type GradientMethod, type GradientStop } from "./gradientMethod";
 import { GuideDialogs, ViewAids } from "./viewAids";
-import { SNAP_PX, boxTargets, documentGuides, guidesVisible, layerEdgesVisible, pixelGridVisible, selectionEdgesVisible, shapeGuides, snapMove, targetPathVisible, snapBox, snapContext, snapXY, useViewAids, type MoveSnap } from "./viewGuides";
+import { SNAP_PX, boxTargets, documentGuides, guideInside, guidesVisible, layerEdgesVisible, pixelGridVisible, selectionEdgesVisible, shapeGuides, snapMove, targetPathVisible, snapBox, snapContext, snapXY, useViewAids, type MoveSnap } from "./viewGuides";
 import { NO_TURN, surfaceClient, surfaceFraction, surfaceOffset, surfaceSize, turnTransform, turnedSize, useViewTurn, visibleArea, type ViewTurn } from "./viewTurn";
 
 type Point = [number, number, number, number, number, number, number];
@@ -555,7 +555,7 @@ export function PhotoStudio() {
     const wheel=(event:WheelEvent)=>{if(!event.ctrlKey&&!event.metaKey)return;event.preventDefault();const factor=Math.exp(-event.deltaY/200);wheelZoom.current(z=>z*factor,event.clientX,event.clientY);};
     view.addEventListener("wheel",wheel,{passive:false});return()=>view.removeEventListener("wheel",wheel);
   },[document?.id]);
-  const [toolsWrap,setToolsWrap]=useState(false),aids=useViewAids(s=>s.flags);
+  const [toolsWrap,setToolsWrap]=useState(false),aids=useViewAids(s=>s.flags),storedGuides=useViewAids(s=>document?s.documents[document.id]:undefined);
   useEffect(()=>{const body=panels.body.current;if(!body||typeof ResizeObserver==="undefined")return;const observer=new ResizeObserver(()=>setToolsWrap(body.clientHeight<TOOLBAR_HEIGHT));observer.observe(body);return()=>observer.disconnect();},[panels.body]);
   const [spacePan,setSpacePan]=useState(false),[screenMode,setScreenMode]=useState(0),[fullScreenPanels,setFullScreenPanels]=useState(false);
   const pasteboard=pasteboards[screenMode]!,pasteboardColor=pasteboardFill(pasteboard);
@@ -642,7 +642,7 @@ export function PhotoStudio() {
   const pixelLayer=["pixel","raster"].includes(currentLayer?.kind.toLowerCase()??"");
   // Artboards are top-level groups; the active one is the active layer itself or its top-level ancestor.
   const artboards=(state?.layers??[]).flatMap(layer=>layer.artboard?[{id:layer.id,rect:layer.artboard.rect,children:layer.children??[]}]:[]);
-  const activeArtboard=artboards.find(board=>board.id===state!.activeLayer||!!findLayer(board.children,state!.activeLayer)),slicesLocked=!!state?.analysis?.slicesLocked;
+  const activeArtboard=artboards.find(board=>board.id===state!.activeLayer||!!findLayer(board.children,state!.activeLayer)),slicesLocked=!!state?.analysis?.slicesLocked,guideList=storedGuides??[];
   const pixelLayers=(state?.selectedLayers??[]).filter(id=>["pixel","raster"].includes(findLayer(state!.layers,id)?.kind.toLowerCase()??"")).length;
   const startFreeTransform=(mode:TransformMode="free")=>{if(currentLayer)beginFreeTransform(document,currentLayer,state?.viewKey,mode);};
   const geometryActive=!!perspectiveCrop||!!specialDialog&&specialDialog!=="develop"&&!!currentLayer;
@@ -1643,10 +1643,10 @@ export function PhotoStudio() {
       {label:"Guides",items:[
         item("Edit Selected Guides",()=>{},false),
         {label:"Lock Guides",checked:aids.lockGuides,shortcut:"Alt+Mod+;",run:()=>useViewAids.getState().setFlags({lockGuides:!aids.lockGuides})},
-        {label:"Clear Guides",run:()=>useViewAids.getState().clearGuides(document.id)},
+        {label:"Clear Guides",disabled:!guideList.length,run:()=>useViewAids.getState().clearGuides(document.id)},
         item("Clear Selected Guides",()=>{},false),
-        {label:"Clear Selected Artboard Guides",disabled:!activeArtboard,run:()=>useViewAids.getState().clearArtboardGuides(document.id,activeArtboard!.rect)},
-        {label:"Clear Canvas Guides",run:()=>useViewAids.getState().clearCanvasGuides(document.id,artboards.map(board=>board.rect))},
+        {label:"Clear Selected Artboard Guides",disabled:!(activeArtboard&&guideList.some(guide=>guideInside(guide,activeArtboard.rect))),run:()=>useViewAids.getState().clearArtboardGuides(document.id,activeArtboard!.rect)},
+        {label:"Clear Canvas Guides",disabled:!guideList.some(guide=>!artboards.some(board=>guideInside(guide,board.rect))),run:()=>useViewAids.getState().clearCanvasGuides(document.id,artboards.map(board=>board.rect))},
         {label:"New Guide…",run:()=>useViewAids.getState().setDialog("new")},
         {label:"New Guide Layout…",run:()=>useViewAids.getState().setDialog("layout")},
         {label:"New Guides From Shape",disabled:!(activeKind==="Shape"&&!!currentLayer?.bounds&&currentLayer.bounds[2]>0&&currentLayer.bounds[3]>0),run:()=>useViewAids.getState().addGuides(document.id,shapeGuides(currentLayer!.bounds!))},

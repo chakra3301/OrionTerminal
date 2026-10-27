@@ -63,7 +63,7 @@ describe("Merge to HDR Pro", () => {
     await act(async () => root.render(<MergeToHdrDialog current="room.jpg" close={close}/>));
     expect(field("Attempt to Automatically Align Source Images")!.checked).toBe(true);
     expect(ok().disabled).toBe(true);
-    await sources(); await click(field("Attempt to Automatically Align Source Images")!);
+    await sources(); await click(button("Add Open Files")); await click(field("Attempt to Automatically Align Source Images")!);
     await submit();
     expect(native.run).not.toHaveBeenCalled();
     expect(close).not.toHaveBeenCalled();
@@ -73,9 +73,12 @@ describe("Merge to HDR Pro", () => {
     expect(["Radius", "Strength", "Gamma", "Exposure", "Detail", "Shadow", "Highlight", "Vibrance", "Saturation"].map(label => field(label)!.value)).toEqual(["7", "0.52", "1", "0", "30", "0", "0", "0", "20"]);
     await type("Radius", "600");
     expect(ok().disabled).toBe(true);
+    expect(field<HTMLSelectElement>("Base Image")!.disabled).toBe(true);
     await type("Radius", "40"); await click(field("Remove ghosts")!);
+    expect([...field<HTMLSelectElement>("Base Image")!.options].map(option => option.textContent)).toEqual(["Automatic", "room.jpg", "-2.tif", "0.tif", "+2.tif"]);
+    await choose("Base Image", "2");
     await submit();
-    expect(native.run).toHaveBeenCalledWith("file.automate.mergeToHdrPro", { paths: ["/hdr/-2.tif", "/hdr/0.tif", "/hdr/+2.tif"], useOpenDocuments: false, align: false, removeGhosts: true, mode: "16", method: "localAdaptation", radius: 40, strength: .52, gamma: 1, exposure: 0, detail: 30, shadow: 0, highlight: 0, vibrance: 0, saturation: 20 });
+    expect(native.run).toHaveBeenCalledWith("file.automate.mergeToHdrPro", { paths: ["/hdr/-2.tif", "/hdr/0.tif", "/hdr/+2.tif"], useOpenDocuments: true, align: false, removeGhosts: true, ghostBase: 2, mode: "16", method: "localAdaptation", radius: 40, strength: .52, gamma: 1, exposure: 0, detail: 30, shadow: 0, highlight: 0, vibrance: 0, saturation: 20 });
     expect(close).toHaveBeenCalled();
   });
 

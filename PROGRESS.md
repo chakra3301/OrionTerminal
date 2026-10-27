@@ -1,3 +1,42 @@
+## 2026-10-27 (cont.) — XDesign: dimmed disabled OK, Clear Guides items dimmed with nothing to clear, HDR Pro base image; build 23
+
+Branch: `validation/alpha-2026-09-14`. **Uncommitted**: the owner's earlier authorisation covered items 1–4 only (commit `89d0238`, pushed), so this batch waits for their go-ahead. Owner request: "okay lets finish this up". No new dependencies, no tokens added, no Rust changes, and Photoshop was not used.
+
+Done (detail in CLAUDE_LOG_ARCHIVE.md):
+1. **Disabled OK** (`photoDialog.css`): the accent border and fill now apply only to an enabled OK, so a disabled one looks like the other disabled buttons. The older magenta dialogs (`photo.css`) already dimmed through `.xd-photo button:disabled`.
+2. **View › Guides ▸** (`PhotoStudio.tsx`, `viewGuides.ts`): as in Photoshop, the Clear items dim when they would do nothing.
+   - Clear Guides dims when the image has no guides.
+   - Clear Canvas Guides dims when every guide lies in an artboard.
+   - Clear Selected Artboard Guides dims without an active artboard or with no guide inside it.
+   - `viewGuides.ts` exports the engine's artboard rule as `guideInside`, so the menu and the clear actions agree.
+3. **Merge to HDR Pro › Base Image** (`MergeDialogs.tsx`): with Remove ghosts on, a Base Image list offers Automatic, then each source in the engine's order (the current image, then the files). A chosen image is sent as `ghostBase`. Automatic leaves the engine to pick the best-exposed image, as Photoshop does.
+
+Gates:
+- `npm run typecheck` is clean.
+- The focused suites pass 293/293: viewAids.studio, MergeDialogs, PhotoStudio.layout, fileMenu.studio and PhotoStudio.tools.
+- No Rust changed, so `cargo test --lib` was not rerun (1439 passing at `89d0238`).
+- Release build 23 succeeded.
+
+Build 23 live (scratch-HOME release instance):
+- **View › Guides ▸** with no guides: Clear Guides, Clear Selected Artboard Guides and Clear Canvas Guides are dimmed, matching the Photoshop dump.
+- After New Guide… at 200 px: Clear Guides and Clear Canvas Guides are enabled, and the artboard item stays dimmed (no artboard). The guide was then cleared.
+- **Merge to HDR Pro** with no sources: OK is dimmed like Remove, with no accent. New Guide's enabled OK keeps the accent. The dialog was cancelled.
+- The Base Image list was not checked live: reaching the options step needs two files through the native Browse panel. The unit test covers it.
+
+Logged, not done:
+- **HDR Pro curve**: the pinned engine hard-codes an empty tone curve (`curve: Vec::new()` in `photo_cmds.rs`), so a curve tab needs an engine change.
+- **HDR Pro preview**: the engine has no preview mode for the merge. A live preview needs a new native preview path, which is separate work.
+- **HDR Pro**: presets (Photoshop's values are unknown, and we won't invent them) and manual EV.
+- **Merge dialogs, Folder source**: the engine accepts a folder, but Photoshop lists the folder's files in the box, so it needs a native directory listing. `merge_sources` still refuses folders.
+- Everything else in the previous entry's logged list stands, apart from the three items done here.
+
+Open questions: none new.
+
+Next, for the owner to choose:
+1. Authorise committing and pushing this batch.
+2. Whether to take up the HDR preview (native preview path) or the Folder source.
+3. A fresh owner-led pass on the panels against Photoshop (Brush Settings, Clone Source, Glyphs).
+
 ## 2026-10-27 (cont.) — XDesign: Photoshop's Window menu, Edit › Keyboard Shortcuts/Menus/Toolbar, Photomerge and Merge to HDR Pro, menu comparison pass; builds 20–22
 
 Branch: `validation/alpha-2026-09-14`. Committed and pushed to origin with the owner's authorisation ("okay lets do 1-4 first then we can commint and push everything once thats done"). The commit includes the builds 18–19 menu-scroll work below. No new dependencies. No tokens were added. Photoshop was not used this segment; the comparison reused the earlier read-only menu dump (`/tmp/pstest/ps_menus.txt`). Plan: `docs/superpowers/plans/2026-10-27-xdesign-window-edit-merge.md`.

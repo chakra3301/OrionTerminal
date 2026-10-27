@@ -15,7 +15,7 @@
 .xd-photo .xd-ps-dialog button { padding:4px 12px;border:1px solid var(--xd-border);border-radius:var(--r-sm);background:var(--xd-raised);color:inherit;font:inherit; }
 .xd-photo .xd-ps-dialog button:hover:not(:disabled) { background:var(--xd-hover); }
 .xd-photo .xd-ps-dialog button:disabled { opacity:1;color:var(--xd-text-3); }
-.xd-photo .xd-ps-dialog button[type=submit] { border-color:var(--xd-accent);background:rgba(var(--xd-accent-rgb),.25); }
+.xd-photo .xd-ps-dialog button[type=submit]:not(:disabled) { border-color:var(--xd-accent);background:rgba(var(--xd-accent-rgb),.25); }
 .xd-photo .xd-ps-dialog :focus-visible { outline:2px solid var(--xd-accent);outline-offset:1px; }
 .xd-photo .xd-ps-dialog :is(select,input[type=number],input[type=text],input:not([type]),textarea) { box-sizing:border-box;padding:2px 4px;border:1px solid var(--xd-border);border-radius:var(--r-sm);background:var(--xd-bg);color:var(--xd-text);font:inherit; }
 .xd-photo .xd-ps-dialog input[type=number] { text-align:right;font-variant-numeric:tabular-nums; }

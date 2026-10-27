@@ -1,3 +1,48 @@
+## 2026-10-27 (cont.) — Claude / XDesign: dimmed disabled OK, Clear Guides items dimmed with nothing to clear, HDR Pro base image; build 23
+
+Owner request: "okay lets finish this up", after the items 1–4 commit `89d0238`. Uncommitted, pending the owner's go-ahead.
+
+**1. Disabled OK** (`photoDialog.css`):
+- `.xd-photo .xd-ps-dialog button[type=submit]` became `…[type=submit]:not(:disabled)`.
+- A disabled OK now falls through to the shared `button:disabled` rule, which uses `--xd-text-3` and no accent.
+- `photo.css`'s `.xd-photo-dialog-actions` dialogs needed nothing: `.xd-photo button:disabled` already sets opacity .4.
+
+**2. Guides submenu** (`PhotoStudio.tsx`, `viewGuides.ts`, `viewAids.studio.test.tsx`):
+- `viewGuides.ts`'s private `inside` is now the exported `guideInside`: the engine's rule that a guide lies strictly between an artboard's edges on its own axis.
+- `PhotoStudio.tsx` subscribes to the image's guides (`storedGuides`, defaulting to `[]` outside the selector, so the selector never returns a fresh array). It disables:
+  - Clear Guides when there are none.
+  - Clear Selected Artboard Guides without an active artboard holding a guide.
+  - Clear Canvas Guides when no guide lies outside every artboard.
+- Tests:
+  - The submenu-order test now expects the three items disabled with no guides.
+  - The artboard test checks the states after each clear: [on, off, on] after clearing the artboard's guides, and [on, on, off] after clearing the canvas guides.
+
+**3. HDR Pro Base Image** (`MergeDialogs.tsx`, `MergeDialogs.test.tsx`):
+- **Source order** (checked):
+  - `derive` starts from an empty `Session::new()`.
+  - `merge_sources` adds the current image, then each file.
+  - The engine's `load_sources` reads `s.documents()` in that order, and `ghostBase` indexes it. An index past the end is refused.
+  - With no `ghostBase`, `hdr::merge` picks the image with the most well-exposed pixels.
+- **Options step**: a Base Image select, enabled only with Remove ghosts. It lists Automatic, then the source names. `ghostBase` is sent only when Remove ghosts is on and an image is chosen.
+- **Test**: the first HDR test now adds the open image, checks the list is [Automatic, room.jpg, -2.tif, 0.tif, +2.tif], picks 0.tif and expects `ghostBase: 2` with `useOpenDocuments: true`.
+
+**Not done, and why:**
+- **HDR curve**: the engine's tone mapping takes a curve, but `merge_to_hdr` passes `Vec::new()`.
+- **HDR preview**: the engine has no merge preview mode.
+- **Folder source**: listing the folder's files, as Photoshop does, needs a native listing command, and `merge_sources` still refuses folders.
+- **HDR presets**: the values are unknown, so none were invented.
+
+**Gates:**
+- Typecheck is clean.
+- viewAids.studio, MergeDialogs, PhotoStudio.layout, fileMenu.studio and PhotoStudio.tools pass 293/293.
+- Release build 23 succeeded.
+
+**Build 23 live** (scratch-HOME instance; shots in `/tmp/pstest/shots/live3/h23-*`):
+- The Guides submenu with no guides, then with one guide.
+- Merge to HDR Pro's disabled OK.
+- New Guide's enabled OK.
+- The Base Image list was not reached live, because that needs the native Browse panel.
+
 ## 2026-10-27 (cont.) — Claude / XDesign: Window menu, Edit customisation dialogs, Photomerge/HDR Pro, comparison pass; builds 20–22
 
 Owner request: "okay lets do 1-4 first then we can commint and push everything once thats done". Items 1–4 were the "Next" list of the builds 18–19 entry. Plan: `docs/superpowers/plans/2026-10-27-xdesign-window-edit-merge.md`. Committed and pushed together with the uncommitted builds 18–19 work.
