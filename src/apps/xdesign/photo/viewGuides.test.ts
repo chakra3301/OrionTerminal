@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DEFAULT_FLAGS, gridSteps, gridVisible, guidesVisible, layoutGuides, EMPTY_LAYOUT, rulerStep, rulerTicks, shapeGuides, snapBox, snapContext, snapValue, snapXY, useViewAids, type SnapContext } from "./viewGuides";
+import { DEFAULT_FLAGS, boxTargets, layerEdgesVisible, pixelGridVisible, snapMove, gridSteps, gridVisible, guidesVisible, layoutGuides, EMPTY_LAYOUT, rulerStep, rulerTicks, shapeGuides, snapBox, snapContext, snapValue, snapXY, useViewAids, type SnapContext } from "./viewGuides";
 
 const ctx = (patch: Partial<SnapContext> = {}): SnapContext => ({ width: 800, height: 600, zoom: 1, guides: [], grid: null, bounds: false, ...patch });
 
@@ -22,6 +22,15 @@ describe("ruler ticks", () => {
   it("starts from the first tick at or after the visible start, including negative positions", () => {
     expect(rulerTicks(-130, -90, 1).filter(tick => tick.level === 0).map(tick => tick.label)).toEqual(["-100"]);
   });
+  it("labels other ruler units in that unit, with fractional ticks between numbers", () => {
+    const inches = rulerTicks(0, 150, 1, 1 / 72);
+    expect(inches.filter(tick => tick.level === 0).map(tick => [tick.label, tick.pos])).toEqual([["0", 0], ["1", 72], ["2", 144]]);
+    expect(inches.find(tick => Math.abs(tick.pos - 36) < 1e-6)?.level).toBe(1);
+    expect(inches.find(tick => Math.abs(tick.pos - 7.2) < 1e-6)?.level).toBe(2);
+    const percent = rulerTicks(0, 400, 1, 100 / 400).filter(tick => tick.level === 0);
+    expect(percent.map(tick => tick.label)).toEqual(["0", "20", "40", "60", "80", "100"]);
+    expect(percent.map(tick => tick.pos)).toEqual([0, 80, 160, 240, 320, 400]);
+  });
 });
 
 describe("grid", () => {
@@ -32,6 +41,13 @@ describe("grid", () => {
   it("drops subdivisions and doubles the spacing when lines would crowd", () => {
     expect(gridSteps(0.1, 72).minor).toBeNull();
     expect(gridSteps(0.05, 72).major).toBe(288);
+  });
+  it("follows the Gridline Every, units and Subdivisions preferences", () => {
+    const grid = (every: number, unit: "pixels" | "centimeters" | "points", subdivisions: number, pointSize: "postscript" | "traditional" = "postscript") =>
+      ({ pointSize, grid: { color: "#808080", style: "lines" as const, every, unit, subdivisions } });
+    expect(gridSteps(1, 72, grid(50, "pixels", 5))).toEqual({ major: 50, minor: 10 });
+    expect(gridSteps(1, 254, grid(1, "centimeters", 1))).toEqual({ major: 100, minor: null });
+    expect(gridSteps(1, 72, grid(72, "points", 1, "traditional")).major).toBeCloseTo(72 / 1.00375);
   });
 });
 
@@ -76,6 +92,26 @@ describe("snapping", () => {
     expect(snapBox(c, { x: 695, y: 10, width: 100, height: 100 }, from)).toEqual({ x: 700, y: 10, width: 100, height: 100 });
     expect(snapBox(c, { x: 50, y: 50, width: 100, height: 100 }, from)).toEqual({ x: 50, y: 50, width: 100, height: 100 });
     expect(snapBox(null, { x: 3, y: 3, width: 1, height: 1 }, from)).toEqual({ x: 3, y: 3, width: 1, height: 1 });
+  });
+});
+
+describe("move snapping and Smart Guides", () => {
+  it("pulls the nearest moving edge or centre onto another box's edge or centre, per axis, and names the lines it meets", () => {
+    const targets = boxTargets([[70, 0, 10, 10]]);
+    expect(snapMove([10, 10, 20, 20], 37, 0, targets, 6)).toEqual({ dx: 40, dy: 0, lines: [{ axis: "v", pos: 70 }, { axis: "h", pos: 10 }] });
+    expect(snapMove([10, 10, 20, 20], 30.4, 22.6, targets, 6)).toEqual({ dx: 30, dy: 23, lines: [] });
+  });
+  it("counts guides on their own axis and leaves a far move alone", () => {
+    const targets = boxTargets([], [{ id: 1, axis: "h", pos: 100 }]);
+    expect(snapMove([0, 0, 50, 50], 0, 47, targets, 6)).toMatchObject({ dx: 0, dy: 50, lines: [{ axis: "h", pos: 100 }] });
+    expect(snapMove([0, 0, 50, 50], 0, 40, targets, 6)).toMatchObject({ dy: 40, lines: [] });
+  });
+  it("shows Layer Edges and the Pixel Grid (past 500%) only with Extras", () => {
+    expect(layerEdgesVisible(DEFAULT_FLAGS)).toBe(false);
+    expect(layerEdgesVisible({ ...DEFAULT_FLAGS, layerEdges: true })).toBe(true);
+    expect(pixelGridVisible(DEFAULT_FLAGS, 5)).toBe(false);
+    expect(pixelGridVisible(DEFAULT_FLAGS, 6)).toBe(true);
+    expect(pixelGridVisible({ ...DEFAULT_FLAGS, extras: false }, 6)).toBe(false);
   });
 });
 

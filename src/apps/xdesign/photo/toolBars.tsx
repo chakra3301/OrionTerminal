@@ -50,8 +50,11 @@ export function ShapeStyleFields({ style, change }: { style: ShapeStyle; change:
     <label>Width<input aria-label="Stroke width" className="xd-ps-number" type="number" min="0" max="1000" disabled={!style.stroke} value={style.strokeWidth} onChange={event => change({ strokeWidth: Math.max(0, Math.min(1000, event.target.valueAsNumber || 0)) })} /><span>px</span></label>
   </>;
 }
-export function PathOpSelect({ value, change }: { value: PathOp; change: (value: PathOp) => void }) {
-  return <select aria-label="Path operation" title="Path operations" value={value} onChange={event => change(event.target.value as PathOp)}>{PATH_OPS.map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select>;
+export function PathOpSelect({ value, change, merge }: { value: PathOp; change: (value: PathOp) => void; merge?: () => void }) {
+  return <select aria-label="Path operation" title="Path operations" value={value} onChange={event => { if (event.target.value === "merge") { event.target.value = value; merge?.(); } else change(event.target.value as PathOp); }}>
+    {PATH_OPS.map(([key, name]) => <option key={key} value={key}>{name}</option>)}
+    <option value="merge" disabled={!merge}>Merge Shape Components</option>
+  </select>;
 }
 
 export type CropRatio = Partial<Record<"style" | "ratioWidth" | "ratioHeight" | "sizeWidth" | "sizeWidthUnit" | "sizeHeight" | "sizeHeightUnit" | "resolution" | "resolutionUnit", unknown>>;
@@ -62,11 +65,16 @@ export const CROP_SIZES = ["Front Image", ...CROP_SIZE_PRESETS.map(([name]) => n
 const PER_INCH: Record<string, number> = { in: 1, cm: 2.54, mm: 25.4 };
 const LENGTH = /^\s*(\d*\.?\d+)\s*(px|in|cm|mm)?\s*$/i;
 const decimals = (value: number) => Number(value.toFixed(2));
+/** The ppi the Resolution field asks for, in pixels per inch, or the document's when it is empty. */
+export function cropResolution(values: CropRatio, documentPpi: number) {
+  const set = Number(values.resolution);
+  return set > 0 ? values.resolutionUnit === "cm" ? decimals(set * 2.54) : set : documentPpi;
+}
 /** The pixels and ppi a W x H x Resolution crop resamples to, or null until both sides have a size. */
 export function cropSizePixels(values: CropRatio, documentPpi: number) {
-  const width = Number(values.sizeWidth), height = Number(values.sizeHeight), set = Number(values.resolution);
+  const width = Number(values.sizeWidth), height = Number(values.sizeHeight);
   if (values.style !== "size" || !(width > 0) || !(height > 0)) return null;
-  const ppi = set > 0 ? values.resolutionUnit === "cm" ? decimals(set * 2.54) : set : documentPpi;
+  const ppi = cropResolution(values, documentPpi);
   const pixels = (value: number, unit: unknown) => Math.max(1, Math.round(typeof unit === "string" && unit in PER_INCH ? value / PER_INCH[unit]! * ppi : value));
   return { width: pixels(width, values.sizeWidthUnit), height: pixels(height, values.sizeHeightUnit), ppi };
 }
@@ -112,16 +120,27 @@ function CropLength({ label, value, unit, disabled, commit }: { label: string; v
   return <input aria-label={label} className="xd-ps-number is-length" type="text" disabled={disabled} value={draft ?? shown} onChange={event => setDraft(event.target.value)} onBlur={finish}
     onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); event.currentTarget.blur(); } else if (event.key === "Escape") { event.stopPropagation(); setDraft(null); } }} />;
 }
-function CropSizeFields({ values, disabled, applySize }: CropRatioProps) {
+function CropSizeFields({ values, disabled, applySize, children, labelled }: Pick<CropRatioProps, "values" | "disabled" | "applySize"> & { children?: ReactNode; labelled?: boolean }) {
   const width = Number(values.sizeWidth) || 0, height = Number(values.sizeHeight) || 0, resolution = Number(values.resolution) || 0;
   const widthUnit = String(values.sizeWidthUnit ?? "px"), heightUnit = String(values.sizeHeightUnit ?? "px"), resolutionUnit = values.resolutionUnit === "cm" ? "cm" : "in";
+  const field = (text: string, input: ReactNode) => labelled ? <label>{text}{input}</label> : input;
   return <>
-    <CropLength label="Crop width" value={width} unit={widthUnit} disabled={disabled} commit={(sizeWidth, sizeWidthUnit) => applySize({ sizeWidth, sizeWidthUnit })} />
+    {field("W:", <CropLength label="Crop width" value={width} unit={widthUnit} disabled={disabled} commit={(sizeWidth, sizeWidthUnit) => applySize({ sizeWidth, sizeWidthUnit })} />)}
     <button aria-label="Swap crop size" title="Swap width and height" disabled={disabled} onClick={() => applySize({ sizeWidth: height, sizeWidthUnit: heightUnit, sizeHeight: width, sizeHeightUnit: widthUnit })}>⇄</button>
-    <CropLength label="Crop height" value={height} unit={heightUnit} disabled={disabled} commit={(sizeHeight, sizeHeightUnit) => applySize({ sizeHeight, sizeHeightUnit })} />
-    <input aria-label="Crop resolution" className="xd-ps-number" type="number" min="0" max="100000" disabled={disabled} value={resolution > 0 ? resolution : ""} onChange={event => applySize({ resolution: Number.isFinite(event.target.valueAsNumber) && event.target.valueAsNumber > 0 ? event.target.valueAsNumber : 0 })} />
-    <select aria-label="Crop resolution unit" disabled={disabled} value={resolutionUnit} onChange={event => { const unit = event.target.value; applySize({ resolution: Number((unit === "cm" ? resolution / 2.54 : resolution * 2.54).toFixed(3)), resolutionUnit: unit }); }}><option value="in">px/in</option><option value="cm">px/cm</option></select>
-    <button aria-label="Clear crop size" title="Clear the width, height and resolution" disabled={disabled || !width && !height && !resolution} onClick={() => applySize({ sizeWidth: 0, sizeHeight: 0, resolution: 0 })}>Clear</button>
+    {field("H:", <CropLength label="Crop height" value={height} unit={heightUnit} disabled={disabled} commit={(sizeHeight, sizeHeightUnit) => applySize({ sizeHeight, sizeHeightUnit })} />)}
+    {field("Resolution:", <input aria-label="Crop resolution" className="xd-ps-number" type="number" min="0" max="100000" disabled={disabled} value={resolution > 0 ? resolution : ""} onChange={event => applySize({ resolution: Number.isFinite(event.target.valueAsNumber) && event.target.valueAsNumber > 0 ? event.target.valueAsNumber : 0 })} />)}
+    <select aria-label="Crop resolution unit" disabled={disabled} value={resolutionUnit} onChange={event => { const unit = event.target.value; applySize({ resolution: Number((unit === "cm" ? resolution / 2.54 : resolution * 2.54).toFixed(3)), resolutionUnit: unit }); }}><option value="in">{labelled ? "Pixels/in" : "px/in"}</option><option value="cm">{labelled ? "Pixels/cm" : "px/cm"}</option></select>
+    {children}
+    <button aria-label="Clear crop size" title="Clear the width, height and resolution" disabled={disabled || !labelled && !width && !height && !resolution} onClick={() => applySize({ sizeWidth: 0, sizeHeight: 0, resolution: 0 })}>Clear</button>
+  </>;
+}
+// Photoshop's Perspective Crop bar: W ⇄ H, Resolution, Front Image, Clear and Show Grid. Empty sizes keep the size from the corners.
+export function PerspectiveCropBar({ values, original, resolution, disabled, change }: { values: CropRatio & { showGrid?: unknown }; original: [number, number]; resolution: number; disabled: boolean; change: (values: CropSizeValues & { showGrid?: boolean }) => void }) {
+  return <>
+    <CropSizeFields values={values} disabled={disabled} applySize={change} labelled>
+      <button aria-label="Front Image" title="Use the image's size and resolution" disabled={disabled} onClick={() => change(cropSizeChoice("Front Image", original, resolution)!)}>Front Image</button>
+    </CropSizeFields>
+    <label><input type="checkbox" aria-label="Show grid" checked={values.showGrid !== false} disabled={disabled} onChange={event => change({ showGrid: event.target.checked })} />Show Grid</label>
   </>;
 }
 // Unconstrained, Photoshop shows the pair empty and only constrains the box once both sides have a value.
@@ -188,6 +207,7 @@ export const BRUSH_BAR_ITEMS: Record<string, readonly BrushBarItem[]> = {
   "paint.pencil": ["angle", "pressureOpacity", "pressureSize", "symmetry"],
   erase: ["airbrush", "angle", "pressureOpacity", "pressureSize", "symmetry"],
   "paint.cloneStamp": ["airbrush", "angle", "pressureOpacity", "pressureSize"],
+  "paint.patternStamp": ["airbrush", "angle", "pressureOpacity", "pressureSize"],
   "paint.historyBrush": ["airbrush", "angle", "pressureOpacity", "pressureSize"],
   "paint.dodge": ["airbrush", "angle", "pressureSize"], "paint.burn": ["airbrush", "angle", "pressureSize"], "paint.sponge": ["airbrush", "angle", "pressureSize"],
   "paint.healingBrush": ["pressureSize"], "paint.spotHealing": ["pressureSize"],

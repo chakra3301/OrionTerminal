@@ -139,7 +139,7 @@ fn coverage_fade_command(command: &str) -> bool {
         || command.strip_prefix("image.adjustments.").is_some_and(|kind| super::preview::ADJUSTMENTS.contains(&kind))
         || PAINT_FADE_COMMANDS.contains(&command)
         || FILL_FADE_COMMANDS.contains(&command)
-        || matches!(command, "paint.patch" | "paint.colorReplacement" | "image.applyImage")
+        || matches!(command, "paint.patch" | "paint.colorReplacement" | "paint.patternStamp" | "image.applyImage")
 }
 fn fade_source(engine: &Session) -> Option<(Target, String)> {
     let state = engine.active()?;

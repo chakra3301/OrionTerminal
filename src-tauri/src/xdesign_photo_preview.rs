@@ -589,6 +589,7 @@ fn render_using_cache_repeat(state:&DocState,color:Option<&super::color_views::S
             "filter.liquify",
             "edit.puppetWarp",
             "edit.perspectiveWarp",
+            "edit.contentAwareFill",
             "image.xdesignPerspectiveCrop",
             "edit.transform.warp",
             "edit.transform",
@@ -1041,6 +1042,14 @@ mod tests {
         let layer = engine.active().unwrap().active_layer.unwrap().0;
         assert_matches_commit(&mut engine, "layer.setProps", json!({"layer":layer,"opacity":0.4}));
         assert_matches_commit(&mut engine, "layer.setProps", json!({"layer":layer,"fill":0.25}));
+    }
+    #[test]
+    fn content_aware_fill_previews_match_apply() {
+        let mut engine = Session::new();
+        engine.execute("file.new", json!({"width":32,"height":32})).unwrap();
+        engine.execute("paint.stroke", json!({"points":[[8,8,1],[24,24,1]],"size":6,"color":"#c06030","seed":7})).unwrap();
+        engine.execute("select.rect", json!({"x":12,"y":12,"width":8,"height":8})).unwrap();
+        assert_matches_commit(&mut engine, "edit.contentAwareFill", json!({"colorAdaptation":"high","output":"new"}));
     }
     #[test]
     fn layer_style_slider_previews_match_apply() {

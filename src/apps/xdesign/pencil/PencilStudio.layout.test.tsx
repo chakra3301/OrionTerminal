@@ -40,6 +40,9 @@ beforeEach(async () => {
 });
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 describe("Design workspace layout", () => {
+  it("keeps the workspace focusable so WebKit clicks on layer rows still route ⇧1/⇧2 to it", async () => {
+    expect(container.querySelector(`section[aria-label="Design workspace"]`)!.getAttribute("tabindex")).toBe("-1");
+  });
   it('reopens a checkpoint through the normal canvas startup and retains selective editing', async () => {
     act(() => root.unmount());
     const doc=useXDesign.getState().pencilDocument!,replica=SharedDesign.fromGraph(deserializeGraph(doc.graph));

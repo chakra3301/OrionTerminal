@@ -1,3 +1,959 @@
+## 2026-10-27 (cont.) — XDesign gap closure: live re-check on build 11, six fixes, builds 12–14
+
+Branch: `validation/alpha-2026-09-14`. Committed and pushed to origin with the owner's authorisation (2026-10-27). The commit covers Tasks 10–30 and the build 12–14 fixes. The push also carried the 6 earlier unpushed commits (c6ff015…56acd17). No new dependencies. Photoshop was not used.
+
+Permissions: the agent's shell runs under EMP's ad-hoc-signed LaunchAgent `empd`, which macOS can't list or grant. Live checks therefore run through a Terminal-hosted job runner (`/tmp/pstest/runner.command`; detail in the archive). The owner re-granted Terminal.
+
+Build 11 live re-check (scratch-HOME release instance, second display):
+- **Pass**: Tasks 19–26 and 28–30 — Single Row/Column, Color Sampler, Red Eye, Pattern Stamp, snapshots, Rotate View, layer colours, Actions record and play, ruler units and Preferences, Save a Copy as Photoshop PDF, and Window › Options/Tools with Reset Essentials.
+- **Failed**: Task 27 Copy CSS/SVG. The items were enabled correctly, but WKWebView rejected the clipboard write.
+- **New defects**: function keys and Delete were dead after a menu choice; Rotate View showed hairline tile seams; the Color group's ≡ and collapse buttons were pushed out of the dock; an overflowing options bar grew a scrollbar that shifted the canvas; Properties offered W/H/X/Y edits from 0 when the selection missed the layer.
+
+Fixes (detail in CLAUDE_LOG_ARCHIVE.md):
+- Copy CSS/SVG goes through a new host command, `xdesign_photo_copy_text` (pbcopy), under Tauri.
+- The menubar key filter passes function keys and Delete/Backspace to the document.
+- Panel tabs ellipsize, and the menu and collapse buttons never shrink.
+- The options bar hides its scrollbar but still scrolls.
+- The Transform fields lock when the selection misses the layer.
+- Rotate View seams: while the view is turned, each tile's checker sits 1 px inside the tile, and a copy of that checker, in the same phase, sits under the preview canvas (`photo.css` and `PhotoTiles.tsx`). The first attempt, a 1 px tile overlap in build 12, was reverted.
+
+Build 12 live: Copy CSS and Copy SVG land on the pasteboard; F7 and ⌥F9 work straight after a menu choice; the tabs, options bar and Properties fixes all pass; Copy Color's Hex Code works. Seams were still visible, about half as bright, which led to the CSS fix above. It was verified first in a headless WebKit repro.
+
+Build 13 live: the opaque seams were gone (0 seam pixels, against 522 on build 12). But the 1 px inset exposed the image's own checker, which WebKit draws out of phase with the tiles. That left a broken-checker strip along the tile boundaries in transparent areas.
+
+Build 14 live: also adds the in-phase checker copy under the preview, after testing it in the same repro. Rotated 36° at 76 % and 94 %, opaque seams measure 0 and the checker is continuous across tile boundaries. All other build 12 fixes are unchanged.
+
+Gates:
+- `npm run typecheck` is clean.
+- `PhotoTiles`, `PhotoStudio.layout` and `PhotoStudio.tools` pass 261/261.
+- `cargo test --lib`: 1436 passed, 0 failed, 20 ignored. The first run had one failure in `db_backup::tests::coordination_lock_refuses_second_owner_and_releases_on_drop` (re-acquiring after drop). That module is untouched, the test passed alone, and a full rerun was clean, so it looks flaky.
+
+The owner's clipboard was backed up before the clipboard checks and restored after them.
+
+Open questions:
+- None new for Hermes; no tokens were added.
+- These were observed and left unchanged:
+  - The Window and Edit menus scroll in a 900 pt window.
+  - Right-click selects layer-name text.
+  - The Properties fields stay in px when ruler units change (Task 28 gap).
+  - Tools without a hint show "Edits update every linked placement".
+  - Snapshot thumbnails are placeholders.
+
+Next, as proposed to the owner:
+1. A small follow-up batch from the observations above: Properties fields in ruler units, real snapshot thumbnails, the layer-name right-click menu, and per-tool hints.
+2. Photomerge and Merge to HDR Pro, which were waiting on multi-file input (Task 18). They need their own plan.
+3. A fresh comparison pass against Photoshop.
+
+The scratch release instance (build 14, PID 57002) stays running, and the Terminal job runner is stopped.
+
+## 2026-10-27 (cont.) — XDesign gap closure: Rust gate, release build 11, archive entries
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. No code changes in this step.
+
+Done:
+- **Rust gate**: `cargo test --lib` passes 1436, with 0 failed and 20 ignored.
+- **Release build 11**: `npm run tauri build -- --bundles app` exit 0. This includes `tsc` and `vite build`. Notarization was skipped (no Apple credentials), as before.
+- **Scratch-HOME release instance**: build 10 (PID 93531) was stopped and build 11 relaunched as PID 30915, with `HOME=/tmp/xd-release-home`. The release app was relaunched only after a wait for the owner to go idle. `/Applications/Orion Terminal.app` was not touched.
+- **CLAUDE_LOG_ARCHIVE.md** has detail entries for Tasks 19–30.
+
+Not done:
+- **Live re-check of Tasks 19–30 on build 11 is blocked.** Right after the relaunch, macOS reported this session as untrusted for both Accessibility (`AXIsProcessTrusted()` false) and Screen Recording (`CGPreflightScreenCaptureAccess()` false). `screencapture` fails with "could not create image from display", and `axt` reads an empty accessibility tree.
+  - A system Accessibility authorization prompt (`universalAccessAuthWarn`) is frontmost. It was not touched: granting permissions is the owner's call.
+  - Earlier live checks in this session (build 10) captured normally, so the permissions changed during the session.
+
+Open question for the owner: re-grant Accessibility and Screen Recording to the terminal that runs the agent, or say if the revocation was intentional.
+
+Next:
+- Once the permissions are back, run the live re-check on the running build 11 instance through `/tmp/pstest/goR.sh` and `capR.sh`. Shots go in `/tmp/pstest/shots/live3`.
+- Items to check:
+  - Save a Copy as Photoshop PDF to `/tmp`, and Artboards to PDF.
+  - Window › Options/Tools and Reset Essentials.
+  - Preferences (live preview, Cancel).
+  - Actions record and play.
+  - Layer colours.
+  - Snapshots.
+  - Rotate View.
+  - Pattern Stamp and Red Eye.
+  - Color Sampler.
+  - Single Row/Column Marquee.
+  - Copy CSS/SVG.
+- After that, wait for the owner's commit decision.
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 4 Task 30: Window › Options and Tools; Workspace › Reset Essentials
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Frontend only; no new dependencies. Photoshop was not used.
+
+Done:
+- **Window › Options** and **Window › Tools** are check items placed before Contextual Task Bar, in Photoshop's order. They show and hide the options bar and the toolbar.
+  - The options bar stays mounted, hidden with `hidden` plus `.xd-photo .xd-ps-options[hidden]{display:none}` in `photoshop.css`, so its pickers keep their state.
+  - The toolbar is not rendered while hidden. Tool shortcuts still switch tools, as in Photoshop.
+- **Workspace › Reset Essentials** (and Essentials (Default)) already restored the panel layout. It now also shows the options bar and toolbar again.
+
+Tests:
+- A new tools test covers the menu order, the check states, hiding both, a tool key working with the toolbar hidden, and Reset Essentials bringing both back.
+- `npm run typecheck` passes.
+- The full `src/apps/xdesign` vitest run (369 files, 4289 tests) had 5 failures on the first run and 8 on a second run, a different set each time. They were mostly 5 s timeouts, plus one Eyedropper assertion, all under full-suite parallel load.
+  - Every failing file passes alone: layout, tools and the two pencil mask-region suites pass 266/266, and `reactExport.artwork` passes 3/3.
+  - Earlier entries record the same parallel-load flake.
+
+Gaps vs Photoshop:
+- Tab still hides only the panels. Photoshop's Tab also hides the toolbar and options bar.
+- Options and Tools visibility lasts for the session. Like the rest of the panel layout, it is not saved.
+- Photoshop's other Window › Workspace entries (New Workspace…, Delete Workspace…, Lock Workspace and the other preset workspaces) are absent; Essentials is the only workspace.
+
+Next: release build 11 and the live re-check of Tasks 19–30, then CLAUDE_LOG_ARCHIVE entries for Tasks 19 onward.
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 3 Task 29: Save a Copy as Photoshop PDF; Export › Artboards to PDF
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. No new dependencies. Photoshop was not used.
+
+Done:
+- **File › Save a Copy…** (⌥⌘S, after Save, as in Photoshop) opens the Export As dialog titled Save a Copy, with a Save button. It offers the same formats plus **Photoshop PDF**; Export As does not offer PDF. The toast says "Copy saved".
+- **Photoshop PDF** (`src-tauri/src/xdesign_photo_pdf.rs`, new): `xdesign_photo_export` now accepts `.pdf`.
+  - The file is one page the size of the image at its resolution, holding the flattened composite over white, through the engine's `print_cmds::print_pdf`.
+  - Colour handling follows the engine's printer-managed print. RGB and Grayscale keep their mode; CMYK is flattened and kept as CMYK; other modes convert to RGB. The document's ICC profile is embedded.
+  - The file goes through `atomic_write`. A layered image gets the warning "Photoshop PDF keeps the flattened image; layers are not saved."
+  - `print_pdf` is called directly, not through `file.print`, so a tiny image is not padded to the print command's 36 pt minimum paper.
+- **File › Export › Artboards to PDF…** (before Layers to Files…, as in Photoshop) is enabled only when the document has artboards. It opens the new `ArtboardsToPdfDialog` (`photo/FileDialogs.tsx`).
+  - The dialog has Export Selected Artboards (disabled with none selected) and JPEG Quality 0–12 (default 10). Run asks for the file in the save dialog, then sends `file.export.artboardsToPdf`, which is now allowed in `command_supported`.
+  - Deviation from the plan's "to a temp file": the engine's `write_file` already writes atomically (.tmp + rename), so no host staging is needed.
+
+Tests:
+- Rust: `xdesign_photo::pdf::tests` checks the page size from resolution (300×150 px at 150 ppi gives 144×72 pt), Gray, CMYK and Lab (as RGB) colour spaces, and a 1 px image. `command_supported_allows_file_commands` covers the new command. Both pass under `cargo test --lib`, with no warnings.
+- Vitest:
+  - FileDialogs adds the Artboards to PDF save, the selection and quality range.
+  - ImageDialogs adds Save a Copy with Photoshop PDF, which Export As doesn't offer.
+  - fileMenu.studio adds the menu order, the ⌥⌘S shortcut, and artboard-gated enabling.
+- fileMenu.studio, FileDialogs and ImageDialogs pass 45/45. Layout and tools pass 255/255. `npm run typecheck` passes.
+
+Gaps vs Photoshop:
+- The Photoshop PDF holds only the flattened image: no Preserve Photoshop Editing Capabilities, PDF presets, compression/compatibility/security options, or PDF/X.
+- Artboards to PDF writes one multi-page file chosen in the save dialog. It has no destination folder with File Name Prefix, no Multiple Documents, no ZIP encoding, no Include ICC Profile, no background or artboard-name options, and no overlapping-areas or content-only choices.
+- A page under 3 pt (a very small image at a high resolution) is below the PDF minimum page size, and some viewers may refuse it.
+
+Next: Task 30 (Window › Options/Tools toggles; Workspace › Reset Essentials).
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 3 Task 28: Preferences › Units & Rulers and Guides, Grid & Slices
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Frontend only; no host change, no new dependencies. Photoshop was not used.
+
+Done:
+- **Store** (`photo/preferences.ts`, new): a zustand store saved to `localStorage` under `orion.xdesign.preferences.v1` as `{schemaVersion:1,preferences}`. Saved values are sanitised field by field, so one bad value doesn't reset the rest.
+  - An unreadable save falls back to the defaults and the Preferences dialog says so. A failed write keeps the values for the session and says so.
+  - `unitsPerPixel` converts pixels, inches, cm, mm, points, picas (PostScript 72 or Traditional 72.27 points/inch) and percent of the axis.
+- **Edit › Preferences › Units & Rulers… / Guides, Grid & Slices…** (`photo/PreferencesDialog.tsx`, new). This is Photoshop's Windows placement; XDesign has no app menu. The section list and Prev/Next reuse the Layer Style page nav.
+  - **Units & Rulers**: Rulers unit, Screen Resolution (Pixels/Inch), and Point/Pica Size.
+  - **Guides, Grid & Slices**: Guides colour and style (Lines/Dashed); Smart Guides colour; Grid colour, style (Lines/Dashed/Dots), Gridline Every with its unit, and Subdivisions; Slices line colour and Show Slice Numbers.
+  - Colours are Photoshop's named list plus Custom with a colour well.
+  - Every change previews on the document at once. OK saves; Cancel and Escape restore the values the dialog opened with. Out-of-range numbers disable OK and leave the last valid value showing.
+- **Wiring**:
+  - Rulers label in the chosen unit (`rulerTicks` takes a units-per-pixel scale, with fractional nice steps from 0.01). The grid uses Gridline Every, its unit and Subdivisions at the document resolution. Guides and grid draw in their colour and style.
+  - Smart Guides draw in their colour. View › Print Size uses Screen Resolution, instead of the fixed 72.
+  - Slices use the line colour through `--xd-photo-slice`; auto slices keep their dashes and grey badge. Slice numbers hide when Show Slice Numbers is off.
+  - Right-clicking a ruler lists the units (radio, saved at once). Double-clicking a ruler opens Units & Rulers, as in Photoshop.
+
+Tests:
+- New `preferences.test.ts` (4 tests): field-by-field sanitising, preview vs save, reload from the save, unreadable save and failed write notices, and unit conversion.
+- `viewGuides.test.ts` adds inch and percent ruler ticks, and grid steps from the preferences (pixels, cm at 254 ppi, Traditional points).
+- A new layout test covers the menu, live preview, disabled OK, Cancel restoring, OK persisting, Print Size at 144 ppi giving 200%, the ruler units menu and the double-click.
+- A new tools test covers the slice colour variable and hidden numbers.
+- Layout, tools, viewGuides, viewAids, viewAids.studio, preferences and EditorMenus pass 322/322, and `npm run typecheck` passes.
+
+Gaps vs Photoshop:
+- No Type units: points stay fixed in Character, Paragraph, the Type options bar and the Type dialogs. Print Resolution and Column Size are omitted, as nothing in XDesign uses them yet.
+- Percent is not offered as a grid unit. The New Guide dialog and the Info panel still read in pixels.
+- Inch rulers subdivide in tenths, not Photoshop's eighths.
+- The other Preferences sections (General, Interface, Performance, Cursors, Transparency, Plug-ins…) are not here. Neither are Layout guide or artboard colours, nor the Guides, Grid & Slices preview swatch.
+- For Hermes: the line colours are content colours drawn over the image (like guide cyan), so they are hex values, not tokens. `--xd-photo-slice` is a runtime variable fed from the preference, not a design token.
+
+Next: Task 29 (Save a Copy as Photoshop PDF; Export › Artboards to PDF).
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 3 Task 27: Copy CSS/SVG and Paste without Formatting
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. No new dependencies. Photoshop was not used.
+
+Done:
+- **Host** (`src-tauri/src/xdesign_photo_layer_code.rs`, new; dispatched after `layer_colors`): `layer.copyCSS` and `layer.copySVG` return `{text}` and add no History state.
+  - They work on the `layer` param, else the selected layers, else the active layer. Only shape and type layers count; with none, the error is "Copy CSS works on shape and type layers" (or "Copy SVG…").
+  - **CSS**: one rule per layer, class = the layer name made CSS-safe. Shapes give border (stroke width, colour, solid/dashed), border-radius (live rect radii, or 50% for an ellipse) and background-color, or a linear/radial gradient. Type gives font-size in px (pt × ppi / 72), font-family, color, weight, italic, underline/strikethrough, letter-spacing, line-height and text-align. Both give opacity, `position: absolute`, left/top, width/height for shapes, and `z-index` from the stacking order.
+  - **SVG**: one document sized to the copied layers. Shapes become `<path>` from the engine's Bézier segments, with fill, gradients in `<defs>`, fill-rule, stroke, cap, join and dashes. Type becomes `<text>` (or `<tspan>` lines), with a matrix when the text is transformed. All text is XML-escaped.
+- **Menus** (`photo/PhotoStudio.tsx`): Layer › Copy CSS and Copy SVG sit after New and are enabled when a selected layer is shape or type. The layer right-click menu shows them for shape and type layers only.
+  - The clipboard write starts inside the click with a pending `ClipboardItem`, so WebKit keeps the user gesture while the host serialises. Without `ClipboardItem` it falls back to `writeText`. A clipboard failure shows as the workspace error.
+- **Edit › Paste Special › Paste without Formatting** comes first in the submenu, as in Photoshop, and is enabled on a type layer.
+  - It reads clipboard text, normalises line endings, and inserts it with the engine's `type.insertText` (History: "Paste"), keeping the surrounding character style.
+  - It inserts at the selection the on-canvas text editor last had on that layer (`lastTextCaret`, set when the editor commits), otherwise at the end, and moves the remembered caret past the paste.
+  - An empty clipboard says "The clipboard has no text." Cmd+V inside the on-canvas editor was already plain text.
+
+Tests:
+- `cargo test --lib layer_code` passes 3/3, with no warnings. It covers a rect shape's CSS rule and SVG path, a type layer with escaped multi-line text, pixel layers refused, explicit `layer` targeting, unrelated commands passing through, no revision change, and CSS-safe names and numbers.
+- A new layout test covers the menu items' enabled states, the right-click items, both clipboard paths, Paste without Formatting at the remembered caret and at the end, and an empty clipboard.
+- The PhotoStudio layout and tools suites pass 253/253, and `npm run typecheck` passes.
+
+Gaps vs Photoshop:
+- No `box-shadow`/`text-shadow` from layer effects, and no layer blend modes in CSS.
+- SVG strokes are always centred; inside/outside alignment is not represented.
+- Subtract/Intersect/Exclude path operations are written as plain subpaths with the fill rule only.
+- Angle, Reflected and Diamond gradients fall back to linear; pattern fills are omitted.
+- Groups are not expanded, and box (paragraph) type is positioned by its drawn bounds.
+- Only the first character and paragraph style is serialised for mixed-style type.
+- Paste without Formatting from the menu with the on-canvas editor still open is untested: the editor commits on blur first, and the paste then queues behind that edit.
+
+Next: Task 28 (Preferences › Units & Rulers with Screen Resolution; Guides, Grid & Slices).
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 3 Task 26: Actions panel
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. No host change; no new dependencies. Photoshop was not used.
+
+Done:
+- **Recording** (`photo/actions.ts`, new): while an action records, the runtime hands every command the engine applied to `recordActionStep`. It records the command id and params sent through `xdesign_photo_command`.
+  - A command is recorded when it made a History state, and the step takes that state's name (Gaussian Blur, Fill, Layer Properties…). Layer selection (`layer.select*`) is recorded too, as "Select Layer", as in Photoshop.
+  - Undo/redo, `history.*`, `view.*` and `preview.*` are never recorded.
+  - Brush-type strokes (`paint.*` except Gradient, Paint Bucket, Magic Eraser and Red Eye) are recorded only with Allow Tool Recording on.
+  - A `layer` param naming the layer that was active is dropped, so the step plays on whatever layer is active then.
+- **Playback** goes through the same `runPhotoCommand` gate, so the engine applies the same commands in order.
+  - Play Selection plays a whole action, or plays from the selected step, or plays a set's checked actions in order.
+  - Unchecked steps are skipped. The first failing step stops playback and shows its error under that step.
+- **Actions panel** (`photo/ActionsPanel.tsx`, new): Window › Actions, Alt+F9, and on the panel strip.
+  - Rows for sets, actions and steps, each with an on/off check and a disclosure. A step expands to its params.
+  - Footer: Stop, Begin Recording, Play Selection, Create New Set, Create New Action, Delete.
+  - Panel menu: New Action…, New Set…, Duplicate, Delete, Play, Start Recording, Action Options…, Set Options…, Allow Tool Recording, Clear All Actions, Reset Actions. Record Again, Insert Menu Item/Stop/Conditional, Playback Options and Load/Replace/Save Actions are listed but disabled.
+  - Dialogs at studio level: New Action (Name, Set; OK reads Record and starts recording), New Set, Action Options and Set Options.
+- **Persistence**: sets and Allow Tool Recording persist in localStorage `orion.xdesign.actions.v1` (schema 1, capped at 512 KB, validated on read). A read or write failure says so in the panel and keeps the session's actions.
+- **Fix found by the test**: panel menus are built when the studio renders, so PhotoStudio now subscribes to the actions store; otherwise the Actions menu showed stale enabled states.
+- **Files**: `photo/actions.ts` (new), `photo/ActionsPanel.tsx` (new), `photo/runtime.ts` (one `recordActionStep` call after the reply is received), `photo/PhotoStudio.tsx`, `photo/photo.css`, and tests `photo/runtimeActions.test.ts` (new) and `PhotoStudio.layout.test.tsx`.
+
+Tests:
+- `runtimeActions.test.ts` passes 2/2 through the real runtime with a mocked host. It covers what is recorded and how it is named, params, persistence, playback through the gate, unchecked steps, Allow Tool Recording, and a failing step stopping playback.
+- The PhotoStudio suites, runtime suites, viewAids/fileMenu studio, DocumentPanels, smartContents, historyPersistence and LayerStyleDialog pass 356/356.
+- `npm run typecheck` passes.
+
+Gaps vs Photoshop:
+- No `.atn` Load/Save/Replace and no Photoshop default actions; the Default Actions set starts empty.
+- No Insert Stop, Insert Menu Item, Insert Conditional or Record Again; no per-step modal (dialog) toggles; no Playback Options (Accelerated, Step by Step, Pause); no Button Mode.
+- Steps cannot be dragged to reorder or between actions, and there are no function-key assignments or colours for actions.
+- Layer ids other than the active layer, and `layers` lists, replay literally, so they refer to the recording document's layers.
+- Playing an action while recording another is not recorded as a "Play" step. New-document commands (Duplicate image, Crop and Straighten Photos) and smart-object Edit Contents bypass the recorder.
+- Colour picks and swatch changes (`tools.*`) add no History state, so they are not recorded; Photoshop records Set Foreground Color.
+- The recording indicator uses `--xd-accent`; Photoshop's red record dot has no XDesign token (same red gap as Task 25).
+
+Next: Task 27 (Paste without Formatting; Copy CSS/SVG).
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 3 Task 25: Layer colour labels
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no new dependencies. Photoshop was not used.
+
+Done:
+- **Host**: new `src-tauri/src/xdesign_photo_layer_colors.rs` handles `layer.setColor` `{color, layers?, layer?}`.
+  - It sets the engine's existing layer `label`, which PSDs already read and write as `lclr`.
+  - Without ids it colours the selected layers, as Photoshop colours the whole selection.
+  - It is one undoable "Layer Properties" step, adds no step when nothing changes, needs no recompositing, and refuses while a job runs.
+  - Each layer in the state now carries `color` (`none|red|orange|yellow|green|blue|violet|gray`).
+- **Layers panel**:
+  - The right-click menu ends with No Color, Red, Orange, Yellow, Green, Blue, Violet, Gray, each with its swatch.
+  - A coloured layer tints its visibility column.
+  - The filter bar gains Color, between Attribute and Smart Object, as in Photoshop.
+- **New Layer / New Group dialog** has a Color field (None by default). It is applied with the other options and folded into the one "New Layer" step.
+- **Files**: `xdesign_photo_layer_colors.rs` (new), `xdesign_photo.rs` (module, dispatch, `color` in the layer state), `photo/types.ts`, `photo/NewLayerDialog.tsx`, `photo/PhotoStudio.tsx`, `photo/photo.css`, and tests in `PhotoStudio.layout.test.tsx` and `PhotoStudio.tools.test.tsx`.
+
+Tests:
+- `cargo test --lib layer_colors` passes 2/2: listed and selected layers, undo, no-op and bad input.
+- PhotoStudio layout and tools, runtimeNewImages and DocumentPanels pass 262/262.
+- `npm run typecheck` passes.
+
+Gaps vs Photoshop:
+- There is no right-click on the eye column for its own short menu (Hide this layer, Show/Hide all other layers, and the colours).
+- The label red is `#ff5e6a`, borrowed from Hermes' `--c-error`, because the XDesign scope has no red token. Orange, yellow, green and violet use the neon tokens, blue uses `--xd-accent`, and gray uses `--xd-text-3`. A label palette token set is needed; flagged for Hermes.
+
+Next: Task 26 (Actions panel).
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 3 Task 24: View — Rotate View, Flip, Fit Layers, Print Size, Pixel Grid, Layer Edges, Smart Guides
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. No host changes; no new dependencies. Photoshop was not used.
+
+Done:
+- **Rotate View tool** (R, in the Hand group).
+  - Drag turns the view about the stage centre. Shift-drag turns in 15° steps.
+  - The options bar has Rotation Angle and Reset View.
+  - The turn is per document and lasts for the session (`photo/viewTurn.ts`). It is a CSS rotate on the image surface, so the pixels are never touched.
+- **View › Flip Horizontal** mirrors the view only, also per document.
+- **View › Fit Layer(s) on Screen** fits the selected layers' union box, rotation-aware. It is disabled when no selected layer has bounds.
+- **View › Print Size** zooms to screen ppi over document ppi. Screen ppi is a fixed 72 until Task 28.
+- **View › Show** now reads Layer Edges, Selection Edges, Target Path, Grid, Guides, Smart Guides, Pixel Grid, as in Photoshop.
+  - Layer Edges outlines the selected layers.
+  - Pixel Grid shows above 500% zoom while Extras are on.
+  - Smart Guides is on by default.
+- **Move snapping and Smart Guides.** Move-tool drags now snap the selected layers' box (edges and centres) to:
+  - other visible layers (Snap To › Layers, new and on by default);
+  - the document edges (Snap To › Document Bounds);
+  - guides.
+  
+  Reach is 8 screen px. Smart Guides draws a magenta line wherever an edge or centre meets, and also snaps when Snap is off, as Photoshop does.
+- **Pointer mapping when turned.** Every tool and overlay now maps the pointer through the turned surface, using `surfaceOffset`, `surfaceFraction`, `surfaceSize`, `surfaceClient` and `visibleArea` in `viewTurn.ts`. This covers:
+  - painting and the brush tip;
+  - marquees and lassos, including Magnetic;
+  - crop and transform;
+  - path editing;
+  - the ruler and count tools;
+  - Color Range sampling;
+  - tiles and stroke previews;
+  - grid and guide drawing.
+  
+  Unturned views keep the exact old arithmetic.
+- **Files**: `photo/viewTurn.ts` (new), `photo/viewGuides.ts`, `photo/viewAids.tsx`, `photo/PhotoStudio.tsx`, `photo/PhotoTiles.tsx`, `photo/CropOverlay.tsx`, `photo/ImageTransformOverlay.tsx`, `photo/PathEditOverlay.tsx`, `photo/AnalysisTools.tsx`, `photo/MagneticLassoOverlay.tsx`, `photo/ColorRangeDialog.tsx`, `photo/photo.css`, `editorTools.ts`, and tests in `viewTurn.test.ts` (new), `viewGuides.test.ts`, `viewAids.studio.test.tsx` and `PhotoStudio.layout.test.tsx`.
+
+Tests:
+- viewTurn and viewGuides pass 26/26.
+- The focused photo suites pass 381/382: PhotoStudio layout and tools, PhotoTiles, the overlays, ColorRange, viewAids, EditorChrome and EditorMenus. The one failure is the known flake "restores native channel overlay options…".
+- `npm run typecheck` passes.
+
+Gaps vs Photoshop:
+- There is no rotation compass overlay and no Rotate All Windows. Esc does not reset the rotation.
+- Rulers are not rotation-aware. While the view is turned, guides cannot be dragged and new ones cannot be pulled from the rulers.
+- The Navigator's view box is the box around the turned visible area.
+- The Gradient Fill dialog drag and the Layer Style effect drag still use unturned screen deltas.
+- Smart Guides span the whole canvas instead of running between the matched objects. They show no distance or spacing readouts and do not snap to equal spacing.
+- No View › Actual Size (physical size from the display) and no Fit Artboard on Screen.
+- Pixel Grid uses grey `rgba(128,128,128,.28)` (the view grid's minor-line colour). There is no token for it; flagged for Hermes.
+
+Next: Task 25 (layer colour labels).
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 3 Task 23: History snapshots
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no new dependencies. Photoshop was not used.
+
+Done:
+- **Named snapshots** are listed under the Open row, above the divider, each with a History Brush source box.
+  - Clicking one reverts the image in one step. Clicking the snapshot already showing does nothing.
+  - Double-clicking renames it inline: Enter or blur commits, Escape cancels.
+- **Footer buttons now work**:
+  - *Create new document from current state* duplicates the image, named after the current snapshot or state.
+  - *Create new snapshot* takes the full document. Alt-click opens the **New Snapshot** dialog: Name, prefilled with the next "Snapshot N", and From: Full Document / Merged Layers / Current Layer.
+  - *Delete current state* deletes the current snapshot if one is selected. Otherwise it drops the current state and everything after it (`history.select` with `discardRedo`), as Photoshop's linear history does. It is disabled at the first state.
+- **History panel menu**: New Snapshot…, Delete and New Document now run the same actions.
+- **History Brush**: a Full Document snapshot is a source while its state is still in History. A history row that a snapshot already represents hides its own source box, as the Open row did, so only one row shows the brush marker.
+- **Host**: the new `src-tauri/src/xdesign_photo_history_snapshots.rs` handles `history.snapshot.new|select|rename|delete` before `execute_view_command`.
+  - Snapshots are stored per photo id, up to 100, and dropped when the session cache evicts the photo.
+  - The reply carries `historySnapshots` and `historySnapshotName`.
+  - All four commands refuse while a job is running.
+  - Merged Layers flattens only the visible layers and errors if none are visible. Current Layer keeps only the active layer.
+- **Files**: `xdesign_photo_history_snapshots.rs` (new), `xdesign_photo.rs` (module, reply fields, hook, command list), `xdesign_photo_history.rs` (`snapshot_id` shared), `xdesign_photo_cache.rs` (forget on eviction), `photo/types.ts`, `photo/PhotoHistory.tsx`, `photo/ImageDialogs.tsx` (`NewSnapshotDialog`), `photo/PhotoStudio.tsx`, and tests in `PhotoHistory.test.tsx`, `ImageDialogs.test.tsx` and `PhotoStudio.tools.test.tsx`.
+
+Tests:
+- `cargo test --lib snapshots` passes 12/12, including the 3 new module tests:
+  - one-step revert, with no step added when re-selecting;
+  - names, rename, delete and forget, with the next name and the command gate;
+  - merged and current-layer snapshots.
+- PhotoHistory, HistoryBrushSource, ImageDialogs, PhotoStudio.layout and fileMenu.studio pass 212/212.
+- PhotoStudio.tools passes 76/76.
+- `npm run typecheck` passes.
+
+Gaps vs Photoshop:
+- Selecting a snapshot adds an undoable History state named after it. Photoshop instead selects the snapshot with no new state, and here both the snapshot and that state are highlighted.
+- Snapshots last only for the session: they are lost on cache eviction (8 images / 512 MB) and on app restart, and are not saved with the image.
+- The History Brush can only use Full Document snapshots whose state is still in History. Merged Layers and Current Layer snapshots, and trimmed states, cannot be sources.
+- Snapshot rows show a generic thumbnail, not the snapshot's pixels.
+- Delete State cannot be undone. There is no delete confirmation and no dragging rows onto the footer buttons.
+- Clear History stays disabled: the engine can only clear the whole history, which would also drop the Open snapshot that Photoshop keeps.
+- History Options… (Automatically Create First Snapshot, Allow Non-Linear History, Show New Snapshot Dialog by Default) is still disabled.
+
+Next: Task 24 (View: Rotate View, Flip Horizontal, Fit Layer(s), Print Size, Pixel Grid, Layer Edges, Smart Guides, Snap To › Layers).
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 3 Task 22: Pattern Stamp Tool
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no new dependencies. Photoshop was not used.
+
+Done:
+- **Pattern Stamp Tool** comes after Clone Stamp in the Stamp flyout (renamed "Stamp tools"), with the S shortcut, so Shift+S cycles the two. The icon is lucide `BrickWall`.
+- **Options bar**: Mode, Opacity, Flow, Aligned (on by default) and a Pattern picker that selects the Patterns panel's current pattern, as the Paint Bucket's does. The brush bar has airbrush, angle and the pressure toggles.
+- **Host**: the new `src-tauri/src/xdesign_photo_pattern_stamp.rs` handles `paint.patternStamp` before `engine.execute`, because the pinned engine has no such command.
+  - It reuses the engine's Clone Stamp dab coverage (`stroke_coverage` + `apply_coverage`), so size, hardness, spacing, flow, opacity, blend mode, selection and Lock Transparency behave as in Clone Stamp, in any colour mode.
+  - Aligned tiles the pattern from the image origin. Unaligned centres it on each stroke's first sample.
+  - It uses the Patterns panel's selected pattern, or the first library pattern when none is selected.
+  - History: one step, labelled "Pattern Stamp", is journalled. It goes through `mask_filters::commit_host_edit`, so Edit › Fade works right after it.
+  - It errors on mask, alpha-channel, Quick Mask or single-channel targets, on locked or non-pixel layers, on empty strokes and when there is no pattern.
+- **Live feedback**: `stroke::pixel_draft` renders the stroke through the same code without a history step, so the stamp previews while dragging, like the other retouch tools.
+- **Files**: `src-tauri/src/xdesign_photo_pattern_stamp.rs` (new), `xdesign_photo.rs` (module plus hook), `xdesign_photo_stroke.rs` (preview route), `xdesign_photo_mask_filters.rs` (Fade allow-list), `editorTools.ts`, `photo/toolBars.tsx`, `photo/PaintToolOptions.tsx`, `PhotoStudio.layout.test.tsx`
+
+Tests:
+- `cargo test --lib pattern_stamp` passes 5/5: aligned tiling with history, journal, damage and Fade; unaligned centring; opacity, Multiply and selection; preview equal to commit with no history; rejections.
+- `cargo test --lib fade` passes 58/58.
+- PhotoStudio.layout, PaintToolOptions, EditorChrome and paintToolPreferences pass 217/217.
+- `npm run typecheck` passes.
+
+Gaps vs Photoshop:
+- The Impressionist option is absent.
+- It paints layer pixels only, not masks, alpha channels or Quick Mask.
+- The modes are the layer blend modes; Behind and Clear are not offered.
+- Live feedback re-renders the whole stroke for up to 2048 samples; past that, the stroke renders on release.
+
+Next: Task 23 (History snapshots).
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 3 Task 21: Red Eye Tool
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no new dependencies. Photoshop was not used.
+
+Done:
+- **Red Eye Tool** comes last in the Healing flyout, with the J shortcut. The icon is lucide `Eye`.
+- **Options bar**: **Pupil Size (%)** and **Darken Amount (%)**, 1–100, both defaulting to 50. There are no brush options.
+- **Gesture**:
+  - A click corrects the red pupil nearest the press point.
+  - A drag of 3 or more screen pixels each way draws a box, previewed as a white rectangle, and corrects every red pupil inside it.
+  - It applies on release, as in Photoshop. The tool hint describes both.
+- **Host**: the new `src-tauri/src/xdesign_photo_red_eye.rs` handles `paint.redEye {x,y[,width,height],pupilSize,darken[,layer]}` before `engine.execute`, because the pinned engine has no red-eye command.
+  - Detection: red pixels, where (r − max(g,b))/r ≥ 0.35, form 4-connected pupils; specks under 4 px are ignored. A click searches a square reaching an eighth of the shorter image side (at least 16 px).
+  - Correction: each pupil gets a disc from 0.5× to 1.5× its area's radius, set by Pupil Size. Within the disc, reddish pixels are blended toward (g+b)/2 and darkened by Darken Amount. The disc edge is anti-aliased, and selection coverage is respected.
+  - History: one step, labelled "Red Eye Tool", is journalled. Only the corrected discs are rewritten. If nothing red is found there is no step and the result is `{corrected:0}`.
+  - It errors on non-RGB images, on mask or single-channel targets, on locked or non-pixel layers, on bad percentages, and on boxes over 8 MP.
+- **Files**: `src-tauri/src/xdesign_photo_red_eye.rs` (new), `xdesign_photo.rs` (module plus hook), `editorTools.ts`, `photo/PaintToolOptions.tsx`, `PhotoStudio.tsx`, `PhotoStudio.layout.test.tsx`
+
+Tests:
+- `cargo test --lib red_eye` passes 5/5: click versus a second eye, box, darken and pupil size, no red or excluded by the selection, and rejections.
+- PhotoStudio.layout, PhotoStudio.tools, PaintToolOptions, paintToolPreferences and EditorChrome pass 284/284.
+- `npm run typecheck` passes.
+
+Gaps vs Photoshop:
+- Detection and correction are a host approximation of Photoshop's, not its exact result.
+- The click search square is a fixed fraction of the image.
+- Lab images are rejected; Photoshop also allows Lab.
+- If no red is found, nothing happens and no message is shown.
+- Content-Aware Move, which sits between Patch and Red Eye in Photoshop, is still absent.
+
+Next: Task 22 (Pattern Stamp tool).
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 3 Task 20: Color Sampler Tool
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. No host changes; no new dependencies. Photoshop was not used.
+
+Done:
+- **Color Sampler Tool** comes second in the Eyedropper flyout, with the I shortcut, so Shift+I now cycles Eyedropper → Color Sampler → Ruler → Note → Count, as in Photoshop. The icon is lucide `Crosshair`.
+- **Samplers**:
+  - A click places a sampler on the pixel under the pointer, up to 10 per image.
+  - Dragging a sampler moves it live.
+  - Dragging it off the image, or Alt-clicking it, deletes it; the rest renumber.
+  - They are kept per image in the new frontend store `photo/colorSamplers.ts`.
+  - Markers show only with the Color Sampler Tool or the Info panel open, and are hidden by View › Extras.
+- **Options bar**: Sample Size (shared with the Eyedropper) and **Clear All**, which is disabled when there are no samplers.
+- **Info panel**: one #N cell per sampler, giving its R/G/B. It re-samples when the image version, view or Sample Size changes. The Info panel's cursor readout now also uses the Sample Size area, as in Photoshop; the default Point Sample keeps the old behaviour.
+- **Files**: `photo/colorSamplers.ts` (new), `photo/AnalysisTools.tsx`, `photo/InfoPanel.tsx`, `photo/infoPanel.css`, `photo/photo.css`, `editorTools.ts`, `PhotoStudio.tsx`, `photo/colorSamplers.test.tsx` (new), `PhotoStudio.layout.test.tsx`, `PhotoStudio.tools.test.tsx` (the Shift+I step counts now include Color Sampler)
+
+Tests:
+- colorSamplers passes 5/5.
+- PhotoStudio.layout, InfoPanel and EditorChrome pass, as do PhotoStudio.tools (76/76) and DocumentPanels (8/8).
+- `npm run typecheck` passes.
+
+Gaps vs Photoshop:
+- Samplers live in memory only: they are not saved in the image (no PSD read/write) and are lost on restart.
+- There is no per-sampler readout mode menu (Actual Color/Proof/HSB/CMYK/Lab); the readout is RGB only.
+- Shift-click with the Eyedropper does not add a sampler.
+- An 11th click is ignored with no message.
+- Marker and number use `--xd-accent`; the #N label uses `--xd-text-2`. No token changes.
+
+Next: Task 21 (Red Eye tool).
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 3 Task 19: Single Row and Single Column Marquee
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. No host changes; no new dependencies. Photoshop was not used.
+
+Done:
+- **Single Row Marquee Tool** and **Single Column Marquee Tool** come third and fourth in the Marquee flyout, without the M shortcut, as in Photoshop, so Shift+M still cycles only Rectangular and Elliptical. The icons are lucide `Ellipsis` and `EllipsisVertical`.
+- **Selection**: a click or drag selects the one-pixel row or column under the release point, across the whole canvas, through `select.rect {x,y,width,height,mode,ellipse:false,feather,antiAlias:false}`. Nothing is selected outside the canvas.
+  - The preview line follows the pointer.
+  - The selection modes and Shift/Alt modifiers work as for the other marquees.
+  - It snaps like the box marquees.
+- **Options bar**: Feather only; Style and Anti-alias are absent, where Photoshop greys them out.
+- **Files**: `editorTools.ts`, `photo/selectionGesture.ts`, `photo/PaintToolOptions.tsx`, `PhotoStudio.tsx`, `photo/selectionGesture.test.ts`, `PhotoStudio.layout.test.tsx`
+
+Tests:
+- selectionGesture plus the new studio test pass. PhotoStudio.layout passes 170/170, and paintToolPreferences, EditorChrome and PaintToolOptions pass 48/48.
+- `npm run typecheck` passes.
+
+Gaps vs Photoshop: Style and Anti-alias are hidden rather than shown disabled. No token changes.
+
+Next: Task 20 (Color Sampler tool).
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 3 Task 18: Duplicate and Crop and Straighten Photos
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no new dependencies. `/Applications/Orion Terminal.app` untouched. Photoshop was not used. Detail: top of `CLAUDE_LOG_ARCHIVE.md`.
+
+Done:
+- **Image › Duplicate…** sits before Apply Image…, as in Photoshop. The dialog has "Duplicate: <name>", **As** (defaulting to "<name> copy") and **Duplicate Merged Layers Only**, which is enabled only with more than one layer. It sends `image.duplicate {name,mergedOnly}`.
+- **File › Automate › Crop and Straighten Photos** comes first, before Conditional Mode Change…, and sends `file.automate.cropAndStraightenPhotos {}`.
+- **New-image path**:
+  - New Tauri command `xdesign_photo_new_documents` in the new `xdesign_photo_documents.rs`.
+  - It runs the command in a throwaway session seeded from the pinned version, so the source keeps its history and the resident session never holds a second document.
+  - Each result is written as its own photo with a fresh history before any session becomes resident.
+  - Both commands stay out of the single-image gate; the one-document guard is unchanged.
+- **Frontend**: `runPhotoCommand` routes the two commands to `createImages`.
+  - Each new image is placed through Pencil, inside one undo batch, or through the legacy board.
+  - Placements roll back on failure, and a project change mid-call is rejected.
+  - The last image becomes the edit target, like Photoshop's frontmost window.
+- **Timing**: about 126 ms to publish 2 photos in a debug build. The temporary timing logs were removed.
+- **Files**:
+  - new: `src-tauri/src/xdesign_photo_documents.rs`, `photo/runtimeNewImages.test.ts`
+  - changed: `src-tauri/src/xdesign_photo.rs`, `src-tauri/src/lib.rs`, `photo/runtime.ts`, `photo/ImageDialogs.tsx`, `PhotoStudio.tsx`, `photo/fileMenu.studio.test.tsx`
+
+Tests:
+- runtimeNewImages 3/3 (new), fileMenu.studio 7/7 (3 new), and FileDialogs plus the ImageDialogs tests pass (37 in the focused run).
+- `npm run typecheck` passes.
+- `cargo test --lib documents::` passes 3/3.
+
+Gaps vs Photoshop (logged, not fixed):
+- Crop and Straighten names results "<name> copy 1/2…", the engine's naming, where Photoshop uses "<name> copy", "copy 2"…
+- Crop and Straighten cannot be limited to the selected photo (Alt in Photoshop).
+- New images are placed at the default placement spot, so several results can overlap on the board.
+- Proof Setup is not carried into the duplicate; colour settings are.
+- No token changes.
+
+Next: Task 19 (Single Row/Column Marquee), then Tasks 20–27, Phase 4 (Tasks 28–30), release build 11 and the live re-check.
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 2 Task 17: File (File Info, Scripts, Automate, Export)
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no new Tauri commands; no new dependencies. `/Applications/Orion Terminal.app` untouched. Photoshop was not used. Detail: top of `CLAUDE_LOG_ARCHIVE.md`.
+
+Done:
+- **File menu**, in Photoshop's order: Export ▸, Place Embedded…, Place Linked…, separator, **Automate ▸**, **Scripts ▸**, separator, **File Info…** (⌥⇧⌘I).
+  - Export ▸: Export As…, separator, **Layers to Files…**, **Color Lookup Tables…**, separator, **Paths to Illustrator…**
+  - Automate ▸: **Conditional Mode Change…**, **Fit Image…**
+  - Scripts ▸: **Delete All Empty Layers**, **Flatten All Layer Effects**, **Flatten All Masks**, each sending `file.scripts.* {}`.
+- **File Info…**:
+  - It reads `file.fileInfo {}` when it opens.
+  - The Basic-tab fields are Document Title, Author, Author Title, Description, Keywords, Copyright Status, Copyright Notice and Copyright Info URL.
+  - It sends only the changed keys, so OK with no edits adds no history step.
+- **Fit Image…** (Constrain Within Width/Height in pixels, Don't Enlarge) uses the engine's formula and sends the host's `image.imageSize {width,height,resample:"bicubic"}`. It sends nothing when the size is unchanged or Don't Enlarge applies.
+- **Conditional Mode Change…** (8 Source Mode checkboxes with All/None; Target Mode Grayscale/RGB/CMYK/Lab) sends the host's `image.mode.<to> {}` only when the current mode is checked and differs from the target.
+- **Color Lookup Tables…** (Description, Grid Points 7–256 with default 32, CUBE) and **Paths to Illustrator…** (Write: All Paths / Work Path / each saved path):
+  - Each opens the save dialog, then sends `file.export.colorLookupTables {size,title,path}` or `file.export.pathsToIllustrator {paths,path}`.
+  - The engine writes the file with the vendored atomic write.
+  - Color Lookup Tables is enabled only with a visible adjustment layer; Paths to Illustrator only with a saved or work path.
+- **Layers to Files…** (Destination with Browse…, File Name Prefix, Visible Layers Only, File Type, JPEG Quality 0–12, Run) sends `file.export.layersToFiles {dir,prefix,visibleOnly,format,quality?}`.
+  - File Type offers BMP, JPEG, PSD, Targa, TIFF and PNG-24; PSD is the default.
+- **Host**:
+  - New `xdesign_photo_exports.rs`: Layers to Files encodes into a temp folder, atomically copies each file into the destination, removes the temp folder, and rewrites the journal entry to the user's folder.
+  - Gate entries: `file.fileInfo`, the three `file.scripts.*`, `file.export.colorLookupTables`, `file.export.pathsToIllustrator` and `file.export.layersToFiles`.
+- **Files**:
+  - new: `src-tauri/src/xdesign_photo_exports.rs`, `photo/FileDialogs.tsx`, `photo/FileDialogs.test.tsx`, `photo/fileMenu.studio.test.tsx`
+  - changed: `src-tauri/src/xdesign_photo.rs`, `PhotoStudio.tsx`
+
+Deviations from the plan:
+- Fit Image and Conditional Mode Change do not use `file.automate.fitImage` or `conditionalModeChange`, which stay gated out. The engine runs its own `image.imageSize` and `image.mode.*` internally, skipping the host's resampling, colour-managed conversion and size admission.
+- Color Lookup Tables and Paths to Illustrator pass the save-dialog path to the engine instead of returning text. A 256-point table is about 450 MB of text, too large for an IPC round trip, and the engine's write is already atomic.
+
+Tests:
+- FileDialogs 11/11 and fileMenu.studio 4/4 (all new). The File-related layout tests pass 2/2.
+- `npm run typecheck` passes.
+- `cargo test --lib command_supported_allows_file_commands exports::` passes 3/3.
+
+Gaps vs Photoshop (logged, not fixed):
+- File Info has only the Basic tab: no Rating, Description Writer, other tabs or templates.
+- Color Lookup Tables has no Copyright field and no "Use lowercase extensions", and writes CUBE only (no 3DL, CSP or ICC).
+- Paths to Illustrator has no Document Bounds option.
+- Layers to Files has no PDF, PNG-8, Include ICC Profile, Trim Layers or per-format options. Numbering skips adjustment layers, as the engine does.
+- No token changes.
+
+Next: Phase 3 (Tasks 18–27), Phase 4 (Tasks 28–30), release build 11 and the live re-check.
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 2 Task 16: View (artboard and canvas guide clears, Lock Slices, Clear Slices)
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no new Tauri commands. `/Applications/Orion Terminal.app` untouched. Photoshop was not used. Detail: top of `CLAUDE_LOG_ARCHIVE.md`.
+
+Done:
+- **View menu**, in Photoshop's order: Lock Guides, Clear Guides, **Clear Selected Artboard Guides**, **Clear Canvas Guides**, New Guide…, New Guide Layout…, New Guides From Shape, separator, **Lock Slices** (checkmark), **Clear Slices**.
+- **Guide clears** stay frontend, because guides are session view state (`useViewAids`). They follow the engine's rule: a guide belongs to an artboard when it lies strictly between the artboard's edges on its own axis.
+  - Clear Selected Artboard Guides uses the active layer's artboard (the layer itself or its top-level group) and is disabled outside one.
+  - Clear Canvas Guides removes guides inside no artboard; with no artboards it removes every guide.
+- **Lock Slices** sends `view.lockSlices {on}`, and its checkmark follows `analysis.slicesLocked`. **Clear Slices** sends `view.clearSlices {}`; it is enabled only with user or layer slices and while unlocked.
+- **While slices are locked**, Slice Select can still pick a slice. The Slice tool draws nothing; moves, resize handles, double-click Slice Options, Delete, Promote, Divide… and Slice Options are all blocked, matching the engine's refusals.
+- **Host**: gate entries `view.lockSlices` and `view.clearSlices`. Test `command_supported_allows_view_slice_commands` also asserts that the engine's guide commands stay gated out.
+- **Files**:
+  - changed: `src-tauri/src/xdesign_photo.rs`, `photo/types.ts` (`PhotoLayer.artboard`), `photo/viewGuides.ts`, `photo/AnalysisTools.tsx`, `PhotoStudio.tsx`, `viewAids.studio.test.tsx`, `PhotoStudio.tools.test.tsx`
+
+Tests:
+- viewAids.studio and PhotoStudio.tools 86/86 (5 new), viewAids 12/12, View-related layout tests 3/3.
+- `npm run typecheck` passes. `cargo test --lib command_supported_allows_view_slice_commands` passes.
+
+Gaps vs Photoshop (logged, not fixed):
+- Guides, and so the guide clears, are still not saved in the file (unchanged since the view-aids work).
+- No token changes.
+
+Next: Task 17 (File Info…, Scripts, Automate › Fit Image… / Conditional Mode Change…, Export › Color Lookup Tables… / Paths to Illustrator… / Layers to Files…), Phases 3–4, release build 11 and the live re-check.
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 2 Task 15: Panels (Layer Comps, Measurement Log, Clone Source overlay, Character/Paragraph Styles)
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no new Tauri commands (everything runs through the existing photo command path). `/Applications/Orion Terminal.app` untouched. Photoshop was not used. Detail: top of `CLAUDE_LOG_ARCHIVE.md`.
+
+Done:
+- **Layer Comps** strip panel: Last Document State row, per-comp apply, comment disclosure, missing-layer warning, Visibility/Position/Appearance toggles; bottom bar Update Visibility/Position/Appearance, Previous/Next, Update, New, Delete. Panel menu: New…, Duplicate, Delete, Update, Apply, Next, Previous, Restore Last Document State, Layer Comp Options…, Clear All Layer Comp Warnings. New Layer Comp / Layer Comp Options dialog (name, Apply To Layers, comment).
+- **Measurement Log** strip panel: Record Measurements, Select All / Deselect All, Export selected (CSV via the save dialog), Delete selected; click, Shift range and Cmd/Ctrl toggle row selection. Panel menu has the same four actions.
+- **Image › Analysis** now has Select Data Points › Custom… (Common plus per-source groups for Selections, Ruler Tool and Count Tool), Record Measurements (Shift+Cmd+M), Ruler Tool and Count Tool, in Photoshop's order.
+- **Character Styles** and **Paragraph Styles** strip panels: click selects and applies to the selected type (Alt clears overrides), "+" marks an overridden current style, Clear Override, Redefine by Merging Overrides, New, Delete. Panel menu: New Style…, Duplicate, Delete, Redefine, Style Options…, Clear Override. Style Options dialog with Basic and Advanced Character Formats (paragraph adds Indents and Spacing, and Hyphenation); sends only the changed keys.
+- **Clone Source overlay**: Show Overlay, Opacity, blend mode (Normal/Darken/Lighten/Difference), Auto Hide, Clipped and Invert in the Clone Source section. The overlay lays the source image under the brush with the slot or tool scale, rotation and flips (inverse of `cloneSourcePoint`), clipped to the brush circle, and hides while painting when Auto Hide is on.
+- The panel dialogs render at studio level, since the flyout box would clip the dialog scrim.
+- **Host**: the reply's `state.panels` reports layer comps, the measurement log and text styles. Gate entries plus tests `command_supported_allows_panel_commands` and `panels_state_matches_the_engine_lists`.
+- **Files**:
+  - new: `photo/LayerCompsPanel.tsx`, `photo/MeasurementLogPanel.tsx`, `photo/TypeStylesPanel.tsx`, `photo/DocumentPanels.test.tsx`
+  - changed: `src-tauri/src/xdesign_photo.rs`, `photo/types.ts`, `photo/cloneSourceGeometry.ts` (+test), `PhotoStudio.tsx`, `PhotoStudio.layout.test.tsx`, `photo.css`
+
+Tests:
+- DocumentPanels 8/8, cloneSourceGeometry 9/9, PhotoStudio layout 169/169 (2 new). One parallel run hit the known "restores native channel overlay options" load flake; it passes alone and in the full-file rerun.
+- `npm run typecheck` passes. `cargo test --lib` for the two new host tests passes.
+
+Gaps vs Photoshop (logged, not fixed):
+- **Simplified:** the Clone Source overlay shows the composite preview, not the sampled layer. The Measurement Log is a strip flyout, not a bottom-docked panel.
+- **Omitted:**
+  - No single "Clear Layer Comp Warning" (only Clear All); no Smart Object layer comp selection.
+  - No Load/Save Default Type Styles or Load Character/Paragraph Styles.
+  - Style Options has no OpenType, Language, Character Position, Composition or Justification pages.
+  - No Data Point presets (save/delete named sets).
+- No new token gaps: `--xd-accent(-rgb)`, `--xd-border`, `--xd-panel`, `--xd-bg`, `--xd-text(-2)`, `--r-sm` and the existing `--warn` (first use in XDesign, for the layer comp warning).
+
+Next: Task 16 (Clear Guides, Clear Selected Artboard Guides, Lock Slices, Clear Slices), Task 17, Phases 3–4, release build 11 and the live re-check.
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 2 Task 14: Tools (Triangle, Polygon/Star, Ruler, Count, Note, Slice)
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no Tauri command signatures changed (everything runs through the existing photo command path). `/Applications/Orion Terminal.app` untouched. Photoshop was not used. Detail: top of `CLAUDE_LOG_ARCHIVE.md`.
+
+Done:
+- **Triangle and Polygon tools** in the Shape group (U). Polygon has Sides and a star ratio. The dragged box is filled by the shape, as in Photoshop (the engine inscribes it in an ellipse, so `polygonShape.ts` sizes the ellipse).
+- **Ruler Tool** (I, after the Eyedropper):
+  - Drag to measure; Shift keeps 45° steps; drag an end or the line to adjust; Alt-drag an end starts the protractor's second line.
+  - The options bar shows X, Y, W, H, A, L1, L2 live while dragging, with Straighten Layer (Alt-click: no crop) and Clear.
+  - While the Ruler is chosen, Info shows A and L (or D1/D2 with a protractor) instead of HSB, and the ruler's W/H.
+- **Count Tool** (I): click adds, Alt-click removes, drag moves a number. Options bar: total, group select, visibility, new/delete group, Clear, group colour, Marker Size (1–10) and Label Size (8–72).
+- **Note Tool** (I): click adds a note and opens the new **Notes** strip panel (text, previous/next, "n of m", delete). Drag moves a note; double-click opens it. Options bar: Author, Color, Clear All, Notes panel toggle.
+- **Slice Tool** and **Slice Select Tool** (C):
+  - Slice draws user slices in Normal (Shift square), Fixed Aspect Ratio or Fixed Size style.
+  - Slice Select selects any slice, moves and resizes user slices with 8 handles, Delete removes, Promote, Divide… (live preview), Hide/Show Auto Slices, and Slice Options (type, name, URL, target, message, alt, cell text, dimensions, background).
+  - Auto slices show dashed and only with a slice tool; user and layer slices, count markers and notes show whenever Extras is on.
+- The Info and Notes flyouts stay open while the Ruler or Note tool works on the canvas; other flyouts still collapse.
+- **Host**: the reply's `state.analysis` reports the ruler, counts, notes and slices, so undo and history stay in step. Gate entries plus tests `command_supported_allows_analysis_tools` and `analysis_state_reports_ruler_counts_notes_and_slices`.
+- **Files**:
+  - new: `photo/AnalysisTools.tsx`, `photo/analysisTool.ts`, `photo/polygonShape.ts`, `photo/polygonShape.test.ts`
+  - changed: `src-tauri/src/xdesign_photo.rs`, `photo/types.ts`, `photo/InfoPanel.tsx`, `editorTools.ts`, `PhotoStudio.tsx`, `photo.css`, `PhotoStudio.tools.test.tsx`, `PhotoStudio.layout.test.tsx`
+
+Tests:
+- PhotoStudio tools 75/75 (4 new analysis tests), layout 167/167 (Crop group expectation now includes the Slice tools), EditorChrome and ColorRangeDialog pass, polygonShape 2/2.
+- `npm run typecheck` passes. `cargo test --lib` for the two new host tests passes.
+
+Gaps vs Photoshop (logged, not fixed):
+- **Unverified:** the Polygon fit against Photoshop's own drag box; the Straighten Layer default (the engine crops a Background layer and rotates other layers; Alt sends `crop:false`).
+- **Omitted:**
+  - Triangle and Polygon have no corner radius; Polygon has no Smooth Star Indents.
+  - Ruler has no Use Measurement Scale.
+  - Slices From Guides is unusable, since guides are frontend-only. The engine has no slice stacking order, so there's no Bring Forward/Send Backward, and no slice align or distribute.
+  - Divide Slice has no "pixels per slice" mode (not in the engine). Slice Options has no cell alignment (not reported by the engine) and no Matte background.
+  - No View › Show › Notes / Count / Slices items; only Extras toggles them. Lock Slices and Clear Slices are Task 16.
+  - The note author doesn't default to the OS user name.
+- **Simplified:** notes and count markers are draggable only with their own tool.
+- No new token gaps: `--xd-accent`, `--xd-text-2`, `--xd-border`, `--xd-raised`, `--xd-text`, `--font-mono`, `--r-sm` and the existing `#fff`.
+
+Next: Task 15 (Panels), then Tasks 16–17, Phases 3–4, release build 11 and the live re-check.
+
+## 2026-10-27 (cont.) — XDesign gap closure, Phase 2 Task 13 follow-up: the Warp gaps
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. No Rust, Cargo or Tauri command changes. `/Applications/Orion Terminal.app` untouched. Photoshop was not used this session; behaviour comes from the Task 13 captures and Adobe's Split Warp page. Detail: top of `CLAUDE_LOG_ARCHIVE.md`.
+
+Done (the ten gaps logged by Task 13, plus the style list):
+- **Menubar live during Warp.** Only Edit › Transform is enabled. It now has Photoshop's full list: Again, the modes, Warp, Split Warp Horizontally / Vertically / Crosswise, Remove Warp Split, Convert warp anchor point, Toggle Guides, then the rotations and flips.
+  - During a Warp, the split items arm the inspector's split tool, and the rotations and flips turn the mesh about the box centre.
+  - Outside a Warp, the warp-only items are greyed out.
+  - The back button, history and panel toggles stay blocked.
+- **Canvas right-click (or Control-click) menu.** It follows Photoshop's order. Its split items split where the menu was opened.
+- **Convert warp anchor point** (Unison / Independent):
+  - Option-click an anchor, or use either menu, to toggle it.
+  - A unison anchor turns the opposite handle the other way; an independent one leaves it.
+- **Guide options** sit behind a gear in the inspector: Auto, Always or Never Show Guides, and Density (default 2, giving thirds on one patch).
+  - The density lines are drawn in every grid cell.
+  - Toggle Guides switches them on and off.
+- **Cylinder style.** It has 8 handles: square corners and sides, round depth handles. Dragging the surface wraps the contents.
+  - The pinned engine has no Cylinder, so it is applied as a custom mesh.
+  - Splits and Grid are disabled for it.
+- **Live split guide** (dashed) under the pointer while a split is armed, or while Cmd is held.
+- **Quick split.** Cmd-click splits crosswise, or across a grid line if the click lands near one. Photoshop then selects the new anchor.
+- **Handle display matches Photoshop:**
+  - Twist points are never shown.
+  - A single patch shows all its handles.
+  - Larger meshes show only the selected anchor's handles, or those along a selected split.
+  - Border anchors are squares.
+- **Dragging inside a custom mesh** pulls the surface (photocraft's `pull`).
+- **Mesh and cylinder drags** are now relative to where the press started.
+- **Split icons** are SVG.
+- **Warp style list:**
+  - The label is "Warp:" (it was "Style").
+  - "None" is removed.
+  - The groups are separated by `<hr>`.
+- `useDesignDialog` ignores keys aimed at an open menu, so Escape closes the menu, not the Warp.
+- **Files**:
+  - new: `photo/warpSession.ts`, `photo/warpCylinder.ts`
+  - changed: `GeometryDialog.tsx`, `PhotoStudio.tsx`, `useDesignDialog.ts`, `photo.css`, `GeometryDialog.test.tsx`, `PhotoStudio.layout.test.tsx`
+
+Tests:
+- GeometryDialog 75/75 (7 new), PhotoStudio layout + tools 238/238 (1 new), EditorMenus and menuModel pass.
+- `npm run typecheck` passes.
+- No cargo run, since no Rust changed.
+
+Gaps vs Photoshop (logged, not fixed):
+- **Unverified behaviour:**
+  - The menubar's split items arm the tool rather than splitting at once.
+  - What Toggle Guides hides (we hide only the density lines).
+  - The default guide mode (we use Always) and the density range (we use 1–10).
+  - The Custom Grid Size starting value (3 x 3) is still inferred from a capture.
+- **Disabled during Warp, enabled in Photoshop:** Free Transform, Scale, Rotate, Skew, Distort, Perspective, Content-Aware Scale and Puppet Warp, in both menus. The View menu is disabled too, because zooming would invalidate the open session; Photoshop keeps zoom live.
+- **Omitted or simplified:**
+  - Rotate Object is omitted (AI).
+  - Cylinder has no options-bar value fields, and a rotation or flip turns it into Custom.
+  - The quick-split preview, surface drag and preset grid display work only on a Custom mesh; presets still draw no grid on the canvas.
+  - The guide colour and opacity aren't settable.
+- No new token gaps: only `--xd-accent` and the existing `#fff` are used.
+
+Next: Task 14 (Tools: Polygon/Star/Triangle, Ruler, Count, Note, Slice), then Tasks 15–17, Phases 3–4, release build 11 and the live re-check.
+
+## 2026-10-27 — XDesign gap closure, Phase 2 Task 13: Warp split options and grid
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged. No Tauri command signatures changed. `/Applications/Orion Terminal.app` untouched. Photoshop was used only for read-only Warp captures on a scratch document, and was left with pfp.psd open and the Brush tool selected. Plan: `docs/superpowers/plans/2026-10-25-xdesign-photoshop-gap-closure.md`. Detail: top of `CLAUDE_LOG_ARCHIVE.md`.
+
+Done (Warp inspector, in Photoshop's options-bar order):
+- **Split**: Split Warp Crosswise, Vertically and Horizontally. Only one tool is armed at a time; clicking the canvas splits at that point and disarms the tool, and clicking the armed tool again disarms it.
+- **Grid**: Custom, Default, 3 x 3, 4 x 4 and 5 x 5. The readout shows Custom for any uneven or non-square mesh, as in Photoshop.
+  - **Custom…** opens Photoshop's Custom Grid Size dialog (Columns and Rows, 1–50). An out-of-range value shows Photoshop's alert, "An integer between 1 and 50 is required. Closest value inserted.", and inserts the closest value.
+- **Remove Warp Split**: click a split line (or Tab to it and press Enter) to select it, then use the button. This replaces the old "Mesh patches" select.
+- The custom mesh now draws its real surface curves, with Photoshop's thirds guides on a single patch, and whiskers from the edge handles to their anchors.
+- **Host**: `edit.transform.*` was already in the gate. Added the test `command_supported_allows_warp_split_and_grid`.
+- **Files**: `GeometryDialog.tsx`, `GeometryDialog.test.tsx`, `photo.css`, `src-tauri/src/xdesign_photo.rs`.
+
+Tests:
+- GeometryDialog 68/68 and all Warp-related vitest files 78/78 (5 new tests).
+- `npm run typecheck` passes.
+- `cargo test --lib` 1406 passed / 0 failed.
+
+Gaps vs Photoshop (logged, not fixed):
+- The menubar is inert while Warp is active, so the Edit › Transform split items can't be reached from there. The controls live in the inspector instead.
+- No canvas right-click Warp menu. No Convert Warp Anchor Point, Toggle Guides, Cylinder style or Option-click quick split.
+- An armed split tool shows no live guide line under the pointer.
+- The interior "twist" control points are still exposed as handles.
+- The 3 x 3 starting value that Custom Grid Size shows on a Default mesh is inferred from a capture.
+- The split icons are Unicode glyphs (⊞ ◫ ⊟), not Photoshop's icons.
+
+No new token gaps (only `--xd-accent` is used). Captures are in `/tmp/pstest/shots/live2/ps_warp_*.png`, which will not survive a reboot. Next: Tasks 14–17 (Tools, Panels, View, File), then Phases 3–4, release build 11 and the live re-check.
+
+## 2026-10-25 (night, cont. 2) — XDesign gap closure, Phase 2 Task 12: Content-Aware Fill, Auto-Align and Auto-Blend Layers
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged. No Tauri command signatures changed. `/Applications/Orion Terminal.app` untouched. Photoshop was used only for read-only dialog captures, and was left with pfp.psd open and the Brush tool selected. Plan: `docs/superpowers/plans/2026-10-25-xdesign-photoshop-gap-closure.md`. Detail: top of `CLAUDE_LOG_ARCHIVE.md`.
+
+Done (Edit menu, in Photoshop's order):
+- **Content-Aware Fill…** after Stroke…, enabled for a pixel layer with a selection. It uses Photoshop's panel sections:
+  - Sampling Area Options: Auto, Rectangular, Custom;
+  - Fill Settings: Color Adaptation, Rotation Adaptation, Scale, Mirror;
+  - Output Settings: Output To Current, New or Duplicate Layer, default New Layer, as in Photoshop.
+  - It previews live on the canvas as a cancellable native job.
+- **Auto-Align Layers…** and **Auto-Blend Layers…** after the Transform submenu, enabled with ≥2 selected pixel layers.
+  - Auto-Align has Photoshop's six Projection radios (Auto, Perspective, Collage / Cylindrical, Spherical, Reposition), its description line, and Lens Correction › Geometric Distortion.
+  - Auto-Blend has Panorama / Stack Images and Seamless Tones and Colors.
+- **Host changes**: `edit.autoAlignLayers`, `edit.autoBlendLayers` and `edit.contentAwareFill` were added to the gate. CAF was added to the preview whitelist and runs via `native_job()` in `xdesign_photo_preview_jobs.rs`.
+- **Files**: `EditDialogs.tsx`, `imageCommands.ts` (`contentAwareFillCommand`), `photoDialog.css` (`.xd-ps-dialog-radios.is-grid`), `PhotoStudio.tsx`.
+
+Tests:
+- Focused vitest (EditDialogs, ImageDialogs, PhotoStudio.tools) 102/102.
+- `npm run typecheck` passes.
+- `cargo test --lib` 1405 passed / 0 failed. The new Rust tests are the gate, CAF preview matches apply, and CAF native-job parity.
+
+Gaps vs Photoshop (logged, not fixed):
+- CAF Custom samples a saved alpha channel ("Sampling Channel") instead of Photoshop's painted sampling brush.
+- CAF has no Sample All Layers, no green sampling-area overlay, and no Apply button (OK only).
+- Auto-Align has no Vignette Removal.
+- Auto-Blend has no Content Aware Fill Transparent Areas.
+- Sky Replacement (next item in Photoshop) is AI, so out of scope.
+
+No new token gaps. The disk filled up during the session (344 MB free). With the owner's approval, `/tmp/pstest/shots` (1.9 GB) was deleted, so the `shots/live2/` screenshots cited in older entries are gone. `cargo clean --profile dev` removed `target/debug` (55 GB). `target/release` was kept because the running release app lives in its bundle, and keeping it makes build 11 incremental. 58 GB is now free. Next: Task 13 (Warp split items and grid), then Tasks 14–17, release build 11 and the live re-check. All of these need disk space.
+
+## 2026-10-25 (night, cont.) — XDesign gap closure, Phase 2 Tasks 10–11: Layer and Edit menu items
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged. No Tauri command signatures changed. `/Applications/Orion Terminal.app` untouched; Photoshop used only on scratch docs (read-only menu queries plus the Frame dialog probe). Plan: `docs/superpowers/plans/2026-10-25-xdesign-photoshop-gap-closure.md`. Detail: top of `CLAUDE_LOG_ARCHIVE.md`.
+
+Done:
+- **Task 10, Layer menu**:
+  - Stamp Visible ⌥⇧⌘E and Stamp Down ⌥⌘E;
+  - Photoshop's hidden layer keys ⌥[ ⌥] ⌥⇧[ ⌥⇧] plus Add Above/Below to selection;
+  - Combine Shapes (4 items, as in Photoshop);
+  - Vector Mask: Reveal All, Hide All, Current Path, Disable, Unlink, plus Rasterize › Vector Mask (the host now reports `hasVectorMask`/`vectorMask`);
+  - New › Frame from Layers… with Photoshop's "Add Frame to Layer" Name/Width/Height. Host `sized_frame` centres a resized frame on the layer bounds, as Photoshop does;
+  - New Layer Based Slice;
+  - "Merge Shape Components" at the end of the options-bar path-operations dropdown.
+- **Task 11, Edit menu**, in Photoshop's order:
+  - Toggle Last State ⌥⌘Z, done on the frontend. It reverses the last undo or redo, and the engine's version would keep redoing;
+  - Check Spelling… and Find and Replace Text…, enabled when a Type layer exists;
+  - Define Brush Preset…, Define Pattern…, Define Custom Shape…, using Photoshop's Name dialogs;
+  - Purge › Clipboard/Histories/All, each behind the "This cannot be undone. Continue?" confirm;
+  - Presets › Preset Manager… (Brushes, Patterns, Custom Shapes; Rename…, Delete). New file `photo/EditDialogs.tsx`.
+- **Host changes**:
+  - the 9 Edit ids were added to the gate;
+  - Purge Clipboard/All also empties the shared image clipboard (`xdesign_photo_clipboard::purge`);
+  - defined custom shapes and Preset Manager pattern renames now persist to the profile. Before this they were lost on relaunch.
+
+Tests:
+- `npm run typecheck` passes.
+- Task 10: all 101 Photo test files pass (1468 tests).
+- Task 11 focused tests: `EditDialogs.test.tsx` + `PhotoStudio.tools.test.tsx` 76/76.
+- New Rust tests pass: the gate, purge, the preset save, `sized_frame` and the vector-mask state.
+
+Gaps vs Photoshop (logged, not fixed):
+- the spelling user dictionary is session-only;
+- Purge Histories clears only the active document, because each document has its own engine session;
+- Find/Replace has no Ignore Accents, and its status line copy is ours;
+- Preset Manager has no Load/Save Set or drag reorder;
+- Purge has no Video Cache (video is out of scope).
+
+No new token gaps. Next: Task 12 (Auto-Align, Auto-Blend, Content-Aware Fill dialogs), then Tasks 13–17. Release build 11 live re-check still pending.
+
+## 2026-10-25 (late night) — XDesign gap closure, Phase 1: Fill Behind/Clear, Perspective Crop bar, history marker, design inspector/zoom, .fig meta
+
+Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed. The owner has not authorised a commit for this work. Cargo.toml is unchanged, so no licence refresh. No Tauri command signatures changed. Photoshop and `/Applications/Orion Terminal.app` were not touched.
+
+Plan: `docs/superpowers/plans/2026-10-25-xdesign-photoshop-gap-closure.md`. The owner's scope:
+- Phase 1: close the new gaps.
+- Phase 2: the ~45 MISSING-UI items (engine has the command).
+- Phase 3: the ~28 MISSING items (host-side engine work).
+- Phase 4: common graphic-design essentials only. No cloud, AI, video or 3D.
+
+Phase 1 is done; Phases 2–4 are next.
+
+Phase 1 changes:
+1. **Edit › Fill Mode has Behind and Clear**, listed after Dissolve as in Photoshop.
+   - The pinned engine has no such blend modes, so the new host module `src-tauri/src/xdesign_photo_fill_modes.rs` handles `edit.fill` with those modes before `engine.execute`. It runs after `history::normalize`, so preview jobs use it too.
+   - Behind composites the fill under existing pixels; Clear scales alpha by selection coverage × opacity. Each is one "Fill" history step.
+   - They are refused on masks, channels, quick mask and transparency-locked layers, matching Photoshop's greyed modes. The host error text is `Behind and Clear need a layer whose transparency is not locked`.
+   - Release timing on a 6000×4000 image with a feathered selection: Behind 423 ms, Clear 316 ms, Normal (engine) 62 ms. The temporary timing test has been removed.
+2. **Perspective Crop options bar**: W, H, Resolution, Front Image, Clear and Show Grid (`toolBars.tsx` `PerspectiveCropBar`, `PaintToolOptions.tsx`, `PerspectiveCropDialog.tsx`, `PhotoStudio.tsx`).
+   - A set W×H overrides the corrected size.
+   - A Resolution different from the image's is applied after the crop. Both fold into a single "Perspective Crop" history step, and a failure rolls back.
+   - Show Grid draws thirds through the quad's homography.
+3. **Perspective corner drags round to whole pixels** (`PerspectiveCropDialog.tsx` `move`).
+4. **History: only the snapshot row shows the source marker.** The "Open" row, which shares the snapshot's id, gets an inert spacer (`PhotoHistory.tsx`).
+5. **Design inspector**:
+   - blend modes show Figma labels (`BLEND_LABELS`, e.g. "Pass through");
+   - numbers display rounded to 2 decimals (`displayNumber`), and blurring without typing commits nothing (`AppearancePanel.tsx`, `SelectionProperties.tsx`, `MixedSelectionProperties.tsx`).
+6. **Design zoom** (new `pencil/viewportZoom.ts`):
+   - ⇧1/⇧2 fit beyond 100%;
+   - ⌘+/⌘−/⌘0 zoom around the viewport centre.
+   - Upstream `zoomToBounds` caps at 1, and `zoomToLevel` forgets to scale the pan.
+7. **.fig export keeps Figma's `meta.json`**: `client_meta` and `file_name` are restored and `exported_at` is refreshed (`figImportData.ts`, `figPaintCompatibility.ts`).
+   - The original is stored as DOCUMENT `pluginData` `open-pencil/figMeta` and stripped before encoding `canvas.fig`.
+8. **Project menu label alignment** (`figma.css`), as recorded in the plan.
+
+Tests:
+- `npm run typecheck` passes.
+- Focused vitest over the changed files: 273/273.
+- New tests:
+  - Fill mode list order and grouping;
+  - Perspective Crop bar ×3;
+  - corner rounding;
+  - single source marker;
+  - inspector labels and rounding;
+  - viewportZoom;
+  - figMeta round trip ×3.
+- `cargo test --lib`: 1397 passed, 0 failed, 20 ignored. That includes 5 new `fill_modes` tests: Behind, Clear, the empty-layer twin of Normal, fall-through, and refusals.
+- Flake: `PhotoStudio.layout.test.tsx` "restores native channel overlay options and reorders saved channels" failed once when 3 files ran in parallel. It passes alone and in 2 full-file runs, and it is unrelated to this work.
+
+Live checks, release build 10 on the scratch-HOME instance:
+- Passed:
+  - Fill Behind/Clear: correct pixels, undoable, listed in Photoshop's order;
+  - a single history source marker;
+  - the Perspective Crop bar is visible with its fields;
+  - design blend label "Pass through" and 2-decimal rounding;
+  - ⇧2 fits above 100% (159%) and centres;
+  - ⌘− zooms around the centre.
+- Found live and fixed since (unit-tested; needs build 11 to re-check):
+  - the current history row's label was dimmed by the disabled-button opacity (`photo.css`, scoped to the history list);
+  - the Perspective Crop bar had no W/H/Resolution labels, said px/in instead of Pixels/in, and greyed Clear when empty, unlike Photoshop (`toolBars.tsx` `CropSizeFields labelled`);
+  - the whole options bar went inert while the crop box was open, so the bar could not edit its own session (`PhotoStudio.tsx`, exempting perspectiveCrop's own session);
+  - ⇧1/⇧2 did nothing after clicking a design Layers row. WKWebView does not focus a `<button>` on click, so focus fell to body and skipped the section's key handler. The design section now has `tabIndex={-1}` (`PencilStudio.tsx`, `pencil.css` `:focus{outline:none}`).
+- Not checked live: .fig meta round trip.
+- A subagent reported Straighten ignoring the ruler line. That is a false positive: `xdesign_photo_straighten.rs` already routes `start`/`end` through `rulerTool` and `straightenLayer`.
+- Gap noted, not fixed: the Fill dialog always shows Custom Pattern, Color Adaptation and the Color swatch. Photoshop shows each only for Pattern, Content-Aware and Color… respectively.
+
+Next: Phase 2, using the engine command map.
+
+Open questions:
+- Hermes: there is still no `--work-muted` token.
+- Should Behind/Clear be disabled in the Fill dialog on locked or non-pixel targets, as Photoshop greys them, instead of the current host error?
+- Behind/Clear ignore Preserve Transparency, and the checkbox stays enabled. How Photoshop's dialog treats that combination has not been checked.
+
+## 2026-10-25 (night, later) — XDesign: Fill Mode, Perspective Crop tool, History Brush source, .fig round trip, missing-features audit
+
+Branch: `validation/alpha-2026-09-14`. **Uncommitted**, not staged, not pushed; the owner has not authorised a commit for this work. Cargo.toml is unchanged, so no licence refresh. No Tauri command signatures changed. Photoshop was not touched, and `/Applications/Orion Terminal.app` was not replaced.
+
+Gaps filled:
+1. **Fill dialog**. Files: `imageCommands.ts` (`FILL` is now `fillCommand(patterns, current, historySource)`), `PhotoStudio.tsx` (`openFillDialog`), `xdesign_photo_history.rs`.
+   - It matches Photoshop's layout: Contents (now with "Color…"), Color, Options (Custom Pattern, Color Adaptation), and Blending (Mode, Opacity, Preserve Transparency).
+   - Options that don't apply to the chosen Contents are disabled and are not sent.
+   - Contents "History" resolves the History Brush source to an engine `state`, the same way the brush does.
+2. **Perspective Crop is a Crop-group tool**, between Crop and Straighten, sharing the C shortcut (`editorTools.ts`, `PhotoStudio.tsx`, `PerspectiveCropDialog.tsx`).
+   - Dragging a box opens the existing quad dialog, seeded with that box (new `box` prop).
+   - The seeded corners are rounded to whole pixels; before, the canvas scale left them fractional.
+3. **The History Brush source is set from the History panel's source column**, as in Photoshop. The options-bar source picker is removed (`HistoryBrushSource.tsx`, `PhotoStudio.tsx`).
+4. **Disabled dialog fields dim their label** (`photoDialog.css`, using `:has(:disabled)` and the existing `--xd-text-3` token).
+
+Tests:
+- typecheck passes.
+- Focused vitest: 4 files, 251 tests passed (PhotoStudio.layout/tools, ImageDialogs, HistoryBrushSource).
+  - New: Fill layout and params (ImageDialogs), and the Perspective Crop tool group with its dragged box (layout). The rounding assertion was RED at 26.67, then GREEN.
+  - Updated: the History Brush source test now picks the source in the History panel, and the Fill params in the tools test now include Mode and Color Adaptation.
+  - Removed: the options-bar picker's component test, along with the picker.
+- `cargo test --lib`: 1392 passed, 20 ignored. This includes the new `history_fill_reads_the_brush_source_state`.
+- The full vitest suite (4162 tests in 356 files) passed before the rounding fix and the CSS line; it was not re-run after them.
+
+Live (release build 9, scratch HOME `/tmp/xd-release-home`, scratch image only):
+- Fill with Pattern in Multiply mode applies, and Undo reverts it.
+- The Mode list grouping matches Photoshop.
+- In Foreground Color mode, the Color, Custom Pattern and Color Adaptation labels render dimmed. Measured peak pixel brightness: about 173,201,216 dimmed versus 238,249,255 enabled.
+- The History Brush paints from a "Fill" state chosen in the History panel.
+- The Crop flyout lists Perspective Crop second.
+- Dragging with Perspective Crop opens the quad dialog with whole-pixel corners (for example 115, 48, 711), and Cancel and Esc close it.
+
+.fig round trip (scratch only):
+- Sources: `f2s-structure.fig` (107,662 B) and `f2s-vector.fig` (29,836 B), from `sketch-hq/fig2sketch` `tests/data` (MIT). They were downloaded to `/tmp/xd-roundtrip`.
+- Both open through Design › File › Open Figma / Pencil, and the render matches each file's own Figma thumbnail.
+- I added a rectangle, then used Export › FIG › Export page to write `f2s-structure-rt.fig` (111,033 B). After reopening, the rectangle is still there, the images are byte-identical, and fig-kiwi v48 is kept.
+- Loss: the exported `meta.json` drops Figma's `client_meta` (background_color, thumbnail_size, render_coordinates) and `file_name`, which are replaced by an OpenPencil stub.
+
+New gaps found (not fixed):
+- Fill Mode lacks Behind and Clear.
+- The Perspective Crop options bar is empty. Photoshop has W/H/Resolution, Front Image, Clear and Show Grid.
+- Perspective quad corner drags still produce fractional values (`PerspectiveCropDialog` `move`).
+- The History snapshot row and the "Open" row share an id, so both show the source marker.
+- Design mode:
+  - the inspector shows raw floats (41.3999999) and a raw `PASS_THROUGH` blend mode on imported .fig layers;
+  - the project-name menu labels are misaligned;
+  - ⇧1 fit seems capped at 100%;
+  - keyboard zoom anchoring is off.
+
+Missing editing features versus Photoshop 2026: the full audit is the top entry of `CLAUDE_LOG_ARCHIVE.md`.
+- Counts: about 60 PRESENT, 45 MISSING-UI (the engine has the command, there is no UI), 28 MISSING (needs engine work), and 130 out of scope (Adobe cloud/AI, video/3D, app chrome).
+- Many MISSING-UI `edit.*` and `file.*` items also need a one-line `command_supported()` allow-list change.
+- Top 15:
+  1. Stamp Visible/Down
+  2. Auto-Align/Auto-Blend
+  3. Photomerge, HDR Pro, Crop & Straighten
+  4. Content-Aware Fill workspace
+  5. Character/Paragraph Styles
+  6. Layer Comps
+  7. Color Sampler, Ruler, Note and Count tools, plus the Measurement Log
+  8. Vanishing Point
+  9. Red Eye, Pattern Stamp, Art History
+  10. Polygon, Triangle, Star and Custom Shape tools
+  11. Revert, Save a Copy, Scripts
+  12. Layers to Files, Quick Export
+  13. Layer colour labels
+  14. Split Warp, Toggle Last State
+  15. Rotate View, Flip View, Pixel Grid, Fit Layer
+
+Next:
+- Commit this work if the owner approves.
+- Then the new gaps above, and the top-15 MISSING-UI items, smallest first.
+
+Open questions (Hermes):
+- In the workstation theme, `--xd-text-3` maps to `--work-muted`, which is `color-mix(--t-secondary 82%, --t-primary)`. That makes "tertiary" text slightly brighter than `--xd-text-2`, so disabled labels are only subtly dimmed.
+- I used `--xd-text-3` without changing it. Should `--work-muted` sit below secondary?
+
 ## 2026-10-25 (late night) — XDesign: Photoshop parity live checks (step 3 of 3)
 
 Branch: `validation/alpha-2026-09-14`. **Committed**, not pushed. This is step 3 of the owner's "do 1, then 2, then 3, and commit after each". Cargo.toml is unchanged, so no licence refresh.

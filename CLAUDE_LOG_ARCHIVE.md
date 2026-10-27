@@ -1,3 +1,566 @@
+## 2026-10-27 (cont.) — Claude / XDesign gap closure: build 11 live re-check, fixes for builds 12–14
+
+Branch: `validation/alpha-2026-09-14`. Committed and pushed with owner authorisation.
+
+- **Permissions root cause**: the agent's shell runs under EMP's LaunchAgent `empd`. macOS TCC assigns Accessibility and Screen Recording to that responsible process, and `empd` is ad-hoc signed, so System Settings can't list or grant it. **Workaround**: `/tmp/pstest/runner.command` is a loop opened in Terminal, which holds both permissions. `t.sh '<cmds>'` queues a job and prints its output. `touch /tmp/pstest/q/stop` ends the loop. `W.sh` takes coordinates relative to the window, `capW.sh` captures the window, and `goR.sh` keeps the idle ≥4 s and frontmost-release-app guards. `axt` gained `f9` (keycode 101); its Escape key is named `esc`.
+- **Menubar focus swallowed function keys** (`PhotoStudio.tsx`, key handler): menu choices and dialogs return focus to the menubar title. The pass-through filter there let only printable keys and Escape reach the document, so F5–F8, ⌥F9, ⇧F5 and Delete/Backspace did nothing until the canvas was clicked. Function keys, Delete and Backspace now pass through too. Space, Enter, Tab and the arrow keys stay with the button. Test: the tools suite's "hands Escape and tool keys…" case now presses ⌥F9 on the Window trigger and expects the Actions panel. It fails with the old filter.
+- **Copy CSS/SVG rejected by WKWebView** (release only): the promise-valued `ClipboardItem`, started inside the click, still failed with `NotAllowedError`. Nothing in the host touches the pasteboard during the command, and there are no devtools in release, so the exact WebKit rule is unconfirmed. **Fix**: under Tauri the engine's text goes to a new host command, `xdesign_photo_copy_text`, which pipes it to `/usr/bin/pbcopy` with `LANG=en_US.UTF-8` (a launchd environment may have no UTF-8 locale). Other platforms get an explicit error. No new dependency. Outside Tauri (browser dev), the WebKit path is unchanged. Test: the layout suite's Copy CSS/SVG case covers the host call and the failure message. There is no native unit test, because one would overwrite the owner's clipboard.
+- **Rotate View tile seams**: build 12 first tried overlapping colour tiles by 1 px while turned. Live on build 12 the hairlines remained, about half as bright. **Root cause**: under `rotate()` every tile is anti-aliased on its own, and each tile's `.xd-photo-tile-pixels.has-color` checker sits directly under its own canvas with the same edge. At a partly covered edge pixel the checker shows through, at up to about 25 % of its brightness. That is a conflation artifact, not a gap: the preview canvas under the tiles is already the right colour there. A headless WebKit repro (`/tmp/pstest/seam/`; Playwright WebKit 2368, 2× scale, 36°) measured 3258 seam pixels (peak 39/255) for the original, 1546 (peak 22) for the 1 px overlap, and 0 with the fix. **Fix** (`photo.css`, CSS only): while `.xd-photo-image[data-view-angle]` is set, the tile checker gets `padding:1px; background-clip:content-box`. Its edge then falls under the tile's own canvas, and the preview fills the tile edge. Canvas placement doesn't move, because absolutely positioned children size against the padding box. Over transparent areas, the repro's fixed render was closer to a single-canvas reference at 8359 pixels and worse at 2 (error ≤10). The overlap code and its test were reverted, because the overlap also stretched each tile's pixels by 1/512. There is no jsdom test, because jsdom does no compositing.
+  - **Build 13 live**: 0 opaque seam pixels in the measured crop, against 522 on build 12. But transparent areas now showed a broken-checker strip along the tile boundaries. The 1 px gap exposed `.xd-photo-image`'s own checker, which WebKit rasterises out of phase with the tile checkers because the layers sit at fractional offsets. In the repro, counted as pixels differing from the base checker over transparent areas, inset alone gave 8899.
+  - **Final fix (build 14)**: each colour tile also renders `.xd-photo-tile-under`. It is a copy of the tile's checker with the same box and `background-position`, and is `display:none` unless the view is turned. While turned it is `z-index:-1`, which puts it in the rotated `.xd-photo-image`'s stacking context: above the image checker and below the preview canvas. The 1 px gap therefore shows the preview where there are pixels, and an in-phase checker where there aren't. The inset rule stays. Repro: 0 opaque seams. The only pixels left differing from base (556) were base's own opaque seam at x≈512, y 198–561. A per-tile copy and one shared container rendered pixel-identical. **Live on build 14** (36°, at 76 % and 94 %): 0 opaque seam pixels, no checker strip (`shots/live3/cmp-r13-r14-line.png`, `cmp-r13-r14-crop1.png`). Known edge: while a view preview (`viewPreview`) is still loading, the preview canvas is hidden, so the gap shows checker over opaque pixels. Build 13 had the same behaviour.
+- **Panel tab strip overflow**: Color, Swatches, Gradients and Patterns fill the 270 px dock, which pushed the Color group's ≡ menu and collapse chevron out of view. Tab labels now sit in a span that ellipsizes. Tabs have `min-width:0`, while the selected tab, the `.xd-editor-menu` wrapper and the collapse button are `flex:none` or don't shrink. The span exists because WebKit doesn't reliably ellipsize text directly inside a `<button>`.
+- **Options bar scrollbar**: `.xd-photo-options` uses `overflow-x:auto`, and the global 8 px `::-webkit-scrollbar` added a row whenever the bar overflowed. That shifted the canvas and panels about 9 px. The scrollbar is now hidden, as `.xd-ps-taskbar-items` already does, and the bar still scrolls sideways.
+- **Properties with a selection**: `transformBounds` comes from the engine's `transform_bounds`, which intersects the layer's content with the selection. A Single Row that misses every pixel gives `[0,0,0,0]`, so W/H/X/Y showed 0, and an X/Y edit would have moved the layer measured from 0. An empty frame now locks the Transform fields. Test in the layout suite's Properties case.
+- **Observations, not changed**:
+  - Window and Edit menus are taller than a 900 pt window minus the shell dock, so they scroll.
+  - Right-click on a layer name selects its text.
+  - The Properties transform fields stay in px when ruler units change (Task 28's open gap).
+  - Tools without a hint (brush, pencil, eraser, Pattern Stamp) show the generic "Edits update every linked placement".
+  - History snapshot thumbnails are placeholders (known gap).
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 4, Task 30 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **State**: `chrome` (`{options, tools}`, both true) sits in `PhotoStudio` next to the task bar state. It lasts for the session only, as the panel layout does.
+- **Options bar**: hidden with the `hidden` attribute rather than unmounted, so the brush, gradient and pattern pickers keep their open state and drafts. `photoshop.css` needs `.xd-photo .xd-ps-options[hidden]{display:none}` because the bar's own `display` rule outranks the UA `[hidden]` style.
+- **Toolbar**: `EditorToolRail` is not rendered while hidden. Tool shortcuts go through the studio key handler, not the rail, so they keep working.
+- **Workspace**: the Essentials (Default) and Reset Essentials items' `run` also calls `setChrome({options:true, tools:true})`.
+- **Test**: the tools suite checks the Window menu order (Options, Tools, Contextual Task Bar), `aria-checked`, both hidden, `C` still switching tools with the rail gone, and Reset Essentials restoring both.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 3, Task 29 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Engine API used** (`print_cmds.rs`): `print_pdf(&PrintPage{paper, image, rect, marks, description, label})` returns the PDF bytes. MediaBox is written `{pw:.2}`. `PrintImage{width, height, channels, data, icc}` takes 8-bit interleaved data with 1, 3 or 4 channels.
+- **Host `pdf::photoshop_pdf`** (`xdesign_photo_pdf.rs`):
+  - It clones the document into a temporary `Session`, so the user's history is never touched.
+  - Modes other than RGB, Grayscale and CMYK run `image.mode.rgb` first.
+  - RGB and Grayscale use `photocraft_compose::flatten(d).over_background([1,1,1])`.
+  - CMYK runs `layer.flattenImage` and reads the single layer's surface, keeping the first `fmt.mode.color_channels()` of `fmt.channels()` per pixel. This drops alpha and spot channels.
+  - Paper is `px × 72 / ppi`, with 72 ppi when the resolution is 0. Calling `print_pdf` directly skips `file.print`'s 36 pt minimum paper.
+- **Host `xdesign_photo_export`**: `pdf` joins the extension list. The PDF branch adds the warning "Photoshop PDF keeps the flattened image; layers are not saved." when there is more than one layer. Both branches end in `photocraft_format::atomic_write`.
+- **Artboards to PDF**: `file.export.artboardsToPdf {path, artboards?, quality}` is added to `command_supported`. It returns `{path, pages}`. The engine's `write_file` is already atomic, so the plan's temporary-file staging was dropped.
+- **Frontend**:
+  - `ImageExportDialog` takes `copy`. `COPY_FORMATS` puts PSD, then Photoshop PDF, then the Export As formats.
+  - `exportOpen` is `"export" | "copy" | false`, and the dialog is keyed on it so switching modes resets the format.
+  - `ArtboardsToPdfDialog` sends the selected artboard ids only when Export Selected Artboards is on.
+- **Tests**: a Rust module test (RGB/Gray/CMYK/Lab colour spaces, page size from ppi, a 1 px image at 0.24 pt), plus FileDialogs, ImageDialogs and fileMenu.studio cases.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 3, Task 28 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Store** (`photo/preferences.ts`): zustand, persisted as `{schemaVersion:1, preferences}` under `orion.xdesign.preferences.v1`.
+  - Each field is sanitised on its own, so one bad value falls back alone.
+  - `previewPreferences` changes the live state without saving; `savePreferences` writes and returns an error message on failure.
+  - `unitsPerPixel(unit, ppi, pointSize, axisPx)` covers px, in, cm, mm, pt, pica and percent. Traditional points are 72.27 per inch.
+- **Dialog** (`PreferencesDialog.tsx`):
+  - It keeps the opening values and restores them on Cancel or Escape (`useDesignDialog(cancel)`).
+  - Number fields keep their own text, so an out-of-range entry disables OK while the last valid value stays on the document.
+  - Section navigation reuses the Layer Style page nav (`xd-photo-style-pages`).
+- **Wiring**:
+  - `rulerTicks` takes a units-per-pixel scale, with nice steps down to 0.01.
+  - Grid spacing is Gridline Every in its unit at the document's ppi, divided by Subdivisions.
+  - Guide, grid, smart-guide and slice colours are content hex values; slices read them through the runtime `--xd-photo-slice` variable.
+  - View › Print Size uses `screenResolution / documentPpi`.
+- **Rulers**: right-click shows a radio list of units that saves at once. Double-click opens the dialog on Units & Rulers.
+- **Tests**: `preferences.test.ts`, ruler and grid cases in `viewGuides.test.ts`, a layout test for the dialog flow, and a tools test for the slice variable.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 3, Task 27 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Host** (`xdesign_photo_layer_code.rs`): `layer.copyCSS` and `layer.copySVG` are dispatched after `layer_colors`. They read the document only and return `{text}` without bumping the revision.
+  - Targets: the `layer` param, else the selected layers, else the active layer. Only shape and type layers count.
+  - CSS class names are made CSS-safe. Numbers are trimmed to at most 2 decimals.
+  - Type size in px is pt × ppi / 72.
+  - SVG paths come from the engine's Bézier segments. Gradients go in `<defs>`, and all text is XML-escaped.
+- **Clipboard**: the write starts inside the click handler with a `ClipboardItem` holding a pending promise, so WebKit keeps the user gesture while the host serialises. Without `ClipboardItem` it falls back to `navigator.clipboard.writeText` after the reply.
+- **Paste without Formatting**:
+  - It reads clipboard text, normalises CRLF and CR to LF, and runs `type.insertText` (History "Paste").
+  - The caret comes from `lastTextCaret`, which the on-canvas text editor sets on commit, else the end of the text. The remembered caret then moves past the inserted text.
+- **Tests**: `cargo test --lib layer_code` (3), and a layout test for the menus, both clipboard paths and paste positions.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 3, Task 26 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Recording hook**: `runtime.ts` calls `recordActionStep(command, params, reply)` once a host reply arrives.
+  - A step is kept when the reply added a History state, and takes that state's name; `layer.select*` steps are kept as "Select Layer".
+  - Excluded: undo/redo, `history.*`, `view.*` and `preview.*`. Brush-type `paint.*` is kept only with Allow Tool Recording.
+  - A `layer` param equal to the then-active layer is dropped, so playback targets the active layer.
+- **Playback**: steps go through the same `runPhotoCommand` gate in order. Unchecked steps are skipped, and the first failure stops playback and is shown on that step.
+- **Store** (`photo/actions.ts`): sets, actions and steps are saved in `orion.xdesign.actions.v1` (schema 1, 512 KB cap, validated on read). Read and write failures surface in the panel.
+- **Bug found by the test**: panel menus are built during the studio render, so `PhotoStudio` subscribes to the actions store. Without this the menu showed stale enabled states.
+- **Tests**: `runtimeActions.test.ts` drives the real runtime against a mocked host; the layout suite covers the panel.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 3, Task 25 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Engine fact**: layers already carry `label`, which the PSD reader and writer map to `lclr`. No engine change was needed.
+- **Host** (`xdesign_photo_layer_colors.rs`): `layer.setColor {color, layers?, layer?}` with `color` ∈ none, red, orange, yellow, green, blue, violet, gray.
+  - With no ids it uses the selected layers.
+  - One "Layer Properties" History state; nothing is added when nothing changes. No recomposite.
+  - It refuses while a job runs. The layer state now includes `color`.
+- **New Layer / New Group**: the colour is folded into the same single "New Layer" step.
+- **Frontend**: the right-click colour items, the tinted visibility column, and Color in the Layers filter bar (between Attribute and Smart Object).
+- **Token gap**: red is `#ff5e6a` (Hermes' `--c-error`); the others map to neon tokens, `--xd-accent` and `--xd-text-3`. Flagged for Hermes.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 3, Task 24 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **View turn** (`photo/viewTurn.ts`): rotation and flip per document for the session.
+  - It is a CSS rotate (and scaleX for flip) on the image surface; pixels never change.
+  - Pointer mapping goes through `surfaceOffset`, `surfaceFraction`, `surfaceSize`, `surfaceClient` and `visibleArea`.
+  - When unturned, these return the old arithmetic exactly, so existing tests are unchanged.
+- **Rotate View tool** (R, Hand group): the drag angle is measured about the stage centre, and Shift snaps to 15°. Options: Rotation Angle and Reset View.
+- **View menu**:
+  - Fit Layer(s) on Screen uses the rotation-aware union box of the selected layers.
+  - Print Size started at a fixed 72 screen ppi; Task 28 replaced it with Screen Resolution.
+  - Show gains Layer Edges, Smart Guides and Pixel Grid (above 500% with Extras on).
+- **Move snapping**: the moving box's edges and centres snap to visible layers, document bounds and guides within 8 screen px. Smart Guides draw the matches and also snap when Snap is off, as Photoshop does.
+- **Converted call sites**: painting, marquees and lassos (Magnetic too), crop, transform, path edit, ruler and count, Color Range sampling, tiles, stroke previews and grid/guide drawing.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 3, Task 23 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Host** (`xdesign_photo_history_snapshots.rs`): `history.snapshot.new|select|rename|delete` are handled before `execute_view_command`.
+  - Snapshots are kept per photo id, up to 100. `xdesign_photo_cache.rs` forgets them on eviction.
+  - `snapshot_id` is shared with `xdesign_photo_history.rs`.
+  - Replies carry `historySnapshots` and `historySnapshotName`. All four commands refuse while a job runs.
+- **From**: Full Document clones the document. Merged Layers flattens the visible layers only and errors if none are visible. Current Layer keeps the active layer only.
+- **Select**: reverting is one undoable step named after the snapshot. Selecting the snapshot already showing adds nothing.
+- **Delete State**: drops the current state and everything after it through `history.select` with `discardRedo`. It is disabled at the first state.
+- **History Brush**: a Full Document snapshot is a source while its state is still in History. Rows a snapshot already represents hide their own source box.
+- **Tests**: `cargo test --lib snapshots` (12, 3 new), plus the PhotoHistory, ImageDialogs and tools suites.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 3, Task 22 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Why host-side**: the pinned engine has no `paint.patternStamp`, so `xdesign_photo_pattern_stamp.rs` hooks it before `engine.execute`.
+- **Dabs**: it reuses the Clone Stamp coverage (`stroke_coverage` and `apply_coverage`), so size, hardness, spacing, flow, opacity, blend mode, selection and Lock Transparency match Clone Stamp in every colour mode.
+- **Pattern**: Aligned tiles from the image origin; unaligned centres the pattern on each stroke's first sample. The source is the selected pattern, else the first library pattern.
+- **History**: one journalled "Pattern Stamp" state through `mask_filters::commit_host_edit`. "Pattern Stamp" is on the Fade allow-list.
+- **Preview**: `stroke::pixel_draft` renders through the same code with no History, for up to 2048 samples.
+- **Tests**: `cargo test --lib pattern_stamp` (5) and `fade` (58).
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 3, Task 21 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Why host-side**: the pinned engine has no red-eye command. `xdesign_photo_red_eye.rs` handles `paint.redEye {x, y[, width, height], pupilSize, darken[, layer]}` before `engine.execute`.
+- **Detection**:
+  - A pixel is red when (r − max(g, b)) / r ≥ 0.35. Red pixels form 4-connected pupils, and specks under 4 px are ignored.
+  - A click searches a square reaching an eighth of the shorter side (at least 16 px) and takes the nearest pupil.
+- **Correction**:
+  - The disc radius is 0.5–1.5 × the pupil's area radius, set by Pupil Size.
+  - Inside the disc, reddish pixels blend toward (g + b) / 2, darkened by Darken Amount. The edge is anti-aliased and selection coverage is respected.
+  - Only the corrected discs are rewritten.
+- **History**: one journalled "Red Eye Tool" state. Finding nothing returns `{corrected:0}` with no step.
+- **Limits**: RGB only. Boxes over 8 MP are refused.
+- **Gesture**: a drag of 3 or more screen px on both axes is a box; anything smaller is a click.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 3, Task 20 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Store** (`photo/colorSamplers.ts`): samplers are kept per image in memory, up to 10, and renumber after a delete.
+- **Sampling**: the Info panel reads each sampler with the shared Sample Size, re-sampling when the image version, view or size changes. The cursor readout now uses the Sample Size area too; Point Sample is unchanged.
+- **Markers**: shown only with the Color Sampler Tool active or the Info panel open, and hidden by View › Extras.
+- **Gestures**: a drag moves a sampler live. Dropping it off the image or Alt-clicking it deletes it.
+- **Tool order**: Color Sampler is second in the Eyedropper flyout. The tools test's Shift+I step counts were updated.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 3, Task 19 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Tools**: Single Row and Single Column Marquee are flyout entries 3 and 4 with no shortcut, so Shift+M still cycles Rectangular and Elliptical only.
+- **Selection** (`photo/selectionGesture.ts`): the release point picks the row or column, which spans the whole canvas. It is sent as `select.rect {…, ellipse:false, feather, antiAlias:false}`, and nothing is sent outside the canvas.
+- **Behaviour**: modes, Shift/Alt and snapping are shared with the box marquees. The options bar shows Feather only.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 3, Task 18 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Host `documents::derive`**:
+  - Only `image.duplicate` and `file.automate.cropAndStraightenPhotos` are accepted, with object params of 64 KB or less.
+  - A fresh `Session` gets a clone of the pinned document, the `Discard`-policy snapshot state and the captured colour views, then runs the command.
+  - Every document after the first is a result. No results is an error ("The operation created no image"); the engine's own "no photos found" error passes through.
+- **Host `documents::open`**: each result gets a new ULID photo id and its own `Session` with the draft's colour settings and preview tool settings, then is published under `assets/xdesign/<project>/<photo>`. Sessions enter the cache only after every write succeeds.
+- **Host tests** (240×160 fixture with two 70×50 rectangles):
+  - The gate still refuses both commands, and `derive` rejects other commands.
+  - Duplicate gives new layer ids, Merged Only gives a single Background, and the source `Arc` is untouched.
+  - Crop and Straighten gives two photos of about 70×50, each with one document, an empty history and journal, and a bundle on disk. A blank image errors.
+- **Frontend `createImages`**:
+  - It checks the 1024-document limit before and after the call, and the active project after it.
+  - It validates each reply and imports Pencil lazily.
+  - On failure it rolls back the undo batch and restores the `photoDocuments` registry.
+- **Studio**: the Duplicate Image dialog is the form element itself (`PhotoDialog` renders `<form role="dialog">`), so the test submits the dialog directly.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 2, Task 17 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Engine semantics checked** (`file_cmds.rs`, `print_cmds.rs`):
+  - `file.fileInfo`: no known keys means a read. Keywords come back as an array and author joined with "; ". A string written to keywords or author is split on `;` and `,`.
+  - `fit_image`: `k = min(bw/w, bh/h)`. No change if `k > 1 && dontEnlarge` or the rounded size equals the current one.
+  - `color_lookup_tables` and `paths_to_illustrator`: with a `path` they `write_file` (the vendored `photocraft_format::atomic_write`); without one they return the text.
+  - `layers_to_files`: top-level layers top to bottom, named `{prefix}_{i:04}_{name}.{ext}`. Adjustment layers are skipped but still use up an index.
+- **Host `exports::execute`**:
+  - It runs before the preview and lens checks in `execute_view_command`.
+  - It refuses a missing or non-folder `dir`, then stages into `temp_dir()/xdesign-layers-to-files-<ulid>`.
+  - It reads each staged file and atomically writes it beside the destination; the `Drop` guard removes the staging folder.
+  - The last journal entry gets the caller's params back.
+  - Tests: the files land in the destination, the document `Arc` is unchanged, the journal shows the user's folder, no staging folder is left behind, and a missing destination is rejected.
+- **`FileDialogs.tsx`**:
+  - The `FileDialog` wrapper keeps a local failure message, so a cancelled save (`CANCELLED`) keeps the dialog open silently while other errors show in the dialog.
+  - `exportTo` does save dialog, then command with `path`.
+  - Mode comparisons lower-case `state.mode`.
+- **PhotoStudio**: `fileDialog` state is added to the clone-marker effect's dependency list, matching the other dialogs.
+- **Tests**: the studio test's `closeMenus` presses Escape on the open menus before reopening a submenu, because clicking an open menubar item closes it.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 2, Task 16 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Engine semantics mirrored**:
+  - From `artboard_cmds.rs` `clear_artboard_guides`: vertical guides with `x0 < x < x1` and horizontal guides with `y0 < y < y1` are removed.
+  - From `file_cmds.rs` `clear_canvas_guides`: guides strictly inside any artboard on their axis are kept.
+  - The host never sends these engine commands, since guides live in `useViewAids`.
+- **`viewGuides.ts`**: `inside(guide, rect)` holds the rule. `clearArtboardGuides(document, rect)` and `clearCanvasGuides(document, rects)` are pure filters.
+- **PhotoStudio**:
+  - Artboards come from top-level layers carrying the engine's `artboard {rect:[x,y,w,h], background, preset}` descriptor. The active artboard is the one that is, or contains, the active layer.
+  - Delete with Slice Select skips `slice.delete` while locked.
+- **AnalysisTools**: a `locked` flag from `analysis.slicesLocked` gates the new-slice drag, the user-slice move, the handles, double-click Options, and the Promote, Divide… and Slice Options buttons. Selecting a slice still works.
+- **Tests**:
+  - Menu order, plus Clear Selected Artboard Guides disabled outside an artboard.
+  - Both clears against two artboards, including edge-exact guides, which count as canvas guides.
+  - The no-artboard canvas clear.
+  - The Lock/Clear Slices ids, params, checkmark and disabling.
+  - The tools test asserts that no `slice.*` command goes out while locked.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 2, Task 15 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **Host `panels_state`**: `layerComps {comps, lastApplied, hasLastDocumentState}`, `measurementLog {rows, columns, dataPoints, available}` (column headers from the engine's `COLUMNS`), `textStyles {character, paragraph, current}` with resolved attrs, so the style dialogs open on real values.
+- **Panel modules** each own a small zustand store (selection and open dialog). The panel-menu builders read it with `getState()`, so PhotoStudio subscribes to each store's `selected` to keep the flyout menu fresh.
+- **Type styles**: a row click always selects; it applies only when type is selected (`current` non-null). Character id 0 ("None") has no options; the Basic Paragraph name is fixed. `set` sends only changed keys, scales as fractions, leading `""` as `"auto"`.
+- **Measurement Log**: Shift selects anchor→target in table order; export runs the save dialog then `measurementLog.export {path, rows}` (the engine writes the CSV).
+- **Clone overlay**: `cloneOverlayTransform` samples `cloneSourcePoint` at three points and inverts the affine map, so the SVG `<image>` is placed with `matrix(...)`; it falls back to a translate when the map is degenerate. The svg, clip circle and transform are updated imperatively in `drawCloneMarker`, alongside the crosshair, and every path that hides the crosshair hides the overlay too. Opacity, blend, invert and clipping are render-time styles. Overlay opacity reuses `CloneSourceValue` (commit on blur/Enter, stale-context guard).
+- **Tests**: `DocumentPanels.test.tsx` covers exact ids and params for every panel button, menu item and dialog; two layout tests cover docking, Image › Analysis items and the overlay (placement, options, Auto Hide during strokes, Show off).
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 2, Task 14 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **`analysisTool.ts`**: a zustand store for tool-local state: the ruler draft (shown in the options bar and Info before the engine has it), the selected note and slice, note author and colour, Hide Auto Slices, slice style/ratio/size, the open slice dialog and the divide preview.
+  - `rulerReadout` ports the engine's `ruler_info` (angle counter-clockwise from +x with y up; with a protractor, the angle between the lines folded to ≤180°).
+  - Engine colours are 0..1 RGB; `rgbHex` converts them.
+- **`AnalysisTools.tsx`**:
+  - `AnalysisOverlay` is one SVG over the image (`viewBox` in doc px). It takes pointer events only while an analysis tool is active and Space isn't held.
+  - Slice refs are `{id, number}`: auto slices have no id and are addressed by `number` (`slice.promote {number}`); user and layer slices by `slice`.
+  - Hit testing prefers user/layer slices over auto, then the smallest area, since the engine keeps no stacking order.
+  - A dragged ruler, slice, note or count stays drawn until the command settles, so it never snaps back.
+  - `NumberField` commits on blur or Enter, clamped; `ColorField` commits only on the native `change`, so one pick is one history step.
+- **PhotoStudio**:
+  - The overlay mounts whenever the state has `analysis` (so extras show with other tools) and not during geometry dialogs.
+  - Delete/Backspace with Slice Select deletes the selected user or layer slice and returns before the layer-delete branch.
+  - The canvas `onPointerDownCapture` that collapses strip flyouts now spares Info for the Ruler and Notes for the Note tool.
+- **Test helpers**: the analysis `drag` mocks the overlay's rect and pointer capture before dispatching, even when the press starts on a child element.
+
+## 2026-10-27 (cont.) — Claude / XDesign gap closure Phase 2, Task 13 follow-up detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+- **`warpSession.ts`**: a zustand store `{session}`.
+  - While a Warp is open, `GeometryDialog` publishes split, removeSplit, convertAnchor, toggleGuides, turn and canSplit, canRemove, canConvert. A ref keeps the closures current, so the store only changes when a flag flips.
+  - `warpMenuItems` builds the shared group for the Edit › Transform submenu and the canvas menu.
+  - `WARP_TURNS` maps each label to its warp action and to the native command it runs outside a Warp.
+- **`PhotoStudio`**:
+  - The header is `inert` only when geometry is active and no Warp session is open.
+  - While a session is open, every menu entry except Edit › Transform is shown disabled (the menu shortcuts were already blocked by `isDesignDialogOpen`).
+  - The `useWarpSession` hook must sit above the `if(!document) return null` early return.
+- **`warpCylinder.ts`**: a TS port of photocraft upstream's `cylinder_mesh`, `cylinder_default`, `cylinder_handles` and `cylinder_dragged` (PR #9798, read from `/tmp/upstream_*.rs`).
+  - It builds a 4×1 patch mesh, us `[0, uL, .5, 1−uL, 1]`, from the 41-row shape table.
+  - The press tolerance on the surface is `6/zoom` doc px.
+- **`GeometryDialog`**:
+  - `dragWarpPoint` and `pullWarpMesh` are ports of BezierMesh `drag_point` and `pull`. Drags are applied to the baseline captured at the press, offset by (pointer − start).
+  - Independent anchors are keyed `"u:v"` by knot value, so the key survives index shifts after a split.
+  - `quickWarpSplit` ports `quick_split_kind`, with tolerance `clamp(8/size, .02, .12)` and thirds counted on one patch.
+  - `nearestWarpAnchor` selects the anchor after a crosswise split.
+  - Handles render as `<rect>` when square, with shared `SVGAttributes` props. A pointerdown with Cmd or Control isn't stopped, so it reaches the svg.
+- **React 19** accepts `<hr>` inside `<select>`, and jsdom keeps the hr elements.
+- **The canvas-menu Escape** used to be swallowed by the dialog's window capture listener. It is now skipped when the target is inside `[role="menu"]`.
+
+## 2026-10-27 — Claude / XDesign gap closure Phase 2, Task 13 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+Engine contracts (photocraft 47f9306, read-only: `crates/engine/src/warp_cmds.rs`, `crates/geom/src/warp.rs`):
+- **Split, grid and remove commands are pure** when the warp is sent inline:
+  - The commands are `edit.transform.splitWarpCrosswise|Vertically|Horizontally`, `edit.transform.removeWarpSplit` and `edit.transform.warpGrid`.
+  - Params: `{rect, style, bend, hDistort, vDistort, vertical, mesh? (custom only), at|size}`.
+  - Reply: `{warp:{style, bend, hDistort, vDistort, vertical, bounds, mesh:{us, vs, points}}}`. The document version doesn't change, so `runPhotoCommand` returns `reply.result`.
+- **Split on a 1×1 custom mesh commits the thirds first.** A crosswise split at the centre gives a 4×4 mesh with knots 0, 1/3, 1/2, 2/3, 1. Presets are fitted as one patch first.
+- **`removeWarpSplit`** removes the interior knot nearest `param_at(at)`, and picks u when du ≤ dv. The frontend therefore sends `at` halfway along the selected line's first patch, so a crossing line can't win.
+- **`warpGrid` is square only** (`size` 1–64; it fits the current surface sampled at i/n).
+- **BezierMesh**:
+  - (3c+1)×(3r+1) control points, row-major.
+  - `fit` uses `BERN_INV=[[1,0,0,0],[-5/6,3,-1.5,1/3],[1/3,-1.5,3,-5/6],[0,0,0,1]]`.
+  - It is not reachable from the host.
+
+Frontend (`src/apps/xdesign/photo/GeometryDialog.tsx`):
+- `locateKnot`, `warpMeshPoint` (eval) and `fitWarpMesh` are exact TS ports of BezierMesh `locate`, `eval` and `fit`. `regridWarpMesh(mesh, cols, rows)` refits the current surface on even knots.
+  - It exists because Photoshop's Custom Grid has separate columns and rows, but native `warpGrid` is square only.
+  - Square sizes go to the engine. Non-square sizes refit locally: from the current custom mesh, or for a preset style from `warpGrid size 1` first.
+- `warpGridId(mesh)` returns "1", "3", "4" or "5" only for even square meshes, otherwise "custom".
+  - The select carries a hidden "custom" readout option, so choosing the "Custom" action option still fires when the readout is already Custom.
+- `CustomGridSizeDialog` is portalled into `.xd-photo` as a sibling of the warp form, not inside it, because React synthetic submit and keydown events bubble through portals. It also calls stopPropagation on submit.
+  - The `useDesignDialog` stack makes Escape close only the inner dialog.
+- Handles ignore pointerdown while a split tool is armed, so a click on a handle still reaches the svg and splits there.
+- `photo.css`:
+  - `.xd-photo-warp-split`: transparent 9px stroke hit lines, accent when pressed or focused.
+  - `.is-splitting`: crosshair cursor.
+  - `.xd-photo-warp-split-tools`: the split button row.
+
+Tests (`GeometryDialog.test.tsx`, "Photoshop warp split and grid options"):
+- Refit preserves the surface.
+- The grid options send the engine params, and Arc is regridded to custom.
+- Custom Grid Size: clamp alert, local 4×2 refit, reopening shows 4/2, Escape closes only the inner dialog, 5×5 goes through the engine.
+- Split arming, disarming and the handle click-through.
+- Remove Warp Split's `at` for vertical and horizontal lines, including selection with Enter.
+
+## 2026-10-25 — Claude / XDesign gap closure Phase 2, Task 12 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+Engine contracts (photocraft 47f9306, read-only):
+- **`edit.autoAlignLayers`**
+  - Params: `{projection: auto|perspective|cylindrical|spherical|collage|reposition, reference?, geometricCorrection: bool=false, interpolation?}`.
+  - Error when matching fails: "Auto-Align couldn't find enough matching detail between the layers".
+- **`edit.autoBlendLayers`**
+  - Params: `{method: panorama|stack, seamlessTones: bool=true}`.
+  - Both auto commands need ≥2 selected raster layers.
+- **`edit.contentAwareFill`** (`edit_menu_cmds.rs:312`)
+  - Params: `{sampling: auto|rectangular|custom, area?|channel?, margin?, colorAdaptation: none|default|high|veryHigh, rotationAdaptation: none|low|medium|high|full, scale, mirror, output: current|new|duplicate, seed?}`.
+  - `custom` errors without `area` or `channel`. A numeric `channel` is a `doc.channels` index, which is the same as `state.channels.alpha[].index`.
+  - Runs through `jobs::run`: inline from `execute`, on a worker from `Session::start`.
+
+Host (`src-tauri/src`):
+- `xdesign_photo.rs`: the three ids are in the explicit gate list. Test: `command_supported_allows_edit_auto_and_content_aware_fill`.
+- `xdesign_photo_preview.rs`: `edit.contentAwareFill` is in `render_using_cache_repeat`. Test: `content_aware_fill_previews_match_apply`.
+- `xdesign_photo_preview_jobs.rs`:
+  - New `native_job()`. CAF qualifies whenever it is enabled; filters keep the old `params_for` + `pixel_preview_job` rule.
+  - Test `content_aware_fill_previews_run_as_native_jobs_with_synchronous_pixels` compares composites, layer names and history length, not raw ids, because layer ids come from the process-wide `NEXT_ID`.
+
+Frontend (`src/apps/xdesign/photo`):
+- `EditDialogs.tsx` — `AutoAlignDialog` and `AutoBlendDialog`. Last values are remembered for the session.
+- `imageCommands.ts` — `contentAwareFillCommand(alphas)`:
+  - Custom and the "Sampling Channel" select appear only when alpha channels exist.
+  - `params` sends `channel` as a Number only for Custom.
+- `photoDialog.css` — the `.is-grid` radios lay out 3 per row, like Photoshop's Projection block.
+- `PhotoStudio.tsx`:
+  - menu items;
+  - `pixelLayers` counts selected pixel/raster layers;
+  - the `editDialog` union gains `autoAlign|autoBlend`.
+
+Photoshop 2026 captures (scratch doc, then restored):
+- **Auto-Align**: the description copy is "Determine the best projection automatically." / "Only allow perspective image transform." / "Allow image rotation, scale and translation." / "Only allow cylindrical image transform." / "Only allow spherical image transform." / "Only allow image translation." Lens Correction is Vignette Removal + Geometric Distortion.
+- **Auto-Blend**: Panorama / Stack Images; Seamless Tones and Colors (on); Content Aware Fill Transparent Areas (on).
+
+Disk: during the session the Data volume reached 100% (344 MB free). `src-tauri/target` is 59 GB and `/tmp/pstest/shots` is 1.9 GB. Afterwards, with the owner's approval, `shots/` was deleted (the helper scripts and scratch files in `/tmp/pstest` were kept) and `cargo clean --profile dev` was run. `target/release` was kept. 58 GB is free.
+
+## 2026-10-25 — Claude / XDesign gap closure Phase 2, Tasks 10–11 detail
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted.
+
+Engine contracts used by the new Edit dialogs (photocraft 47f9306):
+- **`edit.findAndReplaceText`**
+  - Params: `{find, replace, action: find|change|changeFind|changeAll, caseSensitive, wholeWord, forward, allLayers}`.
+  - Returns: changeAll → `{count, layers}`; find/changeFind → `{found: {layer,start,end,text}|null, changed}`.
+  - `change` reuses the cursor from the previous find.
+- **`edit.checkSpelling`**
+  - List: `{allLayers, ignore[]}` → `{misspellings: [{layer,start,end,word,suggestions}], count}`. Offsets are characters.
+  - Actions: `change {layer,start,end,word,replace}`; `changeAll {word,replace,allLayers}` (whole word, case-sensitive); `addToDictionary {word}`. The dictionary lives in the engine's session-only `edit_prefs`.
+  - The dialog remembers Ignore by `layer:start`, shifting later offsets after a Change.
+- **`edit.presets.presetManager`**: `{kind}` lists; `rename {kind,index,newName}`, `delete {kind,index}`. Each returns `{[kind]: names}`.
+- **`edit.defineCustomShape`**
+  - `path` is "work" or a saved path name. Without one, it falls back to the shape layer, then the vector mask.
+  - The menu sends `currentPath`. The default name is the next free "Shape N"; brush and pattern names default to the document name without its extension.
+- **Purge**
+  - The engine clears its own clipboards. The host also empties the static image clipboard (`xdesign_photo_clipboard::store`), which outlives the engine.
+  - Purge Clipboard runs quietly when the engine reports it disabled.
+- **Toggle Last State**: `edit.toggleLastState` returns a bare bool and keeps redoing. The menu instead flips the last undo/redo through our own undo path, which also covers smart-object edit trails. The engine id stays blocked.
+- **Preset persistence**: `tools::execute` now saves when `custom_shapes` or pattern names change, as well as on tool/preset changes.
+
+## 2026-10-25 — Claude / XDesign photo vs Photoshop 2026: missing editing features audit
+
+Branch: `validation/alpha-2026-09-14`. Uncommitted. Full audit behind the summary in the matching PROGRESS.md entry; spot-checked against the engine and PhotoStudio before saving. Line numbers drift.
+
+Legend: PRESENT = wording/context diff or exposed elsewhere. MISSING-UI = engine (photocraft rev 47f9306) has the command, XDesign has no UI. MISSING = needs engine work.
+Sizes: S = UI-only/small, M = moderate, L = significant engine work.
+
+KEY ARCHITECTURE FACT. The engine is the external `photocraft-engine` crate (rev 47f9306, checked out at
+`~/.cargo/git/checkouts/photocraft-58992417ad0aec0a/47f9306/crates/engine/src`). It registers far more commands than XDesign wires up.
+The host gate is `command_supported()` in `src-tauri/src/xdesign_photo.rs:684-762`: prefix allow-list (paint. select. layer. image. filter.
+edit.transform. type. vector. path. channel. tools. shape. gradient. brush. color. pattern. layerComp. count. measurementLog. notes. style. tool.
+cloneSource. slice. variables.) plus an explicit list of `edit.*` / `view.*` ids. NOT allowed today: every `file.*` (automate, scripts, export,
+revert...), `edit.autoAlignLayers`, `edit.autoBlendLayers`, `edit.contentAwareFill`, `edit.defineBrushPreset`, `edit.defineCustomShape`,
+`edit.findAndReplaceText`, `edit.checkSpelling`, `edit.toggleLastState`, `edit.purge.*`, `edit.keyboardShortcuts/menus/toolbar`.
+So most "MISSING-UI (edit./file.)" items need a one-line allow-list change (S) plus the UI. Prefix-allowed families (layerComp., notes.,
+count., measurementLog., slice., variables., cloneSource.) already pass the gate; they simply have zero frontend callers.
+Menu spec is `PhotoStudio.tsx:~1060-1400 (line numbers drift; file is being edited)` (const `menus`); tool rail is `IMAGE_TOOL_GROUPS` in `src/apps/xdesign/editorTools.ts:12-34`;
+panels are `ALL_PANELS` at `PhotoStudio.tsx:114-118`.
+
+---------------------------------------------------------------------------
+## Tools (rail = editorTools.ts:12-34; 41 tools)
+
+Photoshop tool -> status
+- Move: PRESENT (rail). Artboard: MISSING-UI (engine `layer.new.artboard`, `layer.artboard.set`; Layer > New > Artboard... exists, PhotoStudio.tsx:1183) - no tool to draw/resize artboards. M
+- Rectangular / Elliptical Marquee: PRESENT. Single Row / Single Column Marquee: MISSING (not in engine select.* ids; trivial to emulate with select.rect 1px x full width via the existing select.rect command). S
+- Lasso, Polygonal, Magnetic: PRESENT. Object Selection, Quick Selection, Magic Wand: PRESENT.
+- Crop: PRESENT. Straighten: PRESENT (XD extra). Perspective Crop: PRESENT (2026-10-25: now a Crop-group tool; drag a box, then move corners; engine `image.xdesignPerspectiveCrop`). Slice / Slice Select: MISSING-UI (engine `slice.new/set/divide/fromGuides/delete/list/promote`, `layer.newLayerBasedSlice`). Web-oriented. M
+- Frame: MISSING-UI (engine `layer.new.frameFromLayers`; frame/placeholder layer). Low photo value. M
+- Eyedropper: PRESENT (rail; eyedropper.ts). Color Sampler: MISSING (no sampler points in Info panel; engine has none for docs). M. Ruler: MISSING-UI (engine `image.analysis.rulerTool`; Straighten tool + Set Measurement Scale exist). S/M. Note: MISSING-UI (engine `notes.add/set/delete/list`). S/M. Count: MISSING-UI (engine `count.add/remove/move/clear/newGroup/setGroup/deleteGroup`, `image.analysis.countTool`). M
+- Spot Healing, Healing Brush, Patch: PRESENT (rail). Remove tool (PS 2026 Remove): MISSING (closest = Spot Healing type "Content-Aware", PaintToolOptions.tsx:22). L. Content-Aware Move: MISSING (no engine id). L. Red Eye: MISSING (no engine id; simple colour op). M
+- Brush, Pencil, Color Replacement, Mixer Brush: PRESENT. Brush symmetry: PRESENT (toolBars.tsx:185-214).
+- Clone Stamp: PRESENT. Pattern Stamp: MISSING (no `paint.patternStamp`; Clone Stamp engine path would need pattern source). M
+- History Brush: PRESENT (2026-10-25: source is set only in the History panel, as in Photoshop). Art History Brush: MISSING (no engine id). L
+- Eraser, Background Eraser, Magic Eraser: PRESENT.
+- Gradient, Paint Bucket: PRESENT.
+- Blur, Sharpen, Smudge, Dodge, Burn, Sponge: PRESENT.
+- Pen, Freeform Pen, Curvature Pen: PRESENT. Add/Delete Anchor Point, Convert Point: MISSING in rail (Pen path editing handles via modifier/path overlay? PathEditOverlay.tsx exists; Convert Point as separate tool/Alt-click not verified) - low, S if only a rail entry.
+- Horizontal Type: PRESENT. Vertical Type: present as an Orientation toggle (toolBars.tsx:26 ORIENTATIONS; Type > Orientation menu, PhotoStudio.tsx:1287) but not a rail flyout entry. Horizontal/Vertical Type Mask: MISSING (no engine id). M
+- Path Selection, Direct Selection: PRESENT.
+- Rectangle (with corner radius, PhotoStudio.tsx:1672), Ellipse, Line: PRESENT. Triangle, Polygon (and Star): MISSING-UI (engine `shape.create` kinds "polygon"|"star"|"roundedRect", vector_cmds.rs:382-397; rail has only rect/ellipse/line). S. Custom Shape tool: MISSING-UI as a tool; Shapes panel can place presets (AdditionalPresets.tsx:21, `shape.presets.place`). S
+- Hand, Zoom: PRESENT. Rotate View: MISSING (no engine view rotation; pure viewer feature, needs canvas transform + hit-testing). M
+- Edit Toolbar: MISSING (needs prefs + rail customisation; engine `edit.toolbar`). M
+- Quick Mask, Screen Mode: PRESENT (rail foot, PhotoStudio.tsx:112; menus 1325, 1355).
+
+Tools tally: MISSING-UI 9 (Artboard, Slice, Slice Select, Frame, Ruler, Note, Count, Triangle/Polygon, Custom Shape); MISSING 9 (Single Row, Single Column, Color Sampler, Remove, Content-Aware Move, Red Eye, Pattern Stamp, Art History, Type Masks x2, Rotate View, Edit Toolbar).
+
+---------------------------------------------------------------------------
+## Edit
+- Undo/Toggle Last State: Undo PRESENT (wording). Toggle Last State: MISSING-UI (engine `edit.toggleLastState`; needs allow-list entry). S
+- Paste Special > Paste without Formatting: MISSING (text-layer paste; no engine id). S
+- Check Spelling..., Find and Replace Text...: MISSING-UI (engine `edit.checkSpelling`, `edit.findAndReplaceText`; need allow-list). M
+- Content-Aware Fill... (workspace with sampling-area overlay, rotation/scale/mirror, output to new layer): MISSING-UI (engine `edit.contentAwareFill`; not on allow-list). Simple content-aware Fill is PRESENT: Fill dialog Contents "Content-Aware" (imageCommands.ts:24), Spot Healing content-aware, Crop "Content-Aware Fill" (toolBars.tsx:150). M
+- Generative Fill / Generate Image / Sky Replacement: Generative = OUT OF SCOPE. Sky Replacement: MISSING (engine has `select.sky` only; needs sky library + relight/harmonise). L
+- Content-Aware Scale: PRESENT (PhotoStudio.tsx:1097). Puppet Warp/Perspective Warp/Free Transform/Transform: PRESENT.
+- Transform > Split Warp Horizontally/Vertically/Crosswise, Remove Warp Split: MISSING-UI (engine `edit.transform.splitWarp*`, `removeWarpSplit`, `warpGrid`; prefix already allowed). M. Convert warp anchor point: MISSING. S. Toggle Guides (during transform): MISSING. S. Rotate Object: MISSING. S
+- Auto-Align Layers..., Auto-Blend Layers...: MISSING-UI (engine `edit.autoAlignLayers` projection auto|perspective|cylindrical|spherical|collage|reposition, `edit.autoBlendLayers`; blocked by allow-list). M each; high value for stacking/panorama.
+- Define Brush Preset: MISSING-UI as "from selected pixels" (engine `edit.defineBrushPreset`, `brush.defineFromSelection`); Brushes panel only saves current settings (BrushPanel.tsx "Save preset"). S/M
+- Define Pattern: PRESENT (Patterns panel "Define from selection", AdditionalPresets.tsx:15, `pattern.presets.new`; host handles `edit.definePattern` xdesign_photo_tools.rs:188) but no Edit-menu entry. Define Custom Shape: PRESENT-ish via Shapes panel (AdditionalPresets.tsx:21); no Edit-menu entry (engine `edit.defineCustomShape`). S
+- Purge (Clipboard/Histories/All/Video Cache): MISSING-UI (engine `edit.purge.*`). S, low value.
+- Presets > Preset Manager: PRESENT as component (PresetManager.tsx, used by panels); no menu entry. Migrate Presets / Export-Import Presets: MISSING-UI (engine `edit.presets.*`). S
+- Keyboard Shortcuts... / Menus... / Toolbar...: MISSING (engine `edit.keyboardShortcuts`, `edit.menus`, `edit.toolbar`; XDesign has no customisation UI). L
+- Adobe PDF Presets, Remote Connections, OpenColorIO Settings: OUT OF SCOPE/low.
+- Writing Tools / AutoFill / Dictation: OUT OF SCOPE (macOS system).
+- Fill shortcut differs (PS Shift+Delete-style vs XD Shift+F5): cosmetic. Fill dialog Mode: PRESENT (2026-10-25).
+
+## Image
+- Mode > Bitmap / Duotone: PRESENT (wording; PhotoStudio.tsx:1122,1124 "Bitmap…", "Duotone…").
+- Generative Upscale: OUT OF SCOPE.
+- Duplicate...: MISSING (host refuses `image.duplicate`, xdesign_photo.rs:688; needs workspace-level new-document handling; Layer > Duplicate Layer can target another document, PhotoStudio.tsx:374). S/M
+- Variables > Define / Data Sets, Apply Data Set: MISSING-UI (engine `image.variables.define`, `image.variables.dataSets`, `image.applyDataSet`; `variables.` prefix allowed). M, low photo value.
+- Analysis > Set Measurement Scale: PRESENT (wording). Select Data Points, Record Measurements, Ruler Tool, Count Tool: MISSING-UI (engine `image.analysis.selectDataPoints/recordMeasurements/rulerTool/countTool`, `measurementLog.list/export/delete`). M
+- Everything else in Image (Adjustments, Auto *, Image/Canvas Size, Rotation, Trim, Reveal All, Apply Image, Calculations, Trap): PRESENT.
+
+## Layer
+- Group-context labels (Duplicate/Delete/Rename/Hide/Lock Group, Merge Layers): PRESENT (PhotoStudio.tsx:1019 duplicateTitle, 1054 mergeItem, menu ~1180-1300).
+- New > Layer Via Copy/Cut, Artboard from Group: PRESENT (wording; 1186-1187, 1183).
+- New > Frame from Layers.../Convert to Frame: MISSING-UI (engine `layer.new.frameFromLayers`). M
+- New Layer Based Slice: MISSING-UI (engine `layer.newLayerBasedSlice`). S
+- Copy CSS / Copy SVG: MISSING (no engine id). M
+- Export As... / Quick Export as PNG (layer-level): partly PRESENT as File > Export As (PhotoStudio.tsx:1069, whole doc); layer-level export via `layer.exportAs`/`layer.quickExportAsPng` is host-routed but not exposed. S
+- Layer Style > Global Light: PRESENT in the Layer Style dialog (LayerStyleDialog.tsx:571,609).
+- Smart Filter > Disable Smart Filters / Delete Filter Mask / Disable Filter Mask: PRESENT in the Smart Filters editor (SmartFilters.tsx; `layer.smartFilter.disableSmartFilters/deleteFilterMask/disableFilterMask`), not in the Layer menu.
+- New Adjustment Layer > Color and vibrance..., Clarity and dehaze..., Grain...: MISSING (engine `Adjustment` enum, doc/src/adjust.rs:228-246, has no such kinds). Related effects exist only inside Camera Raw Filter (DevelopDialog.tsx:12-17: Clarity, Dehaze, Texture, Grain, Vignette) and can be applied as a Smart Filter. L (new adjustment kinds + PSD round-trip), or S if aliasing to a Camera Raw adjustment layer.
+- Harmonize: OUT OF SCOPE (generative).
+- Layer colour labels: MISSING. Engine `Layer.label: LabelColor` (doc/src/lib.rs:89-101,453) round-trips PSD (io/src/psd_import.rs:207, psd_export.rs:346) but no engine command sets it and XDesign state does not expose it. M (new command + host state + Layers panel menu/rows).
+- Layer Mask > Enable / Unlink: PRESENT (mask-thumbnail buttons PhotoStudio.tsx:288, Shift-click 999, Properties LayerProperties.tsx:87 "Disable/Enable Mask").
+- Vector Mask > Current Path, Enable, Unlink: MISSING-UI (engine `layer.vectorMask.currentPath/enabled/linked/edit/info/fromPath`). S
+- Smart Objects: Replace Contents, Export Contents, Convert to Linked, Relink: PRESENT (SmartFilters.tsx:29). Reset Transform, Embed All Linked, Convert to Layers: MISSING (no engine ids). M. Relink to Library Graphic: OUT OF SCOPE. Smart Object warp: engine `layer.smartObjects.warp/puppetWarp/perspectiveWarp` exist, not wired as menu items (generic Edit warps cover). S
+- Video Layers (all 14), Rasterize > Video/3D/Generative: OUT OF SCOPE. Rasterize > Layer Style: MISSING-UI-ish (engine `layer.layerStyle.createLayer` = "Create Layer", PhotoStudio.tsx:1200, differs from PS "rasterize layer style into pixels"). S
+- Combine Shapes (Unite/Subtract/Overlap...): PRESENT in the Shape/Pen options bar PATH_OPS (toolBars.tsx:12); no Layer menu entry; engine `layer.combineShapes.*`. S
+- Stamp Visible / Stamp Down (Opt+Shift+Cmd+E, not in the dumped menu): MISSING-UI (engine `layer.stampVisible`, `layer.stampDown`). S, very high value.
+- Select next/previous layer shortcuts (`layer.selectAbove/Below/Top/Bottom`), add-to-selection: MISSING-UI keyboard-only. S
+- Mask All Objects: PRESENT (1224).
+
+## Type
+- Panels > Character / Paragraph: PRESENT (strip panels, PhotoStudio.tsx:115, CharacterPanel.tsx, ParagraphPanel.tsx). Glyphs Panel: MISSING-UI (engine `type.insertText`, glyph insertion). M. Character Styles / Paragraph Styles panels: MISSING-UI (engine `type.characterStyle.{new,apply,set,redefine,rename,duplicate,delete}`, `type.paragraphStyle.*`). M each; high value for text-heavy work.
+- Anti-Alias Mac / Mac LCD: MISSING (platform variants; engine has none). S, skip. Windows variants PRESENT (listed).
+- OpenType: PRESENT for Latin features (OPEN_TYPE). Justification Alternates, Japanese 78/Expert/Traditional, Proportional Metrics, Kana, Roman Italics: MISSING. M, low.
+- Convert Text Shape Type: MISSING. S. Convert to Dynamic Text (Block/Circle/Arch/Bow): MISSING (PS 2026 live-text shapes; no engine). L
+- Warp Text...: PRESENT (type bar button, toolBars.tsx:41; PhotoTextGeometryDialog.tsx; engine `type.warpText`).
+- Match Font: MISSING (ML font matching). L. More from Adobe Fonts: OUT OF SCOPE.
+- Font Preview Size: MISSING-UI (engine `type.fontPreview`). S
+- Language Options (East Asian, Middle Eastern, digits, directions, Kashidas...): MISSING. L, low.
+- Manage Missing Fonts: MISSING-UI (engine `type.resolveMissingFonts`; "Replace All Missing Fonts" present, PhotoStudio.tsx:1296). S
+- Type > Check Spelling / Find and Replace: see Edit.
+
+## Select
+- Save Selection: PRESENT (wording). All other Select items PRESENT (24/25). Beyond PS list: engine `select.convertToShape`, `select.nothing` unused (not PS menu items). Select > Modify shortcuts cosmetic.
+
+## Filter
+- Vanishing Point...: MISSING-UI (engine `filter.vanishingPoint`, vp_cmds.rs; `filter.` prefix allowed). L UI (perspective plane editor), engine done.
+- Other > HSB/HSL: PRESENT (wording). Neural Filters, AI Denoise, AI Sharpen: OUT OF SCOPE (AI/cloud ML). (Camera Raw Filter covers manual denoise: DevelopDialog.tsx "Detail" group.)
+- Everything else (Filter Gallery, Adaptive Wide Angle, Camera Raw, Lens Correction, Liquify, Blur/Blur Gallery/Distort/Noise/Pixelate/Render/Sharpen/Stylize/Video/Other, Last Filter, Smart Filters): PRESENT.
+
+## View
+- Proof Setup > Working CMYK / Internet Standard RGB / Monitor RGB: PRESENT via Proof Setup > Custom... (PhotoStudio.tsx:~1345 setProfileDialog("proof")); XD lists only plate/legacy/colour-blind presets (PhotoStudio.tsx:130). S to add presets.
+- Pixel Aspect Ratio (+Correction): OUT OF SCOPE (video).
+- Fit Layer(s) on Screen, Fit Artboard on Screen, Print Size, Actual Size, Flip Horizontal (view mirror): MISSING (no engine; pure viewer; Fit on Screen/100% exist, ~1349-1353). S each
+- Pattern Preview: MISSING (viewer-side tiling; no engine). M
+- Show > Layer Edges, Canvas/Artboard Guides, Artboard Names, Count, Smart Guides, Slices, Notes, Pixel Grid, Pattern tile bounds, Mesh, Edit Pins, All/None, Show Extras Options: MISSING (XD Show has Selection Edges, Target Path, Grid, Guides only; PhotoStudio.tsx:~1359-1364). Pixel Grid S; Layer Edges S; Smart Guides M; the rest depend on missing tools. Extras toggle PRESENT.
+- Snap To > Layers / Slices: MISSING. S/M
+- Guides submenu: New Guide, New Guide Layout, Lock, Clear, New Guides From Shape: PRESENT (top-level items, ~1377-1381). Edit/Clear Selected Guides, Clear Canvas/Artboard Guides: MISSING (artboard guides need artboard tool; engine `view.clearSelectedArtboardGuides`, `view.clearCanvasGuides`). S
+- Lock Slices / Clear Slices: MISSING-UI (engine `view.lockSlices`, `view.clearSlices`). S, tied to slices.
+
+## Window / panels
+Present panels (ALL_PANELS): Adjustments, Brushes (includes Brush Settings editor, BrushPanel.tsx:22), Channels, Character, Color, Gradients, Histogram, History, Info, Layers, Navigator, Paragraph, Paths, Patterns, Properties, Shapes, Styles, Swatches, Tool Presets. Clone Source exists as a Properties inspector section for Clone Stamp/Healing Brush (PhotoStudio.tsx:1773), not as a Window panel; the source overlay (engine `cloneSource.overlay`) has no UI. S.
+- Actions: MISSING (no action recorder in engine; `file.scripts.*` only). L
+- Brush Settings (separate panel): PRESENT merged into Brushes. Clone Source: PRESENT (see above), overlay S.
+- Character Styles, Paragraph Styles, Glyphs: MISSING-UI (see Type). M each
+- Layer Comps: MISSING-UI (engine `layerComp.new/apply/update/rename/duplicate/delete/next/previous/setOptions/setComment/updateWarnings/restoreLastDocumentState`, all prefix-allowed). M, medium value.
+- Measurement Log: MISSING-UI (engine `measurementLog.*`). M. Notes: MISSING-UI (engine `notes.*`). S/M
+- Timeline: MISSING-UI (engine `timeline.create/delete/info/nextFrame/previousFrame/setFrame/setProps`, frame animation only). L, low photo value.
+- Comments, Content Credentials, Libraries, Version History, Materials: OUT OF SCOPE.
+- Arrange (tile/N-up/match zoom-location-rotation/float): MISSING. XD has document tabs only. M, low-medium.
+- Workspace: only Essentials (PhotoStudio.tsx:~1385); Photography/Painting/Motion/New Workspace/Delete/Lock: MISSING. M, low. Engine `workspace.*` ids are app-pref toggles only.
+- History panel footer (New Document from State, New Snapshot, Delete State): buttons present but disabled; engine keeps no named snapshots (PhotoHistory.tsx:8). MISSING (L engine).
+
+## File (editing-related only)
+All of these exist in the engine but `file.*` is blocked by `command_supported()`; XD File menu has only Close, New from Clipboard, Save, Make Independent, Export As, Place Embedded/Linked.
+- Revert (`file.revert`): MISSING-UI. S/M
+- Save As / Save a Copy (`file.saveACopy`), Close All/Others (`file.closeAll/closeOthers`): MISSING-UI (partly covered by Export As). S
+- Automate: Batch, Create/Run Droplet, Crop and Straighten Photos, Fit Image, Contact Sheet II, Conditional Mode Change, Merge to HDR Pro, Photomerge, Lens Correction: MISSING-UI (engine `file.automate.*`). Photomerge/HDR Pro/Crop-and-Straighten are the valuable ones (M each, plus allow-list). Batch/Droplet need file-system UI (L).
+- Scripts: Image Processor, Delete All Empty Layers, Flatten All Layer Effects/Masks, Load Files into Stack, Statistics: MISSING-UI (engine `file.scripts.*`; note XD explicitly blocks `file.scripts.browse`). Empty-layers/flatten-effects/masks are S; Load Files into Stack M.
+- Export: Layers to Files, Artboards to Files/PDF, Layer Comps to Files/PDF, Save for Web (Legacy), Quick Export as PNG, Color Lookup Tables, Paths to Illustrator: MISSING-UI (engine `file.export.*`). Layers to Files + Quick Export are S/M.
+- File Info (`file.fileInfo`): MISSING-UI. S. Package, Print/Print One Copy: MISSING-UI, low. Import > Notes / Video Frames to Layers / Variable Data Sets: MISSING-UI, low.
+- Open, New, Open as Smart Object, Open Recent, Place Linked/Embedded: Place PRESENT; others belong to XDesign's project/home model.
+
+## Already-known gaps (confirmed)
+- Layer colour labels: CONFIRMED MISSING (engine field exists, no command/state/UI). M
+- Color and vibrance / Clarity and dehaze / Grain adjustment layers: CONFIRMED MISSING (no `Adjustment` variants; effects exist only in Camera Raw Filter). L
+- Fill dialog Mode: DONE 2026-10-25 (Contents incl. Color…/Pattern/History, Custom Pattern, Color Adaptation, Mode, Opacity, Preserve Transparency).
+- History Brush source set from History panel: DONE 2026-10-25 (options-bar picker removed).
+- Perspective Crop as a tool: DONE 2026-10-25.
+
+---------------------------------------------------------------------------
+## Out of scope (compact)
+- Photoshop menu / Help / Plugins: all.
+- Adobe cloud/AI: Generative Fill, Generate Image, Generative Upscale, Harmonize, Rasterize > Generative, Neural Filters, AI Denoise, AI Sharpen, Remove-as-generative, Share for Review, Invite to Edit, Libraries, Adobe Fonts, Adobe Stock, Express templates, Firefly Boards, Comments, Content Credentials, Version History panel, Relink to Library Graphic.
+- macOS system: Writing Tools, AutoFill, Start Dictation, Services.
+- Video/3D: Video Layers menu, Timeline video, Render Video, Pixel Aspect Ratio, Materials, Rasterize Video/3D.
+- App chrome: Settings/Preferences, Remote Connections, OpenColorIO, Adobe PDF Presets, Application Frame, Options/Tools window toggles, Bridge items.
+
 ## 2026-10-20 — Codex / Owner paused XDesign goal
 
 Branch: `validation/alpha-2026-09-14`. **Goal PAUSED at owner's explicit request; all six areas unfinished. Changes uncommitted.** Seven numeric Smart Filter editors are integrated/verified: 192 frontend tests/7 files (56 new), 26 focused native tests (8 new), TypeScript and isolated Vite build (8,086 modules/232 files) pass. All 1,358 native tests compile; full suite unrun. Basic-filter verification passes 3,967 hashes; closeout complete. [Acceptance](docs/architecture/xdesign/acceptance-2026-10-20-basic-filter.md), [record](docs/architecture/xdesign/acceptance-artifacts/checks-2026-10-20-basic-filter.json).

@@ -31,6 +31,9 @@ fn character(style: &CharStyle) -> Value {
 
 pub(super) fn describe(native: &Layer, doc: &Document, layer: &mut Value, detailed: bool) {
     layer["hasVectorMask"] = json!(native.vector_mask.is_some());
+    if let Some(mask) = &native.vector_mask {
+        layer["vectorMask"] = json!({"enabled": mask.enabled, "linked": mask.linked});
+    }
     layer["hasPixels"] = json!(native.surface().is_some());
     if detailed {
         let bounds = photocraft_engine::transform_cmds::transform_bounds(doc, native);

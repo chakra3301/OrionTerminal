@@ -8,11 +8,15 @@ import { usePhotoWorkspace } from "./runtime";
 import { useFreeTransform } from "./freeTransform";
 import { xdesignActivityReason } from "../runtimeActivity";
 import { PhotoStudio } from "./PhotoStudio";
-import type { PhotoCloneSources, PhotoDocument, PhotoLayer, PhotoState } from "./types";
+import type { PhotoCloneSources, PhotoDocument, PhotoLayer, PhotoPanels, PhotoState } from "./types";
 import { useViewAids } from "./viewGuides";
 import { PAINT_TOOL_PREFERENCES_KEY } from "./paintToolPreferences";
 import { IMAGE_TOOL_GROUPS } from "../editorTools";
 import { unbaked } from "./gradientMethod";
+import { useColorSamplers } from "./colorSamplers";
+import { recordActionStep, useActions } from "./actions";
+import { lastTextCaret } from "./CanvasTextEditor";
+import { DEFAULT_PREFERENCES, PREFERENCES_KEY, usePreferences } from "./preferences";
 
 const command = vi.hoisted(() => vi.fn(async (_id:string,_params:Record<string,unknown>={}) => undefined));
 const colors=vi.hoisted(()=>vi.fn(async(_colors:Record<string,string>)=>undefined));
@@ -190,10 +194,41 @@ describe("Image workspace layout", () => {
   });
   it("lists Target Path under View > Show after Selection Edges, like Photoshop", async () => {
     await menu("View","Show");
-    expect([...document.querySelectorAll('[role="menu"]')].at(-1)!.querySelectorAll('[role^="menuitem"]')[1]!.textContent).toContain("Target Path");
+    expect([...document.querySelectorAll('[role="menu"]')].at(-1)!.querySelectorAll('[role^="menuitem"]')[2]!.textContent).toContain("Target Path");
     expect(row("Target Path").getAttribute("aria-checked")).toBe("true");
     await act(async()=>row("Target Path").click());expect(useViewAids.getState().flags.targetPath).toBe(false);
     await choose(["View","Show"],"Target Path");expect(useViewAids.getState().flags.targetPath).toBe(true);
+  });
+  it("turns, flips and fits the view and shows layer edges, Smart Guides and the pixel grid from View, like Photoshop", async () => {
+    await menu("View","Show");
+    expect([...[...document.querySelectorAll('[role="menu"]')].at(-1)!.querySelectorAll('[role^="menuitem"]')].map(element=>element.textContent)).toEqual(["Layer Edges","Selection Edges","Target Path","Grid","Guides","Smart Guides","Pixel Grid"]);
+    await act(async()=>row("Layer Edges").click());expect(useViewAids.getState().flags.layerEdges).toBe(true);
+    expect(container.querySelector(".xd-photo-layer-edges rect")).toBeNull();
+    await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,layers:s.state!.layers.map(layer=>({...layer,bounds:[100,50,200,100] as [number,number,number,number]}))}})));
+    expect(container.querySelector(".xd-photo-layer-edges rect")!.getAttribute("x")).toBe("100");
+    await menu("View","Snap To");expect(row("Layers").getAttribute("aria-checked")).toBe("true");
+    await act(async()=>row("None").click());expect(useViewAids.getState().flags.snapTo.layers).toBe(false);
+    await menu("View");expect(row("Fit Layer(s) on Screen").disabled).toBe(false);expect(row("Print Size").disabled).toBe(false);
+    await act(async()=>row("Flip Horizontal").click());
+    const image=container.querySelector<HTMLElement>(".xd-photo-image")!;
+    expect(image.dataset.viewFlip).toBe("");expect(image.style.transform).toContain("scaleX(-1)");
+    await chooseTool("rotateView");const angle=container.querySelector<HTMLInputElement>('[aria-label="Rotation Angle"]')!;
+    await act(async()=>angle.focus());await inputNumber("Rotation Angle",45);await act(async()=>angle.blur());
+    expect(image.dataset.viewAngle).toBe("45");expect(image.style.transform).toContain("rotate(45deg)");
+    await click("Reset View");expect(image.dataset.viewAngle).toBeUndefined();
+    await choose(["View"],"Flip Horizontal");expect(image.style.transform).toBe("");
+  });
+  it("colours layers from the Layers context menu, tints their visibility column and filters by colour, like Photoshop", async () => {
+    const layerRow=()=>container.querySelector<HTMLElement>('.xd-photo-layer-list [data-layer="1"]');
+    await act(async()=>layerRow()!.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true})));
+    expect([...container.querySelectorAll("[role=menu] > button")].slice(-8).map(element=>element.textContent)).toEqual(["No Color","Red","Orange","Yellow","Green","Blue","Violet","Gray"]);
+    expect(row("Violet").querySelector(".xd-photo-label-swatch")!.getAttribute("data-color")).toBe("violet");
+    await act(async()=>row("Violet").click());expect(command).toHaveBeenLastCalledWith("layer.setColor",{color:"violet"});
+    expect(layerRow()!.dataset.color).toBeUndefined();
+    await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,layers:s.state!.layers.map(layer=>({...layer,color:"violet" as const}))}})));
+    expect(layerRow()!.dataset.color).toBe("violet");expect(layerRow()!.querySelector(":scope > .xd-photo-layer-eye")).not.toBeNull();
+    await pick("Select filter type","color");await pick("Filter by layer color","red");expect(layerRow()).toBeNull();
+    await pick("Filter by layer color","violet");expect(layerRow()).not.toBeNull();
   });
   it("drags layers above, below and into groups with pointer events, never below the Background", async () => {
     const layer=(id:number,name:string,extra:Partial<PhotoLayer>={}):PhotoLayer=>({id,name,kind:"Raster",visible:true,opacity:1,fill:1,blend:"Normal",clipped:false,hasMask:false,...extra});
@@ -253,13 +288,48 @@ describe("Image workspace layout", () => {
     await drag(gestureCanvas());expect(command).not.toHaveBeenCalled();
   });
 
-  it("opens perspective crop on the existing canvas without an active layer and requires native capability", async () => {
-    await chooseTool("crop"); expect(button("Perspective Crop…").disabled).toBe(true);
+  it("makes Perspective Crop a Crop-group tool whose dragged box opens on the existing canvas without an active layer", async () => {
+    expect(IMAGE_TOOL_GROUPS.find(group=>group.label==="Crop tools")!.tools.map(tool=>tool.label)).toEqual(["Crop Tool","Perspective Crop Tool","Slice Tool","Slice Select Tool","Straighten Tool"]);
+    const dialog=()=>container.querySelector('[role="dialog"][aria-label="Perspective Crop"]'),value=(label:string)=>container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!.valueAsNumber;
+    await chooseTool("crop"); expect(button("Perspective Crop…")).toBeUndefined();
+    await chooseTool("perspectiveCrop"); expect(container.textContent).toContain("Perspective crop requires an updated native engine");
+    await drag(gestureCanvas()); expect(dialog()).toBeNull();
     await act(async()=>usePhotoWorkspace.setState(current=>({state:{...current.state!,activeLayer:null,layers:[],features:{perspectiveCrop:true}}})));
-    await click("Perspective Crop…"); expect(container.querySelector('[role="dialog"][aria-label="Perspective Crop"]')).not.toBeNull();
+    expect(container.textContent).toContain("Drag a box around a photographed page or screen");
+    const zoomed=gestureCanvas();vi.spyOn(zoomed,"getBoundingClientRect").mockReturnValue({left:0,top:0,width:600,height:450} as DOMRect);
+    await drag(zoomed); expect(dialog()).not.toBeNull();
+    expect([value("Top left X"),value("Top left Y"),value("Bottom right X"),value("Bottom right Y")]).toEqual([27,33,53,60]);
+    const surface=container.querySelector<SVGSVGElement>('svg[aria-label="Perspective crop canvas"]')!;vi.spyOn(surface,"getBoundingClientRect").mockReturnValue({left:0,top:0,width:600,height:450} as DOMRect);
+    await act(async()=>{container.querySelector('[aria-label="Top left crop corner"]')!.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:200,clientY:250}));surface.dispatchEvent(new MouseEvent("pointermove",{bubbles:true,clientX:191.3,clientY:247.9}));surface.dispatchEvent(new MouseEvent("pointerup",{bubbles:true,clientX:191.3,clientY:247.9}));});
+    expect([value("Top left X"),value("Top left Y")]).toEqual([Math.round(value("Top left X")),Math.round(value("Top left Y"))]);expect(value("Top left X")).not.toBe(27);
     expect(container.querySelector('.xd-photo-image > svg[aria-label="Perspective crop canvas"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="detail-tiles"]')).not.toBeNull(); expect(container.querySelector('[aria-label="Image layers"]')!.hasAttribute("inert")).toBe(true);
     await click("Cancel"); expect(container.querySelector('[aria-label="Perspective crop canvas"]')).toBeNull(); expect(container.querySelector('[aria-label="Image layers"]')!.hasAttribute("inert")).toBe(false);
+    expect(container.querySelector('[aria-label="Current tool: Perspective Crop Tool"]')).not.toBeNull(); expect(command).not.toHaveBeenCalled();
+  });
+  const openPerspectiveCrop=async()=>{await chooseTool("perspectiveCrop");await act(async()=>usePhotoWorkspace.setState(current=>({state:{...current.state!,features:{perspectiveCrop:true}}})));const canvas=gestureCanvas();vi.spyOn(canvas,"getBoundingClientRect").mockReturnValue({left:0,top:0,width:600,height:450} as DOMRect);await drag(canvas);};
+  const typeLength=async(label:string,value:string)=>{const element=container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;await act(async()=>{element.focus();Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(element,value);element.dispatchEvent(new Event("input",{bubbles:true}));});await act(async()=>element.blur());};
+  const sizeFields=()=>["Crop width","Crop height","Crop resolution"].map(label=>container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!.value);
+  it("keeps the perspective crop bar live while the crop box is open, as Photoshop does", async () => {
+    await openPerspectiveCrop(); expect(container.querySelector(".xd-photo-perspective-grid")).not.toBeNull();
+    expect(container.querySelector(".xd-ps-options")!.hasAttribute("inert")).toBe(false);
+    expect(container.querySelector(".xd-ps-menubar")!.hasAttribute("inert")).toBe(true);
+  });
+  it("perspective crop bar edits share the dialog size", async () => {
+    await openPerspectiveCrop(); expect(container.querySelector(".xd-photo-perspective-grid")).not.toBeNull();
+    await typeLength("Crop width","400"); await typeLength("Crop height","300"); expect(container.textContent).toContain("400 × 300 px");
+    await act(async()=>container.querySelector<HTMLInputElement>('[aria-label="Show grid"]')!.click()); expect(container.querySelector(".xd-photo-perspective-grid")).toBeNull();
+    command.mockClear(); await click("Apply"); await act(async()=>{});
+    expect(command.mock.calls).toEqual([["image.xdesignPerspectiveCrop",expect.objectContaining({width:400,height:300})]]);
+  });
+  it("perspective crop bar Front Image fills the bar from the document and its resolution folds into one step", async () => {
+    await openPerspectiveCrop(); await click("Front Image"); expect(sizeFields()).toEqual(["800 px","600 px","72"]);
+    await inputNumber("Crop resolution",300); command.mockClear(); await click("Apply"); await act(async()=>{});
+    expect(command.mock.calls).toEqual([["image.xdesignPerspectiveCrop",expect.objectContaining({width:800,height:600})],["image.imageSize",{resolution:300,resample:"none"}],["history.fold",{from:1,label:"Perspective Crop"}]]);
+  });
+  it("perspective crop bar Clear empties W/H/Resolution and restores the automatic size", async () => {
+    await openPerspectiveCrop(); await click("Front Image"); expect(container.textContent).toContain("800 × 600 px");
+    await click("Clear crop size"); expect(sizeFields()).toEqual(["","",""]); expect(container.textContent).toContain("26 × 27 px");
   });
   it("straightens from a reference line with image/layer scope retained after remount", async () => {
     await chooseTool("straighten");
@@ -383,6 +453,48 @@ describe("Image workspace layout", () => {
   });
   it("opens dedicated selection workflows from the inspector without replacing the canvas",async()=>{
     const canvas=container.querySelector('[aria-label="Paint and select image"]');await showDocument();await menu("Select");expect(row("Select and Mask…").disabled).toBe(true);await act(async()=>row("Focus Area…").click());expect(container.querySelector('[role="dialog"][aria-label="Focus Area"]')).toBeTruthy();await click("Cancel");await choose(["Select"],"Color Range…");expect(container.querySelector('[role="dialog"][aria-label="Color Range"]')).toBeTruthy();await click("Cancel");await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,hasSelection:true}})));await choose(["Select"],"Select and Mask…");expect(container.querySelector('[role="dialog"][aria-label="Select and Mask"]')).toBeTruthy();await click("Cancel");expect(container.querySelector('[aria-label="Paint and select image"]')).toBe(canvas);
+  });
+  it("selects a full-width row or full-height column where the pointer is released, with Feather but no Anti-alias",async()=>{
+    expect(IMAGE_TOOL_GROUPS.find(entry=>entry.label==="Marquee tools")!.tools.map(tool=>[tool.label,tool.shortcut])).toEqual([["Rectangular Marquee Tool","M"],["Elliptical Marquee Tool","M"],["Single Row Marquee Tool",undefined],["Single Column Marquee Tool",undefined]]);
+    await chooseTool("singleRowSelection");await inputNumber("Tool Feather (px)",1);
+    expect(["Tool Anti-alias","Tool Style"].map(label=>container.querySelector(`[aria-label="${label}"]`))).toEqual([null,null]);
+    const canvas=gestureCanvas(),ctx={clearRect:vi.fn(),beginPath:vi.fn(),moveTo:vi.fn(),lineTo:vi.fn(),rect:vi.fn(),ellipse:vi.fn(),stroke:vi.fn()};vi.mocked(canvas.getContext).mockReturnValue(ctx as never);
+    await act(async()=>canvas.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:20,clientY:25})));
+    await act(async()=>canvas.dispatchEvent(new MouseEvent("pointermove",{bubbles:true,clientX:300,clientY:70})));
+    expect(ctx.rect).toHaveBeenLastCalledWith(0,70,800,1);
+    await act(async()=>canvas.dispatchEvent(new MouseEvent("pointerup",{bubbles:true,button:0,clientX:300,clientY:70})));
+    expect(command).toHaveBeenLastCalledWith("select.rect",{x:0,y:70,width:800,height:1,ellipse:false,feather:1,antiAlias:false,mode:"replace"});
+    await chooseTool("singleColumnSelection");
+    await act(async()=>canvas.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:120,clientY:25,shiftKey:true})));
+    await act(async()=>canvas.dispatchEvent(new MouseEvent("pointerup",{bubbles:true,button:0,clientX:120,clientY:25,shiftKey:true})));
+    expect(command).toHaveBeenLastCalledWith("select.rect",{x:120,y:0,width:1,height:600,ellipse:false,feather:0,antiAlias:false,mode:"add"});
+  });
+  it("corrects red eye at a click or inside a dragged box, with Pupil Size and Darken Amount",async()=>{
+    expect(IMAGE_TOOL_GROUPS.find(entry=>entry.label==="Healing tools")!.tools.map(tool=>[tool.label,tool.shortcut])).toEqual([["Spot Healing Brush Tool","J"],["Healing Brush Tool","J"],["Patch Tool","J"],["Red Eye Tool","J"]]);
+    await chooseTool("paint.redEye");
+    expect(["Tool Pupil Size (%)","Tool Darken Amount (%)"].map(label=>container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)?.value)).toEqual(["50","50"]);
+    expect(container.querySelector('[aria-label="Tool Size"]')).toBeNull();
+    await inputNumber("Tool Darken Amount (%)",80);
+    const canvas=gestureCanvas(),ctx={clearRect:vi.fn(),beginPath:vi.fn(),moveTo:vi.fn(),lineTo:vi.fn(),rect:vi.fn(),ellipse:vi.fn(),stroke:vi.fn()};vi.mocked(canvas.getContext).mockReturnValue(ctx as never);
+    await act(async()=>canvas.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:120,clientY:90})));
+    await act(async()=>canvas.dispatchEvent(new MouseEvent("pointerup",{bubbles:true,button:0,clientX:121,clientY:90})));
+    expect(command).toHaveBeenLastCalledWith("paint.redEye",{x:120,y:90,pupilSize:50,darken:80});
+    await act(async()=>canvas.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:300,clientY:200})));
+    await act(async()=>canvas.dispatchEvent(new MouseEvent("pointermove",{bubbles:true,clientX:200,clientY:150})));
+    expect(ctx.rect).toHaveBeenLastCalledWith(300,200,-100,-50);
+    await act(async()=>canvas.dispatchEvent(new MouseEvent("pointerup",{bubbles:true,button:0,clientX:200,clientY:150})));
+    expect(command).toHaveBeenLastCalledWith("paint.redEye",{x:200,y:150,width:100,height:50,pupilSize:50,darken:80});
+  });
+  it("offers the Color Sampler Tool after the Eyedropper with Sample Size and Clear All, and shows its samplers over the image",async()=>{
+    expect(IMAGE_TOOL_GROUPS.find(entry=>entry.label==="Eyedropper tools")!.tools.map(tool=>[tool.label,tool.shortcut])).toEqual([["Eyedropper Tool","I"],["Color Sampler Tool","I"],["Ruler Tool","I"],["Note Tool","I"],["Count Tool","I"]]);
+    const id=usePhotoWorkspace.getState().documentId!;useColorSamplers.setState({documents:{}});
+    await chooseTool("colorSampler");
+    expect(container.querySelector('[aria-label="Sample size"]')).not.toBeNull();
+    expect(button("Clear all color samplers").disabled).toBe(true);
+    await act(async()=>{useColorSamplers.getState().add(id,{x:4,y:5});});
+    expect(container.querySelector('[aria-label="Color sampler 1"]')).not.toBeNull();
+    await click("Clear all color samplers");
+    expect([useColorSamplers.getState().documents[id],container.querySelector('[aria-label="Color sampler 1"]')]).toEqual([[],null]);
   });
   it("previews and commits the same centered ellipse with edge options and no paint target",async()=>{
     await chooseTool("ellipseSelection");await inputNumber("Tool Feather (px)",2.5);await act(async()=>container.querySelector<HTMLInputElement>('[aria-label="Tool Anti-alias"]')!.click());
@@ -518,6 +630,12 @@ describe("Image workspace layout", () => {
     command.mockClear();const canvas=gestureCanvas();await drag(canvas);expect(command).toHaveBeenLastCalledWith("paint.bucket",expect.objectContaining({contents:"pattern",scale:150,angle:45}));expect(command.mock.lastCall![1]).not.toHaveProperty("pattern");
     await chooseTool("select.magicWand");await act(async()=>container.querySelector<HTMLInputElement>('[aria-label="Tool Sample all layers"]')!.click());await drag(canvas);expect(command).toHaveBeenLastCalledWith("select.magicWand",expect.objectContaining({sampleAllLayers:true,mode:"replace"}));
   });
+  it("offers the Pattern Stamp Tool beside Clone Stamp and paints the chosen pattern with its Mode, Flow and Aligned options",async()=>{
+    expect(IMAGE_TOOL_GROUPS.find(entry=>entry.label==="Stamp tools")!.tools.map(tool=>[tool.label,tool.shortcut])).toEqual([["Clone Stamp Tool","S"],["Pattern Stamp Tool","S"]]);
+    await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,presets:{gradient:{name:"Default",stops:[[0,"#000000"],[1,"#ffffff"]],transparency:[]},gradients:[],styles:[],pattern:"dots",patterns:[{name:"Basic",presets:[{id:"dots",name:"Dots",width:8,height:8},{id:"lines",name:"Lines",width:8,height:8}]}]}}})));
+    await chooseTool("paint.patternStamp");await pick("Tool Pattern","lines");expect(command).toHaveBeenLastCalledWith("pattern.presets.select",{pattern:"lines"});await pick("Tool Blend","Multiply");await inputNumber("Tool Flow (%)",40);await act(async()=>container.querySelector<HTMLInputElement>('[aria-label="Tool Aligned"]')!.click());
+    command.mockClear();await drag(gestureCanvas());expect(command).toHaveBeenLastCalledWith("paint.patternStamp",expect.objectContaining({mode:"Multiply",flow:40,aligned:false,points:expect.any(Array)}));expect(command.mock.lastCall![1]).not.toHaveProperty("pattern");
+  });
   it("applies classic gradient blend/dither options without sending them to live layers",async()=>{
     await chooseTool("paint.gradient");expect(container.querySelector('[aria-label="Tool Blend"]')).toBeNull();await pick("Gradient mode","classic");await pick("Tool Blend","Multiply");await act(async()=>container.querySelector<HTMLInputElement>('[aria-label="Tool Dither"]')!.click());const canvas=gestureCanvas();await drag(canvas);expect(command).toHaveBeenLastCalledWith("paint.gradient",expect.objectContaining({mode:"Multiply",dither:false}));
     await pick("Gradient mode","live");command.mockClear();await drag(canvas);expect(command.mock.lastCall![0]).toBe("gradient.fill.create");expect(command.mock.lastCall![1]).not.toHaveProperty("mode");expect(command.mock.lastCall![1]).toHaveProperty("dither");
@@ -591,12 +709,14 @@ describe("Image workspace layout", () => {
   });
   it("pins History Brush source identity, refuses eviction and excludes it from presets",async()=>{
     await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,presets:{gradient:{name:"Default",stops:[[0,"#000000"],[1,"#ffffff"]],transparency:[]},gradients:[],styles:[],tools:[]}}})));
-    await chooseTool("paint.historyBrush");const sources=usePhotoWorkspace.getState().state!.historySources!;await pick("History Brush source",sources[1]!.id);await pick("Tool Blend","Multiply");
+    await chooseTool("paint.historyBrush");expect(container.querySelector('select[aria-label="History Brush source"]')).toBeNull();const sources=usePhotoWorkspace.getState().state!.historySources!;
+    const source=async(index:number)=>{if(button("History").getAttribute("aria-pressed")!=="true")await click("History");await act(async()=>[...container.querySelectorAll<HTMLButtonElement>('[aria-label="Sets the source for the history brush"]')].at(index)!.click());};
+    await source(-1);await pick("Tool Blend","Multiply");
     const canvas=container.querySelector<HTMLCanvasElement>('[aria-label="Paint and select image"]')!;vi.spyOn(canvas,"getBoundingClientRect").mockReturnValue({left:0,top:0,width:800,height:600} as DOMRect);vi.spyOn(canvas,"getContext").mockReturnValue(null);canvas.setPointerCapture=vi.fn();canvas.hasPointerCapture=()=>false;
     const drag=async()=>{await act(async()=>canvas.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0,clientX:20,clientY:25})));await act(async()=>canvas.dispatchEvent(new MouseEvent("pointerup",{bubbles:true,button:0,clientX:30,clientY:35})));};
     await drag();expect(command).toHaveBeenLastCalledWith("paint.historyBrush",expect.objectContaining({historySource:sources[1]!.id,mode:"Multiply",flow:100,opacity:100,hardness:80}));await click("Tool Presets");await click("Save tool preset");const saved=command.mock.lastCall![1] as {options:{toolOptions:{paintOptions:Record<string,unknown>}}};expect(saved.options.toolOptions.paintOptions).toEqual({mode:"Multiply",flow:100,spacing:25});await click("Properties");
     await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,historySources:[{...sources[1]!,index:0,current:false}]}})));command.mockClear();await drag();expect(command).toHaveBeenCalledOnce();expect(command.mock.lastCall![1]).toMatchObject({historySource:sources[1]!.id});
-    await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,historySources:[sources[0]!]}})));command.mockClear();await drag();expect(command).not.toHaveBeenCalled();expect(usePhotoWorkspace.getState().busy).toBe(false);expect(container.textContent).toContain("no longer retained");await pick("History Brush source",sources[0]!.id);await drag();expect(command).toHaveBeenCalledOnce();expect(command.mock.lastCall![1]).toMatchObject({historySource:sources[0]!.id});
+    await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,historySources:[sources[0]!]}})));command.mockClear();await drag();expect(command).not.toHaveBeenCalled();expect(usePhotoWorkspace.getState().busy).toBe(false);expect(container.textContent).toContain("no longer retained");await source(0);await drag();expect(command).toHaveBeenCalledOnce();expect(command.mock.lastCall![1]).toMatchObject({historySource:sources[0]!.id});
   });
   it("sets the active native source with Alt-click and leaves aligned pairing to the native slot",async()=>{
     await chooseTool("paint.cloneStamp");
@@ -684,6 +804,63 @@ describe("Image workspace layout", () => {
   it("hides an existing source crosshair when keyboard activation opens a Smart Filter-owned Develop modal",async()=>{
     const slots=emptyCloneSources();slots.sources[0]!.source=[10,20];await act(async()=>{installCloneSources(slots);usePhotoWorkspace.setState(current=>({state:{...current.state!,layers:current.state!.layers.map(layer=>({...layer,kind:"Smart",smartObject:{source:"embedded" as const,name:"image.psd",hasFilterMask:false},smartFilters:[{command:"filter.cameraRaw",params:{exposure:.5},visible:true,opacity:1,blend:"Normal"}]}))}}));});await chooseTool("paint.cloneStamp");await click("100%");const canvas=gestureCanvas(),marker=container.querySelector<SVGSVGElement>('[aria-label="Clone source marker"]')!,edit=container.querySelector<HTMLButtonElement>('[aria-label="Edit Camera Raw filter 1"]')!;edit.closest("details")!.open=true;
     await act(async()=>edit.focus());const hover=()=>act(async()=>{canvas.dispatchEvent(new MouseEvent("pointermove",{bubbles:true,clientX:44,clientY:36}));});await hover();expect(marker.style.display).toBe("");const before=JSON.stringify(usePhotoWorkspace.getState().state);await act(async()=>edit.dispatchEvent(new MouseEvent("click",{bubbles:true,detail:0})));expect(container.querySelector('[role="dialog"][aria-label="Edit Camera Raw Filter"]')).not.toBeNull();expect(container.querySelector('[role="dialog"]')!.contains(document.activeElement)).toBe(true);expect(marker.style.display).toBe("none");await hover();expect(marker.style.display).toBe("none");expect(command).not.toHaveBeenCalled();expect(JSON.stringify(usePhotoWorkspace.getState().state)).toBe(before);await click("Cancel");await hover();expect(marker.style.display).toBe("");
+  });
+  it("sets the Clone Source overlay options and lays the source over the brush like Photoshop's overlay",async()=>{
+    const slots=emptyCloneSources();Object.assign(slots.sources[0]!,{source:[10,20],anchor:[40,30]});await act(async()=>installCloneSources(slots));await chooseTool("paint.cloneStamp");await click("100%");const canvas=gestureCanvas();vi.spyOn(canvas,"getBoundingClientRect").mockReturnValue({left:0,top:0,width:800,height:600} as DOMRect);
+    const overlay=container.querySelector<SVGSVGElement>('[aria-label="Clone source overlay"]')!,marker=container.querySelector<SVGSVGElement>('[aria-label="Clone source marker"]')!,pointer=(type:string,x:number,y:number)=>act(async()=>{canvas.dispatchEvent(new MouseEvent(type,{bubbles:true,button:0,clientX:x,clientY:y}));});
+    expect(overlay.style.display).toBe("none");await pointer("pointermove",44,36);expect(overlay.style.display).toBe("");expect(overlay.style.pointerEvents).toBe("none");expect(overlay.getAttribute("viewBox")).toBe("0 0 800 600");
+    expect(overlay.querySelector("image")!.getAttribute("transform")).toBe("matrix(1 0 0 1 30 10)");const circle=overlay.querySelector("circle")!;expect([circle.getAttribute("cx"),circle.getAttribute("cy")]).toEqual(["44","36"]);expect(overlay.querySelector("g")!.getAttribute("clip-path")).toMatch(/^url\(#/);
+    const check=(label:string)=>act(async()=>container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!.click());
+    await check("Show Overlay");expect(command).toHaveBeenLastCalledWith("cloneSource.overlay",{show:false});
+    await check("Auto Hide");expect(command).toHaveBeenLastCalledWith("cloneSource.overlay",{autoHide:false});
+    await check("Clipped");expect(command).toHaveBeenLastCalledWith("cloneSource.overlay",{clipped:false});
+    await check("Invert overlay");expect(command).toHaveBeenLastCalledWith("cloneSource.overlay",{invert:true});
+    await act(async()=>{const select=container.querySelector<HTMLSelectElement>('[aria-label="Overlay blend mode"]')!;select.value="difference";select.dispatchEvent(new Event("change",{bubbles:true}));});expect(command).toHaveBeenLastCalledWith("cloneSource.overlay",{blend:"difference"});
+    await act(async()=>container.querySelector<HTMLInputElement>('[aria-label="Overlay opacity"]')!.focus());await inputNumber("Overlay opacity",50);await act(async()=>container.querySelector<HTMLInputElement>('[aria-label="Overlay opacity"]')!.blur());expect(command).toHaveBeenLastCalledWith("cloneSource.overlay",{opacity:50});
+    const shown={...slots,overlay:{...slots.overlay,opacity:40,clipped:false,invert:true,blend:"difference"}};await act(async()=>installCloneSources(shown));await pointer("pointermove",44,36);
+    expect(overlay.style.opacity).toBe("0.4");expect(overlay.style.mixBlendMode).toBe("difference");expect(overlay.querySelector("image")!.style.filter).toBe("invert(1)");expect(overlay.querySelector("g")!.hasAttribute("clip-path")).toBe(false);
+    await pointer("pointerdown",44,36);await pointer("pointermove",50,40);expect(marker.style.display).toBe("");expect(overlay.style.display).toBe("none");await pointer("pointercancel",50,40);
+    await act(async()=>installCloneSources({...shown,overlay:{...shown.overlay,auto_hide:false}}));await pointer("pointerdown",44,36);await pointer("pointermove",50,40);expect(overlay.style.display).toBe("");await pointer("pointercancel",50,40);expect(overlay.style.display).toBe("none");
+    await act(async()=>installCloneSources({...shown,overlay:{...shown.overlay,show:false}}));await pointer("pointermove",44,36);expect(marker.style.display).toBe("");expect(overlay.style.display).toBe("none");
+  });
+  it("docks Layer Comps, Measurement Log and the type style panels, and records measurements from Image › Analysis",async()=>{
+    const panels:PhotoPanels={layerComps:{comps:[{id:1,name:"Hero",comment:"",visibility:true,position:true,appearance:true,missingLayers:0}],lastApplied:null,hasLastDocumentState:false},
+      measurementLog:{rows:[],columns:[],dataPoints:{selection:["label"],ruler:["label"],count:["label"]},available:{selection:[{key:"label",name:"Label"}],ruler:[{key:"label",name:"Label"}],count:[{key:"label",name:"Label"}]}},
+      textStyles:{character:[{id:0,name:"None",attrs:{},resolved:{}}],paragraph:[{id:0,name:"Basic Paragraph",paragraphAttrs:{},characterAttrs:{},resolved:{paragraph:{},character:{}}}],current:null}};
+    await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,panels}})));
+    expect([...container.querySelectorAll('[aria-label="Collapsed panels"] button')].map(item=>item.getAttribute("aria-label"))).toEqual(expect.arrayContaining(["Layer Comps","Measurement Log","Character Styles","Paragraph Styles"]));
+    await click("Layer Comps");expect(container.querySelector('[role="group"][aria-label="Layer Comps"]')).not.toBeNull();
+    await click("Layer Comps panel options");await act(async()=>row("New Layer Comp…").click());expect(container.querySelector('[role="dialog"][aria-label="New Layer Comp"]')).not.toBeNull();await click("Cancel");
+    for(const name of ["Measurement Log","Character Styles","Paragraph Styles"]){await click(name);expect(container.querySelector(`[role="group"][aria-label="${name}"]`)).not.toBeNull();}
+    await menu("Image","Analysis");expect(row("Record Measurements").getAttribute("aria-keyshortcuts")).toBe("Shift+Meta+M");await act(async()=>row("Record Measurements").click());expect(command).toHaveBeenLastCalledWith("image.analysis.recordMeasurements",{source:"auto"});
+    await menu("Image","Analysis","Select Data Points");await act(async()=>row("Custom…").click());expect(container.querySelector('[role="dialog"][aria-label="Select Data Points"]')).not.toBeNull();await click("Cancel");
+    await menu("Image","Analysis");await act(async()=>row("Count Tool").click());expect(container.textContent).toContain("Click to add a count");
+    await menu("Image","Analysis");await act(async()=>row("Ruler Tool").click());expect(container.textContent).toContain("Drag to measure");
+    await menu("Window");expect(row("Layer Comps")).toBeTruthy();expect(row("Measurement Log")).toBeTruthy();
+  });
+  it("records an action in the Actions panel and plays its steps back through the same commands, like Photoshop",async()=>{
+    useActions.setState({sets:[{id:"default",name:"Default Actions",actions:[]}],selected:null,recording:null,playing:false,failed:null,dialog:null,allowTools:false});
+    await menu("Window");expect(row("Actions").getAttribute("aria-keyshortcuts")).toBe("Alt+F9");await act(async()=>row("Actions").click());
+    expect(container.querySelector('[role="group"][aria-label="Actions"]')).not.toBeNull();expect(button("Begin Recording").disabled).toBe(true);
+    await click("Create New Action");
+    expect(container.querySelector<HTMLInputElement>('[role="dialog"][aria-label="New Action"] [aria-label="Action name"]')!.value).toBe("Action 1");
+    expect(container.querySelector<HTMLSelectElement>('[aria-label="Action set"]')!.value).toBe("default");
+    await click("Record");
+    expect(container.querySelector('[aria-label="Recording Action 1"]')).not.toBeNull();expect(button("Begin Recording").getAttribute("aria-pressed")).toBe("true");
+    const before=usePhotoWorkspace.getState().state!;
+    act(()=>recordActionStep("edit.fill",{contents:"black"},before,{...before,historySources:[{id:"fill",index:1,label:"Fill",current:true,available:true}]}));
+    await click("Stop Playing/Recording");expect(container.querySelector('[aria-label="Recording Action 1"]')).toBeNull();
+    await click("Expand Action 1");await click("Expand Fill");expect(container.querySelector(".xd-photo-actions dl")!.textContent).toBe('contents: "black"');
+    command.mockClear();await click("Play Selection");
+    expect(command.mock.calls).toEqual([["edit.fill",{contents:"black"}]]);
+    await click("Include Fill");command.mockClear();await click("Play Selection");expect(command).not.toHaveBeenCalled();
+    await click("Actions panel options");expect(row("Allow Tool Recording").getAttribute("aria-checked")).toBe("false");await act(async()=>row("Allow Tool Recording").click());
+    expect(useActions.getState().allowTools).toBe(true);
+    await click("Actions panel options");await act(async()=>row("Action Options…").click());
+    const name=container.querySelector<HTMLInputElement>('[aria-label="Action Options name"]')!;
+    await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(name,"Darken");name.dispatchEvent(new Event("input",{bubbles:true}));});
+    await click("OK");expect(button("Darken")).toBeTruthy();
+    await click("Delete");expect(useActions.getState().sets[0]!.actions).toEqual([]);
   });
   it("clears source crosshairs on leave, scroll, zoom, tool, slot, source, document and view changes",async()=>{
     const slots=emptyCloneSources();slots.sources[0]!.source=[10,20];slots.sources[1]!.source=[70,80];await act(async()=>installCloneSources(slots));await chooseTool("paint.cloneStamp");await click("100%");let canvas=gestureCanvas();const marker=container.querySelector<SVGSVGElement>('[aria-label="Clone source marker"]')!,hover=()=>act(async()=>{canvas.dispatchEvent(new MouseEvent("pointermove",{bubbles:true,clientX:44,clientY:36}));}),hidden=()=>expect(marker.style.display).toBe("none");
@@ -848,7 +1025,9 @@ describe("Image workspace layout", () => {
     await click("Align vertical centers"); expect(command).toHaveBeenLastCalledWith("layer.align.verticalCenters", { to: "layers" });
     await click("Distribute horizontal spacing"); expect(command).toHaveBeenLastCalledWith("layer.distribute.horizontally", {});
     await pick("Align to", "canvas"); await click("Align bottom edges"); expect(command).toHaveBeenLastCalledWith("layer.align.bottomEdges", { to: "canvas" });
-    await act(async () => usePhotoWorkspace.setState(s => ({ state: { ...s.state!, layers: s.state!.layers.map(layer => ({ ...layer, locks: { transparency: false, pixels: false, position: true, all: false } })) } })));
+    await act(async () => usePhotoWorkspace.setState(s => ({ state: { ...s.state!, layers: s.state!.layers.map(layer => ({ ...layer, transformBounds: [0, 0, 0, 0] })) } })));
+    expect(["Width", "X position", "Y position", "Angle"].map(label => container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!.disabled)).toEqual([true, true, true, true]);
+    await act(async () => usePhotoWorkspace.setState(s => ({ state: { ...s.state!, layers: s.state!.layers.map(layer => ({ ...layer, transformBounds: [10, 20, 300, 200], locks: { transparency: false, pixels: false, position: true, all: false } })) } })));
     expect(container.querySelector<HTMLInputElement>('[aria-label="Width"]')!.disabled).toBe(true);
   });
   it("keeps adjustments discoverable and adds them as layers edited in Properties", async () => {
@@ -868,6 +1047,23 @@ describe("Image workspace layout", () => {
     await menu("Edit", "Transform", "Perspective"); expect(useFreeTransform.getState().session?.mode).toBe("perspective"); await click("Cancel transform");
     await menu("Image", "Trim…"); expect(command).not.toHaveBeenCalledWith("image.trim", expect.anything()); expect(container.textContent).toContain("Trim Away");
     await click("OK"); expect(command).toHaveBeenLastCalledWith("image.trim", expect.objectContaining({ top: true, bottom: true, left: true, right: true }));
+  });
+  it("keeps Edit › Transform live during a Warp and routes its warp items to the open mesh", async () => {
+    await menu("Edit","Transform");
+    expect(["Split Warp Crosswise","Remove Warp Split","Convert warp anchor point","Toggle Guides"].map(label=>row(label).disabled)).toEqual([true,true,true,true]);
+    await act(async()=>row("Warp").click());
+    expect(container.querySelector('[aria-label="Warp layer canvas"]')).not.toBeNull();
+    expect(container.querySelector(".xd-ps-menubar")!.hasAttribute("inert")).toBe(false);expect(button("Back to design").disabled).toBe(true);
+    await menu("Edit");
+    expect([...container.querySelectorAll<HTMLButtonElement>("[role=menu] > button")].filter(element=>!element.disabled).map(element=>element.textContent)).toEqual(["Transform"]);
+    await act(async()=>row("Transform").click());
+    expect(["Warp","Scale","Again"].map(label=>row(label).disabled)).toEqual([true,true,true]);
+    expect(["Split Warp Crosswise","Remove Warp Split","Toggle Guides","Flip Horizontal"].map(label=>row(label).disabled)).toEqual([false,true,false,false]);
+    await act(async()=>row("Split Warp Crosswise").click());
+    expect(button("Split Warp Crosswise").getAttribute("aria-pressed")).toBe("true");
+    await choose(["Edit","Transform"],"Flip Horizontal");expect(command).not.toHaveBeenCalledWith("edit.transform.flipHorizontal",expect.anything());
+    await click("Cancel");expect(container.querySelector(".xd-ps-menubar")!.hasAttribute("inert")).toBe(false);
+    await menu("Edit","Transform");expect(row("Split Warp Crosswise").disabled).toBe(true);
   });
   it("rotates the document from the Image menu without affecting layer selection", async () => {
     await menu("Image","Image Rotation","90° Clockwise");
@@ -1119,4 +1315,73 @@ it("lists the engine's Windows anti-alias modes, Stack Mode, Matting and Proof S
   expect(container.querySelector('[role="dialog"]')).not.toBeNull();
   await click("OK");expect(command).toHaveBeenLastCalledWith("layer.matting.defringe",{width:1});
   await menu("View","Proof Setup");expect(rowLabels()).toEqual(expect.arrayContaining(["Working CMY Plate","Legacy Macintosh RGB (Gamma 1.8)"]));
+});
+it("copies shape and type layers as CSS or SVG and pastes clipboard text into a type layer without its formatting",async()=>{
+  const writeText=vi.fn(async(_text:string)=>{}),readText=vi.fn(async()=>"one\r\ntwo");
+  Object.defineProperty(navigator,"clipboard",{value:{writeText,readText},configurable:true});
+  await menu("Layer");expect(row("Copy CSS").disabled).toBe(true);expect(row("Copy SVG").disabled).toBe(true);
+  await menu("Edit","Paste Special");expect(rowLabels().slice(0,2)).toEqual(["Paste without Formatting","Paste in Place"]);expect(row("Paste without Formatting").disabled).toBe(true);
+  await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,layers:[{...layer(1,"Box"),kind:"Shape"},{...layer(2,"Title"),kind:"Type",text:{text:"Hello",font:"Inter",sizePt:12}}] as PhotoLayer[],activeLayer:1}})));
+  command.mockImplementation((async(id:string)=>id==="layer.copyCSS"?{text:".Box {}"}:id==="layer.copySVG"?{text:"<svg/>"}:id==="type.insertText"?{layer:2,caret:9}:undefined) as never);
+  await act(async()=>container.querySelector('.xd-photo-layer-list [data-layer="1"]')!.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true})));
+  expect(rowLabels()).toEqual(expect.arrayContaining(["Copy CSS","Copy SVG"]));await act(async()=>row("Copy CSS").click());
+  expect(command).toHaveBeenLastCalledWith("layer.copyCSS");expect(writeText).toHaveBeenLastCalledWith(".Box {}");writeText.mockClear();
+  await choose(["Layer"],"Copy CSS");
+  expect(command).toHaveBeenLastCalledWith("layer.copyCSS");expect(writeText).toHaveBeenLastCalledWith(".Box {}");
+  const written:Blob[]=[],write=vi.fn(async(items:{types:string[];blob:Promise<Blob>}[])=>{written.push(await items[0]!.blob);});
+  vi.stubGlobal("ClipboardItem",class{types:string[];blob:Promise<Blob>;constructor(data:Record<string,Promise<Blob>>){this.types=Object.keys(data);this.blob=data["text/plain"]!;}});
+  Object.defineProperty(navigator,"clipboard",{value:{writeText,readText,write},configurable:true});
+  await choose(["Layer"],"Copy SVG");
+  expect(command).toHaveBeenLastCalledWith("layer.copySVG");expect(await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.readAsText(written[0]!);})).toBe("<svg/>");expect(writeText).toHaveBeenCalledTimes(1);
+  vi.unstubAllGlobals();
+  native.enabled=true;native.invoke.mockResolvedValue(undefined);write.mockClear();
+  await choose(["Layer"],"Copy CSS");
+  expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_copy_text",{text:".Box {}"});expect(write).not.toHaveBeenCalled();expect(writeText).toHaveBeenCalledTimes(1);
+  native.invoke.mockImplementation(async(name:string)=>{if(name==="xdesign_photo_copy_text")throw "pbcopy failed";});
+  await choose(["Layer"],"Copy SVG");
+  expect(usePhotoWorkspace.getState().error).toBe("The clipboard could not be written: pbcopy failed");
+  native.enabled=false;native.invoke.mockReset();await act(async()=>usePhotoWorkspace.setState({error:null}));
+
+  await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,activeLayer:2}})));
+  lastTextCaret.current={layer:2,range:[1,3]};
+  await choose(["Edit","Paste Special"],"Paste without Formatting");
+  expect(command).toHaveBeenLastCalledWith("type.insertText",{layer:2,text:"one\ntwo",label:"Paste",range:[1,3]});
+  expect(lastTextCaret.current).toEqual({layer:2,range:[9,9]});
+  lastTextCaret.current={layer:7,range:[0,0]};readText.mockResolvedValueOnce("x");
+  await choose(["Edit","Paste Special"],"Paste without Formatting");
+  expect(command).toHaveBeenLastCalledWith("type.insertText",{layer:2,text:"x",label:"Paste"});
+  command.mockClear();readText.mockResolvedValueOnce("");
+  await choose(["Edit","Paste Special"],"Paste without Formatting");
+  expect(command).not.toHaveBeenCalled();expect(usePhotoWorkspace.getState().error).toBe("The clipboard has no text.");
+  Reflect.deleteProperty(navigator,"clipboard");lastTextCaret.current=null;
+});
+it("sets Units & Rulers and Guides, Grid & Slices in Preferences, previewing live and restoring on Cancel, like Photoshop",async()=>{
+  localStorage.removeItem(PREFERENCES_KEY);usePreferences.setState({...DEFAULT_PREFERENCES,notice:null});
+  const dialog=()=>container.querySelector<HTMLFormElement>('[role="dialog"][aria-label="Preferences"]');
+  const pressedSection=()=>dialog()!.querySelector('nav [aria-pressed="true"]')!.textContent;
+  await menu("Edit","Preferences");expect(rowLabels()).toEqual(["Units & Rulers…","Guides, Grid & Slices…"]);
+  await act(async()=>row("Guides, Grid & Slices…").click());expect(pressedSection()).toBe("Guides, Grid & Slices");
+  await pick("Grid color","#ff6b6b");await pick("Guides style","dashed");await inputNumber("Gridline every",50);await pick("Gridline units","pixels");
+  expect(usePreferences.getState()).toMatchObject({grid:{color:"#ff6b6b",every:50,unit:"pixels"},guides:{style:"dashed"}});expect(localStorage.getItem(PREFERENCES_KEY)).toBeNull();
+  await inputNumber("Grid subdivisions",0);expect(dialog()!.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(true);expect(usePreferences.getState().grid.subdivisions).toBe(4);
+  await click("Cancel");expect(dialog()).toBeNull();expect(usePreferences.getState().grid).toEqual(DEFAULT_PREFERENCES.grid);expect(usePreferences.getState().guides).toEqual(DEFAULT_PREFERENCES.guides);
+
+  await choose(["Edit","Preferences"],"Units & Rulers…");expect(pressedSection()).toBe("Units & Rulers");
+  await pick("Ruler units","inches");await inputNumber("Screen resolution",144);
+  await act(async()=>dialog()!.querySelector<HTMLInputElement>('[aria-label="Point/Pica Size"] input:not(:checked)')!.click());
+  await click("Next");expect(pressedSection()).toBe("Guides, Grid & Slices");await act(async()=>dialog()!.querySelector<HTMLInputElement>('[aria-label="Show slice numbers"]')!.click());
+  await act(async()=>dialog()!.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());expect(dialog()).toBeNull();
+  const saved={...DEFAULT_PREFERENCES,rulerUnit:"inches",screenResolution:144,pointSize:"traditional",slices:{...DEFAULT_PREFERENCES.slices,numbers:false}};
+  expect(JSON.parse(localStorage.getItem(PREFERENCES_KEY)!)).toEqual({schemaVersion:1,preferences:saved});
+
+  await choose(["View"],"Print Size");expect(container.querySelector(".xd-ps-doctab span")!.textContent).toContain("@ 200%");
+
+  await act(async()=>useViewAids.setState(state=>({flags:{...state.flags,rulers:true}})));
+  const ruler=container.querySelector<HTMLCanvasElement>('[aria-label="Vertical ruler"]')!;
+  await act(async()=>ruler.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,clientX:5,clientY:40})));
+  expect(rowLabels()).toEqual(["Pixels","Inches","Centimeters","Millimeters","Points","Picas","Percent"]);expect(row("Inches").getAttribute("aria-checked")).toBe("true");
+  await act(async()=>row("Centimeters").click());expect(usePreferences.getState().rulerUnit).toBe("centimeters");expect(JSON.parse(localStorage.getItem(PREFERENCES_KEY)!).preferences.rulerUnit).toBe("centimeters");
+  await act(async()=>ruler.dispatchEvent(new MouseEvent("dblclick",{bubbles:true})));expect(pressedSection()).toBe("Units & Rulers");expect(container.querySelector<HTMLSelectElement>('[aria-label="Ruler units"]')!.value).toBe("centimeters");
+  await click("Cancel");
+  useViewAids.setState(state=>({flags:{...state.flags,rulers:false}}));localStorage.removeItem(PREFERENCES_KEY);usePreferences.setState({...DEFAULT_PREFERENCES,notice:null});
 });

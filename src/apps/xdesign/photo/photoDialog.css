@@ -20,6 +20,7 @@
 .xd-photo .xd-ps-dialog :is(select,input[type=number],input[type=text],input:not([type]),textarea) { box-sizing:border-box;padding:2px 4px;border:1px solid var(--xd-border);border-radius:var(--r-sm);background:var(--xd-bg);color:var(--xd-text);font:inherit; }
 .xd-photo .xd-ps-dialog input[type=number] { text-align:right;font-variant-numeric:tabular-nums; }
 .xd-photo .xd-ps-dialog :is(input,select,textarea):disabled { color:var(--xd-text-3); }
+.xd-photo .xd-ps-dialog :is(.xd-ps-dialog-field,.xd-ps-dialog-check):has(:disabled) { color:var(--xd-text-3); }
 .xd-photo .xd-ps-dialog input[type=range] { display:block;width:100%;margin:4px 0 0;accent-color:var(--xd-accent); }
 .xd-photo .xd-ps-dialog :is(input[type=checkbox],input[type=radio]) { margin:0;accent-color:var(--xd-accent); }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-check { display:flex;align-items:center;gap:6px;margin:0; }
@@ -67,6 +68,7 @@
 .xd-photo .xd-ps-dialog .xd-ps-dialog-radios { display:flex;gap:16px; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-radios > label { margin:0; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-radios.is-column { flex-direction:column;gap:6px; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-radios.is-grid { display:grid;grid-template-columns:repeat(3,auto);gap:6px 16px; }
 /* Trim Away: Top and Bottom stacked in the first column, Left and Right in the second, as Photoshop lays them out. */
 .xd-photo .xd-ps-dialog .xd-ps-dialog-checks { display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:column;grid-template-rows:auto auto;gap:6px 24px; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-checks > label { margin:0; }

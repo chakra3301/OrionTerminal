@@ -25,7 +25,8 @@ export function TransformSection({ layer, disabled }: { layer: PhotoLayer; disab
   const [linked, setLinked] = useState(true);
   const frame = layer.transformBounds ?? layer.bounds;
   if (!frame) return null;
-  const [x, y, w, h] = frame, locked = disabled || !!layer.locks?.position || !!layer.locks?.all;
+  // An empty frame means the selection misses every pixel of the layer, so there is nothing to transform or move from.
+  const [x, y, w, h] = frame, locked = disabled || !w || !h || !!layer.locks?.position || !!layer.locks?.all;
   const corners: Quad = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
   const transform = (quad: Quad) => attempt(runPhotoCommand("edit.transform", { layer: layer.id, rect: [x, y, x + w, y + h], quad }));
   const resize = (width: number, height: number) => { if (width > 0 && height > 0) transform([[x, y], [x + width, y], [x + width, y + height], [x, y + height]]); };

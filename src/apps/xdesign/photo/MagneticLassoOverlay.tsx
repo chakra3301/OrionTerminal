@@ -7,6 +7,7 @@ import { selectionGestureMode, type SelectionMode } from "./selectionGesture";
 import { runPhotoCommand, usePhotoWorkspace } from "./runtime";
 import { beginXDesignActivity } from "../runtimeActivity";
 import { isDesignDialogOpen } from "../useDesignDialog";
+import { surfaceOffset, surfaceSize } from "./viewTurn";
 
 const empty: MagneticSnapshot = { points: [], anchors: [], pending: false, snapped: false, error: null };
 type Key = {key: string; target: EventTarget | null; preventDefault: () => void; stopPropagation: () => void; isComposing?: boolean; nativeEvent?: {isComposing: boolean}};
@@ -23,8 +24,9 @@ export function MagneticLassoOverlay({ document, projectId, viewKey, options, mo
   const reset = () => { draft.current?.dispose(); draft.current = null; altDrag.current = null; action.current = null; release(); if (alive.current) setSnapshot(empty); };
   useEffect(() => { alive.current = true; return () => { alive.current = false; reset(); }; }, []);
   const point = (event: { clientX: number; clientY: number }): MagneticPoint | null => {
-    const bounds = svg.current?.getBoundingClientRect(); if (!bounds?.width || !bounds.height) return null;
-    return [Math.max(0, Math.min(document.width, (event.clientX - bounds.left) * document.width / bounds.width)), Math.max(0, Math.min(document.height, (event.clientY - bounds.top) * document.height / bounds.height))];
+    const element = svg.current, [width, height] = element ? surfaceSize(element) : [0, 0]; if (!element || !width || !height) return null;
+    const [x, y] = surfaceOffset(element, event.clientX, event.clientY);
+    return [Math.max(0, Math.min(document.width, x * document.width / width)), Math.max(0, Math.min(document.height, y * document.height / height))];
   };
   const manual = (p: MagneticPoint, points?: MagneticPoint[]) => {
     const current = draft.current; if (!current || closing.current) return;

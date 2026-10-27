@@ -1,5 +1,6 @@
 import { useRef, useState, type PointerEvent } from "react";
 import type { XY } from "./penPath";
+import { surfaceFraction } from "./viewTurn";
 
 export type PathKnot={anchor:XY;in:XY;out:XY;smooth:boolean};
 export type PathData={subpaths:{closed:boolean;op?:string;knots:PathKnot[]}[];fillRule?:string;inverted?:boolean};
@@ -36,7 +37,7 @@ export function TargetPathOverlay({width,height,zoom,path}:{width:number;height:
 export function PathEditOverlay({width,height,zoom,path,direct,commit,move}:{width:number;height:number;zoom:number;path:PathData;direct:boolean;commit:(path:PathData)=>Promise<unknown>|void;move:(dx:number,dy:number)=>Promise<unknown>|void}) {
   const svg=useRef<SVGSVGElement>(null),drag=useRef<Drag|null>(null),committing=useRef(false),[draft,setDraft]=useState<PathData|null>(null);
   const shown=draft??path,size=7/zoom;
-  const at=(event:PointerEvent<SVGElement>):XY=>{const rect=svg.current!.getBoundingClientRect();return [(event.clientX-rect.left)/rect.width*width,(event.clientY-rect.top)/rect.height*height];};
+  const at=(event:PointerEvent<SVGElement>):XY=>{const [fx,fy]=surfaceFraction(svg.current!,event.clientX,event.clientY);return [fx*width,fy*height];};
   const begin=(event:PointerEvent<SVGElement>,target:Drag["target"])=>{if(event.button!==0||committing.current)return;event.preventDefault();event.stopPropagation();svg.current!.setPointerCapture(event.pointerId);drag.current={pointer:event.pointerId,start:at(event),origin:path,target,alt:event.altKey};};
   const next=(event:PointerEvent<SVGSVGElement>)=>{
     const current=drag.current;if(!current||current.pointer!==event.pointerId)return null;

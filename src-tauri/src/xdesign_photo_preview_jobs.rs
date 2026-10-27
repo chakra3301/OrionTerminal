@@ -14,11 +14,7 @@ pub(super) fn execute(
     if let Some(control) = control {
         control.check()?;
     }
-    let job = control.is_some()
-        && photocraft_engine::filters::params_for(command, &params).is_some()
-        && engine.is_enabled(command)
-        && mask_filters::pixel_preview_job(engine, &params)?;
-    let result = if job {
+    let result = if control.is_some() && native_job(engine, command, &params)? {
         super::validate_filter_input(command, &params)?;
         match engine
             .start(command, params)
@@ -34,6 +30,15 @@ pub(super) fn execute(
         control.check()?;
     }
     Ok(result)
+}
+
+fn native_job(engine: &Session, command: &str, params: &Value) -> Result<bool, String> {
+    if command == "edit.contentAwareFill" {
+        return Ok(engine.is_enabled(command));
+    }
+    Ok(photocraft_engine::filters::params_for(command, params).is_some()
+        && engine.is_enabled(command)
+        && mask_filters::pixel_preview_job(engine, params)?)
 }
 
 fn wait(engine: &mut Session, id: JobId, control: &Token) -> Result<Value, String> {
@@ -101,6 +106,30 @@ mod tests {
             assert!(!engine.has_jobs());
         }
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn content_aware_fill_previews_run_as_native_jobs_with_synchronous_pixels() {
+        let _guard = crate::xdesign_photo::feedback_serial();
+        let mut actual = super::super::tests::ordinary_filter_fixture(8);
+        actual.execute("select.rect", json!({"x":10,"y":8,"width":6,"height":6})).unwrap();
+        let params = json!({"colorAdaptation":"high","output":"new"});
+        assert!(native_job(&actual, "edit.contentAwareFill", &params).unwrap());
+        let mut expected = Session::new();
+        expected.add_document((*actual.active().unwrap().doc).clone(), None);
+        *expected.active_mut().unwrap() = actual.active().unwrap().clone();
+        expected.journal = actual.journal.clone();
+        let result = host::execute_view_command(&mut expected, "edit.contentAwareFill", params.clone()).unwrap();
+        let lease = host::preview_requests::acquire(&format!("caf-job-parity-{}", ulid::Ulid::new()), None).unwrap();
+        let actual_result = execute(&mut actual, "edit.contentAwareFill", params, Some(lease.token())).unwrap();
+        assert_eq!((&actual_result["filled"], &actual_result["window"]), (&result["filled"], &result["window"]));
+        let (a, e) = (actual.active().unwrap(), expected.active().unwrap());
+        let pixels = |doc: &photocraft_engine::doc::Document| photocraft_compose::render(doc, doc.bounds()).px;
+        assert_eq!(pixels(&a.doc), pixels(&e.doc));
+        let names = |doc: &photocraft_engine::doc::Document| doc.layers.iter().map(|layer| layer.name.clone()).collect::<Vec<_>>();
+        assert_eq!(names(&a.doc), names(&e.doc));
+        assert_eq!(a.history.past_len(), e.history.past_len());
+        assert!(!actual.has_jobs());
     }
 
     #[test]

@@ -28,6 +28,14 @@ describe("Image selection geometry and native requests", () => {
     expect(selectionGestureMode("intersect", none, "select.quick")).toBe("replace");
     expect(selectionGestureMode("replace", { shiftKey: true, altKey: true }, "select.quick")).toBe("subtract");
   });
+  it("selects one full-width row or full-height column at the release point, without anti-aliasing", () => {
+    const canvas = { width: 300, height: 200 };
+    expect(selectionGestureCommand("singleRowSelection", [[10, 40.2], [120.7, 57.9]], { feather: 2, antiAlias: true }, "add", none, none, canvas)).toEqual({ id: "select.rect", params: { x: 0, y: 57, width: 300, height: 1, mode: "add", ellipse: false, feather: 2, antiAlias: false } });
+    expect(selectionGestureCommand("singleColumnSelection", [[120.7, 57.9]], {}, "replace", none, none, canvas)).toEqual({ id: "select.rect", params: { x: 120, y: 0, width: 1, height: 200, mode: "replace", ellipse: false, feather: 0, antiAlias: false } });
+    for (const point of [[10, -0.5], [10, 200], [NaN, 10]]) expect(selectionGestureCommand("singleRowSelection", [point], {}, "replace", none, none, canvas)).toBeNull();
+    expect(selectionGestureCommand("singleColumnSelection", [[300, 10]], {}, "replace", none, none, canvas)).toBeNull();
+    expect(selectionGestureCommand("singleRowSelection", [[10, 10]], {}, "replace", none, none)).toBeNull();
+  });
   it("supports click placement of a fixed area and centered fixed size", () => {
     const options = { style: "fixedSize", fixedWidth: 21, fixedHeight: 11 };
     expect(gestureRectangle([50, 50], [50, 50], options, none, none)).toEqual({ x: 50, y: 50, width: 21, height: 11 });

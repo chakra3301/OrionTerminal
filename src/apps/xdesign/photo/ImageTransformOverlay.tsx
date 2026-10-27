@@ -4,6 +4,7 @@ import { identityTransform, layerFrame, CORNERS, distortCorners, perspectiveQuad
 import { beginFreeTransform, cancelFreeTransform, commitFreeTransform, freeTransformChanged, freeTransformParams, patchFreeTransform, useFreeTransform, type Quad } from "./freeTransform";
 import { controlsLocked, runPhotoCommand, usePhotoWorkspace } from "./runtime";
 import { usePhotoCommandPreview } from "./commandPreview";
+import { surfaceFraction } from "./viewTurn";
 
 const HANDLES=[[-1,-1,"top left"],[0,-1,"top"],[1,-1,"top right"],[1,0,"right"],[1,1,"bottom right"],[0,1,"bottom"],[-1,1,"bottom left"],[-1,0,"left"]] as const;
 const RESIZE_CURSORS=["ew-resize","nwse-resize","ns-resize","nesw-resize"];
@@ -33,7 +34,7 @@ export function ImageTransformOverlay({document,layer,zoom,untilShown,autoSelect
     return()=>{window.removeEventListener("keydown",key,true);window.removeEventListener("keyup",up,true);};
   },[]);
   if(!bounds)return null;
-  const point=(event:PointerEvent<SVGElement>):[number,number]=>{const rect=svg.current!.getBoundingClientRect();return [(event.clientX-rect.left)/rect.width*document.width,(event.clientY-rect.top)/rect.height*document.height];};
+  const point=(event:PointerEvent<SVGElement>):[number,number]=>{const [fx,fy]=surfaceFraction(svg.current!,event.clientX,event.clientY);return [fx*document.width,fy*document.height];};
   const corners:Quad=quad??CORNERS.map(([x,y])=>transformHandle(bounds,visible,x,y) as [number,number]);
   const begin=(event:PointerEvent<SVGElement>,kind:Drag["kind"],hx=0,hy=0)=>{
     if(event.button!==0||busy||drag.current)return;

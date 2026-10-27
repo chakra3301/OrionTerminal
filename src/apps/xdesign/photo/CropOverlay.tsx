@@ -1,5 +1,6 @@
 import { useRef, useState, type PointerEvent } from "react";
 import { createLucideIcon, type LucideIcon } from "lucide-react";
+import { surfaceFraction } from "./viewTurn";
 
 export type CropBox={x:number;y:number;width:number;height:number};
 export type CropGuide="thirds"|"grid"|"diagonal"|"triangle"|"golden"|"spiral"|"none";
@@ -66,7 +67,7 @@ const span=(f:number,lo:number,hi:number,size:number,centred:boolean):[number,nu
 // shifted the opposite way in image pixels, and the caller offsets the image to match so the box stays put on screen.
 export function CropOverlay({width,height,zoom,box,change,label="Crop",shade=true,shadeOpacity,hideOutside=false,angle=0,rotate,guide="none",autoGuide=false,orientation=0,menu,movable=true,pan,ratio}:{width:number;height:number;zoom:number;box:CropBox;change:(box:CropBox)=>void;ratio?:number;label?:string;shade?:boolean;shadeOpacity?:number;hideOutside?:boolean;angle?:number;rotate?:(angle:number)=>void;guide?:CropGuide;autoGuide?:boolean;orientation?:number;menu?:(at:{x:number;y:number})=>void;movable?:boolean;pan?:(box:CropBox)=>void}) {
   const svg=useRef<SVGSVGElement>(null),drag=useRef<Drag|null>(null),[dragging,setDragging]=useState(false);
-  const at=(event:PointerEvent<SVGElement>):[number,number]=>{const rect=svg.current!.getBoundingClientRect();return [(event.clientX-rect.left)/rect.width*width,(event.clientY-rect.top)/rect.height*height];};
+  const at=(event:PointerEvent<SVGElement>):[number,number]=>{const [fx,fy]=surfaceFraction(svg.current!,event.clientX,event.clientY);return [fx*width,fy*height];};
   const begin=(event:PointerEvent<SVGElement>,kind:Drag["kind"],fx=0,fy=0)=>{if(event.button!==0)return;event.preventDefault();event.stopPropagation();svg.current!.setPointerCapture(event.pointerId);drag.current={pointer:event.pointerId,fx,fy,kind,start:at(event),client:[event.clientX,event.clientY],box,angle};setDragging(true);};
   const moved=(event:PointerEvent<SVGSVGElement>)=>{
     const current=drag.current;if(!current||current.pointer!==event.pointerId)return;
@@ -75,7 +76,7 @@ export function CropOverlay({width,height,zoom,box,change,label="Crop",shade=tru
     const dx=Math.round(x-current.start[0]),dy=Math.round(y-current.start[1]);
     if(current.kind==="move"&&pan){
       // The svg moves with the image, so measure from the pointer's screen travel rather than svg coordinates.
-      const rect=svg.current!.getBoundingClientRect(),px=Math.round((event.clientX-current.client[0])/rect.width*width),py=Math.round((event.clientY-current.client[1])/rect.height*height);
+      const [fx,fy]=surfaceFraction(svg.current!,event.clientX,event.clientY),[sx,sy]=surfaceFraction(svg.current!,current.client[0],current.client[1]),px=Math.round((fx-sx)*width),py=Math.round((fy-sy)*height);
       pan({...from,x:from.x-px,y:from.y-py});return;
     }
     if(current.kind==="move"){change({...from,x:from.x+dx,y:from.y+dy});return;}

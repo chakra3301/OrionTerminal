@@ -23,8 +23,38 @@ pub(super) fn execute(engine: &mut Session, command: &str, params: &Value) -> Op
         "layer.moveLayersTo" => Some(move_layers(engine, params)),
         "layer.layerStyle.setEffectsEnabled" => Some(set_effects_enabled(engine, params)),
         "layer.setGroupsExpanded" => Some(set_groups_expanded(engine, params)),
+        "layer.new.frameFromLayers" if params.get("width").is_some() || params.get("height").is_some() => Some(sized_frame(engine, params)),
         _ => None,
     }
+}
+
+/// Photoshop's Add Frame to Layer dialog sizes the frame, centred on the layers' bounds; the engine only frames the bounds exactly.
+fn sized_frame(engine: &mut Session, params: &Value) -> Result<Value, String> {
+    let side = |key: &str| params.get(key).map(|value| value.as_f64().filter(|value| (1.0..=32768.0).contains(value)).map(|value| value.round() as i32).ok_or("Frame width and height must be 1 to 32768 px")).transpose();
+    let (width, height) = (side("width")?, side("height")?);
+    let mut forwarded = serde_json::Map::new();
+    if let Some(name) = params.get("name") { forwarded.insert("name".into(), name.clone()); }
+    let mut result = engine.execute("layer.new.frameFromLayers", Value::Object(forwarded)).map_err(|e| e.to_string())?;
+    let frame: Vec<i32> = result["frame"].as_array().into_iter().flatten().filter_map(|v| v.as_i64().map(|v| v as i32)).collect();
+    let (&[x, y, w, h], Some(group)) = (frame.as_slice(), result["layer"].as_u64().map(LayerId)) else { return Ok(result) };
+    let (width, height) = (width.unwrap_or(w), height.unwrap_or(h));
+    if (width, height) == (w, h) { return Ok(result); }
+    if width as u64 * height as u64 > super::MAX_PIXELS {
+        engine.undo();
+        if let Some(state) = engine.active_mut() { state.history.clear_redo(); }
+        return Err("Choose a frame within the image editing limits.".into());
+    }
+    let (x0, y0) = (x + (w - width).div_euclid(2), y + (h - height).div_euclid(2));
+    let rect = photocraft_engine::doc::Rect::new(x0, y0, x0 + width, y0 + height);
+    let state = engine.active_mut().ok_or("No image document")?;
+    let layer = Arc::make_mut(&mut state.doc).layer_mut(group).ok_or("The frame was not created")?;
+    let mut mask = photocraft_engine::doc::LayerMask::hide_all();
+    let row = vec![1.0f32; width as usize];
+    for top in rect.y0..rect.y1 { mask.surface.write_region(photocraft_engine::doc::Rect::new(rect.x0, top, rect.x1, top + 1), &row); }
+    mask.surface.prune();
+    layer.mask = Some(mask);
+    result["frame"] = json!([x0, y0, width, height]);
+    Ok(result)
 }
 
 fn move_layers(engine: &mut Session, params: &Value) -> Result<Value, String> {
@@ -302,5 +332,29 @@ mod tests {
         execute(&mut engine, "layer.setGroupsExpanded", &json!({"layers":[inner,outer],"expanded":true})).unwrap().unwrap();
         restore_folds(engine.active_mut().unwrap(), &view);
         assert!(open(&engine, outer) && !open(&engine, inner));
+    }
+
+    #[test]
+    fn a_sized_frame_is_centred_on_the_layer_bounds_in_one_step_like_photoshops_add_frame_dialog() {
+        let mut engine = Session::new();
+        engine.execute("file.new", json!({"width":200,"height":200})).unwrap();
+        engine.execute("layer.new.layer", json!({})).unwrap();
+        engine.execute("select.rect", json!({"x":40,"y":40,"width":80,"height":80})).unwrap();
+        engine.execute("edit.fill", json!({"contents":"foreground"})).unwrap();
+        engine.execute("select.deselect", json!({})).unwrap();
+        let steps = engine.active().unwrap().history.entries().len();
+        let result = execute(&mut engine, "layer.new.frameFromLayers", &json!({"name":"Frame 1","width":20,"height":80})).unwrap().unwrap();
+        assert_eq!(result["frame"], json!([70, 40, 20, 80]));
+        let state = engine.active().unwrap();
+        assert_eq!(state.history.entries().len(), steps + 1);
+        let group = state.doc.layer(LayerId(result["layer"].as_u64().unwrap())).unwrap();
+        assert_eq!(group.name, "Frame 1");
+        let mask = group.mask.as_ref().unwrap();
+        assert_eq!((mask.value(69, 60), mask.value(70, 60), mask.value(89, 60), mask.value(90, 60)), (0.0, 1.0, 1.0, 0.0));
+        assert!(execute(&mut engine, "layer.new.frameFromLayers", &json!({"width":0})).unwrap().is_err());
+        let steps = engine.active().unwrap().history.entries().len();
+        assert!(execute(&mut engine, "layer.new.frameFromLayers", &json!({"width":32768,"height":32768})).unwrap().is_err());
+        assert_eq!(engine.active().unwrap().history.entries().len(), steps, "an oversized frame leaves nothing behind");
+        assert!(execute(&mut engine, "layer.new.frameFromLayers", &json!({"name":"Plain"})).is_none(), "an unsized frame stays with the engine");
     }
 }

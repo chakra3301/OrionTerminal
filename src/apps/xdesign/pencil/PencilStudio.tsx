@@ -28,6 +28,7 @@ import { InspectorSection, PanelResize, useEditorPanels } from "../EditorChrome"
 import { DESIGN_TOOL_GROUPS } from "../editorTools";
 import { RoomImageControls } from './RoomImageControls';
 import { SelectionProperties } from "./SelectionProperties";
+import { zoomAroundCenter, zoomToFitPage, zoomToFitSelection } from "./viewportZoom";
 import { PrototypePanel } from "./PrototypePanel";
 import { useRailIntent } from "../railIntentStore";
 import { CanvasPreviewContext } from './CanvasPreviewContext';
@@ -100,11 +101,13 @@ export function PencilStudio() {
   const report=(error:unknown)=>usePencilWorkspace.setState({error:String(error)});
   const exportFile=async(format:PencilExportFormat)=>{try{const bytes=await exportPencil(format,exportScale);const extension=format==="REACT"?"tsx":format.toLowerCase();const name=`${editor?.state.documentName||"design"}.${extension}`;if(isTauri()){const path=await save({defaultPath:name,filters:[{name:format,extensions:[extension]}]});if(path)await ipc.xdesignSaveBytes(path,Array.from(bytes));}else downloadFile(name,new Blob([new Uint8Array(bytes).buffer]));}catch(error){report(error);}};
   const zoom=Math.round((editor?.state.zoom??1)*100);
-  const zoomBy=(factor:number)=>editor?.zoomToLevel(editor.state.zoom*factor);
+  const viewSize=()=>({width:element.current?.clientWidth??0,height:element.current?.clientHeight??0});
+  const zoomTo=(level:number)=>{if(editor)zoomAroundCenter(editor,level,viewSize());},zoomBy=(factor:number)=>{if(editor)zoomTo(editor.state.zoom*factor);};
+  const fitPage=()=>{if(editor)zoomToFitPage(editor,viewSize());},fitSelection=()=>{if(editor)zoomToFitSelection(editor,viewSize());};
   const zoomItems=():MenuEntry[]=>[
     {label:"Zoom in",hint:"⌘+",onSelect:()=>zoomBy(2)},{label:"Zoom out",hint:"⌘−",onSelect:()=>zoomBy(.5)},
-    {label:"Zoom to fit",hint:"⇧1",onSelect:()=>editor?.zoomToFit()},{label:"Zoom to selection",hint:"⇧2",disabled:!editor?.state.selectedIds.size,onSelect:()=>editor?.zoomToSelection()},
-    {label:"Zoom to 50%",onSelect:()=>editor?.zoomToLevel(.5)},{label:"Zoom to 100%",hint:"⇧0",onSelect:()=>editor?.zoomTo100()},{label:"Zoom to 200%",onSelect:()=>editor?.zoomToLevel(2)},
+    {label:"Zoom to fit",hint:"⇧1",onSelect:fitPage},{label:"Zoom to selection",hint:"⇧2",disabled:!editor?.state.selectedIds.size,onSelect:fitSelection},
+    {label:"Zoom to 50%",onSelect:()=>zoomTo(.5)},{label:"Zoom to 100%",hint:"⇧0",onSelect:()=>zoomTo(1)},{label:"Zoom to 200%",onSelect:()=>zoomTo(2)},
     "separator",
     {label:"Rulers",hint:"⇧R",checked:view.rulers,onSelect:()=>view.toggle("rulers")},{label:"Canvas grid",checked:view.grid,onSelect:()=>view.toggle("grid")},
   ];
@@ -133,12 +136,12 @@ export function PencilStudio() {
   const avatar=<span className="xd-figma-avatar" title={user??"You"} aria-hidden>{(user??"You").trim().charAt(0).toUpperCase()}</span>;
   const shareButton=<button type="button" className="xd-figma-share" disabled={!editor||busy} onClick={share}>{shareLabel}</button>;
   const zoomMenu=<Popover className="xd-figma-zoom" label="Zoom and view options" title="Zoom/view options" text={<>{zoom}%<ChevronDown size={11}/></>} align="end" disabled={!editor} items={zoomItems}/>;
-  return <CanvasPreviewContext.Provider value={element.current?.parentElement??null}><section className="xd-pencil xd-figma" aria-label="Design workspace" aria-busy={busy} onPaste={e=>{if(isDesignDialogOpen()||(e.target as HTMLElement).closest("input,textarea,select")||!editor||busy||readOnly)return;e.preventDefault();void pastePencilData(editor,{html:e.clipboardData.getData("text/html"),text:e.clipboardData.getData("text/plain"),files:Array.from(e.clipboardData.files)}).catch(report);}} onKeyDown={e=>{
+  return <CanvasPreviewContext.Provider value={element.current?.parentElement??null}><section className="xd-pencil xd-figma" tabIndex={-1} aria-label="Design workspace" aria-busy={busy} onPaste={e=>{if(isDesignDialogOpen()||(e.target as HTMLElement).closest("input,textarea,select")||!editor||busy||readOnly)return;e.preventDefault();void pastePencilData(editor,{html:e.clipboardData.getData("text/html"),text:e.clipboardData.getData("text/plain"),files:Array.from(e.clipboardData.files)}).catch(report);}} onKeyDown={e=>{
     if(isDesignDialogOpen())return;
     if(e.nativeEvent.isComposing||(e.target as HTMLElement).closest("input,textarea,select,[contenteditable=true]")||!editor||busy||usePhotoWorkspace.getState().shapeId)return;
     if((e.metaKey||e.ctrlKey)&&e.key==='\\'){e.preventDefault();e.stopPropagation();toggleUi();return;}
-    if((e.metaKey||e.ctrlKey)&&!e.altKey&&['=','+','-','0'].includes(e.key)){e.preventDefault();e.stopPropagation();if(e.key==='0')editor.zoomTo100();else zoomBy(e.key==='-'?.5:2);return;}
-    if(e.shiftKey&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&['KeyR','Digit0','Digit1','Digit2'].includes(e.code)){e.preventDefault();e.stopPropagation();if(e.code==='KeyR')view.toggle('rulers');else if(e.code==='Digit0')editor.zoomTo100();else if(e.code==='Digit1')editor.zoomToFit();else editor.zoomToSelection();return;}
+    if((e.metaKey||e.ctrlKey)&&!e.altKey&&['=','+','-','0'].includes(e.key)){e.preventDefault();e.stopPropagation();if(e.key==='0')zoomTo(1);else zoomBy(e.key==='-'?.5:2);return;}
+    if(e.shiftKey&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&['KeyR','Digit0','Digit1','Digit2'].includes(e.code)){e.preventDefault();e.stopPropagation();if(e.code==='KeyR')view.toggle('rulers');else if(e.code==='Digit0')zoomTo(1);else if(e.code==='Digit1')fitPage();else fitSelection();return;}
     if(!e.metaKey&&!e.ctrlKey&&e.code==='KeyC'){e.preventDefault();e.stopPropagation();comments.toggle();return;}
     if(e.key==='Escape'&&comments.mode){e.preventDefault();e.stopPropagation();comments.cancel();return;}
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.stopPropagation();performCanvasHistory(editor,roomSession,e.shiftKey?'redo':'undo');return;}

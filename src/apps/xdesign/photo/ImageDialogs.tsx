@@ -140,14 +140,36 @@ export function ImageTrimDialog({state,close}:{state:PhotoState;close:()=>void})
   </Dialog>;
 }
 
+/** Image › Duplicate…. Merged Layers Only needs more than one layer, as in Photoshop. */
+export function DuplicateImageDialog({name,layers,close}:{name:string;layers:number;close:()=>void}) {
+  const [as,setAs]=useState(`${name.replace(/\.[^.]+$/,"")} copy`),[merged,setMerged]=useState(false);
+  return <Dialog title="Duplicate Image" close={close} okDisabled={!as.trim()} apply={()=>runPhotoCommand("image.duplicate",{name:as.trim(),mergedOnly:layers>1&&merged})}>
+    <p className="xd-ps-dialog-text">Duplicate: {name}</p>
+    <Field label="As"><input aria-label="As" maxLength={512} value={as} onChange={e=>setAs(e.target.value)}/></Field>
+    <label className="xd-ps-dialog-check"><input type="checkbox" aria-label="Duplicate Merged Layers Only" disabled={layers<2} checked={layers>1&&merged} onChange={e=>setMerged(e.target.checked)}/>Duplicate Merged Layers Only</label>
+  </Dialog>;
+}
+
+/** History › New Snapshot…. Merged Layers and Current Layer keep only those pixels, as in Photoshop. */
+export function NewSnapshotDialog({next,close}:{next:string;close:()=>void}) {
+  const [name,setName]=useState(next),[from,setFrom]=useState("document");
+  return <Dialog title="New Snapshot" close={close} okDisabled={!name.trim()} apply={()=>runPhotoCommand("history.snapshot.new",{name:name.trim(),from})}>
+    <Field label="Name"><input aria-label="Name" maxLength={255} value={name} onChange={e=>setName(e.target.value)}/></Field>
+    <Field label="From"><select aria-label="From" value={from} onChange={e=>setFrom(e.target.value)}><option value="document">Full Document</option><option value="merged">Merged Layers</option><option value="layer">Current Layer</option></select></Field>
+  </Dialog>;
+}
+
 const EXPORT_FORMATS:[string,string,string[]][]=[["psd","Photoshop (PSD)",["psd","psb"]],["png","PNG",["png"]],["jpg","JPEG",["jpg","jpeg"]],["webp","WebP (lossless)",["webp"]],["avif","AVIF",["avif"]],["tiff","TIFF",["tiff","tif"]],["pcraft","Native image",["pcraft"]]];
-export function ImageExportDialog({name,choose,close}:{name:string;choose:(path:string|null,quality:number|undefined)=>Promise<unknown>;close:()=>void}) {
+// Save a Copy also offers Photoshop PDF: one page, the flattened image at the document's resolution.
+const COPY_FORMATS:[string,string,string[]][]=[...EXPORT_FORMATS.slice(0,1),["pdf","Photoshop PDF",["pdf"]],...EXPORT_FORMATS.slice(1)];
+export function ImageExportDialog({name,copy=false,choose,close}:{name:string;copy?:boolean;choose:(path:string|null,quality:number|undefined)=>Promise<unknown>;close:()=>void}) {
+  const formats=copy?COPY_FORMATS:EXPORT_FORMATS;
   const [format,setFormat]=useState("psd"),[quality,setQuality]=useState(90);
-  const [,label,extensions]=EXPORT_FORMATS.find(([id])=>id===format)!;
+  const [,label,extensions]=formats.find(([id])=>id===format)!;
   const lossy=format==="jpg"||format==="avif";
-  return <Dialog title="Export As" ok="Export" close={close} reset={()=>{setFormat("psd");setQuality(90);}} apply={()=>save({defaultPath:`${name.replace(/\.[^.]+$/,"")}.${extensions[0]}`,filters:[{name:label,extensions}]}).then(path=>choose(path,lossy?quality:undefined))}>
+  return <Dialog title={copy?"Save a Copy":"Export As"} ok={copy?"Save":"Export"} close={close} reset={()=>{setFormat("psd");setQuality(90);}} apply={()=>save({defaultPath:`${name.replace(/\.[^.]+$/,"")}.${extensions[0]}`,filters:[{name:label,extensions}]}).then(path=>choose(path,lossy?quality:undefined))}>
     <div className="xd-ps-dialog-grid has-sliders">
-      <div className="xd-ps-dialog-row"><Field label="Format"><select aria-label="Format" value={format} onChange={e=>setFormat(e.target.value)}>{EXPORT_FORMATS.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></Field></div>
+      <div className="xd-ps-dialog-row"><Field label="Format"><select aria-label="Format" value={format} onChange={e=>setFormat(e.target.value)}>{formats.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></Field></div>
       {lossy&&<div className="xd-ps-dialog-row"><Field label="Quality" unit="%"><input type="number" aria-label="Quality" required min="1" max="100" value={Number.isFinite(quality)?quality:""} onChange={e=>setQuality(e.target.valueAsNumber)}/></Field>
         <input type="range" aria-label="Quality slider" min="1" max="100" value={Number.isFinite(quality)?quality:90} onChange={e=>setQuality(e.target.valueAsNumber)}/></div>}
     </div>

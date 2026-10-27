@@ -2,7 +2,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CROP_PRESETS_KEY, cropPresetName } from "./CropPresets";
-import { CropRatioFields, DistributeMenu, PathOpSelect, ShapeStyleFields, TypeBar, cropSizePixels, shapeStyleParams, typeStyleParams } from "./toolBars";
+import { CropRatioFields, DistributeMenu, PathOpSelect, PerspectiveCropBar, ShapeStyleFields, TypeBar, cropSizePixels, shapeStyleParams, typeStyleParams } from "./toolBars";
 
 let root: Root, container: HTMLDivElement;
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); localStorage.removeItem(CROP_PRESETS_KEY); container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
@@ -45,6 +45,13 @@ describe("shape bar fields", () => {
   it("lists the path operations", () => {
     const change = vi.fn(); render(<PathOpSelect value="new" change={change} />);
     choose(byLabel<HTMLSelectElement>("Path operation"), "subtract"); expect(change).toHaveBeenCalledWith("subtract");
+  });
+  it("ends the path operations with Photoshop's Merge Shape Components, which runs once and keeps the mode", () => {
+    const change = vi.fn(), merge = vi.fn(); render(<PathOpSelect value="combine" change={change} merge={merge} />);
+    const select = byLabel<HTMLSelectElement>("Path operation");
+    expect([...select.options].at(-1)!.textContent).toBe("Merge Shape Components");
+    choose(select, "merge"); expect(merge).toHaveBeenCalledTimes(1); expect(change).not.toHaveBeenCalled(); expect(select.value).toBe("combine");
+    render(<PathOpSelect value="combine" change={change} />); expect([...select.options].at(-1)!.disabled).toBe(true);
   });
 });
 
@@ -96,6 +103,17 @@ describe("W x H x Resolution crops", () => {
     act(() => byLabel("Clear crop size").click()); expect(applySize).toHaveBeenLastCalledWith({ sizeWidth: 0, sizeHeight: 0, resolution: 0 });
     choose(select, "Front Image"); expect(applySize).toHaveBeenLastCalledWith({ style: "size", sizeWidth: 800, sizeWidthUnit: "px", sizeHeight: 600, sizeHeightUnit: "px", resolution: 72, resolutionUnit: "in" });
     choose(select, "size"); expect(applySize).toHaveBeenLastCalledWith({ style: "size", sizeWidth: 0, sizeHeight: 0, resolution: 0 });
+  });
+});
+
+describe("PerspectiveCropBar", () => {
+  it("labels W, H and Resolution with Pixels/in and keeps Clear available like Photoshop", () => {
+    render(<PerspectiveCropBar values={{}} original={[800, 600]} resolution={72} disabled={false} change={vi.fn()} />);
+    expect(container.textContent).toContain("W:");
+    expect(container.textContent).toContain("H:");
+    expect(container.textContent).toContain("Resolution:");
+    expect([...byLabel<HTMLSelectElement>("Crop resolution unit").options].map(option => option.textContent)).toEqual(["Pixels/in", "Pixels/cm"]);
+    expect(byLabel<HTMLButtonElement>("Clear crop size").disabled).toBe(false);
   });
 });
 

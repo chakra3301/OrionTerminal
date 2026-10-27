@@ -4,9 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ulid } from "ulid";
 import { useXDesign } from "../store";
 import { useXDProjects } from "../projectsStore";
-import { usePhotoWorkspace } from "./runtime";
+import { runPhotoCommand, usePhotoWorkspace } from "./runtime";
 import { PhotoStudio } from "./PhotoStudio";
-import type { PhotoDocument, PhotoState } from "./types";
+import type { PhotoDocument, PhotoLayer, PhotoSlice, PhotoState } from "./types";
 import { DEFAULT_FLAGS, useViewAids } from "./viewGuides";
 
 const native = vi.hoisted(() => ({ enabled: false, invoke: vi.fn() }));
@@ -71,13 +71,13 @@ describe("View aids in the View menu", () => {
   it("sets Snap To targets with All and None", async () => {
     await openMenu("View", "Snap To");
     await act(async () => row("None").click());
-    expect(useViewAids.getState().flags.snapTo).toEqual({ guides: false, grid: false, bounds: false });
+    expect(useViewAids.getState().flags.snapTo).toEqual({ guides: false, grid: false, layers: false, bounds: false });
     await openMenu("View", "Snap To");
     await act(async () => row("Grid").click());
     expect(useViewAids.getState().flags.snapTo.grid).toBe(true);
     await openMenu("View", "Snap To");
     await act(async () => row("All").click());
-    expect(useViewAids.getState().flags.snapTo).toEqual({ guides: true, grid: true, bounds: true });
+    expect(useViewAids.getState().flags.snapTo).toEqual({ guides: true, grid: true, layers: true, bounds: true });
   });
   it("opens New Guide, clears guides and adds guides from the active shape layer", async () => {
     await openMenu("View");
@@ -90,6 +90,55 @@ describe("View aids in the View menu", () => {
     await openMenu("View");
     await act(async () => row("Clear Guides").click());
     expect(useViewAids.getState().documents[docId]).toEqual([]);
+  });
+  it("lists the artboard guide and slice items in Photoshop's order", async () => {
+    await openMenu("View");
+    const labels = [...rows()].map(el => el.textContent!);
+    const at = (name: string) => labels.findIndex(text => text.startsWith(name));
+    expect([at("Lock Guides"), at("Clear Guides"), at("Clear Selected Artboard Guides"), at("Clear Canvas Guides"), at("New Guide…"), at("New Guide Layout…"), at("New Guides From Shape"), at("Lock Slices"), at("Clear Slices")].every((n, i, all) => n >= 0 && (i === 0 || n > all[i - 1]!))).toBe(true);
+    expect(row("Clear Selected Artboard Guides").disabled).toBe(true);
+  });
+  it("clears the active artboard's guides or the canvas guides, per axis, strictly inside the artboard", async () => {
+    const layer = (id: number, name: string): PhotoLayer => ({ id, name, kind: "Group", visible: true, opacity: 1, fill: 1, blend: "Normal", clipped: false, hasMask: false });
+    await act(async () => usePhotoWorkspace.setState(s => ({ state: { ...s.state!, activeLayer: 4, layers: [...s.state!.layers,
+      { ...layer(3, "Artboard 1"), artboard: { rect: [100, 100, 200, 200], background: "white", preset: null }, children: [{ ...layer(4, "Layer 1"), kind: "Raster" }] },
+      { ...layer(5, "Artboard 2"), artboard: { rect: [500, 0, 100, 100], background: "white", preset: null }, children: [] }] } })));
+    const guides = () => { useViewAids.getState().addGuides(docId, [{ axis: "v", pos: 150 }, { axis: "v", pos: 100 }, { axis: "v", pos: 550 }, { axis: "v", pos: 400 }, { axis: "h", pos: 250 }, { axis: "h", pos: 50 }, { axis: "h", pos: 350 }], true); };
+    const left = () => useViewAids.getState().documents[docId]!.map(g => [g.axis, g.pos]);
+    guides();
+    await openMenu("View");
+    await act(async () => row("Clear Selected Artboard Guides").click());
+    expect(left()).toEqual([["v", 100], ["v", 550], ["v", 400], ["h", 50], ["h", 350]]);
+    guides();
+    await openMenu("View");
+    await act(async () => row("Clear Canvas Guides").click());
+    expect(left()).toEqual([["v", 150], ["v", 550], ["h", 250], ["h", 50]]);
+  });
+  it("treats every guide as a canvas guide when there are no artboards", async () => {
+    useViewAids.getState().addGuides(docId, [{ axis: "v", pos: 150 }, { axis: "h", pos: 50 }]);
+    await openMenu("View");
+    await act(async () => row("Clear Canvas Guides").click());
+    expect(useViewAids.getState().documents[docId]).toEqual([]);
+  });
+  it("locks slices and clears user slices through the engine", async () => {
+    const slice = (id: number | null): PhotoSlice => ({ number: 1, id, origin: id === null ? "auto" : "user", name: "Portrait_01", rect: [0, 0, 800, 600], kind: "image", layer: null, url: "", target: "", message: "", alt: "", cellText: "", background: null });
+    const analyse = (slices: PhotoSlice[], slicesLocked: boolean) => act(async () => usePhotoWorkspace.setState(s => ({ state: { ...s.state!, analysis: { ruler: null, count: { total: 0, activeGroup: 0, groups: [] }, notes: [], slices, slicesLocked } } })));
+    await analyse([slice(null)], false);
+    await openMenu("View");
+    expect(row("Lock Slices").getAttribute("aria-checked")).toBe("false");
+    expect(row("Clear Slices").disabled).toBe(true);
+    await act(async () => row("Lock Slices").click());
+    expect(runPhotoCommand).toHaveBeenLastCalledWith("view.lockSlices", { on: true });
+    await analyse([slice(3)], false);
+    await openMenu("View");
+    await act(async () => row("Clear Slices").click());
+    expect(runPhotoCommand).toHaveBeenLastCalledWith("view.clearSlices", {});
+    await analyse([slice(3)], true);
+    await openMenu("View");
+    expect(row("Lock Slices").getAttribute("aria-checked")).toBe("true");
+    expect(row("Clear Slices").disabled).toBe(true);
+    await act(async () => row("Lock Slices").click());
+    expect(runPhotoCommand).toHaveBeenLastCalledWith("view.lockSlices", { on: false });
   });
   it("leaves New Guides From Shape out when the active layer has no shape bounds", async () => {
     await act(async () => usePhotoWorkspace.setState(s => ({ state: { ...s.state!, activeLayer: 1 } })));

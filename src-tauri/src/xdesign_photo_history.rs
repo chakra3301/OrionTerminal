@@ -7,7 +7,7 @@ pub(super) mod persisted;
 struct Identity {doc:Weak<Document>,id:String,versions:HashMap<std::path::PathBuf,String>}
 type Ids=HashMap<usize,Identity>;
 fn identities()->&'static Mutex<Ids>{static IDS:OnceLock<Mutex<Ids>>=OnceLock::new();IDS.get_or_init(Default::default)}
-fn snapshot_id(doc:&Arc<Document>)->String{
+pub(super) fn snapshot_id(doc:&Arc<Document>)->String{
     let mut ids=identities().lock().unwrap_or_else(|error|error.into_inner());
     ids.retain(|_,entry|entry.doc.strong_count()>0);let key=Arc::as_ptr(doc) as usize;
     if let Some(entry)=ids.get(&key){if entry.doc.upgrade().is_some_and(|old|Arc::ptr_eq(&old,doc)){return entry.id.clone();}}
@@ -27,7 +27,7 @@ pub(super) fn resolve(engine:&Session,params:&Value)->Result<Source,String>{
 }
 pub(super) fn parameters(params:&Value)->Value{json!({"state":params.get("state"),"historySource":params.get("historySource")})}
 pub(super) fn normalize(engine:&Session,command:&str,mut params:Value)->Result<Value,String>{
-    if command=="paint.historyBrush"{let source=resolve(engine,&params)?;let object=params.as_object_mut().ok_or("Invalid History Brush parameters")?;object.remove("historySource");object.insert("state".into(),json!(source.index));}
+    if command=="paint.historyBrush"||(command=="edit.fill"&&params["contents"]=="history"){let source=resolve(engine,&params)?;let object=params.as_object_mut().ok_or("Invalid History Brush parameters")?;object.remove("historySource");object.insert("state".into(),json!(source.index));}
     Ok(params)
 }
 pub(super) fn surface(doc:&Document,layer:Option<LayerId>,target:&Value)->Result<Surface,String>{
@@ -91,6 +91,12 @@ mod tests{
         let mut engine=fixture();engine.active_mut().unwrap().history.max_states=2;let source=describe(&engine)[1]["id"].clone();let params=json!({"historySource":source,"state":999});let selected=resolve(&engine,&params).unwrap().doc;
         engine.execute("paint.stroke",json!({"points":[[10,25]],"size":4,"color":"#40f020"})).unwrap();let normalized=normalize(&engine,"paint.historyBrush",params.clone()).unwrap();assert_eq!(normalized["state"],0);assert!(normalized.get("historySource").is_none());assert!(Arc::ptr_eq(&resolve(&engine,&params).unwrap().doc,&selected));
         engine.execute("paint.stroke",json!({"points":[[20,25]],"size":4})).unwrap();assert!(resolve(&engine,&params).err().unwrap().contains("no longer available"));let mut reopened=Session::new();reopened.add_document((*selected).clone(),None);assert!(resolve(&reopened,&params).is_err());
+    }
+    #[test]
+    fn history_fill_reads_the_brush_source_state(){
+        let engine=fixture();let source=describe(&engine)[1]["id"].clone();
+        let normalized=normalize(&engine,"edit.fill",json!({"contents":"history","historySource":source})).unwrap();assert_eq!(normalized["state"],1);assert!(normalized.get("historySource").is_none());
+        let color=json!({"contents":"black"});assert_eq!(normalize(&engine,"edit.fill",color.clone()).unwrap(),color);
     }
     #[test]
     fn default_current_and_numeric_sources_validate_without_silent_fallback(){

@@ -1,4 +1,5 @@
 import type { Editor } from '@open-pencil/core/editor';
+import { zoomToFitPage, zoomToFitSelection } from './viewportZoom';
 
 export function installViewerInput(element: HTMLElement, editor: Editor, enabled: () => boolean): () => void {
   let space = false, pointer: { id: number; x: number; y: number } | null = null;
@@ -30,7 +31,7 @@ export function installViewerInput(element: HTMLElement, editor: Editor, enabled
     if (event.code === 'Space') { space = true; event.preventDefault(); event.stopImmediatePropagation(); }
     else if (event.key === 'Escape') { stop(); editor.clearSelection(); }
     else if (!event.metaKey && !event.ctrlKey) {
-      if (event.key === '1') editor.zoomToFit(); else if (event.key === '2') editor.zoomToSelection();
+      if (event.key === '1') zoomToFitPage(editor, { width: element.clientWidth, height: element.clientHeight }); else if (event.key === '2') zoomToFitSelection(editor, { width: element.clientWidth, height: element.clientHeight });
       else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) editor.pan(event.key === 'ArrowLeft' ? 40 : event.key === 'ArrowRight' ? -40 : 0, event.key === 'ArrowUp' ? 40 : event.key === 'ArrowDown' ? -40 : 0);
       else return; event.preventDefault(); event.stopImmediatePropagation();
     }

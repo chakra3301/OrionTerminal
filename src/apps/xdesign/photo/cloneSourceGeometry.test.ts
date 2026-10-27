@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cloneSourcePoint } from "./cloneSourceGeometry";
+import { cloneOverlayTransform, cloneSourcePoint } from "./cloneSourceGeometry";
 import { strokeParameters } from "./PaintToolOptions";
 import type { PhotoCloneSource } from "./types";
 
@@ -33,5 +33,19 @@ describe("native Clone Source marker mapping",()=>{
   it("refuses missing/nonfinite points and never treats the informational layer as a donor identity",()=>{
     expect(cloneSourcePoint(undefined,[1,2],null,{})).toBeNull();expect(cloneSourcePoint({...slot(),source:null},[1,2],null,{})).toBeNull();expect(cloneSourcePoint(slot(),[Infinity,2],null,{})).toBeNull();
     expect(cloneSourcePoint({...slot(),layer:1},[44,36],[40,30],{})).toEqual(cloneSourcePoint({...slot(),layer:999},[44,36],[40,30],{}));
+  });
+});
+describe("Clone Source overlay placement",()=>{
+  const apply=(transform:string,[x,y]:readonly number[])=>{const [a,b,c,d,e,f]=transform.match(/-?\d+(?:\.\d+)?(?:e-?\d+)?/g)!.map(Number);return [a!*x!+c!*y!+e!,b!*x!+d!*y!+f!];};
+  it("lays every source pixel where the brush will paint it, with the slot's scale, rotation and flip",()=>{
+    const source={...slot(),anchor:[40,30] as [number,number],width:200,height:50,rotation:90,flipH:true},transform=cloneOverlayTransform(source,[44,36],null,{})!;
+    expect(transform).toMatch(/^matrix\(/);
+    for(const at of [[44,36],[60,10],[5,80]] as const){const [x,y]=apply(transform,cloneSourcePoint(source,at,null,{})!);expect(x).toBeCloseTo(at[0],9);expect(y).toBeCloseTo(at[1],9);}
+    const tool=cloneOverlayTransform(source,[44,36],[40,30],{aligned:false,scale:[100,200],rotation:0,flipV:true})!;
+    for(const at of [[44,36],[0,0]] as const){const [x,y]=apply(tool,cloneSourcePoint(source,at,[40,30],{aligned:false,scale:[100,200],rotation:0,flipV:true})!);expect(x).toBeCloseTo(at[0],9);expect(y).toBeCloseTo(at[1],9);}
+  });
+  it("centres the source under the pointer until a stroke sets the anchor, and needs a source",()=>{
+    expect(cloneOverlayTransform(slot(),[44,36],null,{})).toBe("translate(34 16)");
+    expect(cloneOverlayTransform({...slot(),source:null},[44,36],null,{})).toBeNull();
   });
 });

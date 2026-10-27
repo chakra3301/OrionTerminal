@@ -16,6 +16,7 @@ export type PhotoTextRun={start:number;end:number;style:Record<string,unknown>};
 export type PhotoTextShape={kind:"point"}|{kind:"box";x:number;y:number;width:number;height:number};
 export type PhotoTextWarp={style:string;bend:number;horizontalDistortion:number;verticalDistortion:number;orientation:"horizontal"|"vertical"};
 export type GradientFill={style:string;angle:number;scale:number;offset:[number,number];reverse:boolean;dither:boolean;align:boolean;from:[number,number];to:[number,number];stops:[number,string][];transparency:[number,number][];midpoints:number[]};
+export type LayerColor = "none"|"red"|"orange"|"yellow"|"green"|"blue"|"violet"|"gray";
 export type PhotoLayer = {
   id: number;
   name: string;
@@ -28,12 +29,16 @@ export type PhotoLayer = {
   hasMask: boolean;
   mask?: {enabled:boolean;linked:boolean};
   hasVectorMask?: boolean;
+  vectorMask?: {enabled:boolean;linked:boolean};
   hasPixels?: boolean;
   selected?: boolean;
   locks?: {transparency:boolean;pixels:boolean;position:boolean;all:boolean};
+  /** Photoshop's layer colour label. */
+  color?: LayerColor;
   linkGroup?: number|null;
   children?: PhotoLayer[];
   expanded?: boolean;
+  artboard?: {rect:[number,number,number,number];background:string;preset:string|null};
   adjustment?: Record<string, unknown>;
   adjustmentKind?: string;
   adjustmentParams?: Record<string, unknown>;
@@ -63,6 +68,24 @@ export type PhotoChannels = {
 export type GradientPreset={name:string;stops:[number,string][];transparency:[number,number][]};
 export type PhotoCloneSource={index:number;source:[number,number]|null;anchor:[number,number]|null;offset:[number,number]|null;layer:number|null;width:number;height:number;rotation:number;flipH:boolean;flipV:boolean};
 export type PhotoCloneSources={active:number;sources:PhotoCloneSource[];overlay:{show:boolean;opacity:number;clipped:boolean;auto_hide:boolean;invert:boolean;blend:string}};
+export type PhotoRulerInfo={x:number;y:number;w:number;h:number;angle:number;l1:number;l2:number|null;length:number;units:string;protractor:boolean};
+/** Colours are 0..1 RGB. */
+export type PhotoCountGroup={name:string;color:number[];markerSize:number;labelSize:number;visible:boolean;points:[number,number][]};
+export type PhotoNote={index:number;author:string;text:string;color:number[];position:[number,number];open:boolean;modified:string};
+export type PhotoSlice={number:number;id:number|null;origin:"auto"|"layer"|"user";name:string;rect:[number,number,number,number];kind:string;layer:number|null;url:string;target:string;message:string;alt:string;cellText:string;background:string|null};
+export type PhotoAnalysis={ruler:{start:[number,number];end:[number,number];protractor:[number,number]|null;info:PhotoRulerInfo}|null;count:{total:number;activeGroup:number;groups:PhotoCountGroup[]};notes:PhotoNote[];slices:PhotoSlice[];slicesLocked:boolean};
+export type PhotoLayerComp={id:number;name:string;comment:string;visibility:boolean;position:boolean;appearance:boolean;missingLayers:number};
+export type PhotoDataPoint={key:string;name:string};
+export type PhotoMeasureSource="selection"|"ruler"|"count";
+/** `attrs` and `resolved` hold the engine's model fields (`size_pt`, `font_family`, `align`, …). */
+export type PhotoCharacterStyle={id:number;name:string;attrs:Record<string,unknown>;resolved:Record<string,unknown>};
+export type PhotoParagraphStyle={id:number;name:string;paragraphAttrs:Record<string,unknown>;characterAttrs:Record<string,unknown>;resolved:{paragraph:Record<string,unknown>;character:Record<string,unknown>}};
+/** `current` is null without a selected type layer; a style id is null when the text mixes styles. */
+export type PhotoPanels={
+  layerComps:{comps:PhotoLayerComp[];lastApplied:number|null;hasLastDocumentState:boolean};
+  measurementLog:{rows:{id:number;values:Record<string,unknown>}[];columns:PhotoDataPoint[];dataPoints:Record<PhotoMeasureSource,string[]>;available:Record<PhotoMeasureSource,PhotoDataPoint[]>};
+  textStyles:{character:PhotoCharacterStyle[];paragraph:PhotoParagraphStyle[];current:{character:number|null;characterOverride:boolean;paragraph:number|null;paragraphOverride:boolean}|null};
+};
 export type PhotoRGBA = [number,number,number,number];
 export type PhotoColor = string | PhotoRGBA;
 export type PhotoState = {
@@ -91,14 +114,19 @@ export type PhotoState = {
     patterns?:{name:string;presets:{id:string;name:string;width:number;height:number}[]}[];pattern?:string|null;
     shapes?:{name:string;presets:{name:string}[]}[];tools?:{name:string;tool:string}[];cloneSource?:PhotoCloneSources};
   globalLight?: {angle:number;altitude:number};
+  analysis?: PhotoAnalysis;
+  panels?: PhotoPanels;
   canUndo: boolean;
   canRedo: boolean;
   canFade?: boolean;
   canCancelPreview?: boolean;
   historySources?:PhotoHistorySource[];
   historyRedo?:string[];
+  historySnapshots?:PhotoHistorySnapshot[];
+  historySnapshotName?:string;
   paths?:{saved:string[];work:boolean};
 };
+export type PhotoHistorySnapshot={id:string;name:string;source:string;current:boolean};
 export type PhotoHistorySource={id:string;index:number;label:string;current:boolean;available:boolean;reason?:string|null};
 
 export type PhotoColorSettings = {revision:string;settings:{workingRgb:string;workingCmyk:string;workingGray:string;policyRgb:"preserve"|"convert"|"off";policyCmyk:"preserve"|"convert"|"off";policyGray:"preserve"|"convert"|"off";askOnMismatch:boolean;askOnPaste:boolean;askOnMissing:boolean;intent:string;bpc:boolean;dither:boolean;blendTextGamma:number;monitorProfile:string};working:Record<"workingRgb"|"workingCmyk"|"workingGray",{description:string;colorSpace:string;custom:boolean;source:string|null}>};

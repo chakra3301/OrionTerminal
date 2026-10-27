@@ -52,4 +52,17 @@ describe("design paint geometry controls", () => {
     editor.graph.updateNode(node.id, { fills: [{ type: "GRADIENT_RADIAL", color, opacity: 1, visible: true, gradientTransform: { ...matrix, m00: 0, m10: 0 }, gradientStops: [{ position: 0, color }, { position: 1, color }] }] }); await render();
     expect(container.textContent).toContain("collapsed axis"); expect(container.querySelector('[aria-label="Gradient 1 angle"]')).toBeNull(); await click("Gradient 1 reset geometry"); expect(node.fills[0]!.gradientTransform).toEqual({ m00: 1, m01: 0, m02: 0, m10: 0, m11: 1, m12: 0 });
   });
+  it("labels blend modes with Figma names while storing the raw enum", async () => {
+    editor.graph.updateNode(node.id, { blendMode: "PASS_THROUGH" }); await render();
+    const blend = () => container.querySelector<HTMLSelectElement>('select[aria-label="Layer blend"]')!;
+    expect(blend().selectedOptions[0]!.textContent).toBe("Pass through");
+    await select("Layer blend", "COLOR_BURN"); expect(node.blendMode).toBe("COLOR_BURN"); expect(blend().selectedOptions[0]!.textContent).toBe("Color burn");
+    expect(container.querySelector<HTMLSelectElement>('select[aria-label="Fill 1 blend"]')!.selectedOptions[0]!.textContent).toBe("Normal");
+  });
+  it("shows two-decimal numbers and leaves the document alone on blur without typing", async () => {
+    const original = structuredClone(node.fills[0]!), angle = container.querySelector<HTMLInputElement>('input[aria-label="Gradient 1 angle"]')!;
+    expect(angle.value).toMatch(/^-?\d+(\.\d{1,2})?$/);
+    await act(async () => { angle.dispatchEvent(new FocusEvent("focusout", { bubbles: true })); }); await render();
+    expect(node.fills[0]).toEqual(original);
+  });
 });

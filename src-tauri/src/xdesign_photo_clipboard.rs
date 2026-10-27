@@ -134,6 +134,16 @@ pub(super) fn set(pixels: Arc<Pixels>) -> Result<(), String> {
         .map_err(|_| "The image clipboard needs to be restarted")? = Some(pixels);
     Ok(())
 }
+pub(super) fn purge(engine: &mut Session, command: &str) -> Result<Value, String> {
+    store()
+        .lock()
+        .map_err(|_| "The image clipboard needs to be restarted")?
+        .take();
+    if !engine.is_enabled(command) {
+        return Ok(json!({"purged":[]}));
+    }
+    engine.execute(command, json!({})).map_err(|e| e.to_string())
+}
 fn label(value: &str) -> String {
     value
         .char_indices()
@@ -683,6 +693,21 @@ mod tests {
             writer: Default::default(),
         }
     }
+    #[test]
+    fn purge_clipboard_and_all_empty_the_shared_image_clipboard() {
+        let _guard = serial();
+        for command in ["edit.purge.clipboard", "edit.purge.all"] {
+            let mut engine = fixture("rgb", 8, "display-p3");
+            engine.execute("select.rect", json!({"x":0,"y":0,"width":4,"height":4})).unwrap();
+            let (_, pixels) = copy(&mut engine, "edit.copy", json!({})).unwrap();
+            set(pixels).unwrap();
+            super::super::execute_view_command(&mut engine, command, json!({})).unwrap();
+            assert!(current().is_err(), "{command}");
+            assert!(engine.clipboard.is_none(), "{command}");
+            super::super::execute_view_command(&mut engine, command, json!({})).unwrap();
+        }
+    }
+
     #[test]
     fn clipboard_copy_cut_and_merged_keep_native_format_selection_alpha_and_source_profile() {
         let _guard = serial();

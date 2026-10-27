@@ -2,7 +2,7 @@ import { assetCredits } from "./assetCredits";
 import type { SceneNode } from "@open-pencil/scene-graph";
 import { InspectorSection } from "../EditorChrome";
 import { usePencilWorkspace, editPencilImage } from "./runtime";
-import { AppearancePanel } from "./AppearancePanel";
+import { AppearancePanel, displayNumber } from "./AppearancePanel";
 import { TypographyPanel } from "./TypographyPanel";
 import { LayoutPanel } from "./LayoutPanel";
 import { ComponentPanel } from "./ComponentPanel";
@@ -18,9 +18,9 @@ import { BehaviourPanel } from "./BehaviourPanel";
 
 function NumberField({ node, field, label, min, max }: { node: SceneNode; field: keyof SceneNode; label: string; min?: number; max?: number }) {
   const editor = usePencilWorkspace(s => s.editor);
-  return <label>{label}<input key={`${node.id}/${String(node[field])}`} aria-label={label} type="number" step="any" min={min} max={max} defaultValue={Number(node[field])} onBlur={event => {
+  return <label>{label}<input key={`${node.id}/${String(node[field])}`} aria-label={label} type="number" step="any" min={min} max={max} defaultValue={displayNumber(Number(node[field]))} onBlur={event => {
     const value = event.target.valueAsNumber;
-    if (editor && Number.isFinite(value) && (min === undefined || value >= min) && (max === undefined || value <= max) && value !== node[field]) {
+    if (editor && Number.isFinite(value) && (min === undefined || value >= min) && (max === undefined || value <= max) && value !== displayNumber(Number(node[field]))) {
       editor.updateNodeWithUndo(node.id, { [field]: value }, `Change ${label}`);
       if (field === "fontWeight" || field === "fontSize") void editor.loadFontsForNodes([node.id]).catch(error => usePencilWorkspace.setState({ error: String(error) }));
     }

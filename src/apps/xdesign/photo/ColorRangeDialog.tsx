@@ -10,6 +10,7 @@ import { useDialogDrag, useHeldModifiers } from "./photoDialog";
 import { readSelectionPreferences, rememberedSelectionValues, saveSelectionPreferences } from "./selectionPreferences";
 import { COLOR_RANGE_PRESETS, COLOR_RANGE_PREVIEWS, MAX_SELECTION_SAMPLES, selectionRequest, selectionSamplePoint, type SelectionPreviewView, type SelectionSample } from "./selectionSettings";
 import type { PhotoColor, PhotoDocument } from "./types";
+import { surfaceFraction, surfaceSize, turnedSurface } from "./viewTurn";
 
 const PRESETS: Record<string, string> = { sampledColors: "Sampled Colors", reds: "Reds", yellows: "Yellows", greens: "Greens", cyans: "Cyans", blues: "Blues", magentas: "Magentas", highlights: "Highlights", midtones: "Midtones", shadows: "Shadows", outOfGamut: "Out Of Gamut" };
 const PREVIEWS: Record<string, string> = { none: "None", mask: "Grayscale", black: "Black Matte", white: "White Matte", overlay: "Quick Mask" };
@@ -21,6 +22,11 @@ const LIVE_PIXELS = 16_777_216;
 export function documentUnder(canvas: HTMLElement | null, x: number, y: number) {
   if (!canvas) return null;
   const image = canvas.getBoundingClientRect(), stage = canvas.closest(".xd-photo-stage")?.getBoundingClientRect() ?? image;
+  if (turnedSurface(canvas)) {
+    // A turned image's box is not the image, so this answers with the unturned image placed to put this point where it falls.
+    const [fx, fy] = surfaceFraction(canvas, x, y), [width, height] = surfaceSize(canvas);
+    return fx >= 0 && fx < 1 && fy >= 0 && fy < 1 && x >= stage.left && x < stage.right && y >= stage.top && y < stage.bottom ? { left: x - fx * width, top: y - fy * height, width, height } : null;
+  }
   return x >= Math.max(image.left, stage.left) && x < Math.min(image.right, stage.right) && y >= Math.max(image.top, stage.top) && y < Math.min(image.bottom, stage.bottom) ? image : null;
 }
 
@@ -58,7 +64,7 @@ export function ColorRangeDialog({ document, canvas, close }: { document: PhotoD
     setValues(current => mode === "replace" ? { ...current, colors: [], points: [point], subtractPoints: [] } : { ...current, [key]: [...current[key] as SelectionSample[], point] });
     setLocalError("");
   };
-  const sample = (event: PointerEvent<HTMLElement>, bounds: DOMRect) => {
+  const sample = (event: PointerEvent<HTMLElement>, bounds: { left: number; top: number; width: number; height: number }) => {
     if (busy || !sampled || event.button !== 0 || !current()) return;
     const point = selectionSamplePoint(event.clientX, event.clientY, bounds, document.width, document.height);
     if (point) pick(point, event.altKey ? "subtract" : event.shiftKey ? "add" : eyedropper);

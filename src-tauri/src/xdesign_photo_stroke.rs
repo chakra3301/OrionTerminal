@@ -441,6 +441,10 @@ fn pixel_draft(engine:&Session,identity:&str,command:&str,params:&Value,view:Opt
     if !params.is_object()||params.to_string().len()>1024*1024{return Err("Invalid native stroke preview parameters".into());}
     if command=="paint.patch"{let (doc,damage)=photocraft_engine::retouch_cmds::patch_preview(engine,params,262_144,patch_step).map_err(|error|error.to_string())?;return Ok(PixelDraft{doc:Arc::new(doc),damage,replace:true});}
     if matches!(command,"paint.magicEraser"|"paint.backgroundEraser"){eraser_limits(engine,command,params)?;let (doc,damage)=isolated_eraser_result(engine,command,params)?;return Ok(PixelDraft{doc,damage,replace:true});}
+    if command==super::pattern_stamp::COMMAND{
+        let points=params["points"].as_array().filter(|points|!points.is_empty()&&points.len()<=8192).ok_or("Native feedback supports up to 8192 stroke samples; finish the stroke to render all samples")?;
+        retouch_limits(engine,Some(identity),command,params,points)?;let (doc,damage)=super::pattern_stamp::preview(engine,params)?;return Ok(PixelDraft{doc,damage,replace:false});
+    }
     let retouch=continuous_retouch::TOOLS.contains(&command);
     if !retouch&&!["paint.stroke","paint.pencil"].contains(&command)||params["seed"].as_u64().is_none(){return Err("Invalid native stroke preview parameters".into());}
     let points=params["points"].as_array().ok_or("Stroke preview needs points")?;

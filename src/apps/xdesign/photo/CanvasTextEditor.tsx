@@ -3,6 +3,10 @@ import { runPhotoCommand } from "./runtime";
 import { textReplacement } from "./ImageDialogs";
 import type { PhotoLayer } from "./types";
 
+/** Where the caret was when a type layer's text was last edited on canvas, in characters, for Edit › Paste Special ›
+ *  Paste without Formatting once the editor has closed. */
+export const lastTextCaret:{current:{layer:number;range:[number,number]}|null}={current:null};
+
 export type CanvasText={layer:PhotoLayer;point?:undefined}|{layer?:undefined;point:[number,number]};
 
 export function findTextLayer(layers:PhotoLayer[],x:number,y:number):PhotoLayer|undefined {
@@ -22,6 +26,8 @@ export function CanvasTextEditor({target,zoom,resolution,font,size,color,create,
   // A committed edit stays in the field until the image shows it.
   const finish=(commit:boolean)=>{
     if(done.current)return;done.current=true;
+    const chars=(index:number)=>Array.from(text.slice(0,index)).length;
+    if(commit&&target.layer&&field.current)lastTextCaret.current={layer:target.layer.id,range:[chars(field.current.selectionStart),chars(field.current.selectionEnd)]};
     const replace=commit&&target.layer?textReplacement(original,text):null;
     const work=!commit?null:!target.layer?(text.trim()?runPhotoCommand("type.create",{text,font,size,color,x:target.point[0],y:target.point[1],...create}).then(async result=>{const layer=(result as {layer?:number}|undefined)?.layer;if(layer===undefined)return result;if(after&&after.antialias!=="smooth")await runPhotoCommand("type.edit",{layer,antialias:after.antialias});if(after&&after.orientation!=="horizontal")await runPhotoCommand(`type.orientation.${after.orientation}`,{layer});return result;}):null):replace?runPhotoCommand("type.edit",{layer:target.layer.id,replace}):null;
     if(!work){close();return;}

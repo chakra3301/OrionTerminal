@@ -18,3 +18,13 @@ export function cloneSourcePoint(slot: PhotoCloneSource | undefined, at: Point |
   const result: [number, number] = [slot.source[0] + (cosine * dx + sine * dy) / sx, slot.source[1] + (-sine * dx + cosine * dy) / sy];
   return result.every(Number.isFinite) ? result : null;
 }
+
+/** The SVG transform that lays the image over the brush so each source pixel sits where it will be painted. `cloneSourcePoint` is affine in `at`, so three samples give its inverse. */
+export function cloneOverlayTransform(slot: PhotoCloneSource | undefined, at: Point, start: Point | null, params: Record<string, unknown>): string | null {
+  const s0 = cloneSourcePoint(slot, at, start, params), s1 = cloneSourcePoint(slot, [at[0] + 1, at[1]], start, params), s2 = cloneSourcePoint(slot, [at[0], at[1] + 1], start, params);
+  if (!s0 || !s1 || !s2) return null;
+  const a = s1[0] - s0[0], b = s1[1] - s0[1], c = s2[0] - s0[0], d = s2[1] - s0[1], det = a * d - b * c;
+  if (Math.abs(det) < 1e-12) return `translate(${at[0] - s0[0]} ${at[1] - s0[1]})`;
+  const m = [d / det, -b / det, -c / det, a / det] as const;
+  return `matrix(${m[0]} ${m[1]} ${m[2]} ${m[3]} ${at[0] - (m[0] * s0[0] + m[2] * s0[1])} ${at[1] - (m[1] * s0[0] + m[3] * s0[1])})`;
+}

@@ -1,7 +1,8 @@
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GeometryDialog, geometryPoint, identityWarpMesh, movePlaneCorner, appendLiquifyPoint, MAX_LIQUIFY_POINTS } from "./GeometryDialog";
+import { GeometryDialog, geometryPoint, identityWarpMesh, movePlaneCorner, appendLiquifyPoint, MAX_LIQUIFY_POINTS, regridWarpMesh, warpMeshPoint, dragWarpPoint, quickWarpSplit, turnWarpMesh } from "./GeometryDialog";
+import { warpMenuItems } from "./warpSession";
 import { DevelopDialog } from "./DevelopDialog";
 import { CurveEditor } from "./PhotoActionDialog";
 import { usePhotoWorkspace } from "./runtime";
@@ -455,5 +456,186 @@ describe('precise shared Camera Raw curves',()=>{
     expect(close).toHaveBeenCalledOnce();expect(svg.releasePointerCapture).toHaveBeenCalledWith(11);
     await pointEvent(svg,'pointermove',180,220);await act(async()=>container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
     expect(native.run).not.toHaveBeenCalled();expect(button('OK').disabled).toBe(true);
+  });
+});
+
+describe("Photoshop warp split and grid options",()=>{
+  const rect=[10,20,90,80];
+  type Mesh=ReturnType<typeof identityWarpMesh>;
+  const warpResult=(mesh:Mesh)=>({warp:{style:"custom",bend:50,hDistort:0,vDistort:0,vertical:false,bounds:rect,mesh}});
+  const preset={rect,style:"custom",bend:50,hDistort:0,vDistort:0,vertical:false};
+  const select=(label:string)=>container.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;
+  const choose=(element:HTMLSelectElement,value:string)=>act(async()=>{element.value=value;element.dispatchEvent(new Event("change",{bubbles:true}));});
+  const labelled=(label:string)=>document.querySelector<HTMLElement>(`[aria-label="${label}"]`)!;
+  const points=()=>container.querySelectorAll('[aria-label^="Warp point"]').length;
+  const pointer=(type:string,x:number,y:number)=>Object.assign(new MouseEvent(type,{bubbles:true,clientX:x,clientY:y,button:0}),{pointerId:1});
+  const type=(input:HTMLInputElement,value:string)=>act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,value);input.dispatchEvent(new Event("input",{bubbles:true}));});
+  const stage=()=>{const svg=container.querySelector<SVGSVGElement>('svg[aria-label="Warp layer canvas"]')!;svg.getBoundingClientRect=()=>({left:0,top:0,width:100,height:100} as DOMRect);svg.setPointerCapture=vi.fn();return svg;};
+  const render=async(close=vi.fn())=>{await act(async()=>root.render(<GeometryDialog kind="warp" document={doc} layer={layer} close={close}/>));return close;};
+  it("evaluates and refits a warp surface to independent columns and rows like the native grid",()=>{
+    const mesh=identityWarpMesh(rect,1);mesh.points[5]=[30,31];
+    const fitted=regridWarpMesh(mesh,4,2);
+    expect(fitted.us).toEqual([0,.25,.5,.75,1]);expect(fitted.vs).toEqual([0,.5,1]);expect(fitted.points).toHaveLength(13*7);
+    for(const [s,t] of [[.3,.7],[.5,.5],[.9,.1]] as const){const [a,b]=[warpMeshPoint(mesh,s,t),warpMeshPoint(fitted,s,t)];expect(b[0]).toBeCloseTo(a[0],9);expect(b[1]).toBeCloseTo(a[1],9);}
+    const identity=warpMeshPoint(identityWarpMesh(rect,2),.25,.5);expect(identity[0]).toBeCloseTo(30,9);expect(identity[1]).toBeCloseTo(50,9);
+  });
+  it("offers Photoshop's Grid presets through the native warp grid, also from a preset style",async()=>{
+    native.run.mockImplementation(async(command:string,params:{size?:number})=>command==="edit.transform.warpGrid"?warpResult(identityWarpMesh(rect,params.size!)):{});
+    await render();const grid=select("Warp grid");
+    expect([...grid.options].filter(option=>!option.hidden).map(option=>option.textContent)).toEqual(["Custom","Default","3 x 3","4 x 4","5 x 5"]);
+    expect(grid.selectedOptions[0]!.textContent).toBe("Default");
+    await choose(grid,"3");
+    expect(native.run).toHaveBeenCalledWith("edit.transform.warpGrid",{...preset,mesh:identityWarpMesh(rect,1),size:3});
+    expect(select("Warp grid").selectedOptions[0]!.textContent).toBe("3 x 3");expect(points()).toBe(16);
+    await choose(select("Warp style"),"arc");expect(select("Warp grid").selectedOptions[0]!.textContent).toBe("Default");
+    await choose(select("Warp grid"),"4");
+    expect(native.run).toHaveBeenLastCalledWith("edit.transform.warpGrid",{...preset,style:"arc",size:4});
+    expect(select("Warp style").value).toBe("custom");expect(select("Warp grid").selectedOptions[0]!.textContent).toBe("4 x 4");expect(points()).toBe(25);
+  });
+  it("sizes a Custom grid with independent columns and rows and inserts the closest valid value",async()=>{
+    native.run.mockImplementation(async(command:string,params:{size?:number})=>command==="edit.transform.warpGrid"?warpResult(identityWarpMesh(rect,params.size!)):{});
+    const close=await render();
+    await choose(select("Warp grid"),"customSize");
+    const field=(label:string)=>labelled("Custom Grid Size").querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+    const ok=()=>[...labelled("Custom Grid Size").querySelectorAll("button")].find(button=>button.textContent==="OK")!;
+    expect([field("Columns").value,field("Rows").value]).toEqual(["3","3"]);
+    await type(field("Columns"),"60");await act(async()=>ok().click());
+    expect(labelled("Custom Grid Size").querySelector('[role="alert"]')!.textContent).toBe("An integer between 1 and 50 is required. Closest value inserted.");
+    expect(field("Columns").value).toBe("50");expect(native.run).not.toHaveBeenCalled();
+    await type(field("Columns"),"4");await type(field("Rows"),"2");await act(async()=>ok().click());
+    expect(document.querySelector('[aria-label="Custom Grid Size"]')).toBeNull();expect(native.run).not.toHaveBeenCalled();expect(close).not.toHaveBeenCalled();
+    expect(points()).toBe(15);expect(select("Warp grid").selectedOptions[0]!.textContent).toBe("Custom");
+    await choose(select("Warp grid"),"customSize");expect([field("Columns").value,field("Rows").value]).toEqual(["4","2"]);
+    await act(async()=>window.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true})));
+    expect(document.querySelector('[aria-label="Custom Grid Size"]')).toBeNull();expect(close).not.toHaveBeenCalled();
+    await choose(select("Warp grid"),"customSize");await type(field("Columns"),"5");await type(field("Rows"),"5");await act(async()=>ok().click());
+    expect(native.run).toHaveBeenCalledOnce();expect(native.run).toHaveBeenCalledWith("edit.transform.warpGrid",expect.objectContaining({style:"custom",size:5}));expect(points()).toBe(36);
+  });
+  it("arms one Photoshop split at a time and splits the edited warp where the canvas is clicked",async()=>{
+    const split=identityWarpMesh(rect,2);native.run.mockResolvedValue(warpResult(split));
+    await render();const svg=stage();
+    const labels=["Split Warp Crosswise","Split Warp Vertically","Split Warp Horizontally"];
+    expect(labels.map(label=>labelled(label).getAttribute("aria-pressed"))).toEqual(["false","false","false"]);
+    await act(async()=>labelled("Split Warp Crosswise").click());await act(async()=>labelled("Split Warp Vertically").click());
+    expect(labels.map(label=>labelled(label).getAttribute("aria-pressed"))).toEqual(["false","true","false"]);
+    await act(async()=>labelled("Split Warp Crosswise").click());
+    await act(async()=>svg.dispatchEvent(pointer("pointerdown",40,50)));
+    expect(native.run).toHaveBeenCalledOnce();expect(native.run).toHaveBeenCalledWith("edit.transform.splitWarpCrosswise",{...preset,mesh:identityWarpMesh(rect,1),at:[40,50]});
+    expect(labelled("Split Warp Crosswise").getAttribute("aria-pressed")).toBe("false");expect(points()).toBe(13);
+    await act(async()=>svg.dispatchEvent(pointer("pointerdown",40,50)));await act(async()=>svg.dispatchEvent(pointer("pointerup",40,50)));expect(native.run).toHaveBeenCalledOnce();
+    await act(async()=>labelled("Split Warp Horizontally").click());
+    await act(async()=>labelled("Warp point 1").dispatchEvent(pointer("pointerdown",10,20)));
+    expect(native.run).toHaveBeenLastCalledWith("edit.transform.splitWarpHorizontally",{...preset,mesh:split,at:[10,20]});
+  });
+  it("removes the selected split line, as Photoshop's Remove Warp Split does",async()=>{
+    const twoByTwo=identityWarpMesh(rect,2),oneByTwo=regridWarpMesh(identityWarpMesh(rect,1),1,2);
+    native.run.mockImplementation(async(command:string)=>warpResult(command==="edit.transform.removeWarpSplit"?oneByTwo:twoByTwo));
+    await render();const svg=stage();
+    await act(async()=>labelled("Split Warp Crosswise").click());await act(async()=>svg.dispatchEvent(pointer("pointerdown",50,50)));
+    const remove=()=>button("Remove Warp Split");expect(remove().disabled).toBe(true);
+    const vertical=labelled("Vertical warp split 1");expect(labelled("Horizontal warp split 1")).not.toBeNull();
+    await act(async()=>vertical.dispatchEvent(pointer("pointerdown",50,40)));
+    expect(vertical.getAttribute("aria-pressed")).toBe("true");expect(remove().disabled).toBe(false);
+    await act(async()=>remove().click());
+    const [command,params]=native.run.mock.lastCall as [string,{at:[number,number]}];
+    expect(command).toBe("edit.transform.removeWarpSplit");expect(params).toEqual({...preset,mesh:twoByTwo,at:expect.any(Array)});
+    expect(params.at[0]).toBeCloseTo(50,9);expect(params.at[1]).toBeCloseTo(35,9);
+    expect(document.querySelector('[aria-label="Vertical warp split 1"]')).toBeNull();expect(remove().disabled).toBe(true);
+    await act(async()=>labelled("Horizontal warp split 1").dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true})));
+    await act(async()=>remove().click());
+    const [,next]=native.run.mock.lastCall as [string,{at:[number,number]}];expect(next.at[0]).toBeCloseTo(50,9);expect(next.at[1]).toBeCloseTo(50,9);
+  });
+});
+
+describe("Photoshop warp anchors, guides, Cylinder and menus",()=>{
+  const rect=[10,20,90,80];
+  type Mesh=ReturnType<typeof identityWarpMesh>;
+  const warpResult=(mesh:Mesh)=>({warp:{style:"custom",bend:50,hDistort:0,vDistort:0,vertical:false,bounds:rect,mesh}});
+  const select=(label:string)=>container.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;
+  const choose=(element:HTMLSelectElement,value:string)=>act(async()=>{element.value=value;element.dispatchEvent(new Event("change",{bubbles:true}));});
+  const labelled=(label:string)=>document.querySelector<HTMLElement>(`[aria-label="${label}"]`)!;
+  const pointer=(type:string,x:number,y:number,keys:MouseEventInit={})=>Object.assign(new MouseEvent(type,{bubbles:true,clientX:x,clientY:y,button:0,...keys}),{pointerId:1});
+  const stage=()=>{const svg=container.querySelector<SVGSVGElement>('svg[aria-label="Warp layer canvas"]')!;svg.getBoundingClientRect=()=>({left:0,top:0,width:100,height:100} as DOMRect);svg.setPointerCapture=vi.fn();return svg;};
+  const render=async()=>act(async()=>root.render(<GeometryDialog kind="warp" document={doc} layer={layer} close={vi.fn()}/>));
+  const submit=()=>act(async()=>container.querySelector("form")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+  const minor=()=>container.querySelectorAll(".xd-photo-warp-guide.is-minor").length;
+  it("splits across a nearby grid line, else crosswise, and turns the mesh about the box centre",()=>{
+    const twoByTwo=identityWarpMesh(rect,2);
+    expect([quickWarpSplit(twoByTwo,rect,[52,35]),quickWarpSplit(twoByTwo,rect,[30,51]),quickWarpSplit(twoByTwo,rect,[30,35]),quickWarpSplit(twoByTwo,rect,[50,50])]).toEqual(["Horizontally","Vertically","Crosswise","Crosswise"]);
+    const one=identityWarpMesh(rect,1),corner=(turn:Parameters<typeof turnWarpMesh>[2])=>turnWarpMesh(one,rect,turn).points[0];
+    expect([corner("rotate180"),corner("rotate90Cw"),corner("rotate90Ccw"),corner("flipHorizontal"),corner("flipVertical")]).toEqual([[90,80],[80,10],[20,90],[90,20],[10,80]]);
+  });
+  it("turns the opposite handle with a unison anchor and leaves it with an independent one",()=>{
+    const mesh=identityWarpMesh(rect,2),unison=dragWarpPoint(mesh,mesh.points,25,[0,6]),independent=dragWarpPoint(mesh,mesh.points,25,[0,6],false);
+    expect(unison.points[25]).toEqual([mesh.points[25]![0],mesh.points[25]![1]+6]);expect(unison.points[23]).toEqual([mesh.points[23]![0],mesh.points[23]![1]-6]);
+    expect(independent.points[25]).toEqual(unison.points[25]);expect(independent.points[23]).toEqual(mesh.points[23]);
+  });
+  it("Cmd-click splits, selects the new anchor and shows only its handles; Option-click converts it",async()=>{
+    const split=identityWarpMesh(rect,2);native.run.mockResolvedValue(warpResult(split));
+    await render();const svg=stage();
+    await act(async()=>svg.dispatchEvent(pointer("pointerdown",50,50,{metaKey:true})));
+    expect(native.run).toHaveBeenCalledWith("edit.transform.splitWarpCrosswise",expect.objectContaining({mesh:identityWarpMesh(rect,1),at:[50,50]}));
+    expect(labelled("Warp point 25").getAttribute("class")).toBe("is-inner is-selected");
+    expect([...container.querySelectorAll('[aria-label^="Warp point"]')].map(node=>node.getAttribute("aria-label"))).toEqual(["Warp point 1","Warp point 4","Warp point 7","Warp point 18","Warp point 22","Warp point 24","Warp point 25","Warp point 26","Warp point 28","Warp point 32","Warp point 43","Warp point 46","Warp point 49"]);
+    expect(labelled("Warp point 1").tagName).toBe("rect");expect(labelled("Warp point 25").tagName).toBe("circle");
+    await act(async()=>labelled("Warp point 25").dispatchEvent(pointer("pointerdown",50,50,{altKey:true})));
+    await act(async()=>labelled("Warp point 26").dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true})));
+    await submit();
+    const [command,params]=native.run.mock.lastCall as [string,{mesh:Mesh}];
+    expect(command).toBe("edit.transform.warp");expect(params.mesh.points[25]).toEqual([split.points[25]![0],split.points[25]![1]+1]);expect(params.mesh.points[23]).toEqual(split.points[23]);
+  });
+  it("shows density guides per the gear's options and opens Photoshop's canvas menu",async()=>{
+    native.run.mockResolvedValue(warpResult(identityWarpMesh(rect,1)));
+    await render();const svg=stage();
+    expect(minor()).toBe(4);
+    await act(async()=>{const input=labelled("Guide density") as HTMLInputElement;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,"3");input.dispatchEvent(new Event("input",{bubbles:true}));});
+    expect(minor()).toBe(6);
+    expect([...select("Show guides").options].map(option=>option.textContent)).toEqual(["Auto Show Guides","Always Show Guides","Never Show Guides"]);
+    await choose(select("Show guides"),"never");expect(minor()).toBe(0);
+    await choose(select("Show guides"),"auto");expect(minor()).toBe(0);
+    await act(async()=>svg.dispatchEvent(new MouseEvent("pointerover",{bubbles:true})));expect(minor()).toBe(6);
+    await act(async()=>svg.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,clientX:50,clientY:50})));
+    const menu=document.querySelector('[role="menu"][aria-label="Warp"]')!,items=[...menu.children].map(node=>node.getAttribute("role")==="separator"?"-":`${node.textContent}${(node as HTMLButtonElement).disabled?" (off)":""}`);
+    expect(items).toEqual(["Free Transform (off)","-","Scale (off)","Rotate (off)","Skew (off)","Distort (off)","Perspective (off)","-","Warp","Split Warp Horizontally","Split Warp Vertically","Split Warp Crosswise","Remove Warp Split (off)","-","Convert warp anchor point (off)","-","Toggle Guides","-","Content-Aware Scale (off)","Puppet Warp (off)","-","Rotate 180°","Rotate 90° Clockwise","Rotate 90° Counter Clockwise","-","Flip Horizontal","Flip Vertical"]);
+    await act(async()=>(menu.children[11] as HTMLButtonElement).click());
+    expect(native.run).toHaveBeenLastCalledWith("edit.transform.splitWarpCrosswise",expect.objectContaining({at:[50,50]}));
+    await act(async()=>svg.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,clientX:50,clientY:50})));
+    await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('[role="menu"] button')].find(node=>node.textContent==="Flip Horizontal")!.click());
+    const flipped=native.run.mock.calls.length;expect(document.querySelector('[role="menu"]')).toBeNull();
+    await submit();const [,params]=native.run.mock.lastCall as [string,{mesh:Mesh}];
+    expect(native.run.mock.calls.length).toBe(flipped+1);expect(params.mesh.points[0]).toEqual([90,20]);
+  });
+  it("previews the armed split under the pointer and lets Escape close only the canvas menu",async()=>{
+    const close=vi.fn();await act(async()=>root.render(<GeometryDialog kind="warp" document={doc} layer={layer} close={close}/>));const svg=stage();
+    const previews=()=>container.querySelectorAll(".is-preview").length;
+    await act(async()=>labelled("Split Warp Vertically").click());await act(async()=>svg.dispatchEvent(pointer("pointermove",50,50)));expect(previews()).toBe(1);
+    await act(async()=>labelled("Split Warp Crosswise").click());await act(async()=>svg.dispatchEvent(pointer("pointermove",52,50)));expect(previews()).toBe(2);
+    await act(async()=>svg.dispatchEvent(pointer("pointermove",2,2)));expect(previews()).toBe(0);
+    await act(async()=>svg.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,clientX:50,clientY:50})));
+    const menu=document.querySelector<HTMLElement>('[role="menu"]')!;
+    await act(async()=>(document.activeElement??menu).dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true})));
+    expect(document.querySelector('[role="menu"]')).toBeNull();expect(close).not.toHaveBeenCalled();
+  });
+  it("lists the presets in Photoshop's groups without None and sends Cylinder as its custom mesh",async()=>{
+    await render();const style=select("Warp style");
+    expect(labelled("Warp style").closest("label")!.firstChild!.textContent).toBe("Warp");
+    expect([...style.options].map(option=>option.textContent)).toEqual(["Custom","Arc","Arc Lower","Arc Upper","Arch","Bulge","Shell Lower","Shell Upper","Flag","Wave","Fish","Rise","Fisheye","Inflate","Squeeze","Twist","Cylinder"]);
+    expect(style.querySelectorAll("hr")).toHaveLength(5);
+    expect(labelled("Split Warp Crosswise").querySelector("svg")).not.toBeNull();
+    await choose(style,"cylinder");
+    expect(container.querySelectorAll('[aria-label^="Cylinder "]')).toHaveLength(8);expect((labelled("Split Warp Crosswise") as HTMLButtonElement).disabled).toBe(true);expect(select("Warp grid").disabled).toBe(true);
+    await act(async()=>labelled("Cylinder depth 1").dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true})));
+    await submit();const [command,params]=native.run.mock.lastCall as [string,{style:string;mesh:Mesh}];
+    expect(command).toBe("edit.transform.warp");expect(params.style).toBe("custom");expect(params.mesh.us).toHaveLength(5);expect(params.mesh.vs).toEqual([0,1]);
+    await choose(select("Warp style"),"custom");
+    expect(container.querySelectorAll('[aria-label^="Warp point"]')).toHaveLength(10);
+  });
+  it("greys the warp group outside a Warp and gates each item on the session",()=>{
+    const off=warpMenuItems(null,false,{label:"Warp"}).filter(entry=>entry!=="-");
+    expect(off.map(entry=>[entry.label,!!entry.disabled])).toEqual([["Warp",false],["Split Warp Horizontally",true],["Split Warp Vertically",true],["Split Warp Crosswise",true],["Remove Warp Split",true],["Convert warp anchor point",true],["Toggle Guides",true]]);
+    const session={split:vi.fn(),removeSplit:vi.fn(),convertAnchor:vi.fn(),toggleGuides:vi.fn(),turn:vi.fn(),canSplit:true,canRemove:false,canConvert:true};
+    const on=warpMenuItems(session,false,{label:"Warp"}).filter(entry=>entry!=="-");
+    expect(on.map(entry=>!!entry.disabled)).toEqual([false,false,false,false,true,false,false]);
+    on[1]!.run!();expect(session.split).toHaveBeenCalledWith("Horizontally");
   });
 });

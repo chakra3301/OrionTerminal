@@ -26,14 +26,18 @@ const clone = [sample, toggle("aligned", "Aligned", true), toggle("transformSour
 const tone = [choice("range", "Range", "midtones", ["shadows", "midtones", "highlights"]), number("exposure", "Exposure (%)", 50, 1), toggle("protectTones", "Protect tones", true)];
 const selectionEdge = [number("feather", "Feather (px)", 0, 0, 1000), toggle("antiAlias", "Anti-alias", true)];
 const CROP_UNITS = ["px", "in", "cm", "mm"];
+const cropSize = [number("sizeWidth", "Width", 0, 0, 300000), choice("sizeWidthUnit", "Width unit", "px", CROP_UNITS), number("sizeHeight", "Height", 0, 0, 300000), choice("sizeHeightUnit", "Height unit", "px", CROP_UNITS),
+  number("resolution", "Resolution", 0, 0, 100000), choice("resolutionUnit", "Resolution unit", "in", ["in", "cm"])];
 const rectangle = [choice("style", "Style", "normal", ["normal", "fixedRatio", "fixedSize"]), number("ratioWidth", "Width", 1, .01, 100000), number("ratioHeight", "Height", 1, .01, 100000), number("fixedWidth", "Width (px)", 100, 1, 100000), number("fixedHeight", "Height (px)", 100, 1, 100000), toggle("fromCenter", "Draw from center", false)];
 export const PAINT_TOOL_FIELDS: Record<string, Field[]> = {
   "paint.stroke": [blend, ...brush], "paint.pencil": [blend, ...brush, toggle("autoErase", "Auto erase", false)], "erase": [eraserMode, ...brush, toggle("eraseToHistory", "Erase to History", false)],
   "paint.patch": [choice("mode", "Patch mode", "source", ["source", "destination"])],
+  "paint.redEye": [number("pupilSize", "Pupil Size (%)", 50, 1, 100), number("darken", "Darken Amount (%)", 50, 1, 100)],
   "paint.magicEraser": [number("tolerance", "Tolerance", 32, 0, 255), number("opacity", "Opacity (%)", 100, 1, 100), toggle("antiAlias", "Anti-alias", true), toggle("contiguous", "Contiguous", true), toggle("sampleAllLayers", "Sample all layers", false)],
   "paint.backgroundEraser": [choice("sampling", "Sampling", "continuous", ["continuous", "once", "backgroundSwatch"]), choice("limits", "Limits", "contiguous", ["discontiguous", "contiguous", "findEdges"]), number("tolerance", "Tolerance (%)", 50, 0, 100), toggle("protectForegroundColor", "Protect foreground color", false)],
   "paint.cloneStamp": clone, "paint.healingBrush": clone, "paint.spotHealing": [choice("type", "Type", "contentAware", ["contentAware", "createTexture", "proximityMatch"]), ...retouch],
   "paint.historyBrush": [blend, ...retouch],
+  "paint.patternStamp": [blend, ...retouch, toggle("aligned", "Aligned", true)],
   "paint.dodge": [...tone, ...retouch], "paint.burn": [...tone, ...retouch],
   "paint.sponge": [choice("mode", "Mode", "desaturate", ["desaturate", "saturate"]), toggle("vibrance", "Protect vibrance", true), ...retouch],
   "paint.blur": [strength, sampleAll, ...retouch], "paint.sharpen": [strength, toggle("protectDetail", "Protect detail", true), sampleAll, ...retouch],
@@ -43,19 +47,19 @@ export const PAINT_TOOL_FIELDS: Record<string, Field[]> = {
   "paint.bucket": [choice("contents", "Fill", "foreground", ["foreground", "pattern"]), number("scale", "Pattern scale (%)", 100, 1, 1000), number("angle", "Pattern angle", 0, -360, 360), number("tolerance", "Tolerance", 32, 0, 255), toggle("contiguous", "Contiguous", true), toggle("antiAlias", "Anti-alias", true)],
   "paint.gradient": [blend, toggle("dither", "Dither", true), choice("method", "Method", "perceptual", GRADIENT_METHODS.map(([id]) => id))],
   "select.magicWand": [number("tolerance", "Tolerance", 32, 0, 255), toggle("contiguous", "Contiguous", true), toggle("antiAlias", "Anti-alias", true), sampleAll],
-  "select.rect": [...rectangle, selectionEdge[0]!], "ellipseSelection": [...rectangle, ...selectionEdge],
+  "select.rect": [...rectangle, selectionEdge[0]!], "ellipseSelection": [...rectangle, ...selectionEdge], "singleRowSelection": [selectionEdge[0]!], "singleColumnSelection": [selectionEdge[0]!],
   "select.lasso": selectionEdge, "polygonLasso": selectionEdge,
   "magneticLasso": [number("width", "Edge width (px)", 10, 1, 256), number("contrast", "Edge contrast (%)", 10, 1), number("frequency", "Fastening frequency", 57), toggle("stylusPressure", "Use tablet pressure", false), ...selectionEdge],
   "select.quick": [number("size", "Selection brush size (px)", 30, 1, 5000), sampleAll, toggle("enhanceEdge", "Enhance edge", false)],
   "select.object": [...rectangle, sampleAll],
   // A size or resolution of 0 is an empty field; an empty resolution keeps the image's.
   "crop": [choice("style", "Ratio", "normal", ["normal", "fixedRatio", "size"]), number("ratioWidth", "Ratio width", 1, .01, 100000), number("ratioHeight", "Ratio height", 1, .01, 100000),
-    number("sizeWidth", "Width", 0, 0, 300000), choice("sizeWidthUnit", "Width unit", "px", CROP_UNITS), number("sizeHeight", "Height", 0, 0, 300000), choice("sizeHeightUnit", "Height unit", "px", CROP_UNITS),
-    number("resolution", "Resolution", 0, 0, 100000), choice("resolutionUnit", "Resolution unit", "in", ["in", "cm"]), toggle("deleteCroppedPixels", "Delete Cropped Pixels", false), choice("fill", "Fill", "background", ["background", "contentAware"])],
+    ...cropSize, toggle("deleteCroppedPixels", "Delete Cropped Pixels", false), choice("fill", "Fill", "background", ["background", "contentAware"])],
+  "perspectiveCrop": [...cropSize, toggle("showGrid", "Show Grid", true)],
   "straighten": [choice("scope", "Straighten target", "image", ["image", "layers"])],
 };
 export const CONTINUOUS_RETOUCH_TOOLS=["paint.cloneStamp","paint.healingBrush","paint.spotHealing","paint.dodge","paint.burn","paint.sponge","paint.blur","paint.sharpen","paint.mixerBrush","paint.colorReplacement","paint.smudge","paint.historyBrush"];
-export const RETOUCH_PREVIEW_TOOLS = ["paint.mixerBrush", "paint.colorReplacement", "paint.cloneStamp", "paint.healingBrush", "paint.spotHealing", "paint.dodge", "paint.burn", "paint.sponge", "paint.blur", "paint.sharpen", "paint.smudge","paint.historyBrush","paint.backgroundEraser"];
+export const RETOUCH_PREVIEW_TOOLS = ["paint.mixerBrush", "paint.colorReplacement", "paint.cloneStamp", "paint.healingBrush", "paint.spotHealing", "paint.dodge", "paint.burn", "paint.sponge", "paint.blur", "paint.sharpen", "paint.smudge","paint.historyBrush","paint.backgroundEraser","paint.patternStamp"];
 export const NATIVE_STROKE_TOOLS = ["paint.stroke", "paint.pencil", "erase", "paint.magicEraser", ...RETOUCH_PREVIEW_TOOLS];
 const normalizedBrush = ["paint.stroke", "paint.pencil", "erase", "paint.mixerBrush", "paint.colorReplacement", "paint.backgroundEraser"];
 export type PaintOptions = Record<string, number | string | boolean>;
@@ -162,7 +166,7 @@ function NumericField({ field, value, disabled, change }: { field: Field; value:
 /** `lead` (the brush Opacity) sits after the blend Mode, or first when the tool has none, as in Photoshop's options bar. */
 export function PaintToolOptions({ tool, values, disabled, change, presets, selectPattern, lead, hide, before }: { tool: string; values: PaintOptions; disabled: boolean; change: (values: PaintOptions) => void; presets?: PhotoState["presets"]; selectPattern?: (pattern: string) => void; lead?: ReactNode; before?: Record<string, ReactNode>; hide?: string[] }) {
   const patterns = presets?.patterns?.flatMap(group => group.presets.map(preset => ({ ...preset, group: group.name }))) ?? [];
-  const patternFields = tool === "paint.bucket" && values.contents === "pattern";
+  const patternFields = tool === "paint.patternStamp" || tool === "paint.bucket" && values.contents === "pattern";
   const visible = (field: Field) => {
     if (["paint.cloneStamp", "paint.healingBrush"].includes(tool) && sourceTransformKeys.includes(field.key)) return values.transformSource === true;
     if (tool === "paint.bucket" && !patternFields && ["scale", "angle"].includes(field.key)) return false;
@@ -177,5 +181,5 @@ export function PaintToolOptions({ tool, values, disabled, change, presets, sele
     : typeof field.value === "boolean" ? <label key={`${tool}/${field.key}`}><input aria-label={`Tool ${field.label}`} type="checkbox" disabled={disabled} checked={values[field.key] === true} onChange={event => change({ ...values, [field.key]: event.target.checked })}/>{field.label}</label>
     : <label key={`${tool}/${field.key}`}>{field === blend ? "Mode" : field.label}{field.choices ? <select aria-label={`Tool ${field.label}`} disabled={disabled} value={String(values[field.key])} onChange={event => change({ ...values, [field.key]: event.target.value })}>{field === blend ? blendOptions(field.choices) : field.choices.map(value => <option key={value} value={value}>{value.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, char => char.toUpperCase())}</option>)}</select> : <NumericField key={`${tool}/${field.key}`} field={field} value={Number(values[field.key])} disabled={disabled} change={value => change({ ...values, [field.key]: value })}/>}</label>;
   const placed = (field: Field) => before?.[field.key] ? <Fragment key={`${tool}/${field.key}/before`}>{before[field.key]}{control(field)}</Fragment> : control(field);
-  return <div className="xd-photo-paint-options">{fields.slice(0, leadAt).map(placed)}{lead}{fields.slice(leadAt).map(placed)}{patternFields&&<label>Pattern<select aria-label="Bucket pattern" disabled={disabled||!patterns.length||!selectPattern} value={presets?.pattern??patterns[0]?.id??""} onChange={event=>selectPattern?.(event.target.value)}>{!patterns.length&&<option value="">No pattern presets available</option>}{patterns.map(pattern=><option key={pattern.id} value={pattern.id}>{pattern.name} · {pattern.group}</option>)}</select></label>}</div>;
+  return <div className="xd-photo-paint-options">{fields.slice(0, leadAt).map(placed)}{lead}{fields.slice(leadAt).map(placed)}{patternFields&&<label>Pattern<select aria-label={tool === "paint.bucket" ? "Bucket pattern" : "Tool Pattern"} disabled={disabled||!patterns.length||!selectPattern} value={presets?.pattern??patterns[0]?.id??""} onChange={event=>selectPattern?.(event.target.value)}>{!patterns.length&&<option value="">No pattern presets available</option>}{patterns.map(pattern=><option key={pattern.id} value={pattern.id}>{pattern.name} · {pattern.group}</option>)}</select></label>}</div>;
 }

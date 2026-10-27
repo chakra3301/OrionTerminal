@@ -16,6 +16,10 @@
 
 /* Options bar */
 .xd-photo .xd-ps-options { gap: 10px; min-height: 34px; padding: 3px 8px; background: var(--xd-panel); border-bottom: 1px solid var(--xd-border); }
+.xd-photo .xd-ps-options[hidden] { display: none; }
+/* Like Photoshop's, an overflowing options bar clips (it still scrolls sideways); a scrollbar would push the canvas down a row. */
+.xd-photo .xd-ps-options { scrollbar-width: none; }
+.xd-photo .xd-ps-options::-webkit-scrollbar { display: none; }
 .xd-photo .xd-ps-options .xd-editor-icon-button { width: 26px; height: 26px; }
 .xd-photo .xd-ps-options .xd-photo-property { padding: 0; }
 .xd-photo .xd-ps-options .xd-photo-section-help { margin: 0; white-space: nowrap; }
@@ -100,10 +104,13 @@
 .xd-ps-group[data-collapsed=true] { flex: 0 0 auto; min-height: 0; }
 .xd-ps-group-color > .xd-editor-panel-scroll { flex: 1; }
 .xd-ps-tabs { display: flex; align-items: flex-end; height: 26px; padding: 0 2px 0 0; background: var(--xd-bg); flex: none; }
-.xd-photo .xd-ps-tabs [role=tab] { height: 26px; padding: 0 9px; border: 0; border-radius: 0; color: var(--xd-text-3); font-weight: 600; white-space: nowrap; }
+.xd-photo .xd-ps-tabs [role=tab] { height: 26px; padding: 0 9px; border: 0; border-radius: 0; color: var(--xd-text-3); font-weight: 600; white-space: nowrap; min-width: 0; }
+/* Inactive tabs give way before the panel menu and collapse button are pushed out of a narrow dock. */
+.xd-photo .xd-ps-tabs [role=tab] > span { display: block; overflow: hidden; text-overflow: ellipsis; }
 .xd-photo .xd-ps-tabs [role=tab]:hover { color: var(--xd-text); background: transparent; }
-.xd-photo .xd-ps-tabs [role=tab][aria-selected=true] { color: var(--xd-text); background: var(--xd-panel); }
-.xd-photo .xd-ps-collapse { align-self: center; width: 20px; height: 20px; padding: 0; color: var(--xd-text-3); }
+.xd-photo .xd-ps-tabs [role=tab][aria-selected=true] { color: var(--xd-text); background: var(--xd-panel); flex-shrink: 0; }
+.xd-photo .xd-ps-tabs > .xd-editor-menu { flex: none; }
+.xd-photo .xd-ps-collapse { align-self: center; flex: none; width: 20px; height: 20px; padding: 0; color: var(--xd-text-3); }
 .xd-photo .xd-ps-collapse[aria-expanded=false] svg { transform: rotate(-90deg); }
 .xd-ps-pad { padding: 8px 10px; }
 .xd-photo .xd-ps-group .xd-editor-section { padding: 0 10px; }

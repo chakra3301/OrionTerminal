@@ -20,11 +20,22 @@ export const SELECTION_MODIFY:ImageCommand[]=[
   radius("select.modify.smooth","Smooth Selection","Sample Radius",1,500),
   radius("select.modify.border","Border Selection","Width",1,200),
 ];
-export const FILL:ImageCommand={id:"edit.fill",title:"Fill",fields:[
-  {key:"contents",label:"Contents",kind:"enum",value:"foreground",choices:[["foreground","Foreground Color"],["background","Background Color"],["contentAware","Content-Aware"],["pattern","Pattern"],["history","History"],["black","Black"],["gray","50% Gray"],["white","White"]]},
-  n("opacity","Opacity",0,100,100,"%","Blending"),
-  {key:"preserveTransparency",label:"Preserve Transparency",kind:"boolean",value:false,group:"Blending"},
-]};
+// Each option is only sent with the contents that reads it.
+const FILL_OPTIONS:Record<string,string>={color:"color",pattern:"pattern",colorAdaptation:"contentAware"};
+// Photoshop lists Behind and Clear only where a fill paints pixels, after Dissolve.
+const FILL_MODES=[...BLEND_MODES.slice(0,2),"Behind","Clear",...BLEND_MODES.slice(2)];
+export function fillCommand(patterns:{id:string;name:string}[],current?:string|null,historySource?:string):ImageCommand {
+  const unused=(key:string)=>(values:Record<string,unknown>)=>values.contents!==FILL_OPTIONS[key];
+  return {id:"edit.fill",title:"Fill",fields:[
+    {key:"contents",label:"Contents",kind:"enum",value:"foreground",choices:[["foreground","Foreground Color"],["background","Background Color"],["color","Color…"],["contentAware","Content-Aware"],["pattern","Pattern"],["history","History"],["black","Black"],["gray","50% Gray"],["white","White"]]},
+    {key:"color",label:"Color",kind:"color",value:"#000000",off:unused("color")},
+    {key:"pattern",label:"Custom Pattern",kind:"enum",group:"Options",value:patterns.find(item=>item.id===current)?.id??patterns[0]?.id??"",choices:patterns.length?patterns.map(item=>[item.id,item.name] as [string,string]):[["","None"]],off:unused("pattern")},
+    {key:"colorAdaptation",label:"Color Adaptation",kind:"boolean",group:"Options",value:true,off:unused("colorAdaptation")},
+    {key:"mode",label:"Mode",kind:"enum",group:"Blending",value:"Normal",choices:FILL_MODES.map(mode=>[mode,mode] as [string,string])},
+    n("opacity","Opacity",0,100,100,"%","Blending"),
+    {key:"preserveTransparency",label:"Preserve Transparency",kind:"boolean",value:false,group:"Blending"},
+  ],params:values=>({...Object.fromEntries(Object.entries(values).filter(([key])=>!(key in FILL_OPTIONS)||!unused(key)(values))),...(values.contents==="history"&&historySource?{historySource}:{})})};
+}
 export const STROKE:ImageCommand={id:"edit.stroke",title:"Stroke",fields:[
   n("width","Width",1,250,1,"px","Stroke"),
   {key:"location",label:"Location",kind:"enum",value:"center",radios:true,choices:[["inside","Inside"],["center","Center"],["outside","Outside"]]},
@@ -42,6 +53,18 @@ export const CONTENT_AWARE_SCALE:ImageCommand={id:"edit.contentAwareScale",title
   n("scaleX","Width",1,400,100,"%"),n("scaleY","Height",1,400,100,"%"),n("amount","Amount",0,100,100,"%"),
   {key:"protectSkinTones",label:"Protect Skin Tones",kind:"boolean",value:false},
 ]};
+// Photoshop paints a custom sampling area; Custom here samples a saved selection instead.
+export function contentAwareFillCommand(alphas:{index:number;name:string}[]):ImageCommand {
+  const sampling:[string,string][]=[["auto","Auto"],["rectangular","Rectangular"],...(alphas.length?[["custom","Custom"] as [string,string]]:[])];
+  return {id:"edit.contentAwareFill",title:"Content-Aware Fill",preview:true,fields:[
+    choice("sampling","Sampling Area Options","auto",sampling,undefined,undefined,true),
+    ...(alphas.length?[choice("channel","Sampling Channel",String(alphas[0]!.index),alphas.map(alpha=>[String(alpha.index),alpha.name] as [string,string]),undefined,values=>values.sampling!=="custom")]:[]),
+    choice("colorAdaptation","Color Adaptation","default",[["none","None"],["default","Default"],["high","High"],["veryHigh","Very High"]],"Fill Settings"),
+    choice("rotationAdaptation","Rotation Adaptation","none",[["none","None"],["low","Low"],["medium","Medium"],["high","High"],["full","Full"]],"Fill Settings"),
+    flag("scale","Scale",false,"Fill Settings"),flag("mirror","Mirror",false,"Fill Settings"),
+    choice("output","Output To","new",[["current","Current Layer"],["new","New Layer"],["duplicate","Duplicate Layer"]],"Output Settings"),
+  ],params:({channel,...values})=>values.sampling==="custom"?{...values,channel:Number(channel)}:values};
+}
 export const SHADOWS_HIGHLIGHTS:ImageCommand={id:"image.adjustments.shadowsHighlights",title:"Shadows/Highlights",sliders:true,preview:true,moreOptions:true,settingsFile:true,fields:[
   n("shadowAmount","Amount",0,100,35,"%","Shadows"),n("shadowTone","Tone",0,100,50,"%","Shadows",1,true),n("shadowRadius","Radius",0,2500,30,"px","Shadows",1,true),
   n("highlightAmount","Amount",0,100,0,"%","Highlights"),n("highlightTone","Tone",0,100,50,"%","Highlights",1,true),n("highlightRadius","Radius",0,2500,30,"px","Highlights",1,true),
@@ -109,6 +132,7 @@ export const SCALE_MARKER:ImageCommand={id:"image.analysis.placeScaleMarker",tit
 ]};
 export const NEW_ARTBOARD:ImageCommand={id:"layer.new.artboard",title:"New Artboard",params:artboardParams,fields:[text("name","Name","Artboard"),n("width","Width",1,16384,1080,"px"),n("height","Height",1,16384,1080,"px"),...ARTBOARD_BACKGROUND]};
 export const ARTBOARD_FROM_GROUP:ImageCommand={id:"layer.new.artboardFromGroup",title:"Artboard from Group",params:artboardParams,fields:ARTBOARD_BACKGROUND};
+export const ADD_FRAME:ImageCommand={id:"layer.new.frameFromLayers",title:"Add Frame to Layer",fields:[text("name","Name","Frame 1"),n("width","Width",1,32768,100,"px"),n("height","Height",1,32768,100,"px")]};
 export const ARTBOARD_FROM_LAYERS:ImageCommand={id:"layer.new.artboardFromLayers",title:"Artboard from Layers",params:artboardParams,fields:[text("name","Name","Artboard"),...ARTBOARD_BACKGROUND]};
 
 export const FLAME:ImageCommand={id:"filter.render.flame",title:"Flame",fields:[

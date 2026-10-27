@@ -22,6 +22,8 @@ export function useDesignDialog<T extends HTMLElement>(close: () => void, busy =
     if (!contains(document.activeElement)) (focusable()[0] ?? dialog).focus();
     const keydown = (event: KeyboardEvent) => {
       if (dialogs.at(-1) !== dialog) return;
+      // A menu opened from the dialog handles its own Escape and arrow keys.
+      if ((event.target as Element | null)?.closest?.('[role="menu"]')) return;
       if (event.key === "Escape") {
         event.preventDefault(); event.stopImmediatePropagation();
         if (!actions.current.busy) actions.current.close();

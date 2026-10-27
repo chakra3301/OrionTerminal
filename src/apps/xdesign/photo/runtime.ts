@@ -8,6 +8,7 @@ import { ipc } from "@/lib/ipc";
 import { validatePhotoDocuments, type PhotoDocument, type PhotoReply, type PhotoState, type PhotoOpenReply, type PhotoColorDecision, type PhotoPasteDecision, type PhotoClipboardReply } from "./types";
 import { usePencilWorkspace } from "../pencil/runtime";
 import { channelWorkspaceRequired } from "./channelSources";
+import { recordActionStep } from "./actions";
 
 import { validatePhotoDrafts, type SmartContentsFrame } from "./drafts";
 export type { SmartContentsFrame } from "./drafts";
@@ -314,8 +315,36 @@ export async function refreshImage(document: PhotoDocument): Promise<void> {
   });
 }
 
+const NEW_IMAGE_COMMANDS=["image.duplicate","file.automate.cropAndStraightenPhotos"];
+// Each result opens as its own image with a fresh history; the last one becomes the edit target, like Photoshop's frontmost window.
+async function createImages(command:string,params:Record<string,unknown>):Promise<{documentIds:string[]}> {
+  return operation(async projectId=>{
+    const id=usePhotoWorkspace.getState().documentId,document=id?useXDesign.getState().photoDocuments[id]:null;
+    if(!document)throw new Error("Reopen the image before editing");
+    if(Object.keys(useXDesign.getState().photoDocuments).length>=1024)throw new Error("The project has reached its image-document limit");
+    const replies=await invoke<PhotoReply[]>("xdesign_photo_new_documents",{projectId,photoId:document.id,version:document.version,command,params});
+    const last=replies.at(-1);
+    if(!last)throw new Error("The operation created no image");
+    if(useXDProjects.getState().activeId!==projectId)throw new Error("The project changed before the image operation completed");
+    if(Object.keys(useXDesign.getState().photoDocuments).length+replies.length>1024)throw new Error("The project has reached its image-document limit");
+    for(const reply of replies)validatePhotoDocuments({[reply.document.id]:reply.document});
+    const registry=useXDesign.getState().photoDocuments,editor=usePencilWorkspace.getState().editor;
+    const pencil=useXDesign.getState().pencilDocument?await import("../pencil/runtime"):null;
+    let shapeId="";
+    if(pencil)editor?.undo.beginBatch("Create images");
+    try {
+      for(const reply of replies)shapeId=pencil?await pencil.commitPencilPhoto(reply.document):useXDesign.getState().applyPhotoDocument(reply.document);
+      if(pencil)editor?.undo.commitBatch();
+    } catch(error) {if(pencil)editor?.undo.rollbackBatch();useXDesign.setState({photoDocuments:registry});throw error;}
+    receive(last,projectId);
+    usePhotoWorkspace.setState({shapeId,documentId:last.document.id,projectId,source:pencil?"pencil":"legacy",smartTrail:[]});
+    return {documentIds:replies.map(reply=>reply.document.id)};
+  });
+}
+
 export async function runPhotoCommand(command: string, params: Record<string, unknown> = {}): Promise<unknown> {
   if(command==="file.newFromClipboard"){await createImageFromClipboard();return {documentId:usePhotoWorkspace.getState().documentId};}
+  if(NEW_IMAGE_COMMANDS.includes(command))return createImages(command,params);
   if(command==="layer.smartObjects.editContents") {
     const layer=typeof params.layer==="number"?params.layer:usePhotoWorkspace.getState().state?.activeLayer;
     if(layer===null||layer===undefined)throw new Error("Choose a smart-object layer.");
@@ -353,6 +382,7 @@ export async function runPhotoCommand(command: string, params: Record<string, un
     })() : CLIPBOARD_COMMANDS.includes(command)?await clipboardCommand({...request,viewKey:target.state?.viewKey??null}):await invoke<PhotoReply>("xdesign_photo_command", request);
     if (useXDesign.getState().photoDocuments[document.id]?.version !== document.version) throw new Error("The image changed before the operation completed");
     receive(reply, projectId);
+    recordActionStep(command,params,target.state,reply.state);
     if(reply.document.version===document.version) return reply.result;
     if(target.smartTrail.length) {
       useXDesign.setState(s=>({photoDocuments:{...s.photoDocuments,[document.id]:reply.document}}));

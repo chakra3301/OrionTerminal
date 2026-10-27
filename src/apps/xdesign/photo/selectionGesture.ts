@@ -1,6 +1,7 @@
 import type { PaintOptions } from "./PaintToolOptions";
 
-export const SELECTION_TOOLS = ["select.rect", "ellipseSelection", "select.lasso", "polygonLasso", "magneticLasso", "select.magicWand", "select.quick", "select.object"];
+export const SELECTION_TOOLS = ["select.rect", "ellipseSelection", "select.lasso", "polygonLasso", "magneticLasso", "select.magicWand", "select.quick", "select.object", "singleRowSelection", "singleColumnSelection"];
+export const LINE_SELECTION_TOOLS = ["singleRowSelection", "singleColumnSelection"];
 export const RECTANGLE_TOOLS = ["select.rect", "ellipseSelection", "select.object", "crop"];
 export type SelectionMode = "replace" | "add" | "subtract" | "intersect";
 export type GestureModifiers = { shiftKey: boolean; altKey: boolean };
@@ -37,6 +38,13 @@ export function gestureRectangle(first: XY, last: XY, options: PaintOptions, sta
   return { x: x0, y: y0, width, height };
 }
 
+/** The one-pixel row or column under `at`, spanning the whole canvas; null outside it. */
+export function lineSelection(tool: string, at: XY, canvas: { width: number; height: number }): GestureRectangle | null {
+  const x = Math.floor(at[0]!), y = Math.floor(at[1]!);
+  if (tool === "singleRowSelection") return y >= 0 && y < canvas.height ? { x: 0, y, width: canvas.width, height: 1 } : null;
+  return x >= 0 && x < canvas.width ? { x, y: 0, width: 1, height: canvas.height } : null;
+}
+
 export function polygonPoint(previous: XY, next: XY, snap: boolean): [number, number] {
   if (!snap) return [next[0]!, next[1]!];
   const dx = next[0]! - previous[0]!, dy = next[1]! - previous[1]!;
@@ -44,7 +52,7 @@ export function polygonPoint(previous: XY, next: XY, snap: boolean): [number, nu
   return [previous[0]! + Math.cos(angle) * length, previous[1]! + Math.sin(angle) * length];
 }
 
-export function selectionGestureCommand(tool: string, points: readonly XY[], options: PaintOptions, mode: SelectionMode, start: GestureModifiers, current: GestureModifiers): { id: string; params: Record<string, unknown> } | null {
+export function selectionGestureCommand(tool: string, points: readonly XY[], options: PaintOptions, mode: SelectionMode, start: GestureModifiers, current: GestureModifiers, canvas?: { width: number; height: number }): { id: string; params: Record<string, unknown> } | null {
   if (!points.length || points.some(point => point.length < 2 || !coordinate(point[0]!) || !coordinate(point[1]!))) return null;
   const first = points[0]!, last = points.at(-1)!;
   if (tool === "straighten") {
@@ -52,6 +60,11 @@ export function selectionGestureCommand(tool: string, points: readonly XY[], opt
     return { id: "image.analysis.straightenLayer", params: { start: first.slice(0, 2), end: last.slice(0, 2), crop: options.scope !== "layers" } };
   }
   const edge = { feather: options.feather ?? 0, antiAlias: options.antiAlias !== false };
+  if (LINE_SELECTION_TOOLS.includes(tool)) {
+    // Photoshop places the line where the pointer is released and greys out Anti-alias for it.
+    const rect = canvas ? lineSelection(tool, last, canvas) : null;
+    return rect && { id: "select.rect", params: { ...rect, mode, ellipse: false, feather: edge.feather, antiAlias: false } };
+  }
   if (RECTANGLE_TOOLS.includes(tool)) {
     const rect = gestureRectangle(first, last, options, start, current);
     if (!rect) return null;

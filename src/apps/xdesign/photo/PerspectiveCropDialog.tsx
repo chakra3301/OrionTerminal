@@ -23,15 +23,25 @@ export function validCropQuad(quad: CropQuad, width: number, height: number): bo
   });
 }
 
-export function PerspectiveCropDialog({ document, close, canvas }: { document: PhotoDocument; close: () => void; canvas?: { element: HTMLElement; zoom: number } }) {
+// Lines map to lines under the square-to-quad homography, so the thirds land where the corrected crop's thirds will be.
+export function perspectiveGrid(quad: CropQuad): string {
+  const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = quad, dx1 = x1 - x2, dx2 = x3 - x2, dy1 = y1 - y2, dy2 = y3 - y2, sx = x0 - x1 + x2 - x3, sy = y0 - y1 + y2 - y3, den = dx1 * dy2 - dx2 * dy1;
+  const g = (sx * dy2 - dx2 * sy) / den, h = (dx1 * sy - sx * dy1) / den, a = x1 - x0 + g * x1, b = x3 - x0 + h * x3, d = y1 - y0 + g * y1, e = y3 - y0 + h * y3;
+  const at = (u: number, v: number) => { const w = g * u + h * v + 1; return `${(a * u + b * v + x0) / w},${(d * u + e * v + y0) / w}`; };
+  return [1 / 3, 2 / 3].map(t => `M${at(t, 0)}L${at(t, 1)}M${at(0, t)}L${at(1, t)}`).join("");
+}
+/** The options bar's size (null keeps the size from the corners), ppi and grid; without it the dialog sizes the crop itself. */
+export type PerspectiveCropOptions = { size: { width: number; height: number } | null; ppi: number; showGrid: boolean };
+
+export function PerspectiveCropDialog({ document, close, canvas, box, options }: { document: PhotoDocument; close: () => void; canvas?: { element: HTMLElement; zoom: number }; box?: CropQuad; options?: PerspectiveCropOptions }) {
   const busy = usePhotoWorkspace(s => s.busy), projectId = usePhotoWorkspace(s => s.projectId), error = usePhotoWorkspace(s => s.error), viewKey = usePhotoWorkspace(s => s.state?.viewKey);
   const supported = usePhotoWorkspace(s => s.state?.features?.perspectiveCrop === true);
   const initialQuad = (): CropQuad => [[0, 0], [document.width, 0], [document.width, document.height], [0, document.height]];
-  const [quad, setQuad] = useState<CropQuad>(initialQuad), [automaticSize, setAutomaticSize] = useState(true), [manualSize, setManualSize] = useState<[number, number]>([document.width, document.height]);
+  const [quad, setQuad] = useState<CropQuad>(() => box ?? initialQuad()), [automaticSize, setAutomaticSize] = useState(true), [manualSize, setManualSize] = useState<[number, number]>([document.width, document.height]);
   const [interpolation, setInterpolation] = useState("bicubic"), [live, setLive] = useState(false), [dragging, setDragging] = useState(false), [applying, setApplying] = useState(false);
   const stage = useRef<SVGSVGElement>(null), gesture = useRef<{ index: number; id: number; baseline: CropQuad } | null>(null);
   const identity = JSON.stringify([projectId, document.id, document.version, viewKey]), initial = useRef(identity), stale = initial.current !== identity;
-  const [width, height] = automaticSize ? cropDimensions(quad) : manualSize;
+  const [width, height] = options ? options.size ? [options.size.width, options.size.height] : cropDimensions(quad) : automaticSize ? cropDimensions(quad) : manualSize;
   const valid = supported && validCropQuad(quad, document.width, document.height) && [width, height].every(v => Number.isInteger(v) && v >= 1 && v <= 100_000) && width * height <= 268_435_456;
   const locked = busy || applying || stale;
   const params = { quad, width, height, interpolation };
@@ -49,23 +59,32 @@ export function PerspectiveCropDialog({ document, close, canvas }: { document: P
     const current = gesture.current;
     if (!current || current.id !== event.pointerId || locked) return;
     const p = geometryPoint(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect(), document.width, document.height);
-    replace(current.index, [Math.max(0, Math.min(document.width, p[0])), Math.max(0, Math.min(document.height, p[1]))]);
+    replace(current.index, [Math.max(0, Math.min(document.width, Math.round(p[0]))), Math.max(0, Math.min(document.height, Math.round(p[1])))]);
+  };
+  // A set Resolution is applied after the crop, and both fold into Photoshop's single Perspective Crop step; a failed step undoes the crop.
+  const apply = async () => {
+    const workspace = usePhotoWorkspace.getState().state, base = workspace?.historySources?.find(source => source.current)?.index;
+    await runPhotoCommand(PERSPECTIVE_CROP_COMMAND, params);
+    if (!options || options.ppi === (workspace?.resolution || 72)) return;
+    try { await runPhotoCommand("image.imageSize", { resolution: options.ppi, resample: "none" }); if (base !== undefined) await runPhotoCommand("history.fold", { from: base, label: "Perspective Crop" }); }
+    catch (error) { if (base !== undefined) await runPhotoCommand("history.select", { index: base, discardRedo: true }).catch(() => {}); throw error; }
   };
   const surface = <svg ref={stage} className={`xd-photo-geometry-stage${canvas ? " xd-photo-main-geometry" : ""}`} aria-label="Perspective crop canvas" viewBox={`0 0 ${document.width} ${document.height}`} onPointerMove={move} onPointerUp={event => { if (gesture.current?.id === event.pointerId) { move(event); finish(false); } }} onPointerCancel={event => { if (gesture.current?.id === event.pointerId) finish(true); }} onLostPointerCapture={event => { if (gesture.current?.id === event.pointerId) finish(true); }} onKeyDownCapture={event => { if (event.key === "Escape" && gesture.current) { event.preventDefault(); event.stopPropagation(); finish(true); } }}>
     {!canvas && <image href={convertFileSrc(document.previewPath)} width={document.width} height={document.height} />}
     {validCropQuad(quad, document.width, document.height) && <polygon className="xd-photo-warp-guide" points={quad.map(p => p.join(",")).join(" ")} vectorEffect="non-scaling-stroke" />}
+    {options?.showGrid && validCropQuad(quad, document.width, document.height) && <path className="xd-photo-warp-guide xd-photo-perspective-grid" d={perspectiveGrid(quad)} vectorEffect="non-scaling-stroke" />}
     {quad.map((p, index) => p.every(Number.isFinite) && <circle key={index} role="button" tabIndex={locked ? -1 : 0} aria-label={`${cornerNames[index]} crop corner`} aria-disabled={locked} className="xd-photo-warp-handle" cx={p[0]} cy={p[1]} r={canvas ? 6 / canvas.zoom : document.width / 70} onPointerDown={event => { if (locked || event.button !== 0 || gesture.current) return; event.preventDefault(); event.stopPropagation(); gesture.current = { index, id: event.pointerId, baseline: structuredClone(quad) }; setDragging(true); stage.current?.setPointerCapture?.(event.pointerId); }} onKeyDown={event => { if (locked || gesture.current || !event.key.startsWith("Arrow")) return; event.preventDefault(); event.stopPropagation(); const step = event.shiftKey ? 10 : 1; replace(index, [Math.max(0, Math.min(document.width, p[0] + (event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0))), Math.max(0, Math.min(document.height, p[1] + (event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0)))]); }} />)}
   </svg>;
   const field = (label: string, value: number, change: (value: number) => void, max: number) => <label>{label}<input aria-label={label} type="number" min={0} max={max} step="any" value={Number.isFinite(value) ? value : ""} disabled={locked || dragging} onChange={event => change(event.currentTarget.valueAsNumber)} /></label>;
   const controls = <div className="xd-photo-special-controls" inert={locked}>
     {quad.map((p, index) => <div key={index}>{field(`${cornerNames[index]} X`, p[0], x => replace(index, [x, p[1]]), document.width)}{field(`${cornerNames[index]} Y`, p[1], y => replace(index, [p[0], y]), document.height)}</div>)}
-    <label><input type="checkbox" aria-label="Crop automatic size" checked={automaticSize} disabled={dragging} onChange={event => { setManualSize([width, height]); setAutomaticSize(event.target.checked); }} />Size from opposing edges</label>
-    {automaticSize ? <p>Corrected size: {width} × {height} px</p> : <>{field("Crop output width", width, value => setManualSize([value, height]), 100_000)}{field("Crop output height", height, value => setManualSize([width, value]), 100_000)}</>}
+    {!options && <label><input type="checkbox" aria-label="Crop automatic size" checked={automaticSize} disabled={dragging} onChange={event => { setManualSize([width, height]); setAutomaticSize(event.target.checked); }} />Size from opposing edges</label>}
+    {options || automaticSize ? <p>Corrected size: {width} × {height} px</p> : <>{field("Crop output width", width, value => setManualSize([value, height]), 100_000)}{field("Crop output height", height, value => setManualSize([width, value]), 100_000)}</>}
     <label>Interpolation<select aria-label="Crop interpolation" value={interpolation} disabled={dragging} onChange={event => setInterpolation(event.target.value)}>{["nearest", "bilinear", "bicubic"].map(value => <option key={value}>{value}</option>)}</select></label>
     <button type="button" disabled={dragging} onClick={() => { setQuad(initialQuad()); setManualSize([document.width, document.height]); setAutomaticSize(true); }}>Reset crop</button>
   </div>;
   const feedback = <><div className="xd-photo-preview-actions"><label><input type="checkbox" checked={live} disabled={locked || document.width * document.height > 16_777_216} onChange={event => setLive(event.target.checked)} />Live preview</label><button type="button" disabled={locked || dragging || !valid || preview.loading} onClick={() => { void preview.preview(); }}>{preview.loading ? "Rendering…" : "Preview crop"}</button></div>{preview.url && <div className="xd-photo-special-preview"><img src={preview.url} alt="Unapplied corrected crop" /><p role="status">{preview.stale ? "Updating corrected crop…" : "Unapplied corrected crop"}</p></div>}{preview.error && <p role="alert">{preview.error}</p>}</>;
-  const form = <form ref={dialog} role="dialog" aria-modal={canvas ? undefined : true} aria-label="Perspective Crop" className={canvas ? "xd-photo-geometry-inspector" : "xd-photo-dialog xd-photo-special-dialog"} onSubmit={event => { event.preventDefault(); if (!valid || locked || gesture.current) return; setApplying(true); void runPhotoCommand(PERSPECTIVE_CROP_COMMAND, params).then(close).catch(() => {}).finally(() => setApplying(false)); }}>
+  const form = <form ref={dialog} role="dialog" aria-modal={canvas ? undefined : true} aria-label="Perspective Crop" className={canvas ? "xd-photo-geometry-inspector" : "xd-photo-dialog xd-photo-special-dialog"} onSubmit={event => { event.preventDefault(); if (!valid || locked || gesture.current) return; setApplying(true); void apply().then(close).catch(() => {}).finally(() => setApplying(false)); }}>
     <header><h3>Perspective Crop</h3><p>Place corners clockwise around a photographed page or screen. Drag, use arrow keys or enter coordinates.</p></header>
     <p>Text, shapes, fills and filtered Smart Objects retain their editable source inside Smart Objects. The corrected rectangle crops exterior pixels and clears the selection. Guides that become angled are removed.</p>
     {!supported && <p role="alert">Perspective crop requires an updated native engine.</p>}

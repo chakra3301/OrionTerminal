@@ -5,6 +5,7 @@ import { bakeProceduralPaints, restoreProceduralPaints } from "./proceduralExpor
 import { prepareFigSlots, recoverFigSlotDefinitions } from "./figSlots";
 import { prepareFigPrototype } from './figPrototype';
 import { prepareFigComments } from './figComments';
+import { isFigMeta } from './figImportData';
 
 /** The installed .fig schema calls a transformed image STRETCH; its renderer
  * calls the same paint CROP. Adapt explicit paints, including rich-text/vector
@@ -40,8 +41,14 @@ export function convertFigImageModes(graph: SceneGraph, direction: "import" | "e
 
 /** Receives the caller's export graph. Render its thumbnail before converting
  * to the schema vocabulary, so the installed renderer still honors the crop. */
+function exportedFigMeta(graph: SceneGraph): string|null {
+  const root=graph.getNode(graph.rootId),stored=root?.pluginData.find(isFigMeta)?.value;
+  if(root)root.pluginData=root.pluginData.filter(entry=>!isFigMeta(entry));
+  try{const meta:unknown=stored?JSON.parse(stored):null;return meta&&typeof meta==="object"&&!Array.isArray(meta)?JSON.stringify({...meta,exported_at:new Date().toISOString()}):null;}catch{return null;}
+}
+
 export async function exportFigImageCompatible(graph: SceneGraph, ck?: CanvasKit, renderer?: SkiaRenderer, pageId?: string): Promise<Uint8Array> {
-  const io=await import("@open-pencil/core/io");
+  const io=await import("@open-pencil/core/io"),meta=exportedFigMeta(graph);
   if(ck)bakeProceduralPaints(graph,ck);
   let cropped=false;visitImagePaints(graph,paint=>{if(paint.imageScaleMode==="CROP")cropped=true;});
   const hasSlots=[...graph.nodes.values()].some(node=>node.componentPropertyDefinitions.some(def=>String(def.type)==="SLOT")||node.pluginData.some(entry=>entry.pluginId==='open-pencil'&&entry.key==='behaviour'));
@@ -54,10 +61,14 @@ export async function exportFigImageCompatible(graph: SceneGraph, ck?: CanvasKit
   const slots=finalizeSlots?finalizeSlots(exported):exported;
   const prototypes=finalizePrototype?finalizePrototype(slots):slots;
   const bytes=finalizeComments?finalizeComments(prototypes):prototypes;
-  if(!(changed||finalizeSlots)||!thumbnail)return bytes;
+  const replaceThumbnail=!!(changed||finalizeSlots)&&!!thumbnail;
+  if(!replaceThumbnail&&!meta)return bytes;
   const {default:JSZip}=await import("jszip");
   const zip=await JSZip.loadAsync(bytes);
-  if(!zip.file("thumbnail.png"))throw new Error("The exported design has no thumbnail entry");
-  zip.file("thumbnail.png",thumbnail);
+  if(replaceThumbnail){
+    if(!zip.file("thumbnail.png"))throw new Error("The exported design has no thumbnail entry");
+    zip.file("thumbnail.png",thumbnail);
+  }
+  if(meta)zip.file("meta.json",meta);
   return zip.generateAsync({type:"uint8array",compression:"DEFLATE",compressionOptions:{level:6}});
 }

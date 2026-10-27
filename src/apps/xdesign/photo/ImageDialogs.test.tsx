@@ -1,8 +1,8 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { humanBytes, ImageCommandDialog, ImageExportDialog, ImageSizeDialog, ImageTrimDialog, replacedColor, replacementFor } from "./ImageDialogs";
-import { FADE, matchColorCommand, REPLACE_COLOR, SHADOWS_HIGHLIGHTS, STROKE } from "./imageCommands";
+import { humanBytes, ImageCommandDialog, ImageExportDialog, ImageSizeDialog, ImageTrimDialog, NewSnapshotDialog, replacedColor, replacementFor } from "./ImageDialogs";
+import { contentAwareFillCommand, FADE, fillCommand, matchColorCommand, REPLACE_COLOR, SHADOWS_HIGHLIGHTS, STROKE } from "./imageCommands";
 import { usePhotoWorkspace } from "./runtime";
 import type { PhotoState } from "./types";
 
@@ -33,6 +33,41 @@ describe("Photoshop command dialogs", () => {
   it("separates Fade's blend modes into Photoshop's groups", async () => {
     await act(async () => root.render(<ImageCommandDialog command={FADE} close={vi.fn()}/>));
     expect([...field<HTMLSelectElement>("Mode").querySelectorAll("hr")].map(hr => hr.nextElementSibling!.textContent)).toEqual(["Darken", "Lighten", "Overlay", "Difference", "Hue"]);
+  });
+  it("lays out Fill like Photoshop and sends only what the chosen contents use", async () => {
+    await act(async () => root.render(<ImageCommandDialog command={fillCommand([{ id: "p1", name: "Bubbles" }, { id: "p2", name: "Clouds" }], "p2")} close={vi.fn()}/>));
+    expect([...container.querySelectorAll("legend")].map(legend => legend.textContent)).toEqual(["Options", "Blending"]);
+    expect(field<HTMLSelectElement>("Mode").value).toBe("Normal"); expect(field<HTMLSelectElement>("Custom Pattern").value).toBe("p2");
+    expect([...field<HTMLSelectElement>("Mode").options].slice(0, 5).map(option => option.textContent)).toEqual(["Normal", "Dissolve", "Behind", "Clear", "Darken"]);
+    expect([...field<HTMLSelectElement>("Mode").querySelectorAll("hr")].map(hr => hr.nextElementSibling!.textContent)).toEqual(["Darken", "Lighten", "Overlay", "Difference", "Hue"]);
+    expect([field("Color"), field("Custom Pattern"), field("Color Adaptation")].map(control => control.disabled)).toEqual([true, true, true]);
+    await select("Contents", "color"); await input("Color", "#123456"); await select("Mode", "Multiply"); await input("Opacity", "40"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("edit.fill", { contents: "color", color: "#123456", mode: "Multiply", opacity: 40, preserveTransparency: false });
+    await act(async () => root.render(<ImageCommandDialog key="pattern" command={fillCommand([{ id: "p1", name: "Bubbles" }], null)} close={vi.fn()}/>));
+    await select("Contents", "pattern"); expect(field("Custom Pattern").disabled).toBe(false); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("edit.fill", { contents: "pattern", pattern: "p1", mode: "Multiply", opacity: 40, preserveTransparency: false });
+    await act(async () => root.render(<ImageCommandDialog key="history" command={fillCommand([], null, "source")} close={vi.fn()}/>));
+    await select("Contents", "history"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("edit.fill", { contents: "history", historySource: "source", mode: "Multiply", opacity: 40, preserveTransparency: false });
+  });
+  it("lays out Content-Aware Fill like Photoshop's panel and samples a saved selection for Custom", async () => {
+    await act(async () => root.render(<ImageCommandDialog command={contentAwareFillCommand([])} close={vi.fn()}/>));
+    expect(container.querySelector("h3")!.textContent).toBe("Content-Aware Fill");
+    expect([...container.querySelectorAll("legend")].map(legend => legend.textContent)).toEqual(["Sampling Area Options", "Fill Settings", "Output Settings"]);
+    expect([...container.querySelectorAll<HTMLInputElement>('[role="radiogroup"] input')].map(radio => radio.closest("label")!.textContent)).toEqual(["Auto", "Rectangular"]);
+    expect([...field<HTMLSelectElement>("Color Adaptation").options].map(option => option.textContent)).toEqual(["None", "Default", "High", "Very High"]);
+    expect([...field<HTMLSelectElement>("Rotation Adaptation").options].map(option => option.textContent)).toEqual(["None", "Low", "Medium", "High", "Full"]);
+    expect([...field<HTMLSelectElement>("Output To").options].map(option => option.textContent)).toEqual(["Current Layer", "New Layer", "Duplicate Layer"]);
+    expect(container.querySelector(".xd-ps-dialog-buttons input[type=checkbox]")).not.toBeNull();
+    await submit();
+    expect(native.run).toHaveBeenLastCalledWith("edit.contentAwareFill", { sampling: "auto", colorAdaptation: "default", rotationAdaptation: "none", scale: false, mirror: false, output: "new" });
+    await act(async () => root.render(<ImageCommandDialog key="custom" command={contentAwareFillCommand([{ index: 3, name: "Alpha 1" }])} close={vi.fn()}/>));
+    expect([...container.querySelectorAll<HTMLInputElement>('[role="radiogroup"] input')].map(radio => radio.value)).toEqual(["auto", "rectangular", "custom"]);
+    expect(field<HTMLSelectElement>("Sampling Channel").disabled).toBe(true);
+    await click(container.querySelector('input[type="radio"][value="custom"]')!);
+    expect(field<HTMLSelectElement>("Sampling Channel").disabled).toBe(false);
+    await click(field("Mirror")); await select("Output To", "current"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("edit.contentAwareFill", { sampling: "custom", channel: 3, colorAdaptation: "default", rotationAdaptation: "none", scale: false, mirror: true, output: "current" });
   });
   it("groups Stroke like Photoshop, remembers the last values and resets to them with Alt", async () => {
     const close = vi.fn();
@@ -120,6 +155,18 @@ describe("Photoshop command dialogs", () => {
   });
 });
 
+describe("New Snapshot", () => {
+  it("offers the next default name and Photoshop's three sources", async () => {
+    const close = vi.fn();
+    await act(async () => root.render(<NewSnapshotDialog next="Snapshot 3" close={close}/>));
+    expect(field("Name").value).toBe("Snapshot 3");
+    expect([...field<HTMLSelectElement>("From").options].map(option => option.textContent)).toEqual(["Full Document", "Merged Layers", "Current Layer"]);
+    await input("Name", "  Before grade "); await select("From", "merged"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("history.snapshot.new", { name: "Before grade", from: "merged" }); expect(close).toHaveBeenCalled();
+    await input("Name", " "); expect(button("OK").disabled).toBe(true);
+  });
+});
+
 describe("Image Size", () => {
   it("keeps proportions, reports the new size and picks the reduction method automatically", async () => {
     await act(async () => root.render(<ImageSizeDialog state={state} canvas={false} close={vi.fn()}/>));
@@ -186,6 +233,18 @@ describe("Export As", () => {
     await select("Format", "jpg"); await input("Quality", "70"); await click(button("Export"));
     expect(native.save).toHaveBeenCalledWith({ defaultPath: "Shot.jpg", filters: [{ name: "JPEG", extensions: ["jpg", "jpeg"] }] });
     expect(choose).toHaveBeenCalledWith("/tmp/Shot.jpg", 70);
+  });
+  it("saves a copy as Photoshop PDF, which Export As doesn't offer", async () => {
+    const options = () => [...container.querySelectorAll<HTMLOptionElement>('[aria-label="Format"] option')].map(option => option.textContent);
+    await act(async () => root.render(<ImageExportDialog name="Shot.psd" choose={vi.fn()} close={vi.fn()}/>));
+    expect(options()).not.toContain("Photoshop PDF");
+    const choose = vi.fn().mockResolvedValue(undefined); native.save.mockResolvedValue("/tmp/Shot.pdf");
+    await act(async () => root.render(<ImageExportDialog key="copy" name="Shot.psd" copy choose={choose} close={vi.fn()}/>));
+    expect(container.querySelector('[role="dialog"]')!.getAttribute("aria-label")).toBe("Save a Copy");
+    expect(options().slice(0, 2)).toEqual(["Photoshop (PSD)", "Photoshop PDF"]);
+    await select("Format", "pdf"); await click(button("Save"));
+    expect(native.save).toHaveBeenCalledWith({ defaultPath: "Shot.pdf", filters: [{ name: "Photoshop PDF", extensions: ["pdf"] }] });
+    expect(choose).toHaveBeenCalledWith("/tmp/Shot.pdf", undefined);
   });
 });
 

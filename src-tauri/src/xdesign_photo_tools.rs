@@ -136,6 +136,10 @@ pub(super) fn execute(
     engine.style_clipboard = tools.engine.style_clipboard.clone();
     let previous_presets = engine.presets.rev;
     let previous_colors = (engine.tools.foreground, engine.tools.background);
+    // Custom shapes and Preset Manager pattern edits change the libraries without bumping a revision.
+    let previous_shapes = engine.edit_state.custom_shapes.clone();
+    let pattern_names = |engine: &Session| engine.patterns.items.iter().map(|pattern| (pattern.id.clone(), pattern.name.clone())).collect::<Vec<_>>();
+    let previous_patterns = pattern_names(engine);
     let mut result = work(engine)?;
     if command == "tool.presets.select" {
         if let Some(background) = result["options"].get("background") {
@@ -162,7 +166,7 @@ pub(super) fn execute(
             tools.warnings.push(warning);
         }
     }
-    if previous_presets != engine.presets.rev {
+    if previous_presets != engine.presets.rev || previous_shapes != engine.edit_state.custom_shapes {
         let bytes = serde_json::to_vec(&tools.engine.presets.to_json(&tools.engine))
             .map_err(|error| error.to_string())?;
         if bytes.len() > 32 * 1024 * 1024 {
@@ -186,6 +190,7 @@ pub(super) fn execute(
         ]
         .contains(&command)
         || command == "edit.definePattern"
+        || previous_patterns != pattern_names(engine)
     {
         match photocraft_io::pattern_map::write_pat(&tools.engine.patterns.items) {
             Ok(bytes) if bytes.len() <= 128 * 1024 * 1024 => {
@@ -354,6 +359,24 @@ pub(super) fn edit_shapes(engine: &mut Session, params: &Value) -> Option<Result
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn defined_brushes_custom_shapes_and_managed_patterns_are_saved_for_the_next_launch() {
+        let dir=std::env::temp_dir().join(format!("orion-define-presets-{}",ulid::Ulid::new()));
+        let mut engine=Session::new();engine.execute("file.new",json!({"width":32,"height":32,"background":"#ffffff"})).unwrap();activate(&dir,&mut engine).unwrap();
+        let run=|engine:&mut Session,command:&str,params:Value|{execute(&dir,engine,command,|engine|engine.execute(command,params).map_err(|error|error.to_string())).unwrap();};
+        engine.execute("shape.create",json!({"rect":[4,4,20,20],"fill":[1.,0.,0.,1.]})).unwrap();
+        run(&mut engine,"edit.defineCustomShape",json!({"name":"Badge"}));
+        run(&mut engine,"edit.definePattern",json!({"name":"Swatch","rect":[0,0,8,8]}));
+        run(&mut engine,"edit.presets.presetManager",json!({"action":"rename","kind":"patterns","name":"Swatch","newName":"Tile"}));
+        engine.execute("layer.new.layer",json!({})).unwrap();engine.execute("select.rect",json!({"x":2,"y":2,"width":8,"height":8})).unwrap();engine.execute("edit.fill",json!({"contents":"black"})).unwrap();
+        run(&mut engine,"edit.defineBrushPreset",json!({"name":"Dot"}));
+        let reopened=load_profile(&dir,false).engine;
+        assert!(reopened.edit_state.custom_shapes.iter().any(|shape|shape.name=="Badge"));
+        assert!(reopened.patterns.items.iter().any(|pattern|pattern.name=="Tile"));
+        assert!(reopened.tools.presets.iter().any(|preset|preset.name=="Dot"));
+        stores().lock().unwrap().remove(&dir);std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn native_clone_source_crosshair_mapping_has_known_inverse_transform_coordinates() {

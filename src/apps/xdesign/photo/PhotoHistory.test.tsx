@@ -22,13 +22,39 @@ describe("PhotoHistory",()=>{
   });
   it("sets the History Brush source from enabled source boxes only and marks the chosen one",async()=>{
     const choose=vi.fn();await show(make(),{source:"c",chooseSource:choose});const boxes=btn("Sets the source for the history brush");
-    expect(boxes.map(b=>b.disabled)).toEqual([false,false,true,false]);expect(boxes.map(b=>!!b.querySelector("svg"))).toEqual([false,false,false,true]);
-    await act(async()=>boxes[1]!.click());expect(choose).toHaveBeenCalledWith("a");await act(async()=>boxes[2]!.click());expect(choose).toHaveBeenCalledOnce();
+    expect(boxes.map(b=>b.disabled)).toEqual([false,true,false]);expect(boxes.map(b=>!!b.querySelector("svg"))).toEqual([false,false,true]);
+    await act(async()=>boxes[0]!.click());expect(choose).toHaveBeenCalledWith("a");await act(async()=>boxes[1]!.click());expect(choose).toHaveBeenCalledOnce();
     await show(make(),{source:null,chooseSource:choose});expect(btn("Sets the source for the history brush")[0]!.querySelector("svg")).toBeTruthy();
+    // The snapshot row is the Open state, so only it carries the marker, as in Photoshop.
+    expect(btn("Sets the source for the history brush").filter(b=>b.getAttribute("aria-pressed")==="true")).toHaveLength(1);
   });
-  it("keeps redo states greyed and shows the three footer buttons disabled with Photoshop tooltips",async()=>{
-    await show(make());expect(container.querySelector(".xd-photo-history-redo")?.textContent).toBe("Fill");
-    for(const tip of ["Create new document from current state","Create new snapshot","Delete current state"]){const [b]=btn(tip);expect(b!.disabled).toBe(true);expect(b!.title).toBe(tip);}
+  it("keeps redo states greyed and runs the three footer buttons with Photoshop tooltips",async()=>{
+    const ask=vi.fn();await show(make(),{newSnapshot:ask});expect(container.querySelector(".xd-photo-history-redo")?.textContent).toBe("Fill");
+    for(const tip of ["Create new document from current state","Create new snapshot","Delete current state"]){const [b]=btn(tip);expect(b!.disabled).toBe(false);expect(b!.title).toBe(tip);}
+    await act(async()=>btn("Create new document from current state")[0]!.click());expect(run).toHaveBeenLastCalledWith("image.duplicate",{name:"Brush",mergedOnly:false});
+    await act(async()=>btn("Create new snapshot")[0]!.click());expect(run).toHaveBeenLastCalledWith("history.snapshot.new",{});
+    await act(async()=>btn("Create new snapshot")[0]!.dispatchEvent(new MouseEvent("click",{bubbles:true,altKey:true})));expect(ask).toHaveBeenCalledOnce();expect(run).toHaveBeenCalledTimes(2);
+    await act(async()=>btn("Delete current state")[0]!.click());expect(run).toHaveBeenLastCalledWith("history.select",{index:1,discardRedo:true});
+    await show(make([src("a",0,"Open",true)],[]));expect(btn("Delete current state")[0]!.disabled).toBe(true);
+  });
+  it("lists named snapshots under the opening one, reverts, renames, deletes and offers them as History Brush sources",async()=>{
+    const choose=vi.fn(),state={...make(),historySnapshots:[{id:"s1",name:"Before blur",source:"a",current:false},{id:"s2",name:"Merged",source:"m",current:true}]} as PhotoState;
+    await show(state,{source:"a",chooseSource:choose});
+    const rows=[...container.querySelectorAll(".xd-photo-history-snapshot")];expect(rows.map(row=>row.querySelector(".xd-photo-layer-name")?.textContent)).toEqual(["Portrait.jpg","Before blur","Merged"]);
+    expect(rows.map(row=>row.classList.contains("selected"))).toEqual([false,false,true]);
+    const boxes=btn("Sets the source for the history brush");expect(boxes.map(b=>b.disabled)).toEqual([false,false,true,true,false]);
+    expect(boxes[2]!.title).toContain("Full Document snapshot");expect(boxes.filter(b=>b.getAttribute("aria-pressed")==="true")).toHaveLength(2);
+    await act(async()=>boxes[1]!.click());expect(choose).toHaveBeenCalledWith("a");
+    await act(async()=>rows[1]!.querySelector("button.xd-photo-layer-name")!.dispatchEvent(new MouseEvent("click",{bubbles:true})));expect(run).toHaveBeenLastCalledWith("history.snapshot.select",{id:"s1"});
+    run.mockClear();await act(async()=>rows[2]!.querySelector("button.xd-photo-layer-name")!.dispatchEvent(new MouseEvent("click",{bubbles:true})));expect(run).not.toHaveBeenCalled();
+    await act(async()=>rows[1]!.querySelector("button.xd-photo-layer-name")!.dispatchEvent(new MouseEvent("dblclick",{bubbles:true})));
+    const input=container.querySelector<HTMLInputElement>('input[aria-label="Snapshot name"]')!;expect(input.value).toBe("Before blur");
+    const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!;
+    await act(async()=>{set.call(input,"  Clean  ");input.dispatchEvent(new Event("input",{bubbles:true}));});
+    await act(async()=>input.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true})));expect(run).toHaveBeenLastCalledWith("history.snapshot.rename",{id:"s1",name:"Clean"});
+    expect(container.querySelector('input[aria-label="Snapshot name"]')).toBeNull();
+    await act(async()=>btn("Create new document from current state")[0]!.click());expect(run).toHaveBeenLastCalledWith("image.duplicate",{name:"Merged",mergedOnly:false});
+    await act(async()=>btn("Delete current state")[0]!.click());expect(run).toHaveBeenLastCalledWith("history.snapshot.delete",{id:"s2"});
   });
   it("scrolls its panel to the current state when it changes, like Photoshop",async()=>{
     container.style.overflowY="auto";

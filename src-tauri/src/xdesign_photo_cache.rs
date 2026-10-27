@@ -168,6 +168,7 @@ impl PhotoCache {
             };
             if let Some(entry) = self.entries.remove(&victim) {
                 bytes = bytes.saturating_sub(entry.bytes);
+                super::snapshots::forget(&victim);
             }
         }
     }

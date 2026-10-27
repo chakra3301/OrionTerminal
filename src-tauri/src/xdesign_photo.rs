@@ -20,6 +20,12 @@ mod input;
 mod place;
 #[path = "xdesign_photo_image_size.rs"]
 mod image_size;
+#[path = "xdesign_photo_exports.rs"]
+mod exports;
+#[path = "xdesign_photo_pdf.rs"]
+mod pdf;
+#[path = "xdesign_photo_documents.rs"]
+mod documents;
 
 #[cfg(test)]
 #[path = "xdesign_photo_fidelity.rs"]
@@ -68,6 +74,16 @@ mod color_conversion;
 mod straighten;
 #[path = "xdesign_photo_perspective_crop.rs"]
 mod perspective_crop;
+#[path = "xdesign_photo_fill_modes.rs"]
+mod fill_modes;
+#[path = "xdesign_photo_red_eye.rs"]
+mod red_eye;
+#[path = "xdesign_photo_pattern_stamp.rs"]
+mod pattern_stamp;
+#[path = "xdesign_photo_layer_colors.rs"]
+mod layer_colors;
+#[path = "xdesign_photo_layer_code.rs"]
+mod layer_code;
 #[path = "xdesign_photo_selection_brush.rs"]
 mod selection_brush;
 #[path = "xdesign_photo_magnetic.rs"]
@@ -90,6 +106,8 @@ mod linked_replay;
 mod stroke;
 #[path = "xdesign_photo_history.rs"]
 mod history;
+#[path = "xdesign_photo_history_snapshots.rs"]
+mod snapshots;
 #[path = "xdesign_photo_prepared.rs"]
 mod prepared;
 #[path = "xdesign_photo_styles.rs"]
@@ -448,6 +466,79 @@ pub(crate) fn saved_history_references(view:&Value,version:&str)->Result<Vec<Str
 pub(crate) fn validate_saved_history(dir:&Path,version:&str)->Result<(),String>{restore_with_settings(dir,version,None,false).map(|_|())}
 pub(crate) fn room_transfer_access(root:&Path)->Result<(),String>{storage::access(root)}
 
+/// The Ruler line, count markers, notes and slices the canvas draws; undo and history change them like any edit.
+fn analysis_state(engine: &Session) -> Value {
+    let Some(doc) = engine.active().map(|state| &state.doc) else { return Value::Null };
+    let m = &doc.measurement;
+    json!({
+        "ruler": m.ruler.map(|r| json!({"start": r.start, "end": r.end, "protractor": r.protractor, "info": photocraft_engine::analysis_cmds::ruler_info(&r, &m.scale)})),
+        "count": {"total": m.count_total(), "activeGroup": m.active_count_group, "groups": m.count_groups.iter().map(|g| json!({"name": g.name, "color": g.color.to_rgb(), "markerSize": g.marker_size, "labelSize": g.label_size, "visible": g.visible, "points": g.points})).collect::<Vec<_>>()},
+        "notes": doc.notes.iter().enumerate().map(|(i, n)| photocraft_engine::notes_cmds::note_json(i, n)).collect::<Vec<_>>(),
+        "slices": photocraft_engine::doc::slices::resolve(doc).iter().map(|r| photocraft_engine::slice_cmds::resolved_json(doc, r)).collect::<Vec<_>>(),
+        "slicesLocked": engine.file_menu.slices_locked,
+    })
+}
+
+/// photocraft_text's default family, which the engine resolves type styles against.
+const STYLE_FAMILY: &str = "Inter";
+
+/// The Layer Comps, Measurement Log and Character / Paragraph Styles panels, as the engine's `list` commands report them.
+fn panels_state(engine: &Session) -> Value {
+    use photocraft_engine::analysis_cmds::{available, log_columns, COLUMNS};
+    use photocraft_engine::doc::{text_styles::NO_CHARACTER_STYLE, LayerContent};
+    let Some(st) = engine.active() else { return Value::Null };
+    let (doc, styles, log) = (&st.doc, &st.doc.text_styles, &engine.analysis.log);
+    let header = |key: &str| COLUMNS.iter().find(|c| c.0 == key).map_or(key.to_string(), |c| c.1.to_string());
+    let character: Vec<Value> = std::iter::once(json!({"id": 0, "name": NO_CHARACTER_STYLE, "attrs": {}, "resolved": styles.resolve_char(None, None, STYLE_FAMILY)}))
+        .chain(styles.character.iter().map(|d| json!({"id": d.id, "name": d.name, "attrs": d.attrs, "resolved": styles.resolve_char(None, Some(d.id), STYLE_FAMILY)})))
+        .collect();
+    let paragraph: Vec<Value> = std::iter::once(&styles.basic)
+        .chain(&styles.paragraph)
+        .map(|d| json!({"id": d.id, "name": d.name, "paragraphAttrs": d.para_attrs, "characterAttrs": d.char_attrs, "resolved": {"paragraph": styles.resolve_para(Some(d.id)), "character": styles.resolve_char(Some(d.id), None, STYLE_FAMILY)}}))
+        .collect();
+    // The engine's private `current` over the selected type layers' whole text.
+    let (mut chars, mut paras, mut char_override, mut para_override, mut typed) = (Vec::new(), Vec::new(), false, false, false);
+    for id in st.selected_layers() {
+        let Some(LayerContent::Text(t)) = doc.layer(id).map(|layer| &layer.content) else { continue };
+        typed = true;
+        let (mut at, mut spans) = (0, Vec::new());
+        for run in t.paragraph_runs().iter().filter(|run| run.len > 0 || t.text.is_empty()) {
+            paras.push(run.style.style_sheet.unwrap_or(0));
+            para_override |= !styles.para_overrides(&run.style).is_empty();
+            spans.push((at, run.style.style_sheet));
+            at += run.len;
+        }
+        let mut at = 0;
+        for run in t.char_runs().iter().filter(|run| run.len > 0 || t.text.is_empty()) {
+            let para = spans.iter().rev().find(|span| span.0 <= at).and_then(|span| span.1);
+            chars.push(run.style.style_sheet.unwrap_or(0));
+            char_override |= !styles.char_overrides(&run.style, para, STYLE_FAMILY).is_empty();
+            at += run.len;
+        }
+    }
+    let one = |ids: &[u32]| ids.first().filter(|first| ids.iter().all(|id| id == *first)).copied();
+    let points = &engine.analysis.data_points;
+    let sources: serde_json::Map<String, Value> = ["selection", "ruler", "count"].into_iter().map(|source| (source.to_string(), available(source).iter().map(|key| json!({"key": key, "name": header(key)})).collect())).collect();
+    json!({
+        "layerComps": {
+            "comps": doc.layer_comps.iter().map(|c| json!({"id": c.id, "name": c.name, "comment": c.comment, "visibility": c.apply_visibility, "position": c.apply_position, "appearance": c.apply_appearance, "missingLayers": c.missing_layers(doc).len()})).collect::<Vec<_>>(),
+            "lastApplied": doc.last_applied_comp,
+            "hasLastDocumentState": doc.last_document_state.is_some(),
+        },
+        "measurementLog": {
+            "rows": log,
+            "columns": log_columns(log).iter().map(|key| json!({"key": key, "name": header(key)})).collect::<Vec<_>>(),
+            "dataPoints": {"selection": points.selection, "ruler": points.ruler, "count": points.count},
+            "available": sources,
+        },
+        "textStyles": {
+            "character": character,
+            "paragraph": paragraph,
+            "current": typed.then(|| json!({"character": one(&chars), "characterOverride": char_override, "paragraph": one(&paras), "paragraphOverride": para_override})),
+        },
+    })
+}
+
 fn reply(
     dir: &Path,
     photo: &str,
@@ -467,6 +558,7 @@ fn reply(
                         content::describe(native, doc, layer, active == Some(native.id));
                         layer["effects"] = json!({"enabled":native.effects.enabled,"items":native.effects.items.iter().map(styles::settings).collect::<Vec<_>>()});
                         layer["locks"] = json!({"transparency":native.locks.transparency,"pixels":native.locks.pixels,"position":native.locks.position,"all":native.locks.all});
+                        layer["color"] = json!(layer_colors::name(native.label));
                         if let Some(mask) = &native.mask { layer["mask"] = json!({"enabled":mask.enabled,"linked":mask.linked}); }
                         if let photocraft_engine::doc::LayerContent::Smart(smart) = &native.content
                         {
@@ -519,9 +611,13 @@ fn reply(
     state["colorProfile"] = profiles::describe(&session.engine.active().ok_or("No image document")?.doc);
     state["historySources"] = history::describe(&session.engine);
     state["historyRedo"] = history::redo_labels(&session.engine);
+    state["historySnapshots"] = snapshots::describe(&session.engine, photo);
+    state["historySnapshotName"] = json!(snapshots::next_name(photo));
     let doc = &session.engine.active().ok_or("No image document")?.doc;
     state["paths"] = json!({"saved":doc.paths.iter().map(|path|path.name.as_str()).collect::<Vec<_>>(),"work":doc.work_path.is_some()});
     state["presets"] = tools::presets(&session.engine);
+    state["analysis"] = analysis_state(&session.engine);
+    state["panels"] = panels_state(&session.engine);
     state["globalLight"] = json!(
         session
             .engine
@@ -627,6 +723,23 @@ pub async fn xdesign_photo_color_settings(app:AppHandle,action:String,params:Val
         }
     }).await.map_err(|e|e.to_string())?
 }
+/// Copy CSS/SVG text reaches the system pasteboard here because WKWebView refuses a write that waits on the engine.
+#[tauri::command]
+pub async fn xdesign_photo_copy_text(text:String)->Result<(),String>{
+    tauri::async_runtime::spawn_blocking(move||copy_text(&text)).await.map_err(|e|e.to_string())?
+}
+#[cfg(target_os="macos")]
+fn copy_text(text:&str)->Result<(),String>{
+    use std::io::Write;
+    // pbcopy decodes its input by locale, and the app's launchd environment may not name a UTF-8 one.
+    let mut child=std::process::Command::new("/usr/bin/pbcopy").env("LANG","en_US.UTF-8").stdin(std::process::Stdio::piped()).spawn().map_err(|e|e.to_string())?;
+    let written=child.stdin.take().ok_or("The clipboard could not be opened")?.write_all(text.as_bytes());
+    let status=child.wait().map_err(|e|e.to_string())?;
+    written.map_err(|e|e.to_string())?;
+    if status.success(){Ok(())}else{Err("The clipboard could not be written".into())}
+}
+#[cfg(not(target_os="macos"))]
+fn copy_text(_text:&str)->Result<(),String>{Err("Copying text needs the macOS pasteboard".into())}
 #[tauri::command]
 pub async fn xdesign_photo_clipboard(app:AppHandle,request_id:String,project_id:String,photo_id:String,version:Option<String>,command:String,params:Value,view_key:Option<String>,token:Option<String>,action:Option<String>)->Result<clipboard::Reply,String>{
     id(&request_id)?;id(&project_id)?;id(&photo_id)?;clipboard::validate(&command,&params)?;
@@ -737,6 +850,10 @@ fn command_supported(command: &str) -> bool {
             "edit.redo",
             "history.select",
             "history.fold",
+            "history.snapshot.new",
+            "history.snapshot.select",
+            "history.snapshot.rename",
+            "history.snapshot.delete",
             "edit.contentAwareScale",
             "edit.transform",
             "edit.puppetWarp",
@@ -754,13 +871,31 @@ fn command_supported(command: &str) -> bool {
             "edit.convertToProfile",
             "edit.profileInfo",
             "edit.colorSettings",
+            "edit.purge.clipboard",
+            "edit.purge.histories",
+            "edit.purge.all",
+            "edit.defineBrushPreset",
+            "edit.definePattern",
+            "edit.defineCustomShape",
+            "edit.presets.presetManager",
+            "edit.findAndReplaceText",
+            "edit.checkSpelling",
+            "edit.autoAlignLayers",
+            "edit.autoBlendLayers",
+            "edit.contentAwareFill",
             "view.layerMask",
+            "view.lockSlices", "view.clearSlices",
             "view.proofSetup", "view.proofColors", "view.gamutWarning", "view.thirtyTwoBitPreviewOptions",
             "view.proofSetup.workingCyanPlate", "view.proofSetup.workingMagentaPlate", "view.proofSetup.workingYellowPlate", "view.proofSetup.workingBlackPlate", "view.proofSetup.workingCmyPlate",
             "view.proofSetup.legacyMacintoshRgb", "view.proofSetup.colorBlindnessProtanopia", "view.proofSetup.colorBlindnessDeuteranopia",
         ]
         .contains(&command)
-        || ["file.placeEmbedded", "file.placeLinked"].contains(&command)
+        || [
+            "file.placeEmbedded", "file.placeLinked", "file.fileInfo",
+            "file.scripts.deleteAllEmptyLayers", "file.scripts.flattenAllLayerEffects", "file.scripts.flattenAllMasks",
+            "file.export.colorLookupTables", "file.export.pathsToIllustrator", "file.export.layersToFiles", "file.export.artboardsToPdf",
+        ]
+        .contains(&command)
 }
 
 // The crop box is rotated clockwise by `angle` on screen: rotate the canvas back so the box is
@@ -801,6 +936,8 @@ fn execute_view_command(
     if command == "history.fold" { return history::fold(engine, &params); }
     if command == "image.cropRotated" { return crop_rotated(engine, &params); }
     if command == "layer.new.layerViaCopy" { return layer_via_copy(engine, params); }
+    if command == "edit.purge.clipboard" || command == "edit.purge.all" { return clipboard::purge(engine, command); }
+    if let Some(result) = exports::execute(engine, command, &params) { return result; }
     let params = preview::prepare_lens_edit(engine, command, params)?;
     preview::validate_filter_input(command, &params)?;
     if !mask_filters::separate(command) || !mask_filters::targets_coverage(engine, &params) { preview::validate_lens_input(engine, command, &params)?; }
@@ -868,6 +1005,11 @@ fn execute_view_command(
     if let Some(result) = linked_replay::execute(engine, command, &params) { return result; }
     if let Some(result) = place::execute(engine, command, &params) { return result; }
     if let Some(result) = image_size::execute(engine, command, &params) { return result; }
+    if let Some(result) = fill_modes::execute(engine, command, &params) { return result; }
+    if let Some(result) = red_eye::execute(engine, command, &params) { return result; }
+    if let Some(result) = pattern_stamp::execute(engine, command, &params) { return result; }
+    if let Some(result) = layer_colors::execute(engine, command, &params) { return result; }
+    if let Some(result) = layer_code::execute(engine, command, &params) { return result; }
     let mut params = params;
     let coverage_fade = mask_filters::prepare_paint_fade(engine, command, &mut params);
     let adjusted = if command == "layer.setAdjustment" { params["layer"].as_u64().map(photocraft_engine::doc::LayerId).or_else(|| engine.active().and_then(|state| state.active_layer)) } else { None };
@@ -963,7 +1105,7 @@ pub async fn xdesign_photo_command(
         let color_before=if color_views::COMMANDS.contains(&command.as_str()){Some(color_views::Snapshot::capture(&session.engine)?.native(&before.doc)?)}else{None};
         let stroke_identity=format!("{project_id}/{photo_id}/{version}/{}",color_views::key(&session.engine)?);
         let output_path = linked_replay::output_path(&command, &params);
-        let result = tools::execute(&tool_dir,&mut session.engine,&command,|engine|match stroke::commit_feedback(engine,&stroke_identity,&command,&params){Some(result)=>result,None=>execute_view_command(engine, &command, params)}).and_then(|(value,warnings)| linked_replay::persist_output(output_path.as_deref(), || {
+        let result = tools::execute(&tool_dir,&mut session.engine,&command,|engine|match stroke::commit_feedback(engine,&stroke_identity,&command,&params){Some(result)=>result,None=>match snapshots::execute(engine,&photo_id,&command,&params){Some(result)=>result,None=>execute_view_command(engine, &command, params)}}).and_then(|(value,warnings)| linked_replay::persist_output(output_path.as_deref(), || {
             if match_source.is_some() { while session.engine.documents().len() > 1 { session.engine.close(session.engine.documents().len() - 1); } session.engine.set_active(0); }
             if session.engine.documents().len()!=1||session.engine.active_index()!=Some(0) {return Err("This operation creates another image document and needs a workspace integration".into());}
             persist_command(&dir, &photo_id, session, &before, &command)?;
@@ -1011,6 +1153,11 @@ pub async fn xdesign_storage_schedule_compaction(app:AppHandle,enabled:bool)->Re
 #[tauri::command]
 pub async fn xdesign_photo_channel_operation(app: AppHandle, project_id: String, photo_id: String, version: String, command: String, params: Value, view_key: Option<String>, preview: bool) -> Result<Value, String> {
     channel_workspace::run(app, project_id, photo_id, version, command, params, view_key, preview).await
+}
+
+#[tauri::command]
+pub async fn xdesign_photo_new_documents(app: AppHandle, project_id: String, photo_id: String, version: String, command: String, params: Value) -> Result<Vec<PhotoReply>, String> {
+    documents::run(app, project_id, photo_id, version, command, params).await
 }
 
 #[tauri::command]
@@ -1117,7 +1264,7 @@ pub async fn xdesign_photo_export(
         .to_ascii_lowercase();
     if ![
         "png", "jpg", "jpeg", "webp", "tiff", "tif", "psd", "psb", "pcraft", "exr", "hdr", "avif",
-        "gif", "bmp", "tga", "ico", "qoi", "pnm",
+        "gif", "bmp", "tga", "ico", "qoi", "pnm", "pdf",
     ]
     .contains(&ext.as_str())
     {
@@ -1125,15 +1272,17 @@ pub async fn xdesign_photo_export(
     }
     tauri::async_runtime::spawn_blocking(move || {
         let doc = restore(&dir, &version, None)?;
-        let exported = photocraft_io::export(
-            &doc.engine.active().ok_or("No image document")?.doc,
-            &ext,
-            &options,
-        )
-        .map_err(|e| e.to_string())?;
-        photocraft_format::atomic_write(Path::new(&path), &exported.bytes)
+        let doc = &doc.engine.active().ok_or("No image document")?.doc;
+        let (bytes, warnings) = if ext == "pdf" {
+            let flattened = (doc.layers.len() > 1).then(|| "Photoshop PDF keeps the flattened image; layers are not saved.".to_string());
+            (pdf::photoshop_pdf(doc)?, flattened.into_iter().collect())
+        } else {
+            let exported = photocraft_io::export(doc, &ext, &options).map_err(|e| e.to_string())?;
+            (exported.bytes, exported.warnings)
+        };
+        photocraft_format::atomic_write(Path::new(&path), &bytes)
             .map_err(|e| e.to_string())?;
-        Ok(exported.warnings)
+        Ok(warnings)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -1463,6 +1612,135 @@ mod tests {
     }
 
     #[test]
+    fn command_supported_allows_edit_menu_items() {
+        for command in [
+            "edit.purge.clipboard",
+            "edit.purge.histories",
+            "edit.purge.all",
+            "edit.defineBrushPreset",
+            "edit.definePattern",
+            "edit.defineCustomShape",
+            "edit.presets.presetManager",
+            "edit.findAndReplaceText",
+            "edit.checkSpelling",
+        ] {
+            assert!(command_supported(command), "{command}");
+        }
+        for command in [
+            "edit.purge.undo",
+            "edit.purge.videoCache",
+            "edit.presets.exportImportPresets",
+            "edit.presets.migratePresets",
+            "edit.toggleLastState",
+        ] {
+            assert!(!command_supported(command), "{command}");
+        }
+    }
+
+    #[test]
+    fn command_supported_allows_edit_auto_and_content_aware_fill() {
+        for command in ["edit.autoAlignLayers", "edit.autoBlendLayers", "edit.contentAwareFill"] {
+            assert!(command_supported(command), "{command}");
+        }
+    }
+
+    #[test]
+    fn command_supported_allows_analysis_tools() {
+        for command in ["image.analysis.rulerTool", "image.analysis.straightenLayer", "count.add", "count.remove", "count.move", "count.clear", "count.newGroup", "count.deleteGroup", "count.setGroup", "notes.add", "notes.set", "notes.delete", "slice.new", "slice.set", "slice.promote", "slice.delete", "slice.divide"] {
+            assert!(command_supported(command), "{command}");
+        }
+    }
+
+    #[test]
+    fn command_supported_allows_view_slice_commands() {
+        for command in ["view.lockSlices", "view.clearSlices"] {
+            assert!(command_supported(command), "{command}");
+        }
+        // Guides are frontend view state, so the engine's guide commands stay out.
+        for command in ["view.clearGuides", "view.clearCanvasGuides", "view.clearSelectedArtboardGuides"] {
+            assert!(!command_supported(command), "{command}");
+        }
+    }
+
+    #[test]
+    fn command_supported_allows_file_commands() {
+        for command in ["file.fileInfo", "file.scripts.deleteAllEmptyLayers", "file.scripts.flattenAllLayerEffects", "file.scripts.flattenAllMasks", "file.export.colorLookupTables", "file.export.pathsToIllustrator", "file.export.layersToFiles", "file.export.artboardsToPdf"] {
+            assert!(command_supported(command), "{command}");
+        }
+        // The engine's versions call its own image.imageSize and image.mode.*, skipping the host's; the
+        // dialogs send those host-handled commands instead.
+        for command in ["file.automate.fitImage", "file.automate.conditionalModeChange", "file.automate.batch", "file.scripts.browse", "file.automate.runDroplet", "file.automate.createDroplet", "file.scripts.scriptEventsManager", "file.closeAll", "file.closeOthers", "file.package"] {
+            assert!(!command_supported(command), "{command}");
+        }
+    }
+
+    #[test]
+    fn command_supported_allows_panel_commands() {
+        for command in ["layerComp.new", "layerComp.update", "layerComp.apply", "layerComp.previous", "layerComp.next", "layerComp.delete", "layerComp.duplicate", "layerComp.setOptions", "layerComp.restoreLastDocumentState", "layerComp.updateWarnings", "image.analysis.recordMeasurements", "image.analysis.selectDataPoints", "measurementLog.delete", "measurementLog.export", "cloneSource.overlay", "type.characterStyle.new", "type.characterStyle.apply", "type.characterStyle.redefine", "type.characterStyle.clearOverride", "type.paragraphStyle.set", "type.paragraphStyle.delete", "type.paragraphStyle.duplicate"] {
+            assert!(command_supported(command), "{command}");
+        }
+    }
+
+    #[test]
+    fn panels_state_matches_the_engine_lists() {
+        let mut engine = Session::new();
+        engine.execute("file.new", json!({"width": 100, "height": 80})).unwrap();
+        let layer = engine.execute("type.create", json!({"x": 10, "y": 50, "text": "Hello world", "size": 12})).unwrap()["layer"].as_u64().unwrap();
+        let cs = engine.execute("type.characterStyle.new", json!({"name": "Title", "attrs": {"size": 30}, "fromSelection": false})).unwrap()["id"].clone();
+        engine.execute("type.characterStyle.apply", json!({"id": cs, "layer": layer})).unwrap();
+        engine.execute("type.paragraphStyle.new", json!({"name": "Body", "apply": true})).unwrap();
+        engine.execute("type.setStyle", json!({"layer": layer, "range": [0, 5], "italic": true})).unwrap();
+        engine.execute("layerComp.new", json!({"name": "A", "position": false, "comment": "c"})).unwrap();
+        engine.execute("image.analysis.rulerTool", json!({"start": [0, 0], "end": [30, 40]})).unwrap();
+        engine.execute("image.analysis.recordMeasurements", json!({"source": "ruler"})).unwrap();
+        let state = panels_state(&engine);
+        let comps = engine.execute("layerComp.list", json!({})).unwrap();
+        assert_eq!(state["layerComps"]["comps"][0], json!({"id": comps["comps"][0]["id"], "name": "A", "comment": "c", "visibility": true, "position": false, "appearance": true, "missingLayers": 0}));
+        assert_eq!(state["layerComps"]["lastApplied"], comps["lastApplied"]);
+        assert_eq!(state["layerComps"]["hasLastDocumentState"], comps["hasLastDocumentState"]);
+        let log = engine.execute("measurementLog.list", json!({})).unwrap();
+        assert_eq!(state["measurementLog"]["rows"], log["rows"]);
+        assert_eq!(state["measurementLog"]["columns"].as_array().unwrap().iter().map(|c| c["key"].clone()).collect::<Vec<_>>(), log["columns"].as_array().unwrap().clone());
+        assert!(state["measurementLog"]["columns"].as_array().unwrap().contains(&json!({"key": "length", "name": "Length"})));
+        assert_eq!(state["measurementLog"]["available"]["ruler"].as_array().unwrap().last().unwrap(), &json!({"key": "angle", "name": "Angle"}));
+        let character = engine.execute("type.characterStyle.list", json!({})).unwrap();
+        let paragraph = engine.execute("type.paragraphStyle.list", json!({})).unwrap();
+        assert_eq!(state["textStyles"]["current"], character["current"]);
+        assert_eq!(state["textStyles"]["current"], json!({"character": cs, "characterOverride": true, "paragraph": paragraph["styles"][1]["id"], "paragraphOverride": false}));
+        assert_eq!(state["textStyles"]["character"][0]["name"], character["styles"][0]["name"]);
+        assert_eq!(state["textStyles"]["character"][1], character["styles"][1]);
+        assert_eq!(state["textStyles"]["paragraph"], paragraph["styles"]);
+        engine.execute("layer.new.layer", json!({})).unwrap();
+        assert_eq!(panels_state(&engine)["textStyles"]["current"], Value::Null);
+    }
+
+    #[test]
+    fn analysis_state_reports_ruler_counts_notes_and_slices() {
+        let mut engine = Session::new();
+        engine.execute("file.new", json!({"width": 100, "height": 80})).unwrap();
+        engine.execute("image.analysis.rulerTool", json!({"start": [10, 10], "end": [40, 50]})).unwrap();
+        engine.execute("count.add", json!({"x": 5, "y": 6})).unwrap();
+        engine.execute("notes.add", json!({"x": 20, "y": 30, "text": "fix", "author": "QA"})).unwrap();
+        engine.execute("slice.new", json!({"rect": [10, 10, 30, 20]})).unwrap();
+        let state = analysis_state(&engine);
+        assert_eq!(state["ruler"]["info"]["l1"], json!(50.0));
+        assert_eq!(state["count"]["groups"][0]["points"], json!([[5.0, 6.0]]));
+        assert_eq!(state["notes"][0]["text"], json!("fix"));
+        let slices = state["slices"].as_array().unwrap();
+        assert!(slices.iter().any(|s| s["origin"] == "user" && s["rect"] == json!([10, 10, 30, 20])), "{slices:?}");
+        assert_eq!(state["slicesLocked"], json!(false));
+        engine.execute("edit.undo", json!({})).unwrap();
+        assert!(analysis_state(&engine)["slices"].as_array().unwrap().iter().all(|s| s["origin"] == "auto"));
+    }
+
+    #[test]
+    fn command_supported_allows_warp_split_and_grid() {
+        for command in ["edit.transform.splitWarpCrosswise", "edit.transform.splitWarpVertically", "edit.transform.splitWarpHorizontally", "edit.transform.removeWarpSplit", "edit.transform.warpGrid"] {
+            assert!(command_supported(command), "{command}");
+        }
+    }
+
+    #[test]
     fn pen_and_shape_tool_payloads_create_shapes_paths_and_selections() {
         use super::*;
         let mut engine=Session::new();engine.execute("file.new",json!({"width":32,"height":32})).unwrap();
@@ -1727,6 +2005,19 @@ mod tests {
         let before=engine.active().unwrap().doc.clone();
         execute_view_command(&mut engine,"edit.contentAwareScale",json!({"scaleX":50,"amount":100})).unwrap();
         assert!(!std::sync::Arc::ptr_eq(&before,&engine.active().unwrap().doc));
+    }
+
+    #[test]
+    fn layer_state_reports_vector_mask_enable_and_link_for_the_layer_menu() {
+        use super::*;
+        let mut engine=Session::new();engine.execute("file.new",json!({"width":16,"height":16,"background":"#905080"})).unwrap();
+        for (id,params) in [("layer.new.layer",json!({})),("layer.vectorMask.revealAll",json!({})),("layer.vectorMask.enabled",json!({"enabled":false})),("layer.vectorMask.linked",json!({"linked":false}))] {
+            assert!(command_supported(id));execute_view_command(&mut engine,id,params).unwrap();
+        }
+        let session=PhotoSession{engine,color_settings:None,version:ulid::Ulid::new().to_string(),original_path:None,writer:Default::default()};
+        let state=reply(std::path::Path::new("/tmp"),&ulid::Ulid::new().to_string(),&session,Vec::new()).unwrap().state;
+        assert_eq!(state["layers"][0]["vectorMask"],json!({"enabled":false,"linked":false}));
+        assert!(state["layers"][1].get("vectorMask").is_none());
     }
 
     #[test]

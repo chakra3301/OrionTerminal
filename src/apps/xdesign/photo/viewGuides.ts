@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { usePreferences, unitsPerPixel, type Preferences } from "./preferences";
 
 /*
  * View aids (rulers, grid, guides, Extras, Snap) are frontend state for the session only: the engine catalogue marks
@@ -10,17 +11,15 @@ import { create } from "zustand";
 /** "h" is a horizontal line at y = pos, "v" a vertical line at x = pos; positions are document pixels. */
 export type GuideAxis = "h" | "v";
 export type Guide = { id: number; axis: GuideAxis; pos: number };
-export type SnapTargets = { guides: boolean; grid: boolean; bounds: boolean };
-export type ViewFlags = { rulers: boolean; grid: boolean; extras: boolean; guides: boolean; selectionEdges: boolean; targetPath: boolean; lockGuides: boolean; snap: boolean; snapTo: SnapTargets };
+export type SnapTargets = { guides: boolean; grid: boolean; layers: boolean; bounds: boolean };
+export type ViewFlags = { rulers: boolean; grid: boolean; extras: boolean; guides: boolean; layerEdges: boolean; selectionEdges: boolean; targetPath: boolean; smartGuides: boolean; pixelGrid: boolean; lockGuides: boolean; snap: boolean; snapTo: SnapTargets };
 export type GuideDialog = "new" | "layout" | null;
 
 export const RULER_SIZE = 18;
 /** Screen pixels within which Snap pulls a value onto a target. */
 export const SNAP_PX = 6;
-/** Photoshop's default grid is one inch with 4 subdivisions; one inch is `resolution` pixels (72 by default). */
-export const GRID_SUBDIVISIONS = 4;
 
-export const DEFAULT_FLAGS: ViewFlags = { rulers: false, grid: false, extras: true, guides: true, selectionEdges: true, targetPath: true, lockGuides: false, snap: true, snapTo: { guides: true, grid: true, bounds: true } };
+export const DEFAULT_FLAGS: ViewFlags = { rulers: false, grid: false, extras: true, guides: true, layerEdges: false, selectionEdges: true, targetPath: true, smartGuides: true, pixelGrid: true, lockGuides: false, snap: true, snapTo: { guides: true, grid: true, layers: true, bounds: true } };
 
 type Store = {
   flags: ViewFlags;
@@ -34,11 +33,17 @@ type Store = {
   moveGuide: (document: string, id: number, pos: number) => void;
   deleteGuide: (document: string, id: number) => void;
   clearGuides: (document: string) => void;
+  clearArtboardGuides: (document: string, artboard: Rect) => void;
+  /** Canvas guides are those inside none of the artboards; with no artboards every guide is one. */
+  clearCanvasGuides: (document: string, artboards: Rect[]) => void;
   /** Adds many guides at once, dropping duplicates; `clear` first empties the document (New Guide Layout's Clear Existing Guides). */
   addGuides: (document: string, guides: Omit<Guide, "id">[], clear?: boolean) => void;
 };
 
 const same = (a: number, b: number) => Math.abs(a - b) < 1e-3;
+type Rect = readonly [number, number, number, number];
+/** The engine's rule: a guide belongs to an artboard when it lies strictly between the artboard's edges on its own axis. */
+const inside = (guide: Guide, [x, y, w, h]: Rect) => guide.axis === "v" ? guide.pos > x && guide.pos < x + w : guide.pos > y && guide.pos < y + h;
 
 export const useViewAids = create<Store>((set, get) => ({
   flags: DEFAULT_FLAGS,
@@ -56,6 +61,8 @@ export const useViewAids = create<Store>((set, get) => ({
   moveGuide: (document, id, pos) => set(state => ({ documents: { ...state.documents, [document]: (state.documents[document] ?? []).map(guide => guide.id === id ? { ...guide, pos } : guide) } })),
   deleteGuide: (document, id) => set(state => ({ documents: { ...state.documents, [document]: (state.documents[document] ?? []).filter(guide => guide.id !== id) } })),
   clearGuides: document => set(state => ({ documents: { ...state.documents, [document]: [] } })),
+  clearArtboardGuides: (document, artboard) => set(state => ({ documents: { ...state.documents, [document]: (state.documents[document] ?? []).filter(guide => !inside(guide, artboard)) } })),
+  clearCanvasGuides: (document, artboards) => set(state => ({ documents: { ...state.documents, [document]: (state.documents[document] ?? []).filter(guide => artboards.some(rect => inside(guide, rect))) } })),
   addGuides: (document, guides, clear = false) => {
     let next = get().next;
     const list = clear ? [] : [...(get().documents[document] ?? [])];
@@ -72,28 +79,34 @@ export const gridVisible = (flags: ViewFlags) => flags.extras && flags.grid;
 export const guidesVisible = (flags: ViewFlags) => flags.extras && flags.guides;
 export const selectionEdgesVisible = (flags: ViewFlags) => flags.extras && flags.selectionEdges;
 export const targetPathVisible = (flags: ViewFlags) => flags.extras && flags.targetPath;
+export const layerEdgesVisible = (flags: ViewFlags) => flags.extras && flags.layerEdges;
+/** Photoshop draws the pixel grid only past 500%. */
+export const pixelGridVisible = (flags: ViewFlags, zoom: number) => flags.extras && flags.pixelGrid && zoom > 5;
 
 // ---- Rulers ----
 
-const NICE = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
+const NICE = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
 /** Minimum screen pixels between two numbered ruler ticks. */
 const LABEL_PX = 56;
 
 export type Tick = { pos: number; level: 0 | 1 | 2; label?: string };
 
-/** Interval between numbered ticks: the smallest "nice" number that leaves LABEL_PX on screen, so labels thin out as you zoom out. */
-export function rulerStep(zoom: number): number {
-  return NICE.find(step => step * zoom >= LABEL_PX) ?? NICE[NICE.length - 1]!;
+/** Interval between numbered ticks: the smallest "nice" number of at least `min` that leaves LABEL_PX on screen, so labels thin out as you zoom out. */
+export function rulerStep(zoom: number, min = 1): number {
+  return NICE.find(step => step >= min && step * zoom >= LABEL_PX) ?? NICE[NICE.length - 1]!;
 }
 
-/** Ticks between document positions `from` and `to`: level 0 is numbered, 1 a half step, 2 a tenth of a step (only when at least 5 screen pixels apart). */
-export function rulerTicks(from: number, to: number, zoom: number): Tick[] {
-  const step = rulerStep(zoom), tenth = step >= 10 && (step / 10) * zoom >= 5, half = step >= 2 && (step / 2) * zoom >= 5;
+/** Ticks between document positions `from` and `to`, labelled in the ruler unit, `scale` of which span one document
+ *  pixel: level 0 is numbered, 1 a half step, 2 a tenth of a step (only when at least 5 screen pixels apart). Pixel
+ *  rulers never tick between pixels. */
+export function rulerTicks(from: number, to: number, zoom: number, scale = 1): Tick[] {
+  const min = scale === 1 ? 1 : 0, unitZoom = zoom / scale, step = rulerStep(unitZoom, min);
+  const tenth = step / 10 >= min && (step / 10) * unitZoom >= 5, half = step / 2 >= min && (step / 2) * unitZoom >= 5;
   const unit = tenth ? step / 10 : half ? step / 2 : step;
   const ticks: Tick[] = [];
-  for (let i = Math.floor(from / unit); i * unit <= to && ticks.length < 5000; i++) {
-    const pos = i * unit, onStep = same(pos / step, Math.round(pos / step));
-    ticks.push(onStep ? { pos, level: 0, label: String(Math.round(pos)) } : tenth && !same(pos / (step / 2), Math.round(pos / (step / 2))) ? { pos, level: 2 } : { pos, level: 1 });
+  for (let i = Math.floor(from * scale / unit); i * unit <= to * scale && ticks.length < 5000; i++) {
+    const at = i * unit, pos = at / scale, onStep = same(at / step, Math.round(at / step));
+    ticks.push(onStep ? { pos, level: 0, label: String(Math.round(at * 100) / 100) } : tenth && !same(at / (step / 2), Math.round(at / (step / 2))) ? { pos, level: 2 } : { pos, level: 1 });
   }
   return ticks;
 }
@@ -102,12 +115,15 @@ export function rulerTicks(from: number, to: number, zoom: number): Tick[] {
 
 export type GridSteps = { major: number; minor: number | null };
 
-/** Gridline spacing in document pixels at this zoom; lines thin out so they never sit closer than 8 (major) or 4 (minor) screen pixels. */
-export function gridSteps(zoom: number, resolution = 72): GridSteps {
-  let major = resolution > 0 ? resolution : 72;
+/** Gridline spacing in document pixels at this zoom, from Preferences › Guides, Grid & Slices (one inch in 4 by
+ *  default); lines thin out so they never sit closer than 8 (major) or 4 (minor) screen pixels. */
+export function gridSteps(zoom: number, resolution = 72, preferences: Pick<Preferences, "grid" | "pointSize"> = usePreferences.getState()): GridSteps {
+  const { every, unit, subdivisions } = preferences.grid;
+  let major = every / unitsPerPixel(unit, resolution, preferences.pointSize);
+  if (!(major > 0) || !Number.isFinite(major)) major = resolution > 0 ? resolution : 72;
   while (major * zoom < 8) major *= 2;
-  const minor = major / GRID_SUBDIVISIONS;
-  return { major, minor: minor * zoom >= 4 ? minor : null };
+  const minor = subdivisions > 1 ? major / subdivisions : null;
+  return { major, minor: minor !== null && minor * zoom >= 4 ? minor : null };
 }
 
 // ---- Snapping ----
@@ -157,6 +173,32 @@ export function snapBox(ctx: SnapContext | null, box: Box, from: Box): Box {
   };
   const [x, width] = axis("v", box.x, box.width, from.x, from.width), [y, height] = axis("h", box.y, box.height, from.y, from.height);
   return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) };
+}
+
+// ---- Move snapping and Smart Guides ----
+
+export type MoveTargets = { v: number[]; h: number[] };
+export type MoveSnap = { dx: number; dy: number; lines: { axis: GuideAxis; pos: number }[] };
+
+/** Edges and centres of boxes, as the lines a moving box's own edges and centre can meet. */
+export function boxTargets(boxes: readonly Rect[], lines: readonly Guide[] = []): MoveTargets {
+  const targets: MoveTargets = { v: [], h: [] };
+  for (const [x, y, w, h] of boxes) { targets.v.push(x, x + w / 2, x + w); targets.h.push(y, y + h / 2, y + h); }
+  for (const guide of lines) targets[guide.axis].push(guide.pos);
+  return targets;
+}
+
+/** Pulls a box moved by dx, dy so its nearest edge or centre lands on a target within `reach` document pixels, per axis; lines are the targets it then meets. */
+export function snapMove([x, y, w, h]: Rect, dx: number, dy: number, targets: MoveTargets, reach: number): MoveSnap {
+  const axis = (start: number, size: number, delta: number, list: readonly number[]) => {
+    let moved = Math.round(delta), best = reach;
+    for (const feature of [start + delta, start + delta + size / 2, start + delta + size])
+      for (const target of list) { const gap = Math.abs(target - feature); if (gap <= best) { best = gap; moved = Math.round(delta + target - feature); } }
+    const met = [start + moved, start + moved + size / 2, start + moved + size];
+    return { moved, lines: [...new Set(list.filter(target => met.some(feature => Math.abs(target - feature) < .5)))] };
+  };
+  const across = axis(x, w, dx, targets.v), down = axis(y, h, dy, targets.h);
+  return { dx: across.moved, dy: down.moved, lines: [...across.lines.map(pos => ({ axis: "v" as const, pos })), ...down.lines.map(pos => ({ axis: "h" as const, pos }))] };
 }
 
 // ---- New Guide Layout ----
