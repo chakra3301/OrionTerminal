@@ -10,3 +10,11 @@
 .xd-type-toggle:disabled { opacity:.45;cursor:default; }
 .xd-type-empty { margin:0;color:var(--xd-text-3); }
 .xd-type-error { margin:0;color:var(--xd-text); }
+.xd-glyphs { display:flex;flex-direction:column;gap:6px;min-width:0;color:var(--xd-text);font-size:11px; }
+.xd-glyphs-recent { display:flex;gap:2px;min-height:28px;border-bottom:1px solid var(--xd-border);padding-bottom:4px;overflow:hidden; }
+.xd-glyphs-font,.xd-glyphs-show,.xd-glyphs-size { display:flex;align-items:center;gap:6px;color:var(--xd-text-2); }
+.xd-glyphs-font input,.xd-glyphs-font select,.xd-glyphs-show select { flex:1;min-width:0; }
+.xd-glyphs-grid { display:flex;flex-wrap:wrap;align-content:flex-start;gap:1px;max-height:260px;overflow:auto;background:var(--xd-border); }
+.xd-glyph { display:grid;place-items:center;padding:0;border:0;background:var(--xd-bg);color:var(--xd-text);line-height:1;cursor:default; }
+.xd-glyph:hover,.xd-glyph:focus-visible { background:var(--xd-raised);outline:1px solid var(--xd-accent);outline-offset:-1px; }
+.xd-glyphs-size input { flex:1; }

@@ -17,6 +17,8 @@ import { useColorSamplers } from "./colorSamplers";
 import { recordActionStep, useActions } from "./actions";
 import { lastTextCaret } from "./CanvasTextEditor";
 import { DEFAULT_PREFERENCES, PREFERENCES_KEY, usePreferences } from "./preferences";
+import { useShell } from "@/shell/store/useShell";
+import { CUSTOMIZATION_KEY, DEFAULT_CUSTOMIZATION, useCustomization } from "./customization";
 
 const command = vi.hoisted(() => vi.fn(async (_id:string,_params:Record<string,unknown>={}) => undefined));
 const colors=vi.hoisted(()=>vi.fn(async(_colors:Record<string,string>)=>undefined));
@@ -31,6 +33,7 @@ let root: Root, container: HTMLDivElement;
 const emptyCloneSources=():PhotoCloneSources=>({active:0,sources:Array.from({length:5},(_,index)=>({index,source:null,anchor:null,offset:null,layer:null,width:100,height:100,rotation:0,flipH:false,flipV:false})),overlay:{show:true,opacity:100,clipped:true,auto_hide:true,invert:false,blend:"normal"}});
 const installCloneSources=(cloneSource:PhotoCloneSources)=>usePhotoWorkspace.setState(current=>({state:{...current.state!,presets:{gradient:{name:"Default",stops:[[0,"foreground"],[1,"background"]],transparency:[]},gradients:[],styles:[],...current.state!.presets,cloneSource}}}));
 const button = (label: string) => [...container.querySelectorAll<HTMLButtonElement>("button")].find(element => element.getAttribute("aria-label") === label || element.textContent === label)!;
+const labelled = <T extends Element>(selector: string, label: string) => [...container.querySelectorAll<T>(selector)].find(element => element.getAttribute("aria-label") === label)!;
 const click = async (label: string) => { await act(async () => button(label).click()); };
 const menu=async(...path:string[])=>{for(const [index,label] of path.entries())await act(async()=>[...container.querySelectorAll<HTMLButtonElement>(index?"[role=menu] > button":"[role=menubar] > button")].find(element=>element.textContent===label)!.click());};
 const row=(label:string)=>[...container.querySelectorAll<HTMLButtonElement>("[role=menu] > button")].find(element=>element.textContent===label)!;
@@ -82,7 +85,7 @@ beforeEach(async () => {
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
   await act(async () => root.render(<PhotoStudio/>));
 });
-afterEach(() => { act(() => root.unmount()); container.remove(); usePhotoWorkspace.getState().close(); vi.unstubAllGlobals(); });
+afterEach(() => { act(() => root.unmount()); container.remove(); usePhotoWorkspace.getState().close(); vi.unstubAllGlobals(); useCustomization.setState(DEFAULT_CUSTOMIZATION, true); localStorage.removeItem(CUSTOMIZATION_KEY); });
 
 describe("Image workspace layout", () => {
   it("fades the last step from Edit with an opacity and blend mode", async () => {
@@ -873,6 +876,114 @@ describe("Image workspace layout", () => {
     await menu("Image","Analysis");await act(async()=>row("Ruler Tool").click());expect(container.textContent).toContain("Drag to measure");
     await menu("Window");expect(row("Layer Comps")).toBeTruthy();expect(row("Measurement Log")).toBeTruthy();
   });
+  it("lays out the Window menu as Photoshop does: Arrange and Workspace, panels A–Z, frame toggles, then the open document",async()=>{
+    await menu("Window");
+    const entries=[...container.querySelectorAll<HTMLElement>("[role=menu] > *")].map(element=>element.getAttribute("role")==="separator"?"-":element.textContent);
+    expect(entries.slice(0,3)).toEqual(["Arrange","Workspace","-"]);
+    const panels=entries.slice(3,entries.indexOf("-",3));
+    expect(panels).toEqual([...panels].sort());
+    expect(panels).toEqual(expect.arrayContaining(["Brush Settings","Brushes","Clone Source","Glyphs"]));
+    expect(entries.slice(entries.indexOf("-",3))).toEqual(["-","Application Frame","Options","Tools","Contextual Task Bar","-","Portrait"]);
+    expect(row("Brush Settings").getAttribute("aria-keyshortcuts")).toBe("F5");expect(row("Brushes").hasAttribute("aria-keyshortcuts")).toBe(false);
+    expect(row("Application Frame").disabled).toBe(true);expect(row("Application Frame").getAttribute("aria-checked")).toBe("true");expect(row("Portrait").getAttribute("aria-checked")).toBe("true");
+    await act(async()=>row("Arrange").click());
+    for(const label of ["Tile All Vertically","2-up Horizontal","6-up","Consolidate All to Tabs","Cascade","Float in Window","Match All","New Window for Portrait"])expect(row(label).disabled).toBe(true);
+    expect(row("Minimize").getAttribute("aria-keyshortcuts")).toBe("Control+Meta+M");
+    const id="xdesign-window",before=useShell.getState();useShell.setState({windows:[{id,app:"xdesign",x:0,y:0,w:800,h:600,z:1,minimized:false,maximized:false,fullscreen:false}],focusedWindowId:id,maxZ:1});
+    await act(async()=>row("Minimize").click());expect(useShell.getState().windows.find(window=>window.id===id)!.minimized).toBe(true);
+    await menu("Window","Arrange");await act(async()=>row("Bring All to Front").click());expect(useShell.getState().focusedWindowId).toBe(id);
+    await menu("Window","Workspace");expect(row("Essentials (Default)").getAttribute("aria-checked")).toBe("true");expect(row("Reset Essentials")).toBeTruthy();
+    useShell.setState({windows:before.windows,focusedWindowId:before.focusedWindowId,maxZ:before.maxZ});
+  });
+  it("ends the Edit menu with Photoshop's Keyboard Shortcuts…, Menus… and Toolbar…",async()=>{
+    await menu("Edit");
+    const entries=[...container.querySelectorAll<HTMLElement>("[role=menu] > *")].map(element=>element.getAttribute("role")==="separator"?"-":element.textContent);
+    expect(entries.slice(-6)).toEqual(["-","Keyboard Shortcuts…","Menus…","Toolbar…","-","Preferences"]);
+    expect(row("Keyboard Shortcuts…").getAttribute("aria-keyshortcuts")).toBe("Alt+Shift+Meta+K");expect(row("Menus…").getAttribute("aria-keyshortcuts")).toBe("Alt+Shift+Meta+M");
+    await act(async()=>row("Menus…").click());
+    expect(container.querySelector('[role="dialog"]')!.textContent).toContain("Keyboard Shortcuts and Menus");expect(container.querySelector('[role="dialog"] [role="tab"][aria-selected="true"]')!.textContent).toBe("Menus");
+    await click("Cancel");
+    const editor=container.querySelector('[aria-label="Image editor"]')!;
+    await act(async()=>editor.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,key:"˚",code:"KeyK",metaKey:true,altKey:true,shiftKey:true,cancelable:true})));
+    expect(container.querySelector('[role="dialog"] [role="tab"][aria-selected="true"]')!.textContent).toBe("Keyboard Shortcuts");
+    await click("Cancel");
+    await choose(["Window","Workspace"],"Keyboard Shortcuts & Menus…");expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+  });
+  it("rebinds a shortcut in Keyboard Shortcuts, warning about the conflict and moving the key on Accept",async()=>{
+    await choose(["Edit"],"Keyboard Shortcuts…");
+    await act(async()=>[...container.querySelectorAll<HTMLButtonElement>('[role="dialog"] .xd-customize-disclosure')].find(element=>element.textContent==="Edit")!.click());
+    await click("Shortcut for Edit > Copy");
+    const field=labelled<HTMLInputElement>("input","Shortcut for Edit > Copy");
+    await act(async()=>field.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,key:"k",code:"KeyK",cancelable:true})));
+    expect(container.textContent).toContain("Shortcuts must include Command or Control and/or a function key.");
+    await act(async()=>field.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,key:"x",code:"KeyX",metaKey:true,cancelable:true})));
+    expect(container.querySelector(".xd-customize-conflict")!.textContent).toContain("⌘X is already in use and will be removed from Edit > Cut if accepted.");
+    await click("Accept and Go to Conflict");
+    expect(button("Shortcut for Edit > Copy").textContent).toBe("⌘X");expect(button("Shortcut for Edit > Cut").textContent).toBe("");
+    await click("OK");
+    await menu("Edit");expect(row("Copy").getAttribute("aria-keyshortcuts")).toBe("Meta+X");expect(row("Cut").hasAttribute("aria-keyshortcuts")).toBe(false);
+    await act(async()=>container.querySelector("[role=menu]")!.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true})));expect(container.querySelector("[role=menu]")).toBeNull();
+    expect(JSON.parse(localStorage.getItem(CUSTOMIZATION_KEY)!).customization.shortcuts).toEqual({"Edit › Copy":"Mod+X","Edit › Cut":null});
+    const editor=container.querySelector('[aria-label="Image editor"]')!;command.mockClear();
+    await act(async()=>editor.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,key:"c",code:"KeyC",metaKey:true,cancelable:true})));expect(command).not.toHaveBeenCalled();
+    await act(async()=>editor.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,key:"x",code:"KeyX",metaKey:true,cancelable:true})));expect(command).toHaveBeenLastCalledWith("edit.copy",{});
+    await choose(["Edit"],"Keyboard Shortcuts…");await act(async()=>{const set=container.querySelector<HTMLSelectElement>('select[aria-label="Set"]')!;set.value="defaults";set.dispatchEvent(new Event("change",{bubbles:true}));});await click("OK");
+    await menu("Edit");expect(row("Cut").getAttribute("aria-keyshortcuts")).toBe("Meta+X");
+  });
+  it("hides a command and its shortcut in Menus, and colours a row",async()=>{
+    await choose(["Edit"],"Menus…");
+    await act(async()=>[...container.querySelectorAll<HTMLButtonElement>('[role="dialog"] .xd-customize-disclosure')].find(element=>element.textContent==="Edit")!.click());
+    expect(labelled("button","Visibility for Edit > Menus…")).toBeUndefined();
+    await click("Visibility for Edit > Copy");
+    await act(async()=>{const color=labelled<HTMLSelectElement>("select","Color for Edit > Cut");color.value="red";color.dispatchEvent(new Event("change",{bubbles:true}));});
+    await click("OK");
+    await menu("Edit");expect(row("Copy")).toBeUndefined();expect(row("Cut").dataset.color).toBe("red");
+    await act(async()=>container.querySelector("[role=menu]")!.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true})));
+    const editor=container.querySelector('[aria-label="Image editor"]')!;command.mockClear();
+    await act(async()=>editor.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,key:"c",code:"KeyC",metaKey:true,cancelable:true})));expect(command).not.toHaveBeenCalled();
+  });
+  it("moves a tool to Extra Tools in Customize Toolbar, taking it and its key off the toolbar until restored",async()=>{
+    const rail=()=>container.querySelector('[role="toolbar"][aria-label="Image tools"]')!;
+    expect(rail().querySelector('[aria-label="Move Tool"]')).not.toBeNull();
+    await choose(["Edit"],"Toolbar…");
+    await click("Move Move Tool to Extra Tools");
+    expect(container.querySelector('[aria-label="Extra Tools"]')!.textContent).toContain("Move Tool");
+    await click("Done");
+    expect(rail().querySelector('[aria-label="Move Tool"]')).toBeNull();
+    await chooseTool("select.lasso");
+    await act(async()=>container.querySelector('[aria-label="Image editor"]')!.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,key:"v",code:"KeyV"})));
+    expect(rail().querySelector('[aria-pressed="true"]')?.getAttribute("aria-label")).not.toBe("Move Tool");
+    await click("Edit Toolbar");expect(row("Move Tool")).toBeTruthy();await act(async()=>row("Edit Toolbar…").click());
+    await click("Restore Defaults");await click("Done");
+    expect(rail().querySelector('[aria-label="Move Tool"]')).not.toBeNull();
+  });
+  it("shows the clone source slots and overlay in Window › Clone Source with any tool",async()=>{
+    installCloneSources(emptyCloneSources());
+    await menu("Window","Clone Source");
+    const panel=container.querySelector('[role="region"][aria-label="Clone Source panel"]')!;
+    expect(panel.querySelector('[aria-label="Clone source slot"]')).not.toBeNull();
+    await pick("Clone source slot","2");expect(command).toHaveBeenLastCalledWith("cloneSource.select",{index:2});
+  });
+  it("lists a font's glyphs in Window › Glyphs and inserts one at the type caret on double-click",async()=>{
+    // A font holding only a cmap that maps A–C.
+    const be16=(value:number)=>[value>>8&255,value&255];
+    const cmap=[0,0,0,1,0,3,0,1,0,0,0,12,...be16(4),...be16(32),0,0,...be16(4),0,0,0,0,0,0,...be16(0x43),...be16(0xffff),0,0,...be16(0x41),...be16(0xffff),...be16(-0x40&0xffff),...be16(1),0,0,0,0];
+    const font=btoa(String.fromCharCode(0,1,0,0,0,1,0,16,0,0,0,0,..."cmap".split("").map(c=>c.charCodeAt(0)),0,0,0,0,0,0,0,28,0,0,0,cmap.length,...cmap));
+    native.enabled=true;native.invoke.mockImplementation(async(name:string,args?:{family:string})=>name==="xdesign_font_families"?["Arial","Broken"]:name==="xdesign_font_load"?(args!.family==="Arial"?font:null):undefined);
+    await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,layers:s.state!.layers.map(layer=>({...layer,kind:"Type" as const,text:{text:"Hi",font:"Arial",sizePt:12}}))}})));
+    lastTextCaret.current={layer:1,range:[1,1]};
+    await menu("Window","Glyphs");await act(async()=>{});
+    expect(native.invoke).toHaveBeenCalledWith("xdesign_font_load",{family:"Arial",style:"Regular"});
+    expect([...container.querySelectorAll('[role="group"][aria-label="Glyphs"] button')].map(glyph=>glyph.textContent)).toEqual(["A","B","C"]);
+    expect([...container.querySelectorAll<HTMLOptionElement>('select[aria-label="Show"] option')].map(option=>option.value)).toEqual(["Entire Font","Basic Latin"]);
+    await act(async()=>button("Glyph B").dispatchEvent(new MouseEvent("dblclick",{bubbles:true})));
+    expect(command).toHaveBeenCalledWith("type.insertText",{layer:1,text:"B",label:"Insert Glyph",range:[1,1]});
+    expect(container.querySelector('[role="group"][aria-label="Recently used glyphs"]')!.textContent).toBe("B");
+    await act(async()=>{const field=container.querySelector<HTMLInputElement>('[aria-label="Glyphs font family"]')!;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(field,"Broken");field.dispatchEvent(new Event("input",{bubbles:true}));});
+    await act(async()=>{});
+    expect(container.textContent).toContain("This font's glyphs could not be read.");
+    localStorage.removeItem("xdesign.glyphs.recent");
+  });
   it("records an action in the Actions panel and plays its steps back through the same commands, like Photoshop",async()=>{
     useActions.setState({sets:[{id:"default",name:"Default Actions",actions:[]}],selected:null,recording:null,playing:false,failed:null,dialog:null,allowTools:false});
     await menu("Window");expect(row("Actions").getAttribute("aria-keyshortcuts")).toBe("Alt+F9");await act(async()=>row("Actions").click());
@@ -1237,10 +1348,14 @@ describe("Image workspace layout", () => {
     await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,brush:{sampledTip:false,sampledTexture:false,presets:[{name:"Soft round",group:"Basic",builtin:true,size:48,hardness:.2}],settings:{size:48,opacity:1,hardness:.2,shapeDynamics:{enabled:true,size:{control:"penPressure",jitter:0,minimum:0}}}}}})));
     await click("Brushes");await click("Use brush Soft round");
     expect(command).toHaveBeenCalledWith("tools.setBrush",{preset:"Soft round"});
+    // Photoshop splits the presets (Brushes) from the tip and dynamics (Brush Settings, F5).
+    expect(container.querySelector('[aria-label="Shape Dynamics · Size · Control"]')).toBeNull();
+    await act(async()=>container.querySelector(".xd-photo")!.dispatchEvent(new KeyboardEvent("keydown",{key:"F5",bubbles:true})));
+    expect(container.querySelector('[role="region"][aria-label="Brush Settings panel"]')).not.toBeNull();
     const control=container.querySelector<HTMLSelectElement>('[aria-label="Shape Dynamics · Size · Control"]')!;
     await act(async()=>{control.value="penTilt";control.dispatchEvent(new Event("change",{bubbles:true}));});
     expect(command).toHaveBeenCalledWith("tools.setBrush",{shapeDynamics:{size:{control:"penTilt"}}});
-    await click("Save preset");expect(command).toHaveBeenCalledWith("brush.presets.save",{name:"Custom brush"});
+    await click("Brushes");await click("Save preset");expect(command).toHaveBeenCalledWith("brush.presets.save",{name:"Custom brush"});
   });
   it("edits smart-filter order, blending and parameters without flattening the layer",async()=>{
     await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,layers:s.state!.layers.map(layer=>({...layer,smartObject:{source:"embedded" as const,name:"Contents.pcraft",hasFilterMask:false},smartFiltersEnabled:true,smartFilters:[{command:"filter.blur.gaussianBlur",visible:true,opacity:.5,blend:"Normal",params:{radius:4}}]}))}})));
@@ -1361,7 +1476,50 @@ it("lists the engine's Windows anti-alias modes, Stack Mode, Matting and Proof S
   await act(async()=>row("Defringe…").click());
   expect(container.querySelector('[role="dialog"]')).not.toBeNull();
   await click("OK");expect(command).toHaveBeenLastCalledWith("layer.matting.defringe",{width:1});
-  await menu("View","Proof Setup");expect(rowLabels()).toEqual(expect.arrayContaining(["Working CMY Plate","Legacy Macintosh RGB (Gamma 1.8)"]));
+  await menu("View","Proof Setup");expect(rowLabels()).toEqual(["Custom…","Working CMYK","Working Cyan Plate","Working Magenta Plate","Working Yellow Plate","Working Black Plate","Working CMY Plates","Legacy Macintosh RGB (Gamma 1.8)","Internet Standard RGB (sRGB)","Monitor RGB","Color Blindness - Protanopia-type","Color Blindness - Deuteranopia-type"]);
+  expect(row("Monitor RGB").disabled).toBe(true);
+});
+it("proofs Working CMYK and sRGB, and sets the default measurement scale",async()=>{
+  await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,colorView:{profile:"srgb",description:"sRGB",kind:"workingCyanPlate",intent:"relative",bpc:true,simulatePaper:false,on:false,gamutWarning:false,threshold:2,hdr:{highlightCompression:false,exposure:0,gamma:1},active:false}}})));
+  await choose(["View","Proof Setup"],"Working CMYK");expect(command).toHaveBeenLastCalledWith("view.proofSetup",{profile:"working-cmyk",kind:"profile",on:true});
+  await choose(["View","Proof Setup"],"Internet Standard RGB (sRGB)");expect(command).toHaveBeenLastCalledWith("view.proofSetup",{profile:"srgb",kind:"profile",on:true});
+  await menu("Image","Analysis","Set Measurement Scale");expect(rowLabels()).toEqual(["Default","Custom…"]);
+  await act(async()=>row("Default").click());expect(command).toHaveBeenLastCalledWith("image.analysis.setMeasurementScale",{preset:"default"});
+});
+it("opens the type panels from Type › Panels",async()=>{
+  await menu("Type","Panels");expect(rowLabels()).toEqual(["Character Panel","Paragraph Panel","Glyphs Panel","Character Styles Panel","Paragraph Styles Panel"]);
+  expect(container.querySelector('[aria-label="Glyphs font family"]')).toBeNull();
+  await act(async()=>row("Glyphs Panel").click());
+  expect(container.querySelector('[aria-label="Glyphs font family"]')).not.toBeNull();
+});
+it("toggles smart filters and their mask from Layer › Smart Filter",async()=>{
+  const smart=(enabled:boolean)=>act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,activeLayer:1,layers:[{...layer(1,"Smart"),smartObject:{source:"embedded",name:"a.psd",hasFilterMask:true,filterMaskEnabled:enabled},smartFilters:[{command:"filter.blur.gaussianBlur",params:{},visible:true,opacity:100,blend:"normal"}],smartFiltersEnabled:enabled}]}})));
+  await smart(true);
+  await menu("Layer","Smart Filter");expect(rowLabels()).toEqual(["Disable Smart Filters","Delete Filter Mask","Disable Filter Mask","Clear Smart Filters"]);
+  await act(async()=>row("Disable Smart Filters").click());expect(command).toHaveBeenLastCalledWith("layer.smartFilter.disableSmartFilters",{layer:1,enabled:false});
+  await smart(false);
+  await choose(["Layer","Smart Filter"],"Enable Filter Mask");expect(command).toHaveBeenLastCalledWith("layer.smartFilter.disableFilterMask",{layer:1,enabled:true});
+  await choose(["Layer","Smart Filter"],"Delete Filter Mask");expect(command).toHaveBeenLastCalledWith("layer.smartFilter.deleteFilterMask",{layer:1});
+});
+it("sets Global Light from the document's current light",async()=>{
+  await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,globalLight:{angle:90,altitude:45}}})));
+  await choose(["Layer","Layer Style"],"Global Light…");
+  expect(container.querySelector('[role="dialog"][aria-label="Global Light"]')).not.toBeNull();
+  await click("OK");expect(command).toHaveBeenLastCalledWith("layer.layerStyle.globalLight",{angle:90,altitude:45});
+});
+it("saves the selection to a new or existing channel from Select › Save Selection…",async()=>{
+  await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,hasSelection:true,channels:{alpha:[{index:0,name:"Alpha 1",spot:null},{index:1,name:"Spot",spot:{}}]}}})));
+  await choose(["Select"],"Save Selection…");
+  expect(labelled<HTMLInputElement>("input","Add to Channel").disabled).toBe(true);
+  expect([...labelled<HTMLSelectElement>("select","Channel").options].map(option=>option.textContent)).toEqual(["New","Alpha 1"]);
+  await act(async()=>{const field=labelled<HTMLInputElement>("input","Name");Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(field,"Sky");field.dispatchEvent(new Event("input",{bubbles:true}));});
+  await click("OK");expect(command).toHaveBeenLastCalledWith("select.saveSelection",{channel:"new",operation:"new",name:"Sky"});
+  await choose(["Select"],"Save Selection…");
+  await pick("Channel","0");
+  expect(labelled<HTMLInputElement>("input","Name").disabled).toBe(true);
+  expect(labelled<HTMLInputElement>("input","Replace Channel").checked).toBe(true);
+  await act(async()=>labelled<HTMLInputElement>("input","Subtract from Channel").click());
+  await click("OK");expect(command).toHaveBeenLastCalledWith("select.saveSelection",{channel:0,operation:"subtract"});
 });
 it("copies shape and type layers as CSS or SVG and pastes clipboard text into a type layer without its formatting",async()=>{
   const writeText=vi.fn(async(_text:string)=>{}),readText=vi.fn(async()=>"one\r\ntwo");

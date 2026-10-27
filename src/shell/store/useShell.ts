@@ -62,6 +62,8 @@ const MENUBAR_H = 44;
 /** Space a window must leave above the viewport bottom: the dock (14px gap + 66px
  * tall) plus an 8px breath, so title bars, composers and footers never sit under it. */
 const DOCK_CLEARANCE = 88;
+/** How near the dock (px) the pointer comes before its icons magnify up over the windows. */
+export const DOCK_REACH = 24;
 
 export const useShell = create<ShellState>((set, get) => ({
   windows: [],

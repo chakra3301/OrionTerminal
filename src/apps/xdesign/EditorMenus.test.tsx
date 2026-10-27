@@ -223,6 +223,56 @@ describe("ContextMenu", () => {
   });
 });
 
+describe("menus taller than their space", () => {
+  const ROW = 22;
+  const menuOnly = (value: number) => function (this: HTMLElement) { return this.getAttribute("role") === "menu" ? value : 0; };
+  const menu = () => popups()[0] as HTMLElement;
+  const arrows = () => [...menu().querySelectorAll(".xd-menu-scroll")].map(arrow => arrow.classList.contains("up") ? "up" : "down");
+  const scrollTo = (top: number) => act(() => { menu().scrollTop = top; menu().dispatchEvent(new Event("scroll")); });
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(menuOnly(10 * ROW));
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(menuOnly(30 * ROW));
+    vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (this: HTMLElement) { return [...this.parentElement!.querySelectorAll(":scope > button")].indexOf(this as HTMLButtonElement) * ROW; });
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(ROW);
+    act(() => root.render(<MenuBar label="Photo menus" menus={[{ label: "Window", items: Array.from({ length: 30 }, (_, index) => ({ label: `Panel ${index}`, run })) }]}/>));
+    act(() => title("Window").focus()); press(title("Window"), "ArrowDown");
+  });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it("shows macOS scroll arrows, not a scrollbar, at each end that has more rows", () => {
+    expect(arrows()).toEqual(["down"]);
+    scrollTo(10 * ROW);
+    expect(arrows()).toEqual(["up", "down"]);
+    scrollTo(20 * ROW);
+    expect(arrows()).toEqual(["up"]);
+    expect(menu().querySelectorAll(".xd-menu-scroll[role], .xd-menu-scroll[tabindex]")).toHaveLength(0);
+  });
+
+  it("scrolls while the pointer rests on an arrow and stops at the end", () => {
+    vi.useFakeTimers();
+    hover(menu().querySelector(".xd-menu-scroll.down")!);
+    expect(document.activeElement).toBe(menu());
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(menu().scrollTop).toBeGreaterThan(0);
+    act(() => { vi.advanceTimersByTime(10_000); });
+    expect(menu().scrollTop).toBe(20 * ROW);
+  });
+
+  it("keeps the row chosen from the keyboard in view, clear of the arrows", () => {
+    press(menu(), "End");
+    expect(focused()).toBe("Panel 29");
+    expect(menu().scrollTop).toBe(20 * ROW);
+    press(menu(), "Home");
+    expect(menu().scrollTop).toBe(0);
+    for (let step = 0; step < 10; step++) press(document.activeElement!, "ArrowDown");
+    expect(focused()).toBe("Panel 10");
+    expect(menu().scrollTop).toBe(2 * ROW);
+    press(document.activeElement!, "p");
+    expect(focused()).toBe("Panel 11");
+    expect(menu().scrollTop).toBe(3 * ROW);
+  });
+});
+
 describe("positionPopup", () => {
   const rect = (left: number, top: number, width: number, height: number) => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
   const placeBelow = (anchorTop: number, menuHeight: number) => {
@@ -239,6 +289,14 @@ describe("positionPopup", () => {
     const style = placeBelow(20, 900);
     expect(style.top).toBe("46px");
     expect(style.maxHeight).toBe("554px");
+  });
+
+  it("stops above the shell's dock and the reach that magnifies it, as macOS menus stop above the Dock", () => {
+    const dock = document.createElement("div");
+    dock.className = "ot-dock-wrap"; dock.getBoundingClientRect = () => rect(300, 520, 300, 66); container.append(dock);
+    const style = placeBelow(20, 900);
+    expect(style.top).toBe("46px");
+    expect(style.maxHeight).toBe("450px");
   });
 
   it("opens a pull-down above a title near the bottom instead of covering the title", () => {

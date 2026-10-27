@@ -48,7 +48,7 @@ describe("File menu", () => {
     expect([at("Export"), at("Place Embedded…"), at("Place Linked…"), at("Automate"), at("Scripts"), at("File Info…")].every((n, i, all) => n >= 0 && (i === 0 || n > all[i - 1]!))).toBe(true);
     expect(row("File Info…").dataset.shortcut).toBe("⌥⇧⌘I");
     await closeMenus(); await openMenu("File", "Automate");
-    expect([...rows()].map(el => el.textContent)).toEqual(["Crop and Straighten Photos", "Conditional Mode Change…", "Fit Image…"]);
+    expect([...rows()].map(el => [el.textContent, el.disabled])).toEqual([["Batch…", true], ["PDF Presentation…", true], ["Create Droplet…", true], ["Crop and Straighten Photos", false], ["Contact Sheet II…", true], ["Conditional Mode Change…", false], ["Fit Image…", false], ["Lens Correction…", true], ["Merge to HDR Pro…", false], ["Photomerge…", false]]);
     await closeMenus(); await openMenu("File", "Scripts");
     expect([...rows()].map(el => el.textContent)).toEqual(["Delete All Empty Layers", "Flatten All Layer Effects", "Flatten All Masks"]);
     await closeMenus(); await openMenu("File", "Export");
@@ -103,7 +103,7 @@ describe("File menu", () => {
     expect(dialog("File Info")).not.toBeNull();
     expect(runPhotoCommand).toHaveBeenCalledWith("file.fileInfo", {});
     await act(async () => [...dialog("File Info")!.querySelectorAll("button")].find(el => el.textContent === "Cancel")!.click());
-    for (const [path, title] of [[["Automate", "Fit Image…"], "Fit Image"], [["Automate", "Conditional Mode Change…"], "Conditional Mode Change"], [["Export", "Layers to Files…"], "Export Layers To Files"]] as const) {
+    for (const [path, title] of [[["Automate", "Fit Image…"], "Fit Image"], [["Automate", "Conditional Mode Change…"], "Conditional Mode Change"], [["Automate", "Photomerge…"], "Photomerge"], [["Automate", "Merge to HDR Pro…"], "Merge to HDR Pro"], [["Export", "Layers to Files…"], "Export Layers To Files"]] as const) {
       await openMenu("File", path[0]);
       await act(async () => row(path[1]).click());
       expect(dialog(title)).not.toBeNull();

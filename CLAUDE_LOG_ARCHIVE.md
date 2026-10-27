@@ -1,3 +1,125 @@
+## 2026-10-27 (cont.) — Claude / XDesign: Window menu, Edit customisation dialogs, Photomerge/HDR Pro, comparison pass; builds 20–22
+
+Owner request: "okay lets do 1-4 first then we can commint and push everything once thats done". Items 1–4 were the "Next" list of the builds 18–19 entry. Plan: `docs/superpowers/plans/2026-10-27-xdesign-window-edit-merge.md`. Committed and pushed together with the uncommitted builds 18–19 work.
+
+**1. Window menu** (`PhotoStudio.tsx`):
+- **Arrange ▸**: the tile, n-up and float items are disabled, because XDesign has one image per session. It ends with Minimize ⌃⌘M and Bring All to Front.
+- **Workspace ▸**: Essentials (Default), Reset Essentials, and Keyboard Shortcuts & Menus…, which opens the item 2 dialog.
+- **Panels**:
+  - They are listed in alphabetical order.
+  - Brush Settings (F5) is now its own panel, split out of `BrushPanel.tsx`'s Brushes.
+  - Clone Source opens as its own panel, with the clone-source controls.
+  - Glyphs is the new `GlyphsPanel.tsx`. `fontCmap.ts` `fontCodepoints` reads the font's cmap, so the grid shows only glyphs the font has.
+- **Bottom of the menu**: Application Frame (checked, disabled), Options, Tools and Contextual Task Bar, then a radio list of the open documents.
+
+**2. Edit › Keyboard Shortcuts… / Menus… / Toolbar…**:
+- **`CustomizeDialogs.tsx`** has two dialogs:
+  - `ShortcutsMenusDialog` has two tabs. The Keyboard Shortcuts tab shows the menu tree and records a key per command, with Use Default and Delete Shortcut. It follows Photoshop's rule that menu keys need ⌘, ⌃ or an F-key. A conflict names the other command and offers Accept and Go to Conflict or Undo Changes.
+  - The Menus tab sets visibility and colour per item. A hidden item also loses its key.
+  - `ToolbarDialog` moves tools to and from Extra Tools, with Restore Defaults and Clear Tools.
+- **`customization.ts`**:
+  - `customizeMenus` applies one saved state to what the menus show and to `findShortcut` dispatch.
+  - `toolbarGroups` rebuilds the toolbar, and returns tools a saved layout doesn't mention to their group.
+  - `sanitizeCustomization` keeps the valid entries of a damaged save.
+  - The state is stored in localStorage `orion.xdesign.customization.v1`.
+- **`menuModel.ts`**: gains `shortcutFromEvent`, which reads the physical key so ⌥ combinations record correctly.
+
+**3. Photomerge / Merge to HDR Pro**:
+- **`MergeDialogs.tsx`**:
+  - Source Files has Browse… (the raster and camera formats Orion decodes), Remove and Add Open Files. Add Open Files adds the image being edited, because other photos are separate sessions.
+  - Photomerge has six layouts and four options, and OK needs at least two sources.
+  - HDR Pro has two steps: sources and Align, then Remove ghosts, Mode (32/16/8) and Method. Only the sliders the method reads are sent, and 32-bit sends none. An engine refusal stays in the dialog.
+- **`xdesign_photo_documents.rs`**:
+  - `file.automate.photomerge` and `file.automate.mergeToHdrPro` join `COMMANDS`.
+  - `merge_sources` imports each path with `import_image_path` into the derive draft, plus the current image when `useOpenDocuments` is set. It then rewrites the params to `useOpenDocuments:true`, so the engine merges the draft's documents.
+  - It refuses fewer than 2 or more than 64 sources, folders, non-files, an `input` param and images over `MAX_PIXELS`.
+  - Task 18's `open` writes every result before any becomes resident.
+  - The tests build a textured scene and two overlapping PNG crops, and check for a single panorama. Another test checks the refusals.
+
+**4. Comparison pass**:
+- **Method**: `/tmp/pstest/menu_dump_89.sh` dumps XDesign's menus. `diff_menus.py` diffs that against the earlier read-only Photoshop dump; the diff went from 309 to 260 lines.
+- **Fixes**:
+  - **Labels**: Bitmap and Duotone (no ellipsis), Artboard from Group, Layer Via Copy/Cut (with their `fromMenu` references) and Working CMY Plates. HSB/HSL opens its options without an ellipsis.
+  - **Layer Style tail**: Global Light… comes before Create Layer, with a new `GLOBAL_LIGHT` command seeded from `state.globalLight`.
+  - **Smart Filter ▸**: Enable/Disable Smart Filters, Delete Filter Mask, Enable/Disable Filter Mask, Clear Smart Filters.
+  - **Type › Panels ▸**: Character Panel, Paragraph Panel, Glyphs Panel, Character Styles Panel, Paragraph Styles Panel.
+  - **Select › Save Selection…**: `SaveSelectionDialog.tsx` sends `select.saveSelection` as `{channel:"new",operation:"new",name?}` or `{channel:<index>,operation}`, and spot channels are left out.
+  - **View › Guides ▸**: replaces the seven top-level guide items, in Photoshop's order with no separator. Edit Selected Guides and Clear Selected Guides are disabled, and Clear Selected Artboard Guides needs an active artboard. New Guides From Shape needs a shape layer with non-empty bounds.
+  - **Proof Setup**: Working CMYK and sRGB run `view.proofSetup` with a profile, and Monitor RGB is disabled.
+  - **Set Measurement Scale ▸**: Default and Custom….
+
+**Live fix, builds 21–22**: In the build 20 Keyboard Shortcuts and Menus dialog, the tabs and the depth-0 menu rows rendered as centred raised buttons.
+- **Cause**: `.xd-photo .xd-ps-dialog button` (0,2,1) and its hover rule (0,4,1) outranked `.xd-customize-tabs [role=tab]` and `.xd-customize-disclosure`, and `.xd-photo button` centred the flex content.
+- **First fix (build 21)**: the resets are now prefixed with `.xd-photo .xd-customize-dialog`, the selected-tab rule too, and a scoped hover reset was added. The tabs were then correct, but the rows were still centred.
+- **Second fix (build 22)**: adding `justify-content:flex-start` made the rows correct. The jsdom suites can't see this, because they don't load CSS.
+
+**Gates**:
+- typecheck clean.
+- The nine focused suites pass 335/335. Their stderr is only jsdom's canvas `getContext` notice.
+- `cargo test --lib` passes 1439, with 20 ignored.
+- Release builds 20, 21 and 22 succeeded.
+
+**Live (scratch HOME, guarded by goR.sh)**:
+- **Checked**: Window top, View and Guides ▸, Select (dimmed and enabled) and the Save Selection dialog, File › Automate and the Photomerge dialog, the Edit menu end, and the Shortcuts/Menus and Toolbar dialogs. Every dialog was cancelled.
+- **Guard abort**: one guard abort (the owner was active) left the rest of a chained click sequence running against the wrong screen. Those clicks created an empty "Untitled design" project in the scratch HOME. Later sequences chain each step with `&&`, so an abort stops the run.
+
+**Logged, not done**: see the PROGRESS.md entry.
+
+## 2026-10-27 (cont.) — Claude / XDesign: macOS-style menu scrolling, menus clear of the dock; builds 18–19
+
+Owner request: "okay lets do that then see what else we should do". "That" was the open observation: the Window and Edit menus scroll in a 900 pt window. Uncommitted, pending authorisation.
+
+**Cause**:
+- XDesign's menus are fixed popups clamped to the in-canvas window, because `.ot-window` clips them. The Window menu needs about 670 px and the Edit menu about 1100 px.
+- So the menus showed WebKit's scrollbar, with the last row half-cut under the shell dock.
+- Keyboard focus used `preventScroll`, so End or ArrowDown could focus a row out of view.
+- Real Photoshop's Edit and Window menus also scroll on a 900 pt screen. The fix is to scroll the way macOS does, not to portal the menus out of the window.
+
+**`EditorMenus.tsx`**:
+- `positionPopup` bounds the menu at the top of `.ot-dock-wrap` minus `DOCK_REACH`, when that edge falls inside the host. It ignores zero-sized rects, as in jsdom.
+- `Popup` keeps `more {up, down}`, which `measure()` updates after positioning and on every scroll.
+- Rows reached from the keyboard go through `focusRow(index, true)`, which scrolls the row into view with one `ROW` (22 px) of margin for the strips. Hovered rows only take focus.
+- `scrollWhileOver(direction)` steps `scrollTop` by `ROW` every 60 ms until the end. It also closes any open submenu and moves focus to the menu, so the hovered row's highlight goes away.
+- The strips are `aria-hidden` divs with pointer enter/leave handlers. The interval is cleared on unmount.
+
+**`editorMenus.css`**:
+- The scrollbar is hidden.
+- `.xd-menu-scroll` is `position: sticky` with `top: -4px` / `bottom: -4px` and `margin: 0 -4px`. WebKit measures sticky offsets from the content box, so this pins the strips to the padding edge across the full width.
+- A −22 px margin on the inner side gives each strip zero net height, so rows never shift when one appears.
+- Checked in Playwright WebKit (webkit-2368) before building.
+
+**Dock reach**:
+- Build 18 showed a menu ending 14 px above the dock. That is inside the 24 px proximity in which `Dock.tsx` magnifies its tiles.
+- Resting on ▼ grew the Orion tile about 28 px above the dock, over the strip, and the tile took the pointer, so nothing scrolled.
+- `DOCK_REACH = 24` is now exported from `useShell.ts`, next to `DOCK_CLEARANCE`. `Dock.tsx` uses it in place of its four literals, and the menus stop above it.
+
+**Tests (`EditorMenus.test.tsx`)**:
+- A new describe stubs `clientHeight`, `scrollHeight`, `offsetTop` and `offsetHeight` on the prototypes. It checks:
+  - which strips show at the top, middle and end;
+  - that the strips carry no role or tabindex;
+  - hover scrolling with fake timers, through to the end;
+  - the scroll positions End, Home, ArrowDown and typeahead reach.
+- `positionPopup` gains a dock test: dock top 520 gives maxHeight 450.
+
+**Live**:
+- Build 18:
+  - The Window and Edit menus showed ▼ and no scrollbar.
+  - End and Home revealed Preferences and Undo.
+  - Hovering ▼ triggered the dock defect.
+- Build 19:
+  - The menu ends 24 px above the dock, with no half-cut row.
+  - Hovering ▼ scrolled to the end within 0.5 s, and hovering ▲ scrolled back. The wheel works.
+  - The dock still magnifies when hovered directly. The pasteboard menu and Esc are unchanged.
+- The test tool `/tmp/pstest/axt` gained `move` (hover) and `home`/`end` key codes.
+
+**Photoshop menu comparison** (from the saved `ps_menus.txt` dump, for the next choice):
+- Window:
+  - Photoshop has Arrange ▸ and Workspace ▸ at the top, and Application Frame, Options, Tools, Contextual Task Bar and the open documents at the bottom.
+  - XDesign lacks Arrange ▸, Application Frame, the document list and Glyphs, and its Workspace ▸ is at the bottom.
+  - Brush Settings and Clone Source exist in XDesign, but as a toggle and a Properties section, not as Window items.
+- Edit: XDesign lacks Keyboard Shortcuts…, Menus… and Toolbar….
+- Out of scope (video, 3D or cloud): Timeline, Libraries, Materials, Comments, Version History and Content Credentials.
+
 ## 2026-10-27 (cont.) — Claude / XDesign: app-wide WebKit menu guard, pasteboard colour menu; build 17
 
 Owner request: "1. yes 2. sure if its recommended and 3 lets build it". That meant (1) commit and push the previous batch (done, 96c3c2f), (2) block WebKit's menu app-wide, and (3) build Photoshop's pasteboard right-click colour menu. Items 2 and 3 were committed and pushed with the owner's authorisation.

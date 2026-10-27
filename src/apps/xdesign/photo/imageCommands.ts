@@ -87,6 +87,7 @@ export function matchColorCommand(images:{id:string;version:string;name:string}[
 export const DEFRINGE:ImageCommand={id:"layer.matting.defringe",title:"Defringe",fields:[n("width","Width",1,200,1,"pixels")]};
 export const COLOR_DECONTAMINATE:ImageCommand={id:"layer.matting.colorDecontaminate",title:"Color Decontaminate",fields:[n("amount","Amount",0,100,100,"%"),n("radius","Radius",1,100,4,"pixels")]};
 export const SCALE_EFFECTS:ImageCommand={id:"layer.layerStyle.scaleEffects",title:"Scale Layer Effects",fields:[n("scale","Scale",1,1000,100,"%")]};
+export const GLOBAL_LIGHT:ImageCommand={id:"layer.layerStyle.globalLight",title:"Global Light",fields:[n("angle","Angle",-180,180,120,"°"),n("altitude","Altitude",0,90,30,"°")]};
 export const HDR_TONING:ImageCommand={id:"image.adjustments.hdrToning",title:"HDR Toning",fields:[
   n("radius","Radius",1,500,30,"px","Edge Glow"),n("strength","Strength",.1,4,.5,undefined,"Edge Glow",.1),
   n("gamma","Gamma",.1,2,1,undefined,"Tone and Detail",.01),n("exposure","Exposure",-5,5,0,undefined,"Tone and Detail",.1),n("detail","Detail",-100,300,30,"%","Tone and Detail"),

@@ -7,15 +7,16 @@ import { PhotoDialog } from "./photoDialog";
 const CANCELLED = Symbol("cancelled");
 const stem = (name: string) => name.replace(/\.[^.]+$/, "") || "Untitled";
 
-function FileDialog({title,children,apply,close,ok,okDisabled}:{title:string;children:ReactNode;apply:()=>Promise<unknown>;close:()=>void;ok?:string;okDisabled?:boolean}) {
+/** `done` replaces closing after a successful apply, for dialogs that go on to a second step. */
+export function FileDialog({title,children,apply,close,done,ok,okDisabled}:{title:string;children:ReactNode;apply:()=>Promise<unknown>;close:()=>void;done?:()=>void;ok?:string;okDisabled?:boolean}) {
   const busy=usePhotoWorkspace(s=>s.busy),error=usePhotoWorkspace(s=>s.error),[failure,setFailure]=useState<string|null>(null);
   const dialog=useDesignDialog<HTMLFormElement>(close,busy);
-  return <PhotoDialog dialog={dialog} title={title} busy={busy} ok={ok} okDisabled={okDisabled} close={close} onSubmit={e=>{e.preventDefault();setFailure(null);void apply().then(close).catch(reason=>{if(reason!==CANCELLED)setFailure(reason instanceof Error?reason.message:String(reason));});}}>
+  return <PhotoDialog dialog={dialog} title={title} busy={busy} ok={ok} okDisabled={okDisabled} close={close} onSubmit={e=>{e.preventDefault();setFailure(null);void apply().then(done??close).catch(reason=>{if(reason!==CANCELLED)setFailure(reason instanceof Error?reason.message:String(reason));});}}>
     {children}{(failure??error)&&<p role="alert">{failure??error}</p>}
   </PhotoDialog>;
 }
 
-function Field({label,unit,children}:{label:string;unit?:string;children:ReactNode}) {
+export function Field({label,unit,children}:{label:string;unit?:string;children:ReactNode}) {
   return <label className="xd-ps-dialog-field"><span>{label}:</span>{children}{unit&&<span className="xd-ps-dialog-unit">{unit}</span>}</label>;
 }
 

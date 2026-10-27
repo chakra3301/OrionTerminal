@@ -315,7 +315,7 @@ export async function refreshImage(document: PhotoDocument): Promise<void> {
   });
 }
 
-const NEW_IMAGE_COMMANDS=["image.duplicate","file.automate.cropAndStraightenPhotos"];
+const NEW_IMAGE_COMMANDS=["image.duplicate","file.automate.cropAndStraightenPhotos","file.automate.photomerge","file.automate.mergeToHdrPro"];
 // Each result opens as its own image with a fresh history; the last one becomes the edit target, like Photoshop's frontmost window.
 async function createImages(command:string,params:Record<string,unknown>):Promise<{documentIds:string[]}> {
   return operation(async projectId=>{

@@ -1,3 +1,116 @@
+## 2026-10-27 (cont.) — XDesign: Photoshop's Window menu, Edit › Keyboard Shortcuts/Menus/Toolbar, Photomerge and Merge to HDR Pro, menu comparison pass; builds 20–22
+
+Branch: `validation/alpha-2026-09-14`. Committed and pushed to origin with the owner's authorisation ("okay lets do 1-4 first then we can commint and push everything once thats done"). The commit includes the builds 18–19 menu-scroll work below. No new dependencies. No tokens were added. Photoshop was not used this segment; the comparison reused the earlier read-only menu dump (`/tmp/pstest/ps_menus.txt`). Plan: `docs/superpowers/plans/2026-10-27-xdesign-window-edit-merge.md`.
+
+Done (detail in CLAUDE_LOG_ARCHIVE.md):
+1. **Window menu in Photoshop's order**:
+   - Arrange ▸ and Workspace ▸ (Essentials (Default), Reset Essentials, Keyboard Shortcuts & Menus…) are at the top.
+   - The panels are listed alphabetically, now with Brush Settings (F5, split from Brushes), Clone Source and a new Glyphs panel (`GlyphsPanel.tsx`, which reads the font's cmap through `fontCmap.ts`).
+   - Then Application Frame (checked, disabled), Options, Tools, Contextual Task Bar and a radio list of open documents.
+2. **End of the Edit menu**: Keyboard Shortcuts… (⌥⇧⌘K), Menus… (⌥⇧⌘M) and Toolbar….
+   - `CustomizeDialogs.tsx` has the Keyboard Shortcuts and Menus dialog (both tabs) and Customize Toolbar.
+   - `customization.ts` applies the saved shortcuts, hidden items, colours and toolbar layout to both what the menus show and what the keys do. It saves to localStorage `orion.xdesign.customization.v1` and keeps the valid entries of a damaged save.
+3. **Photomerge… and Merge to HDR Pro…** (File › Automate), through Task 18's new-document path:
+   - `MergeDialogs.tsx` has Photoshop's dialogs: Source Files with Browse…/Remove/Add Open Files; the six Photomerge layouts and four options; HDR Pro's two steps, with Mode, Method and the Local Adaptation and Exposure and Gamma sliders.
+   - `xdesign_photo_documents.rs` `merge_sources` opens 2–64 chosen files, plus the current image when asked, into the derive draft. It refuses folders, unreadable files and images over 256 MP. The engine's merge result then opens as a new image.
+4. **Comparison pass against Photoshop** (menu diff 309 → 260 lines; what remains is logged below):
+   - Layer › Layer Style gains Global Light…; Layer › Smart Filter gains Enable/Disable Smart Filters, Delete Filter Mask and Enable/Disable Filter Mask.
+   - Type › Panels ▸ opens Character, Paragraph, Glyphs, Character Styles and Paragraph Styles.
+   - Select › Save Selection… has its own dialog (`SaveSelectionDialog.tsx`): New channel with a name, or Replace/Add/Subtract/Intersect with an alpha channel.
+   - View › Guides ▸ is now a submenu in Photoshop's order, with New Guides From Shape enabled only for a shape layer with bounds.
+   - View › Proof Setup gains Working CMYK, Internet Standard RGB (sRGB) and a disabled Monitor RGB.
+   - Image › Analysis › Set Measurement Scale ▸ has Default and Custom….
+   - Labels now match Photoshop: Bitmap, Duotone, Artboard from Group, Layer Via Copy/Cut, Working CMY Plates and HSB/HSL.
+- **Live fix (builds 21–22)**: in the Keyboard Shortcuts and Menus dialog, the shared dialog-button rules outranked the tree's resets. The tabs and menu rows showed as centred raised buttons. `customizeDialogs.css` now scopes those resets to the dialog, so the rows are left-aligned disclosure rows as in Photoshop.
+
+Gates:
+- `npm run typecheck` is clean.
+- The nine focused suites pass 335/335: PhotoStudio.layout, viewAids.studio, fileMenu.studio, MergeDialogs, PhotoStudio.tools, customization, EditorMenus, runtimeNewImages and fontCmap.
+- `cargo test --lib` passes 1439, with 20 ignored.
+- Release builds 20, 21 and 22 succeeded.
+
+Builds 20–22 live (scratch-HOME release instance; the window is 1400×874):
+- **Window menu**: Arrange ▸ and Workspace ▸ at the top, then the alphabetical panels, with Brush Settings F5, Clone Source and Glyphs. It scrolls with ▼.
+- **View**: View › Guides ▸ matches Photoshop's order and disabled items, and New Guides From Shape is enabled on Rectangle 1.
+- **Select**: Save Selection… is dimmed without a selection. After Select › All its dialog opens, and it was cancelled.
+- **File**: File › Automate shows Merge to HDR Pro… and Photomerge… enabled. Photomerge opens with OK disabled and was cancelled.
+- **Edit**: the menu ends with Keyboard Shortcuts…, Menus… and Toolbar… above Preferences.
+  - The Shortcuts and Menus dialog is correct from build 22.
+  - Customize Toolbar opened and was cancelled.
+- **Scratch state**: misplaced clicks after a guard abort (the owner was active) created an empty "Untitled design" project in the scratch HOME only.
+
+Logged, not done (out of scope or needing their own work):
+- **File**: Bridge, Stock, Package, Import, Print, Open Recent, Revert, Save As and Close All/Others. Package and Close All/Others stay blocked.
+- **Layer**:
+  - Video Layers.
+  - Rasterize Video/3D/Generative/Layer Style, and Harmonize.
+  - Smart Objects: Reset Transform, Convert to Layers and Embed All Linked.
+  - The 2026 adjustments: Color and vibrance, Clarity and dehaze, Grain.
+  - Quick Export and Export As.
+- **Type**:
+  - More from Adobe Fonts, Match Font, Font Preview Size and Language Options.
+  - The Japanese OpenType entries and the Mac anti-alias names.
+  - Convert Text Shape Type, Convert to Dynamic Text, Manage Missing Fonts and the placement of Warp Text.
+- **View**: Pixel Aspect Ratio, the Show ▸ extras, Fit Artboard on Screen, Actual Size, Pattern Preview, Snap To › Slices.
+- **Window**: other workspaces, and New/Delete/Lock Workspace.
+- **Filter and Edit**: Neural Filters, AI Denoise/Sharpen and Vanishing Point; Writing Tools and AutoFill (out of scope).
+- **Labels and states that differ**:
+  - Content-Aware Scale… keeps its ellipsis, because XDesign opens a dialog.
+  - Clear Guides is always enabled; Photoshop dims it when there are no guides.
+  - A disabled OK keeps the accent border in every Photoshop-style dialog; only its text dims.
+- **Merge dialogs**:
+  - There is no Folder source.
+  - Add Open Files adds only the current image, because other photos are separate sessions.
+  - HDR Pro has no preview, curve, presets, ghost-base picking or manual EV.
+- **Save Selection**: Document lists only the current image, and there is no layer-mask channel.
+- **Customisation**:
+  - Items with a dynamic label (Enable/Disable Smart Filters and similar) don't keep a customisation.
+  - The Menus extras are missing, and Toolbar has no drag or presets.
+
+Open questions: none new.
+
+Next, for the owner to choose:
+1. Whether to take up any logged item. The likeliest are a dimmed OK (no accent when disabled), Clear Guides dimmed with no guides, and HDR Pro's preview and curve.
+2. A fresh owner-led pass on the panels against Photoshop (Brush Settings, Clone Source, Glyphs).
+
+The scratch release instance (build 22) stays running, and the Terminal job runner is stopped.
+
+## 2026-10-27 (cont.) — XDesign: overlong menus scroll the macOS way and stop above the dock; builds 18–19
+
+Branch: `validation/alpha-2026-09-14`. Committed and pushed with the next entry's batch, on the owner's authorisation (2026-10-27). No new dependencies. No tokens were added. Photoshop was not used.
+
+Done (detail in CLAUDE_LOG_ARCHIVE.md):
+- **Menus taller than the window** scroll like macOS. In a 900 pt window this means the Window and Edit menus, the observation left open earlier.
+  - The menu has ▲/▼ strips that scroll it while the pointer rests on them, and the wheel also scrolls it. There is no scrollbar and no half-cut row at the bottom.
+  - Arrow keys, Home/End and typeahead bring the focused row into view, clear of the strips. Before this, keyboard focus could move off-screen.
+- **Menus stop above the dock** and the 24 px reach in which it magnifies. Build 18 showed why the reach matters: the bottom of a menu sat in that reach, so resting on ▼ ballooned a dock tile over the menu, and the tile took the pointer. `DOCK_REACH` is now exported from `useShell.ts` and used by both the dock and the menus.
+
+Gates:
+- `npm run typecheck` is clean.
+- Before the dock-reach change, EditorMenus, PhotoStudio.layout and PhotoStudio.tools passed 284/284. After it, EditorMenus passes 24/24.
+- `cargo test --lib` was not re-run; no Rust changed.
+
+Builds 18–19 live (scratch-HOME release instance; the window is 1400×874):
+- **Window menu (build 19)**:
+  - It opens with ▼ and no scrollbar, and ends 24 px above the dock.
+  - Resting on ▼ scrolls to the end: Workspace ▸, Options, Tools, Contextual Task Bar. ▲ then appears and ▼ goes away.
+  - Resting on ▲ scrolls back to the top. The wheel scrolls.
+- **Edit menu (build 18)**: End reveals Preferences ▸, with ▲ at the top; Home returns to Undo.
+- **Unchanged**: the dock still magnifies under the pointer. The pasteboard menu still opens, and Esc leaves the scratch pasteboard on Default.
+
+Open questions: none new.
+
+Next, for the owner to choose:
+1. The Window menu's layout against Photoshop's:
+   - Arrange ▸ and Workspace ▸ belong at the top; Workspace currently sits at the bottom.
+   - Missing: Application Frame and the list of open documents.
+   - Brush Settings and Clone Source exist as a panel toggle and a Properties section but have no Window items. Glyphs is missing.
+2. The end of the Edit menu: Keyboard Shortcuts… (⌥⇧⌘K), Menus… (⌥⇧⌘M) and Toolbar….
+3. Photomerge and Merge to HDR Pro (Task 18), which need their own plan.
+4. A fresh comparison pass against Photoshop.
+
+The scratch release instance (build 19) stays running, and the Terminal job runner is stopped.
+
 ## 2026-10-27 (cont.) — XDesign: no WebKit menu app-wide, Photoshop pasteboard colour menu; build 17
 
 Branch: `validation/alpha-2026-09-14`. Committed and pushed to origin with the owner's authorisation (2026-10-27). No new dependencies. No tokens were added. Photoshop was not used.

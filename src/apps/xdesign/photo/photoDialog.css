@@ -124,3 +124,8 @@
 .xd-photo .xd-ps-dialog .xd-ps-swatches > button[aria-pressed=true] { outline:2px solid var(--xd-accent);outline-offset:-2px;position:relative; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-ink { display:grid;grid-template-columns:auto 28px 1fr;gap:6px;align-items:center;margin:0 0 6px; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-ink > input[type=color] { width:28px;height:22px;padding:0; }
+/* Photomerge and Merge to HDR Pro: Layout beside the sources, and the file list with its buttons to the right. */
+.xd-photo .xd-ps-dialog .xd-ps-merge { display:flex;gap:16px;align-items:flex-start; }
+.xd-photo .xd-ps-dialog .xd-ps-merge-files { display:flex;gap:8px;align-items:flex-start; }
+.xd-photo .xd-ps-dialog .xd-ps-merge-files > select { flex:1;min-width:240px;min-height:140px; }
+.xd-photo .xd-ps-dialog .xd-ps-merge-buttons { display:flex;flex-direction:column;gap:6px; }

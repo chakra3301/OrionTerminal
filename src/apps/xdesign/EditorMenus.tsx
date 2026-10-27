@@ -1,17 +1,22 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type RefObject } from "react";
 import { ChevronDown, type LucideIcon } from "lucide-react";
+import { DOCK_REACH } from "@/shell/store/useShell";
 import { ariaShortcut, shortcutGlyphs, type MenuEntry, type MenuItem, type MenuSpec } from "./menuModel";
 import "./editorMenus.css";
 
 export type PopupPlace = { kind: "below"; el: HTMLElement; align: "start" | "end" } | { kind: "side"; el: HTMLElement } | { kind: "point"; x: number; y: number };
 type Focus = "first" | "self" | "none";
 type Sub = { index: number; el: HTMLElement; focus: "first" | "none" };
+// One macOS menu row: the height of each scroll arrow, and how far it scrolls per step.
+const ROW = 22;
 
 // Fixed positioning is relative to .xd-root (container-type) or a transformed window, so measure the real offset and correct for it.
 export function positionPopup(el: HTMLElement, place: PopupPlace) {
   el.style.maxHeight = ""; el.style.left = "0px"; el.style.top = "0px";
-  const host = el.closest(".xd-root")?.getBoundingClientRect();
-  const bounds = host ?? { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+  const host = el.closest(".xd-root")?.getBoundingClientRect() ?? { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+  // The shell's dock floats over every window and magnifies as the pointer nears it, so like the macOS Dock it ends the room a menu has.
+  const dock = document.querySelector(".ot-dock-wrap")?.getBoundingClientRect(), dockReach = dock?.height ? dock.top - DOCK_REACH : Infinity;
+  const bounds = { left: host.left, top: host.top, right: host.right, bottom: dockReach < host.bottom ? Math.max(host.top, dockReach) : host.bottom };
   const { width } = el.getBoundingClientRect();
   let { height } = el.getBoundingClientRect();
   let x: number, y: number, space = bounds.bottom - bounds.top;
@@ -45,9 +50,35 @@ function Popup({ items, label, place, focus, choose, dismiss, back, step, onEnte
   const rows = useRef<(HTMLButtonElement | null)[]>([]);
   const hover = useRef(0);
   const typed = useRef({ text: "", timer: 0 });
+  const scroller = useRef(0);
   const [sub, setSub] = useState<Sub | null>(null);
+  const [more, setMore] = useState({ up: false, down: false });
   const enabled = (index: number) => { const entry = items[index]; return !!entry && entry !== "-" && !entry.disabled; };
-  const focusRow = (index: number | undefined) => { if (index !== undefined) rows.current[index]?.focus({ preventScroll: true }); };
+  const measure = () => {
+    const el = ref.current!, up = el.scrollTop > 0, down = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    setMore(previous => previous.up === up && previous.down === down ? previous : { up, down });
+  };
+  // A row reached from the keyboard scrolls into view clear of the arrows; a hovered row is already in view.
+  const focusRow = (index: number | undefined, reveal = false) => {
+    const row = index === undefined ? null : rows.current[index], el = ref.current!;
+    if (!row) return;
+    row.focus({ preventScroll: true });
+    if (!reveal) return;
+    const top = row.offsetTop - ROW, bottom = row.offsetTop + row.offsetHeight + ROW;
+    if (top < el.scrollTop) el.scrollTop = Math.max(0, top);
+    else if (bottom > el.scrollTop + el.clientHeight) el.scrollTop = Math.min(el.scrollHeight - el.clientHeight, bottom - el.clientHeight);
+  };
+  const scrollWhileOver = (direction: 1 | -1) => {
+    clearInterval(scroller.current);
+    setSub(null);
+    ref.current!.focus({ preventScroll: true });
+    scroller.current = window.setInterval(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.scrollTop += direction * ROW;
+      if (direction > 0 ? el.scrollTop + el.clientHeight >= el.scrollHeight - 1 : el.scrollTop <= 0) clearInterval(scroller.current);
+    }, 60);
+  };
   const openSub = (index: number, focus: Sub["focus"]) => { const el = rows.current[index]; if (el) setSub({ index, el, focus }); };
   const activate = (index: number) => {
     const item = items[index];
@@ -56,11 +87,12 @@ function Popup({ items, label, place, focus, choose, dismiss, back, step, onEnte
   };
   useLayoutEffect(() => {
     positionPopup(ref.current!, place);
+    measure();
     const first = items.findIndex((_, index) => enabled(index));
     if (focus === "first" && first >= 0) focusRow(first);
     else if (focus !== "none") ref.current!.focus({ preventScroll: true });
   }, []);
-  useEffect(() => () => { clearTimeout(hover.current); clearTimeout(typed.current.timer); }, []);
+  useEffect(() => () => { clearTimeout(hover.current); clearTimeout(typed.current.timer); clearInterval(scroller.current); }, []);
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.metaKey || event.ctrlKey) return;
@@ -75,11 +107,11 @@ function Popup({ items, label, place, focus, choose, dismiss, back, step, onEnte
         handled();
         if (!list.length) return;
         const at = list.indexOf(current), delta = event.key === "ArrowDown" ? 1 : -1;
-        focusRow(at < 0 ? list[delta > 0 ? 0 : list.length - 1] : list[(at + delta + list.length) % list.length]);
+        focusRow(at < 0 ? list[delta > 0 ? 0 : list.length - 1] : list[(at + delta + list.length) % list.length], true);
         return;
       }
-      case "Home": handled(); focusRow(list[0]); return;
-      case "End": handled(); focusRow(list[list.length - 1]); return;
+      case "Home": handled(); focusRow(list[0], true); return;
+      case "End": handled(); focusRow(list[list.length - 1], true); return;
       case "ArrowRight":
         if (subItem) { handled(); openSub(current, "first"); }
         else if (step) { handled(); step(1); }
@@ -102,19 +134,20 @@ function Popup({ items, label, place, focus, choose, dismiss, back, step, onEnte
     const from = current < 0 ? 0 : text.text.length > 1 ? current : current + 1;
     for (let offset = 0; offset < items.length; offset++) {
       const index = (from + offset) % items.length, entry = items[index];
-      if (enabled(index) && (entry as MenuItem).label.toLowerCase().startsWith(text.text)) { focusRow(index); return; }
+      if (enabled(index) && (entry as MenuItem).label.toLowerCase().startsWith(text.text)) { focusRow(index, true); return; }
     }
   };
 
   const parent = sub && items[sub.index] as MenuItem;
   return <>
-    <div ref={ref} className="xd-menu" role="menu" aria-label={label} tabIndex={-1} onKeyDown={onKeyDown} onPointerEnter={onEnter}>
+    <div ref={ref} className="xd-menu" role="menu" aria-label={label} tabIndex={-1} onKeyDown={onKeyDown} onPointerEnter={onEnter} onScroll={measure}>
+      {more.up && <div className="xd-menu-scroll up" aria-hidden="true" onPointerEnter={() => scrollWhileOver(-1)} onPointerLeave={() => clearInterval(scroller.current)}/>}
       {items.map((entry, index) => {
         if (entry === "-") return <div key={index} role="separator"/>;
         const role = entry.checked === undefined ? "menuitem" : entry.radio ? "menuitemradio" : "menuitemcheckbox";
         const Icon = entry.icon;
         return <button key={index} ref={node => { rows.current[index] = node; }} type="button" tabIndex={-1} role={role} className={Icon ? "xd-menu-item with-icon" : "xd-menu-item"}
-          disabled={entry.disabled} aria-checked={entry.checked} aria-haspopup={entry.items ? "menu" : undefined} aria-expanded={entry.items ? sub?.index === index : undefined}
+          disabled={entry.disabled} data-color={entry.color} aria-checked={entry.checked} aria-haspopup={entry.items ? "menu" : undefined} aria-expanded={entry.items ? sub?.index === index : undefined}
           data-shortcut={entry.shortcut ? shortcutGlyphs(entry.shortcut) : undefined} aria-keyshortcuts={entry.shortcut ? ariaShortcut(entry.shortcut) : undefined}
           onPointerEnter={() => {
             clearTimeout(hover.current);
@@ -124,6 +157,7 @@ function Popup({ items, label, place, focus, choose, dismiss, back, step, onEnte
           }}
           onClick={() => { if (entry.items) openSub(index, "none"); else choose(entry); }}>{Icon && <Icon size={16}/>}{entry.label}</button>;
       })}
+      {more.down && <div className="xd-menu-scroll down" aria-hidden="true" onPointerEnter={() => scrollWhileOver(1)} onPointerLeave={() => clearInterval(scroller.current)}/>}
     </div>
     {sub && parent && <Popup key={`${sub.index}${sub.focus}`} items={parent.items!} label={parent.label} place={{ kind: "side", el: sub.el }} focus={sub.focus}
       choose={choose} dismiss={dismiss} back={() => { setSub(null); focusRow(sub.index); }} step={step} onEnter={() => clearTimeout(hover.current)}/>}

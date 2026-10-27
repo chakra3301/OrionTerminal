@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
-import { useShell } from "@/shell/store/useShell";
+import { DOCK_REACH, useShell } from "@/shell/store/useShell";
 import { useAppDescriptors, type AppId } from "@/plugins/appRegistry";
 import { useRosie } from "@/features/rosie/rosieStore";
 import { useControlPanel } from "@/store/controlPanelStore";
@@ -50,10 +50,10 @@ export function Dock() {
     const onMove = (e: MouseEvent) => {
       const rect = el.getBoundingClientRect();
       const inside =
-        e.clientY >= rect.top - 24 &&
-        e.clientY <= rect.bottom + 24 &&
-        e.clientX >= rect.left - 24 &&
-        e.clientX <= rect.right + 24;
+        e.clientY >= rect.top - DOCK_REACH &&
+        e.clientY <= rect.bottom + DOCK_REACH &&
+        e.clientX >= rect.left - DOCK_REACH &&
+        e.clientX <= rect.right + DOCK_REACH;
       if (inside) setCursorX(e.clientX);
       else setCursorX(null);
     };

@@ -97,13 +97,14 @@ html.xd-photo-drag-ew,html.xd-photo-drag-ew * { cursor:ew-resize !important; }
 .xd-photo-layer input { -webkit-user-select:text;user-select:text; }
 .xd-photo-layer.selected { background:rgba(var(--xd-accent-rgb),.13); }
 /* Colour labels tint the visibility column, as in Photoshop. There is no red or label palette token: red borrows Hermes' error value (gap logged in PROGRESS.md). */
-.xd-photo-layer[data-color=red],.xd-photo-label-swatch[data-color=red] { --label:#ff5e6a; }
-.xd-photo-layer[data-color=orange],.xd-photo-label-swatch[data-color=orange] { --label:var(--neon-amber); }
-.xd-photo-layer[data-color=yellow],.xd-photo-label-swatch[data-color=yellow] { --label:var(--neon-yellow); }
-.xd-photo-layer[data-color=green],.xd-photo-label-swatch[data-color=green] { --label:var(--neon-green); }
-.xd-photo-layer[data-color=blue],.xd-photo-label-swatch[data-color=blue] { --label:var(--xd-accent); }
-.xd-photo-layer[data-color=violet],.xd-photo-label-swatch[data-color=violet] { --label:var(--neon-violet); }
-.xd-photo-layer[data-color=gray],.xd-photo-label-swatch[data-color=gray] { --label:var(--xd-text-3); }
+.xd-photo-layer[data-color=red],.xd-photo-label-swatch[data-color=red],.xd-photo .xd-menu-item[data-color=red] { --label:#ff5e6a; }
+.xd-photo-layer[data-color=orange],.xd-photo-label-swatch[data-color=orange],.xd-photo .xd-menu-item[data-color=orange] { --label:var(--neon-amber); }
+.xd-photo-layer[data-color=yellow],.xd-photo-label-swatch[data-color=yellow],.xd-photo .xd-menu-item[data-color=yellow] { --label:var(--neon-yellow); }
+.xd-photo-layer[data-color=green],.xd-photo-label-swatch[data-color=green],.xd-photo .xd-menu-item[data-color=green] { --label:var(--neon-green); }
+.xd-photo-layer[data-color=blue],.xd-photo-label-swatch[data-color=blue],.xd-photo .xd-menu-item[data-color=blue] { --label:var(--xd-accent); }
+.xd-photo-layer[data-color=violet],.xd-photo-label-swatch[data-color=violet],.xd-photo .xd-menu-item[data-color=violet] { --label:var(--neon-violet); }
+.xd-photo-layer[data-color=gray],.xd-photo-label-swatch[data-color=gray],.xd-photo .xd-menu-item[data-color=gray] { --label:var(--xd-text-3); }
+.xd-photo .xd-menu-item[data-color] { background:color-mix(in srgb,var(--label) 35%,transparent); }
 .xd-photo-layer[data-color] > .xd-photo-layer-eye { background:color-mix(in srgb,var(--label) 45%,transparent); }
 .xd-photo-label-swatch { display:inline-block;flex:none;box-sizing:border-box;border-radius:2px;background:var(--label,transparent);border:1px solid var(--xd-border); }
 .xd-photo-layer[data-drop=above],.xd-photo-channel-row[data-drop=above] { box-shadow:inset 0 2px var(--neon-magenta); }

@@ -13,6 +13,8 @@ export type MenuItem = {
   radio?: boolean;
   run?: () => void;
   items?: MenuEntry[];
+  /** Edit › Menus highlight colour, shown as the row background. */
+  color?: string;
 };
 export type MenuEntry = MenuItem | "-";
 export type MenuSpec = { label: string; items: MenuEntry[] };
@@ -39,6 +41,13 @@ export function ariaShortcut(shortcut: string): string {
 }
 
 type KeyLike = Pick<KeyboardEvent, "key" | "code" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey">;
+const CODE_KEYS = Object.fromEntries(Object.entries(PUNCTUATION_CODES).map(([key, code]) => [code, key]));
+/** The shortcut a key press spells, by key position like matchesShortcut, or null while only modifiers are down. */
+export function shortcutFromEvent(event: KeyLike): string | null {
+  if (["Meta", "Control", "Alt", "Shift", "CapsLock", "Fn", "Dead", "Unidentified", " "].includes(event.key)) return null;
+  const key = /^Key[A-Z]$/.test(event.code) ? event.code.slice(3) : /^Digit\d$/.test(event.code) ? event.code.slice(5) : CODE_KEYS[event.code] ?? (event.key.length === 1 ? event.key.toUpperCase() : event.key);
+  return [event.ctrlKey && "Ctrl", event.altKey && "Alt", event.shiftKey && "Shift", event.metaKey && "Mod", key].filter(Boolean).join("+");
+}
 export function matchesShortcut(event: KeyLike, shortcut: string): boolean {
   const { ctrl, alt, shift, mod, key } = parse(shortcut);
   const modifiers = mod && ctrl ? event.metaKey && event.ctrlKey : mod ? event.metaKey !== event.ctrlKey : ctrl ? event.ctrlKey && !event.metaKey : !event.metaKey && !event.ctrlKey;

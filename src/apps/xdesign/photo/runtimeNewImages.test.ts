@@ -47,6 +47,16 @@ it("places every straightened photo through Pencil and edits the last one", asyn
   expect(usePhotoWorkspace.getState()).toMatchObject({ documentId: photos[1]!.id, shapeId: "node-Portrait copy 2", source: "pencil" });
 });
 
+it("opens a Photomerge or HDR Pro result as a new image", async () => {
+  for (const [command, name] of [["file.automate.photomerge", "Untitled_Panorama1"], ["file.automate.mergeToHdrPro", "Untitled_HDR1"]] as const) {
+    const merged = image(name), params = { paths: ["/a.jpg", "/b.jpg"], useOpenDocuments: false };
+    invoke.mockResolvedValueOnce([ready(merged)]);
+    await expect(runPhotoCommand(command, params)).resolves.toEqual({ documentIds: [merged.id] });
+    expect(invoke).toHaveBeenLastCalledWith("xdesign_photo_new_documents", expect.objectContaining({ command, params }));
+    expect(usePhotoWorkspace.getState().documentId).toBe(merged.id);
+  }
+});
+
 it("keeps the current image when no photo is found or the project changes meanwhile", async () => {
   invoke.mockRejectedValueOnce("no photos found on a uniform background");
   await expect(runPhotoCommand("file.automate.cropAndStraightenPhotos", {})).rejects.toBe("no photos found on a uniform background");
