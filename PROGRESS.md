@@ -1,6 +1,37 @@
+## 2026-10-27 (cont.) — XDesign alpha smoke test: machine checks on build 23, owner checklist, alpha limits
+
+Branch: `validation/alpha-2026-09-14`. Owner request: "do all of that then", after asking whether XDesign is good enough for an alpha. That covered: commit and push the build 23 batch (`79d1169`), write a smoke-test checklist and alpha-limits text, and run the checks that don't need a person. No code changed. Photoshop was used read-only on scratch documents and restored afterwards; the owner's open documents were not touched.
+
+Done (detail in CLAUDE_LOG_ARCHIVE.md):
+1. **`docs/releases/xdesign-alpha-smoke-test.md`**: the verified results, eight findings, a ~30-minute owner checklist and "XDesign alpha limits" text for the release notes.
+2. **PSD round trip against Photoshop: pass.**
+   - A Photoshop-made 2400×1600 PSD (group, mask, drop shadow, Screen 80%, editable text, fill, Brightness/Contrast) opens in XDesign.
+   - Saved back as PSD, Photoshop reads an identical layer tree, and its render is pixel-identical to the original.
+   - XDesign's flattened PNG is within 5/255. An opacity edit reads back correctly in Photoshop.
+3. **24 MP (6000×4000): pass, with findings.**
+   - Timings: open ~3.5 s; Levels preview under 0.8 s; Levels OK ~4.1 s; undo ~2.6 s; PSD save 3.9 s (145 MB); project save 5.9 s (216 MB); project reopen 6–17 s; JPEG export 3.85 s.
+   - Edits and undo history survive project save, close and reopen. Memory is 1.3–1.6 GB, peaking at ~2 GB.
+
+Findings, not fixed:
+1. Levels OK on a large image shows the unadjusted image for ~4 s before the result.
+2. ⌘L (and probably other shortcuts) opens the shell's R.O.S.I.E. when focus is in the XDesign header rather than the editor.
+3. The first ⌘S on an image with no PSD opens a dialog titled "Export As"; Photoshop says Save As.
+4. Opening a large project shows no progress for 6 s or more.
+5. ~2 GB peak memory during an adjustment on 24 MP.
+6. One image per editor session: a second image replaces the first in the editor (the first stays in the project).
+7. The text-layer thumbnail shows a checkerboard, not a "T".
+8. The text layer's Properties panel shows Transform only; Photoshop also has Character and Paragraph. To confirm.
+
+Open questions: none new.
+
+Next:
+1. The owner runs the checklist in the smoke-test doc with a real photo and a real PSD. That decides whether XDesign is usable for the alpha.
+2. Then fix what it turns up, with findings 1–3 as the likely first candidates.
+3. When a release is cut, add the alpha-limits text to its notes.
+
 ## 2026-10-27 (cont.) — XDesign: dimmed disabled OK, Clear Guides items dimmed with nothing to clear, HDR Pro base image; build 23
 
-Branch: `validation/alpha-2026-09-14`. **Uncommitted**: the owner's earlier authorisation covered items 1–4 only (commit `89d0238`, pushed), so this batch waits for their go-ahead. Owner request: "okay lets finish this up". No new dependencies, no tokens added, no Rust changes, and Photoshop was not used.
+Branch: `validation/alpha-2026-09-14`. Committed as `79d1169` and pushed with the owner's go-ahead ("do all of that then"). Owner request: "okay lets finish this up". No new dependencies, no tokens added, no Rust changes, and Photoshop was not used.
 
 Done (detail in CLAUDE_LOG_ARCHIVE.md):
 1. **Disabled OK** (`photoDialog.css`): the accent border and fill now apply only to an enabled OK, so a disabled one looks like the other disabled buttons. The older magenta dialogs (`photo.css`) already dimmed through `.xd-photo button:disabled`.

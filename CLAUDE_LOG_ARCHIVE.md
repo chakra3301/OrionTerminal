@@ -1,6 +1,42 @@
+## 2026-10-27 (cont.) — Claude / XDesign: alpha smoke test on build 23
+
+Owner request: "do all of that then". No code changed. Results and the owner checklist are in `docs/releases/xdesign-alpha-smoke-test.md`.
+
+**Setup:**
+- Release build 23 ran on the scratch-HOME instance (`HOME=/tmp/xd-release-home`), driven through the guarded `/tmp/pstest` runner.
+- Test files are in `/tmp/xd-smoke/`:
+  - `ps-made.psd` and `ps-made.png`: a 2400×1600 scratch document made in Photoshop.
+  - `big-24mp.jpg`: generated 6000×4000 noise.
+  - The outputs: `xd-roundtrip.psd`, `xd-export.png`, `xd-edited.psd`, `big-edited.psd`, `big-export.jpg` and `smoke.xdesign`.
+- **Photoshop**: used only on scratch documents, through `/tmp/pstest/score/readback*.jsx`. These dump the layer tree, save a PNG and close without saving. Each restores the active document, ruler units and dialog mode.
+- **Timing**: `burst.sh` and `burstc.sh` take timed window captures with RSS, and `score/frames.py` reads a box's mean colour per frame. Times are the first frame showing the result.
+
+**PSD round trip:**
+- `ps-made.psd` opened in XDesign and was saved as `xd-roundtrip.psd`.
+- Photoshop's read-back had the same tree: group, mask, drop shadow, Screen 80%, 110 pt editable text, solid fill and Brightness/Contrast.
+- Photoshop's render of it compared with `ps-made.png` at max difference 0.
+- XDesign's `xd-export.png` compared at max 5, mean 1.14, with no pixel above 8.
+- **Edit test**: Sun set to 50% and saved as `xd-edited.psd`. Photoshop reads 50%, and the diff is confined to the Sun region.
+
+**24 MP results:**
+- Open ~3.5 s at ~609 MB RSS. Levels preview under 0.8 s. Levels OK → result ~4.1 s, peaking at ~2 GB, during which the unadjusted image shows. Undo ~2.6 s.
+- Brush stroke immediate; its undo under 0.9 s.
+- PSD save 3.9 s (145 MB; noise defeats RLE). Project save 5.9 s (216 MB). Reopen 6–17 s with no indicator. Editor reopen ~3.7 s. JPEG export 3.85 s, with the correct Levels result.
+- Edits and history persisted across close and reopen. Footprint 1.3–1.6 GB with the image open.
+
+**Other observations:**
+- **Shortcut focus**: after clicking the header's Image control, ⌘L went to the shell's R.O.S.I.E.; clicking the editor tab first fixed it.
+- **First Save**: ⌘S with no `savedPsd` opens `ImageDialogs`' "Export As" (`PhotoStudio.tsx` `saveImage`).
+- **Second image**: opening it through the header's File ▾ adds a new photo document (`createImage`) and replaces the editor's image.
+- **Text layer**: the thumbnail is a checkerboard, and Properties shows Transform.
+
+**Coverage check** for the alpha-limits text (`/tmp/pstest/score/score.py` on the current menu dump):
+- 495 of 617 in-scope Photoshop menu items are present (80%). File is lowest at 34%.
+- No Print, Save As, Revert or Close All.
+
 ## 2026-10-27 (cont.) — Claude / XDesign: dimmed disabled OK, Clear Guides items dimmed with nothing to clear, HDR Pro base image; build 23
 
-Owner request: "okay lets finish this up", after the items 1–4 commit `89d0238`. Uncommitted, pending the owner's go-ahead.
+Owner request: "okay lets finish this up", after the items 1–4 commit `89d0238`. Committed as `79d1169` and pushed on "do all of that then".
 
 **1. Disabled OK** (`photoDialog.css`):
 - `.xd-photo .xd-ps-dialog button[type=submit]` became `…[type=submit]:not(:disabled)`.
