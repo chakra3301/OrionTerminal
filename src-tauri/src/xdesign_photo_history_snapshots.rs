@@ -12,12 +12,15 @@ use std::{
 
 pub(super) const COMMANDS: [&str; 4] = ["history.snapshot.new", "history.snapshot.select", "history.snapshot.rename", "history.snapshot.delete"];
 const MAX_SNAPSHOTS: usize = 100;
+/// The layer thumbnails' size, so snapshot rows match the Layers panel.
+const THUMBNAIL_SIZE: u32 = 56;
 
 struct Snapshot {
     id: String,
     name: String,
     doc: Arc<Document>,
     active: Option<LayerId>,
+    thumbnail: Option<String>,
 }
 
 #[derive(Default)]
@@ -26,6 +29,8 @@ struct Store {
     created: usize,
     /// The snapshot last chosen and the revision it left, so the row stays selected until the image changes.
     selected: Option<(String, u64)>,
+    /// The Open row's thumbnail and the History Brush identity of the state it shows, so refreshes reuse it.
+    opening: Option<(String, Option<String>)>,
 }
 
 fn stores() -> &'static Mutex<HashMap<String, Store>> {
@@ -55,8 +60,30 @@ pub(super) fn describe(engine: &Session, photo: &str) -> Value {
             "name": item.name,
             "source": super::history::snapshot_id(&item.doc),
             "current": store.selected.as_ref().is_some_and(|(id, at)| *id == item.id && Some(*at) == revision),
+            "thumbnail": item.thumbnail,
         }))
         .collect::<Vec<_>>())
+}
+
+/// The Open row's thumbnail: the image as opened, while that state is still retained.
+pub(super) fn opening(engine: &Session, photo: &str) -> Value {
+    let Some(state) = engine.active() else { return Value::Null };
+    if state.history.entries().first().map(String::as_str) != Some("Open") {
+        return Value::Null;
+    }
+    let Some(doc) = (if state.history.past_len() == 0 { Some(state.doc.clone()) } else { state.history.state(0) }) else { return Value::Null };
+    let Ok(mut stores) = stores().lock() else { return Value::Null };
+    let store = stores.entry(photo.to_owned()).or_default();
+    let source = super::history::snapshot_id(&doc);
+    if store.opening.as_ref().is_none_or(|(id, _)| *id != source) {
+        store.opening = Some((source, thumbnail(&doc)));
+    }
+    json!(store.opening.as_ref().and_then(|(_, thumbnail)| thumbnail.as_deref()))
+}
+
+fn thumbnail(doc: &Document) -> Option<String> {
+    let image = photocraft_compose::thumbnail(doc, THUMBNAIL_SIZE);
+    super::tiles::png(image.width, image.height, image.pixels).ok()
 }
 
 /// The name New Snapshot gives when none is typed, which its dialog offers.
@@ -133,8 +160,9 @@ fn create(engine: &Session, store: &mut Store, params: &Value) -> Result<Value, 
         other => return Err(format!("Unknown snapshot source \"{other}\"")),
     };
     let id = ulid::Ulid::new().to_string();
+    let thumbnail = thumbnail(&doc);
     store.created += 1;
-    store.items.push(Snapshot { id: id.clone(), name: name.clone(), doc, active });
+    store.items.push(Snapshot { id: id.clone(), name: name.clone(), doc, active, thumbnail });
     Ok(json!({"id": id, "name": name}))
 }
 
@@ -203,6 +231,19 @@ mod tests {
     }
 
     #[test]
+    fn the_open_row_keeps_the_image_as_opened() {
+        let (mut engine, photo) = image();
+        let first = opening(&engine, &photo);
+        let bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, first.as_str().unwrap()).unwrap();
+        assert_eq!(photocraft_codecs::decode(&bytes).unwrap().data()[..4], [255, 255, 255, 255]);
+        engine.execute("edit.fill", json!({"color": "#000000"})).unwrap();
+        assert_eq!(opening(&engine, &photo), first);
+        assert_eq!(opening(&engine, "another photo"), first, "the store is only a cache");
+        engine.active_mut().unwrap().history.clear();
+        assert_eq!(opening(&engine, &photo), Value::Null, "the opening state is gone");
+    }
+
+    #[test]
     fn names_rename_delete_and_forget() {
         let (mut engine, photo) = image();
         run(&mut engine, &photo, "history.snapshot.new", json!({})).unwrap();
@@ -243,6 +284,15 @@ mod tests {
         let doc = engine.active().unwrap().doc.clone();
         assert_eq!(doc.layers.len(), 1);
         assert_eq!(doc.layers[0].surface().unwrap().rgba(12, 4)[3], 0.0, "only the painted layer");
+        let thumbnail = |row: &Value| {
+            let bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, row["thumbnail"].as_str().unwrap()).unwrap();
+            let image = photocraft_codecs::decode(&bytes).unwrap();
+            let data = image.data().to_vec();
+            (image.width(), [data[3], data[data.len() - 1]])
+        };
+        let rows = describe(&engine, &photo);
+        assert_eq!(thumbnail(&rows[0]), (16, [255, 255]), "the merged image is opaque, and small images are not enlarged");
+        assert_eq!(thumbnail(&rows[1]), (16, [255, 0]), "the layer alone is clear where it is unpainted");
         engine.undo();
         engine.undo();
         assert_eq!(engine.active().unwrap().doc.layers.len(), layers);

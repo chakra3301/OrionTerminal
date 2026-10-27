@@ -1,3 +1,33 @@
+## 2026-10-27 (cont.) — Claude / XDesign follow-up batch: ruler-unit Properties, snapshot thumbnails, layer right-click, tool hints; builds 15–16
+
+Branch: `validation/alpha-2026-09-14`. Committed and pushed with owner authorisation.
+
+- **Properties in ruler units** (`LayerProperties.tsx`, `TransformSection`): it reads `rulerUnit` and `pointSize` from `usePreferences` and converts with `unitsPerPixel(unit, resolution, pointSize, length)`, the function the rulers use. Percent is of the canvas width for W/X and of the height for H/Y, as on the rulers. Labels are px, in, cm, mm, pt, pica and %. Commits convert back to px, and X/Y moves round to whole pixels. `PhotoStudio` passes `resolution` (`state.resolution ?? 72`).
+- **Snapshot thumbnails** (`xdesign_photo_history_snapshots.rs`):
+  - Each snapshot renders a 56 px thumbnail, the Layers panel's size, when it is created, using `photocraft_compose::thumbnail` and `tiles::png`. `thumbnail` never enlarges, so small images stay small.
+  - The Open row's thumbnail comes from `snapshots::opening`. It uses the document at history index 0, or the current one while there is no past. It returns nothing once the first entry is no longer "Open".
+  - It is cached per photo, keyed by the History Brush identity of that state, so state refreshes don't re-render it. The photo state returns it as `historyOpenThumbnail`.
+  - `PhotoHistory.tsx` shows the PNGs and falls back to the placeholder icon. When the Open row is current and has no thumbnail, it uses the live preview.
+- **Layer-name right-click** (`photo.css`): WebKit selects the word under a right-click before the custom menu opens. `.xd-photo-layer` is now `user-select:none`, with the rename input re-enabled.
+- **Tool hints** (`PhotoStudio.tsx`, `toolHint`):
+  - Added hints for Spot Healing, Pattern Stamp, History Brush, Blur, Sharpen, Smudge, Dodge, Burn and Sponge.
+  - The Eraser has two: erase to the History source, or to transparency and the background colour.
+  - A correction to the previous entry: Brush and Pencil already had hints.
+  - A layout test walks every tool in `IMAGE_TOOL_GROUPS` and fails if any shows the generic text.
+- **Page reload during the build 15 live check**:
+  - Cause: ⌘R had hidden the rulers, so a scripted right-click meant for the ruler landed on the pasteboard (`.xd-photo-stage`). It has no `contextmenu` handler, so WebKit showed its own menu, and the next scripted click hit **Reload**.
+  - The system log shows `perform action for menu item`, then `FrameLoader::reload`, at 15:49:28.
+  - ⌘R itself was ruled out: Tauri 2.11's default macOS menu has no ⌘R item.
+  - The document survived in the native session; only the view was lost.
+  - **Fix**: the `.xd-photo` root prevents the default context menu unless the target is inside an `input`, `textarea` or `[contenteditable]`, which keep Cut/Copy/Paste. React bubbles the event through portals, so portaled menus and dialogs are covered too.
+  - Not done: Photoshop's own pasteboard right-click, the pasteboard colour menu, is not implemented.
+  - Outside the photo workspace, the shell and the other apps still show WebKit's menu, with Reload, on areas that don't handle right-clicks.
+- **Thumbnail spacing**: live on build 15, the snapshot labels touched the image thumbnails. The `<img>` now also carries `xd-photo-history-thumb` (6 px right margin), as the placeholder did, because the snapshot rows set `gap:0`.
+- **Harness notes**:
+  - zsh's builtin `log` shadows `/usr/bin/log`. `/tmp/pstest/logwin.sh` (all lines) and `logwin2.sh` (navigation and menu lines) call `/usr/bin/log show`.
+  - `goR.sh` with no arguments crashes axt (rc 133); use `goR.sh front`.
+  - axt's Escape key is `esc`.
+
 ## 2026-10-27 (cont.) — Claude / XDesign gap closure: build 11 live re-check, fixes for builds 12–14
 
 Branch: `validation/alpha-2026-09-14`. Committed and pushed with owner authorisation.

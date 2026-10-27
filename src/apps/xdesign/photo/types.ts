@@ -124,9 +124,10 @@ export type PhotoState = {
   historyRedo?:string[];
   historySnapshots?:PhotoHistorySnapshot[];
   historySnapshotName?:string;
+  historyOpenThumbnail?:string|null;
   paths?:{saved:string[];work:boolean};
 };
-export type PhotoHistorySnapshot={id:string;name:string;source:string;current:boolean};
+export type PhotoHistorySnapshot={id:string;name:string;source:string;current:boolean;thumbnail?:string|null};
 export type PhotoHistorySource={id:string;index:number;label:string;current:boolean;available:boolean;reason?:string|null};
 
 export type PhotoColorSettings = {revision:string;settings:{workingRgb:string;workingCmyk:string;workingGray:string;policyRgb:"preserve"|"convert"|"off";policyCmyk:"preserve"|"convert"|"off";policyGray:"preserve"|"convert"|"off";askOnMismatch:boolean;askOnPaste:boolean;askOnMissing:boolean;intent:string;bpc:boolean;dither:boolean;blendTextGamma:number;monitorProfile:string};working:Record<"workingRgb"|"workingCmyk"|"workingGray",{description:string;colorSpace:string;custom:boolean;source:string|null}>};

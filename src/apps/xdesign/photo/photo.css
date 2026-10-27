@@ -92,7 +92,9 @@ html.xd-photo-drag-ew,html.xd-photo-drag-ew * { cursor:ew-resize !important; }
 .xd-photo-layer-controls label { display:flex;align-items:center;justify-content:space-between;width:100%; }
 .xd-photo-layer-controls input[type=number] { width:50px; }
 .xd-photo-layer-list { min-height:80px;flex:1;overflow:auto;overscroll-behavior:contain;padding:5px 0; }
-.xd-photo-layer { display:flex;align-items:center;gap:2px;min-height:36px;padding-left:8px; }
+/* Unselectable because WebKit selects the word under a right-click before the layer menu opens; Photoshop only opens the menu. */
+.xd-photo-layer { display:flex;align-items:center;gap:2px;min-height:36px;padding-left:8px;-webkit-user-select:none;user-select:none; }
+.xd-photo-layer input { -webkit-user-select:text;user-select:text; }
 .xd-photo-layer.selected { background:rgba(var(--xd-accent-rgb),.13); }
 /* Colour labels tint the visibility column, as in Photoshop. There is no red or label palette token: red borrows Hermes' error value (gap logged in PROGRESS.md). */
 .xd-photo-layer[data-color=red],.xd-photo-label-swatch[data-color=red] { --label:#ff5e6a; }

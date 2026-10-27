@@ -1,3 +1,47 @@
+## 2026-10-27 (cont.) — XDesign follow-up batch: ruler-unit Properties, snapshot thumbnails, layer right-click, tool hints; builds 15–16
+
+Branch: `validation/alpha-2026-09-14`. Committed and pushed to origin with the owner's authorisation (2026-10-27). No new dependencies. No tokens were added. Photoshop was not used.
+
+Done (detail in CLAUDE_LOG_ARCHIVE.md):
+- **Ruler units in Properties**: the W/H/X/Y fields read and accept values in the ruler unit, including percent (Task 28 gap).
+- **Snapshot thumbnails**: History snapshots and the Open row show real thumbnails instead of placeholders.
+- **Layer-name right-click**: it opens the layer menu without selecting the name's text.
+- **Tool hints**: every tool has its own status-bar hint.
+  - 10 added: Spot Healing, Pattern Stamp, History Brush, Eraser, Blur, Sharpen, Smudge, Dodge, Burn and Sponge.
+  - The previous entry was wrong to list Brush and Pencil; they already had hints.
+- **No WebKit menu**: the photo workspace no longer opens WebKit's own context menu, except in text fields. This was found live on build 15: a right-click on the pasteboard opened WebKit's menu, and choosing its **Reload** reloaded the page. The document survived in the native session; the view did not.
+- **Thumbnail spacing**: the History thumbnails have the same spacing as the placeholder icons. On build 15 the labels touched the images.
+
+Gates:
+- `npm run typecheck` is clean.
+- PhotoHistory, PhotoProperties, PhotoStudio.layout and PhotoStudio.tools pass 275/275.
+- `cargo test --lib`: 1437 passed, 0 failed, 20 ignored.
+
+Build 15 live (scratch-HOME release instance):
+- The Eraser and Dodge hints show in the status bar.
+- Right-clicking "Rectangle 1" opens the layer menu, and no text is selected after Esc.
+- In inches, Properties read W 2.58, H 3.31, X 1.22 and Y 2.5, which matches the pixel values at 72 ppi. Typing W 2 in resized the layer, with H following through the link.
+- The snapshot and Open-row thumbnails show the right images.
+- Two defects were found and fixed in build 16: the Reload menu and the thumbnail spacing.
+
+Build 16 live:
+- Right-clicking the pasteboard or an empty part of the Properties panel opens no menu.
+- The ruler menu still opens.
+- The thumbnails are spaced from their labels.
+
+The scratch preferences are back to Pixels with the rulers shown.
+
+Open questions:
+- **For the owner**: outside the photo workspace, the shell and the other apps still open WebKit's menu, with Reload, on areas that don't handle right-clicks. Should the shell suppress it everywhere except text fields?
+- Photoshop's pasteboard right-click menu (pasteboard colour) is not implemented.
+- Still observed and unchanged: the Window and Edit menus scroll in a 900 pt window.
+
+Next:
+1. Photomerge and Merge to HDR Pro (Task 18), which need their own plan.
+2. A fresh comparison pass against Photoshop.
+
+The scratch release instance (build 16, PID 69283) stays running, and the Terminal job runner is stopped.
+
 ## 2026-10-27 (cont.) — XDesign gap closure: live re-check on build 11, six fixes, builds 12–14
 
 Branch: `validation/alpha-2026-09-14`. Committed and pushed to origin with the owner's authorisation (2026-10-27). The commit covers Tasks 10–30 and the build 12–14 fixes. The push also carried the 6 earlier unpushed commits (c6ff015…56acd17). No new dependencies. Photoshop was not used.

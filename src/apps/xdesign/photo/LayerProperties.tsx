@@ -1,12 +1,14 @@
 import { useRef, useState, type ReactNode } from "react";
 import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter, AlignHorizontalDistributeEnd, AlignHorizontalDistributeStart, AlignHorizontalSpaceAround, AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, AlignVerticalDistributeEnd, AlignVerticalDistributeStart, AlignVerticalSpaceAround, FlipHorizontal2, FlipVertical2, Link2, Link2Off, RotateCw, Check, Eye, Square, SquareDashed, SquareDashedMousePointer, SquarePlus, Trash2, type LucideIcon } from "lucide-react";
 import { InspectorSection } from "../EditorChrome";
+import { unitsPerPixel, usePreferences, type RulerUnit } from "./preferences";
 import { runPhotoCommand } from "./runtime";
 import type { PhotoLayer } from "./types";
 
 type Quad = [number, number][];
 const attempt = (work: Promise<unknown>) => { void work.catch(() => {}); };
 const round = (value: number) => Math.round(value * 100) / 100;
+const UNIT_LABELS: Record<RulerUnit, string> = { pixels: "px", inches: "in", centimeters: "cm", millimeters: "mm", points: "pt", picas: "pica", percent: "%" };
 
 export function Field({ label, name, unit, value, disabled, commit }: { label: ReactNode; name: string; unit: string; value: number; disabled: boolean; commit: (value: number) => void }) {
   const [draft, setDraft] = useState<string | null>(null), cancelled = useRef(false);
@@ -21,8 +23,10 @@ export function Field({ label, name, unit, value, disabled, commit }: { label: R
 
 // Photoshop's Transform cluster: W and H resize from the top-left corner (linked keeps the aspect), X and Y move the layer,
 // and the angle turns it about its centre. Pixel layers keep no rotation, so the angle reads 0° again once applied.
-export function TransformSection({ layer, disabled }: { layer: PhotoLayer; disabled: boolean }) {
+// Sizes and positions read in the ruler unit, percent being of the canvas width or height as on the rulers.
+export function TransformSection({ layer, size: [width, height], resolution, disabled }: { layer: PhotoLayer; size: [number, number]; resolution: number; disabled: boolean }) {
   const [linked, setLinked] = useState(true);
+  const unit = usePreferences(state => state.rulerUnit), pointSize = usePreferences(state => state.pointSize);
   const frame = layer.transformBounds ?? layer.bounds;
   if (!frame) return null;
   // An empty frame means the selection misses every pixel of the layer, so there is nothing to transform or move from.
@@ -35,13 +39,14 @@ export function TransformSection({ layer, disabled }: { layer: PhotoLayer; disab
     const angle = degrees * Math.PI / 180, cos = Math.cos(angle), sin = Math.sin(angle), cx = x + w / 2, cy = y + h / 2;
     transform(corners.map(([px, py]) => [cx + (px - cx) * cos - (py - cy) * sin, cy + (px - cx) * sin + (py - cy) * cos]));
   };
+  const kx = unitsPerPixel(unit, resolution, pointSize, width), ky = unitsPerPixel(unit, resolution, pointSize, height), label = UNIT_LABELS[unit];
   const LinkIcon = linked ? Link2 : Link2Off;
   return <InspectorSection title="Transform" defaultOpen><div className="xd-photo-transform">
-    <div><Field label="W" name="Width" unit="px" value={w} disabled={locked} commit={width => resize(width, linked ? h * width / w : h)}/>
+    <div><Field label="W" name="Width" unit={label} value={w * kx} disabled={locked} commit={value => { const next = value / kx; resize(next, linked ? h * next / w : h); }}/>
       <button type="button" aria-label="Link width and height" title="Link width and height" aria-pressed={linked} disabled={locked} onClick={() => setLinked(!linked)}><LinkIcon size={13}/></button>
-      <Field label="H" name="Height" unit="px" value={h} disabled={locked} commit={height => resize(linked ? w * height / h : w, height)}/></div>
-    <div><Field label="X" name="X position" unit="px" value={x} disabled={locked} commit={next => move(Math.round(next - x), 0)}/><span/>
-      <Field label="Y" name="Y position" unit="px" value={y} disabled={locked} commit={next => move(0, Math.round(next - y))}/></div>
+      <Field label="H" name="Height" unit={label} value={h * ky} disabled={locked} commit={value => { const next = value / ky; resize(linked ? w * next / h : w, next); }}/></div>
+    <div><Field label="X" name="X position" unit={label} value={x * kx} disabled={locked} commit={next => move(Math.round(next / kx - x), 0)}/><span/>
+      <Field label="Y" name="Y position" unit={label} value={y * ky} disabled={locked} commit={next => move(0, Math.round(next / ky - y))}/></div>
     <div><Field label={<RotateCw size={12}/>} name="Angle" unit="°" value={0} disabled={locked} commit={rotate}/>
       <button type="button" aria-label="Flip horizontal" title="Flip horizontal" disabled={locked} onClick={() => transform([corners[1]!, corners[0]!, corners[3]!, corners[2]!])}><FlipHorizontal2 size={14}/></button>
       <button type="button" aria-label="Flip vertical" title="Flip vertical" disabled={locked} onClick={() => transform([corners[3]!, corners[2]!, corners[1]!, corners[0]!])}><FlipVertical2 size={14}/></button></div>

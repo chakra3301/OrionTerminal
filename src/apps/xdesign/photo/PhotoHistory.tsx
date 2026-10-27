@@ -18,6 +18,9 @@ export function historyActions(state:PhotoState) {
   };
 }
 
+const png=(data:string)=>`data:image/png;base64,${data}`;
+const thumb=(src?:string)=>src?<img className="xd-photo-layer-thumb xd-photo-history-thumb" src={src} alt=""/>:<span className="xd-photo-layer-thumb xd-photo-history-thumb"><ImageIcon size={14}/></span>;
+
 export function PhotoHistory({state,disabled,contents,name,preview,source,chooseSource,newSnapshot}:{state:PhotoState;disabled:boolean;contents:boolean;name?:string;preview?:string;source?:string|null;chooseSource?:(id:string)=>void;newSnapshot?:()=>void}) {
   const past=state.historySources??[],current=past.find(source=>source.current)?.index??past.length-1;
   const rows=[...past.map(source=>({index:source.index,label:source.label,current:source.current,redo:false,id:source.id,available:source.available,reason:source.reason})),...(state.historyRedo??[]).map((label,offset)=>({index:current+1+offset,label,current:false,redo:true,id:"",available:false,reason:null}))];
@@ -44,13 +47,13 @@ export function PhotoHistory({state,disabled,contents,name,preview,source,choose
       <div role="listitem" className={`xd-photo-layer xd-photo-history-snapshot${open?.current?" selected":""}`}>
         {open?pick(open):<span className="xd-photo-history-src"/>}
         <button className="xd-photo-layer-name" disabled={disabled||!open||open.current} aria-current={open?.current?"step":undefined} title={!open?"The opening state is no longer retained":open.current?"Current state":"Return to this state"} onClick={()=>open&&jump(open.index)}>
-          {preview&&open?.current?<img className="xd-photo-layer-thumb" src={preview} alt=""/>:<span className="xd-photo-layer-thumb xd-photo-history-thumb"><ImageIcon size={14}/></span>}<span>{name||state.name}</span></button>
+          {thumb(state.historyOpenThumbnail?png(state.historyOpenThumbnail):open?.current?preview:undefined)}<span>{name||state.name}</span></button>
       </div>
       {snapshots.map(row=>{const at=past.find(state=>state.id===row.source);return <div key={row.id} role="listitem" className={`xd-photo-layer xd-photo-history-snapshot${row.current?" selected":""}`}>
         {pick({id:row.source,available:!!at?.available,reason:at?at.reason:SNAPSHOT_GONE})}
         {renaming?.id===row.id?<input className="xd-photo-layer-name" aria-label="Snapshot name" autoFocus maxLength={255} value={renaming.name} onChange={e=>setRenaming({id:row.id,name:e.target.value})} onBlur={rename} onKeyDown={e=>{if(e.key==="Enter")rename();else if(e.key==="Escape")setRenaming(null);}}/>:
         <button className="xd-photo-layer-name" disabled={disabled} aria-current={row.current?"step":undefined} title={row.current?"Current snapshot. Double-click to rename":"Return to this snapshot. Double-click to rename"} onClick={()=>{if(!row.current)run("history.snapshot.select",{id:row.id});}} onDoubleClick={()=>setRenaming({id:row.id,name:row.name})}>
-          <span className="xd-photo-layer-thumb xd-photo-history-thumb"><ImageIcon size={14}/></span><span>{row.name}</span></button>}
+          {thumb(row.thumbnail?png(row.thumbnail):undefined)}<span>{row.name}</span></button>}
       </div>;})}
       <hr className="xd-photo-history-divider"/>
       {rows.map(row=><div key={`${row.index}/${row.redo}`} ref={row.current?currentRow:undefined} role="listitem" className={`xd-photo-layer${row.current?" selected":""}${row.redo?" xd-photo-history-redo":""}`}>

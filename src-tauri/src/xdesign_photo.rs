@@ -613,6 +613,7 @@ fn reply(
     state["historyRedo"] = history::redo_labels(&session.engine);
     state["historySnapshots"] = snapshots::describe(&session.engine, photo);
     state["historySnapshotName"] = json!(snapshots::next_name(photo));
+    state["historyOpenThumbnail"] = snapshots::opening(&session.engine, photo);
     let doc = &session.engine.active().ok_or("No image document")?.doc;
     state["paths"] = json!({"saved":doc.paths.iter().map(|path|path.name.as_str()).collect::<Vec<_>>(),"work":doc.work_path.is_some()});
     state["presets"] = tools::presets(&session.engine);

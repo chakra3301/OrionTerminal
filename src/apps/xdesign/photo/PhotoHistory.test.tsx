@@ -17,6 +17,12 @@ describe("PhotoHistory",()=>{
     await show(make());const snap=container.querySelector<HTMLButtonElement>(".xd-photo-history-snapshot .xd-photo-layer-name")!;expect(snap.textContent).toBe("Portrait.jpg");expect(container.querySelector("hr")).toBeTruthy();
     await act(async()=>snap.click());expect(run).toHaveBeenCalledWith("history.select",{index:0});
   });
+  it("shows the image as opened and each snapshot's image, like Photoshop's snapshot thumbnails",async()=>{
+    const thumbs=()=>[...container.querySelectorAll(".xd-photo-history-snapshot")].map(row=>row.querySelector("img")?.getAttribute("src")??null);
+    await show({...make(),historyOpenThumbnail:"T1",historySnapshots:[{id:"s1",name:"A",source:"a",current:false,thumbnail:"T2"},{id:"s2",name:"B",source:"b",current:false}]} as PhotoState);
+    expect(thumbs()).toEqual(["data:image/png;base64,T1","data:image/png;base64,T2",null]);
+    await show(make([src("a",0,"Open",true)]));expect(thumbs()).toEqual(["p.png"]);
+  });
   it("disables the snapshot row when the opening state was evicted",async()=>{
     await show(make([src("b",0,"Blur"),src("c",1,"Brush",true)]));const snap=container.querySelector<HTMLButtonElement>(".xd-photo-history-snapshot .xd-photo-layer-name")!;expect(snap.disabled).toBe(true);expect(snap.title).toContain("no longer retained");
   });

@@ -179,6 +179,17 @@ describe("Image workspace layout", () => {
     await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,activeLayer:1}})));
     expect(blend().value).toBe("Normal");expect([...blend().options].map(option=>option.value)).not.toContain("Pass Through");
   });
+  it("gives every tool its own status bar hint, as Photoshop's Info panel does", async () => {
+    const generic:string[]=[];
+    for(const {id} of IMAGE_TOOL_GROUPS.flatMap(group=>group.tools)){await chooseTool(id);if(container.querySelector(".xd-ps-status-text")!.textContent==="Edits update every linked placement")generic.push(id);}
+    expect(generic).toEqual([]);
+  });
+  it("never opens the browser's own menu, whose Reload drops the session, but keeps it in text fields", async () => {
+    await showDocument();
+    const rightClick=(target:Element)=>!target.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true}));
+    expect(rightClick(container.querySelector(".xd-photo-stage")!)).toBe(true);
+    expect(rightClick(container.querySelector(".xd-photo input")!)).toBe(false);
+  });
   it("shows selections as marching ants only by default, like Photoshop", async () => {
     await showDocument();
     expect(container.querySelector<HTMLSelectElement>('[aria-label="Selection display"]')!.value).toBe("outline");
@@ -1029,6 +1040,18 @@ describe("Image workspace layout", () => {
     expect(["Width", "X position", "Y position", "Angle"].map(label => container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!.disabled)).toEqual([true, true, true, true]);
     await act(async () => usePhotoWorkspace.setState(s => ({ state: { ...s.state!, layers: s.state!.layers.map(layer => ({ ...layer, transformBounds: [10, 20, 300, 200], locks: { transparency: false, pixels: false, position: true, all: false } })) } })));
     expect(container.querySelector<HTMLInputElement>('[aria-label="Width"]')!.disabled).toBe(true);
+  });
+  it("shows the Transform fields in the ruler unit, like Photoshop's Properties panel", async () => {
+    const field = (label: string) => container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+    const edit = async (label: string, value: string) => { await act(async () => { const input = field(label); input.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); input.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" })); }); };
+    try {
+      await framed(); await act(async () => usePreferences.setState({ rulerUnit: "inches" })); command.mockClear();
+      expect(["Width", "Height", "X position", "Y position"].map(label => [field(label).value, field(label).parentElement!.textContent])).toEqual([["4.17", "Win"], ["2.78", "Hin"], ["0.14", "Xin"], ["0.28", "Yin"]]);
+      await edit("Width", "2"); expect(command).toHaveBeenLastCalledWith("edit.transform", { layer: 1, rect: [10, 20, 310, 220], quad: [[10, 20], [154, 20], [154, 116], [10, 116]] });
+      await act(async () => usePreferences.setState({ rulerUnit: "percent" }));
+      expect([field("Width").value, field("Height").value, field("Width").parentElement!.textContent]).toEqual(["37.5", "33.33", "W%"]);
+      await edit("X position", "50"); expect(command).toHaveBeenLastCalledWith("layer.translate", { layer: 1, dx: 390, dy: 0 });
+    } finally { await act(async () => usePreferences.setState({ ...DEFAULT_PREFERENCES, notice: null })); }
   });
   it("keeps adjustments discoverable and adds them as layers edited in Properties", async () => {
     expect(button("Levels")).toBeUndefined(); await click("Adjustments");
