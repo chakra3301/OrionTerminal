@@ -30,7 +30,10 @@ import { placePencilAsset, editPencilImage, pencilCanvasPoint, usePencilWorkspac
 import { trackXDesignActivity } from "./runtimeActivity";
 import { openProjectFile, saveProjectFile } from "./projectFiles";
 import { DraftRecoveryDialog } from "./photo/DraftRecoveryDialog";
+import { resumeImageEditor, startOpenImageTracking } from "./photo/resume";
+import { startPreviewTracking } from "./projectPreview";
 import { ProjectHistoryDialog } from "./ProjectHistoryDialog";
+import { ProjectChangeStatus } from "./ProjectChangeStatus";
 
 const PencilStudio = lazy(() => import("./pencil/PencilStudio").then(m=>({default:m.PencilStudio})));
 
@@ -123,7 +126,12 @@ async function handleImageDrop(paths: string[], point?: { x: number; y: number }
   }
 }
 
+// The status sits outside .xd-root so the inert, dimmed workspace doesn't dim or hide it.
 export function XDesignApp() {
+  return <><XDesignWorkspace/><ProjectChangeStatus/></>;
+}
+
+function XDesignWorkspace() {
   const stageRef = useRef<HTMLDivElement>(null);
   // Captured via callback ref → state so the docked Design Partner can portal
   // up to the shell and live as a real flex column (see XDesignClaudeRail).
@@ -149,6 +157,16 @@ export function XDesignApp() {
   const activeId = useXDProjects((s) => s.activeId);
   const transitioning = useXDProjects((s) => s.transitioning);
   useEffect(()=>{if(photoProject&&photoProject!==activeId)usePhotoWorkspace.getState().close();},[activeId,photoProject]);
+  useEffect(()=>startOpenImageTracking(),[]);
+  useEffect(()=>startPreviewTracking(),[]);
+  const pencilEditor=usePencilWorkspace(s=>s.editor);
+  const resumedFor=useRef<string|null>(null);
+  useEffect(()=>{
+    if(!activeId){resumedFor.current=null;return;}
+    if(transitioning||!imageReady||resumedFor.current===activeId)return;
+    resumedFor.current=activeId;
+    void resumeImageEditor(activeId).then(done=>{if(!done&&resumedFor.current===activeId)resumedFor.current=null;});
+  },[activeId,transitioning,imageReady,pencilEditor]);
   useEffect(()=>{if(rawImport&&rawImport.projectId!==activeId)setRawImport(null);},[activeId,rawImport]);
   useEffect(()=>()=>{cancelColorImport();cancelPasteColor();},[]);
   const decisionProject=usePhotoWorkspace(state=>state.pasteDecision?.projectId??state.colorDecision?.projectId);

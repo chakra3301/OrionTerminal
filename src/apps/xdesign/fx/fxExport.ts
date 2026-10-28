@@ -71,6 +71,9 @@ export async function renderFxSnapshot(
     );
   } finally {
     compositor.dispose();
+    // dispose() frees GL objects, not the context; WebKit caps live contexts
+    // and evicts the oldest, which can be the open editor's.
+    canvas.getContext("webgl2")?.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }
 

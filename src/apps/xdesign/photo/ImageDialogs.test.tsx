@@ -239,12 +239,22 @@ describe("Export As", () => {
     await act(async () => root.render(<ImageExportDialog name="Shot.psd" choose={vi.fn()} close={vi.fn()}/>));
     expect(options()).not.toContain("Photoshop PDF");
     const choose = vi.fn().mockResolvedValue(undefined); native.save.mockResolvedValue("/tmp/Shot.pdf");
-    await act(async () => root.render(<ImageExportDialog key="copy" name="Shot.psd" copy choose={choose} close={vi.fn()}/>));
+    await act(async () => root.render(<ImageExportDialog key="copy" name="Shot.psd" kind="copy" choose={choose} close={vi.fn()}/>));
     expect(container.querySelector('[role="dialog"]')!.getAttribute("aria-label")).toBe("Save a Copy");
     expect(options().slice(0, 2)).toEqual(["Photoshop (PSD)", "Photoshop PDF"]);
     await select("Format", "pdf"); await click(button("Save"));
     expect(native.save).toHaveBeenCalledWith({ defaultPath: "Shot.pdf", filters: [{ name: "Photoshop PDF", extensions: ["pdf"] }] });
     expect(choose).toHaveBeenCalledWith("/tmp/Shot.pdf", undefined);
+  });
+  it("titles the first save of an image Save As, as Photoshop does, with PSD first", async () => {
+    const options = () => [...container.querySelectorAll<HTMLOptionElement>('[aria-label="Format"] option')].map(option => option.textContent);
+    const choose = vi.fn().mockResolvedValue(undefined); native.save.mockResolvedValue("/tmp/Shot.psd");
+    await act(async () => root.render(<ImageExportDialog name="Shot.jpg" kind="save" choose={choose} close={vi.fn()}/>));
+    expect(container.querySelector('[role="dialog"]')!.getAttribute("aria-label")).toBe("Save As");
+    expect(options().slice(0, 2)).toEqual(["Photoshop (PSD)", "Photoshop PDF"]);
+    await click(button("Save"));
+    expect(native.save).toHaveBeenCalledWith({ defaultPath: "Shot.psd", filters: [{ name: "Photoshop (PSD)", extensions: ["psd", "psb"] }] });
+    expect(choose).toHaveBeenCalledWith("/tmp/Shot.psd", undefined);
   });
 });
 

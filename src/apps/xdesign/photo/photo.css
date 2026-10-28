@@ -171,6 +171,7 @@ html.xd-photo-drag-ew,html.xd-photo-drag-ew * { cursor:ew-resize !important; }
 .xd-photo-notes-bar output { flex:1;text-align:center;font-size:11px;color:var(--xd-text-2); }
 .xd-photo-canvas-text { position:absolute;z-index:3;box-sizing:border-box;padding:2px 4px;border:1px dashed var(--xd-accent);background:rgba(0,0,0,.35);color:#fff;resize:none;overflow:hidden;outline:none;white-space:pre; }
 .xd-photo-layer-thumb { width:28px;height:28px;flex-shrink:0;object-fit:contain;border:1px solid var(--xd-border);border-radius:2px;background:repeating-conic-gradient(#8a8a8a 0 25%,#c8c8c8 0 50%) 0 0/8px 8px; }
+.xd-photo-layer-type-thumb { display:grid;place-items:center;background:var(--xd-panel);color:var(--xd-text); }
 .xd-photo-navigator-zoom { display:flex;align-items:center;gap:4px;margin-top:8px;color:var(--xd-text-2);font-size:11px; }
 .xd-photo-navigator-zoom input[type=number] { box-sizing:border-box;width:44px;height:20px;padding:0 4px;border:1px solid var(--xd-border);border-radius:var(--r-sm);background:var(--xd-raised);color:var(--xd-text);font:inherit; }
 .xd-photo-navigator-zoom input[type=range] { flex:1;min-width:0;accent-color:var(--xd-accent); }

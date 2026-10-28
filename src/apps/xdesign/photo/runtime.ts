@@ -5,7 +5,8 @@ import { useXDProjects } from "../projectsStore";
 import { useXDesign } from "../store";
 import { beginXDesignActivity, trackXDesignActivity } from "../runtimeActivity";
 import { ipc } from "@/lib/ipc";
-import { validatePhotoDocuments, type PhotoDocument, type PhotoReply, type PhotoState, type PhotoOpenReply, type PhotoColorDecision, type PhotoPasteDecision, type PhotoClipboardReply } from "./types";
+import { log } from "@/lib/log";
+import { PSD_PATH, validatePhotoDocuments, type PhotoDocument, type PhotoReply, type PhotoState, type PhotoOpenReply, type PhotoColorDecision, type PhotoPasteDecision, type PhotoClipboardReply } from "./types";
 import { usePencilWorkspace } from "../pencil/runtime";
 import { channelWorkspaceRequired } from "./channelSources";
 import { recordActionStep } from "./actions";
@@ -481,12 +482,15 @@ export async function stepSmartContentsHistory(redo:boolean):Promise<void> {
   },true);
 }
 
-export async function exportImage(path: string, quality?: number): Promise<string[]> {
+export async function exportImage(path: string, quality?: number, saveAs = false): Promise<string[]> {
   return operation(async projectId => {
     const target=usePhotoWorkspace.getState();
     const document = target.documentId ? useXDesign.getState().photoDocuments[target.documentId] : null;
     if (!document) throw new Error("Reopen the image before exporting");
-    return invoke<string[]>("xdesign_photo_export", { projectId, photoId: document.id, version: document.version, path, quality: quality ?? null });
+    const warnings = await invoke<string[]>("xdesign_photo_export", { projectId, photoId: document.id, version: document.version, path, quality: quality ?? null });
+    if (saveAs && PSD_PATH.test(path)) useXDesign.setState(state => ({ photoSavePaths: { ...Object.fromEntries(Object.entries(state.photoSavePaths).filter(([id]) => state.photoDocuments[id])), [document.id]: path } }));
+    await useXDProjects.getState().noteImageSaved(projectId, path, saveAs).catch(error => log.warn("xdesign: project list not updated after saving an image", error));
+    return warnings;
   });
 }
 

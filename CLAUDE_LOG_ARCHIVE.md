@@ -1,3 +1,132 @@
+## 2026-10-28 — Claude / XDesign: Home previews, image-editor resume, names from Save As; builds 26–27
+
+Owner request: real thumbnails on the XDesign Home page ("i picture seeing that project r2c at the top and a preview of the conten like the image that i was working on, when i click it it should basically pic right back up from the last save"). Brainstormed into the spec, planned in 6 tasks, run inline (owner: "just go native"), each step test-first. Committed and pushed on the owner's go-ahead. The ledger in `.superpowers/sdd/2026-10-28-xdesign-home-previews/` was deleted after the commit; git history is the record.
+
+**Task 1, top of the list and names from Save As** (`projectsStore.ts`, `photo/runtime.ts`):
+- Registry entries carry `nameFromFile`; `DEFAULT_PROJECT_NAME` marks an untouched name.
+- `noteImageSaved(projectId, path, saveAs)` runs after a successful image file write. It bumps `updatedAt`. On a Save As, a default or file-derived name takes the file's stem, numbered if another project has it, never counting the project itself. A typed name is left alone.
+- `exportImage` calls it.
+
+**Task 2, resume** (`photo/resume.ts`, `photo/types.ts`, `store.ts`, `pluginContributions.ts`, `PhotoStudio.tsx`, `XDesignApp.tsx`, `xdesign_archive.rs`):
+- `photoResume` (legacy shape id, or Pencil node id plus photo document id) is saved beside `photoDocuments`, so undo can't change it, and checked on load by `validatePhotoResume`.
+- `startOpenImageTracking` records it while the image editor is open; `closeImageEditor` clears it on a user close.
+- `resumeImageEditor()` returns `Promise<boolean>`; XDesignApp retries when the Pencil editor arrives. It does nothing for FX and 3D projects, and checks `pencilEditorProject()` so a leftover editor can't clear the new project's image.
+- `local_only()` drops `photoResume` from exports, clones and imports.
+
+**Task 3, storage** (`src-tauri/src/xdesign_preview.rs`, `lib.rs`):
+- `xdesign_preview_write(projectId, png)`, `xdesign_preview_list()`, `xdesign_preview_delete(projectId)`.
+- Ids must round-trip as a ULID. Writes are capped at 4 MiB, must start with the PNG signature, and use `atomic_write_bytes`. Listing skips anything that isn't `<ULID>.png`. `revision` is the file's mtime in µs.
+- 3 Rust tests.
+
+**Task 4, capture** (`projectPreview.ts`, `previewCapture.ts`, `previewImage.ts`, `pencil/runtime.ts` `capturePencilPreview`, `projectsStore.ts`, `XDesignApp.tsx`):
+- `captureProjectPicture` picks, in order: nothing unless active; "clear" while the Claude page is open; FX via `renderFxSnapshot` at t=0; 3D via `captureReviewShot`; the resumable image's preview; the Pencil board (rendered from a decoded copy of autosave's cached graph); the legacy board.
+- `startPreviewTracking` (mounted by XDesignApp) watches the active id and its `updatedAt`, input events, and the photo and Pencil busy flags. Captures don't register XDesign activity, so they never block a project change.
+- A switch marks a running capture abandoned. Its result is dropped, and the project is captured again when it's next active.
+- `leaveActive()` (open, Home, close of the active tab) saves, then `settlePreview` with a 400 ms budget. `deleteProject` removes the preview after the commit.
+- 11 + 7 tests, plus 2 in `projectsStore.test.ts`.
+
+**Task 5, Home** (`XDesignHome.tsx`, `tokens.css`):
+- Loads the preview list on mount. Cards with an entry render `img.xd-home-card-image` at `convertFileSrc(path)?v=<revision>`. `onError` falls back to `ProjectThumb` for that revision.
+- Full docs load only after the list, and only for design projects with no entry.
+- `.xd-home-card-image` sets no colour or spacing, so no tokens were needed.
+- 3 tests. `ProjectImportRecovery.runtime.test.tsx` now answers `xdesign_preview_list` and counts only import-control calls.
+
+**Rulings** (all in the ledger, each with its cost if wrong):
+- No worktree, no commits; reviewed from the working-tree diff.
+- `pencilEditorProject()`; resume returns a boolean; resume skips FX/3D; the PhotoStudio close test goes through File › Close.
+- `projectPreview` is lazy from `projectsStore` and imports `previewCapture` statically; Pencil captures from a copy; any switch abandons a capture; it polls every 1.5 s while blocked; `load()` outside Tauri does nothing.
+- The recovery test counts only its own native calls.
+
+**Gates:**
+- Typecheck clean.
+- 9 focused files pass, 191/191. A first run beside the `cargo` compile had 3 `PhotoStudio.tools` timeouts at 5 s; that file alone passed 81/81, and the final run passed clean.
+- `cargo test --lib` 1442 passed, 20 ignored.
+- Build 26 (`/Users/lucaorion/Orion_Terminal/src-tauri/target/release/bundle/macos/Orion Terminal.app`) starts on `HOME=/tmp/xd-release-home` and opens its window with an empty log; it was then quit. `/Applications` was not replaced.
+- No UI automation: `AXIsProcessTrusted` is false in this session.
+
+**Final review** (a fresh opus reviewer, whole working-tree diff): "With fixes", 0 Critical, 2 Important, 5 Minor, and 10 items it declined to judge. I re-graded them by what a person gets:
+- **Fixed, Important 1:** `renderFxSnapshot` freed its GL objects but never its WebGL context, so each FX capture left one alive, and WebKit drops the oldest, which can be the open FX editor's. It now calls `WEBGL_lose_context.loseContext()` after `dispose()`. This also covers FxEditor's snapshot exports. Test: `fx/fxExport.snapshot.test.ts`.
+- **Fixed, Important 2, legacy half:** a legacy board capture rendered each photo at full resolution (`xdesign_photo_render`), then read and base64-encoded it on the main thread. `rasterizePNG`/`renderPngBytes` take `fullResolutionPhotos` (default true, so the Claude vision picture is unchanged), and previews pass false, keeping the board's own preview hrefs. Tests: 2 in `exportXD.resource.test.ts`, and `previewCapture.test.ts` expects the flag.
+- **Ruled, Important 2, Pencil half:** a Pencil capture still decodes a copy of the graph, image bytes included, on the main thread. Avoiding the copy means rendering the live graph, which reads as an edit (Task 4 ruling). Unmeasured; there's a new owner-checklist line for it.
+- **Declined items, all ruled to stand, with costs in the ledger:**
+  - a tab switch during a resume is refused with a message;
+  - opening an image moves its project to the top;
+  - each activation takes one capture;
+  - the export text-measurer swap can only overlap on a session's first capture;
+  - checkpoint restore carries resume and save paths;
+  - a mid-capture delete is unreachable;
+  - a typed "Untitled N" can be renamed by Save As;
+  - legacy previews use the dark editor backdrop;
+  - builds 24–25 weren't in this diff.
+  - The full-resolution `render.png` on a first legacy capture is gone with the fix above.
+- **Deferred minors:**
+  - a failing capture retries every 15 s;
+  - there's no `pencilEditorProject()` guard on the Pencil capture;
+  - an unreadable preview shows an empty card, not the shape drawing;
+  - orphaned preview files aren't swept;
+  - the number-array IPC, and 1 s mtime filesystems repeating a revision.
+- **After the fixes:** 14 focused files pass 223/223; typecheck is clean; Rust is unchanged.
+- **Build 27:** release bundle at the same path, exit 0. It starts on `HOME=/tmp/xd-release-home`, opens its window in about 6 s with an empty log, and was quit by pid. `/Applications` wasn't touched, and the owner's dev instance was left running.
+- **Plan correction:** the self-review's WebGL row now says the context is released too.
+
+**Owner result and commit:** the owner ran the whole checklist and reported "everything was fine". On "looks good lets commit everything", builds 24–27 (the smoke-test fixes, Save As persistence, this spec, plan and feature) went into one commit. The shared hunks couldn't be split without interactive staging. Pushed on "sure lets close this".
+
+**Smoke-test doc:** the status line now covers builds 24–27. There's a new "Home page" checklist block, with a stutter and FX-preview check for the unmeasured capture cost.
+
+## 2026-10-27 (cont.) — Claude / XDesign: smoke-test fixes, builds 24–25
+
+Owner request: "lets fix those problems you found first then ill test". Each fix was made test-first. Uncommitted.
+
+**F1, Levels flicker:**
+- **Cause**: OK cleared the live preview overlay at once, while the applied full-resolution image took ~4 s to reach the canvas.
+- **Fix**: `PhotoActionDialog` takes an `untilShown` prop, which defaults to settling on the command. PhotoStudio passes its own, which waits for the canvas `imageShown` with a 2 s fallback.
+- **Display**: the dialog keeps `held = preview.url` and keeps the portal `<img>` mounted with that src until then.
+- **Scope**: Smart Blur, the only gallery-guarded path, uses geometry and never had the overlay.
+- **Test**: "keeps the previewed result on the canvas after OK until the applied image is shown".
+
+**F2, shortcut focus:**
+- **Cause**: WebKit doesn't focus a clicked button, so a header click left focus on the body. The shell's global hotkeys then took ⌘L.
+- **Fix**: a document `mousedown` listener in PhotoStudio. On the next frame, if focus is on the body and the click was inside the same `.ot-window` but outside `.xd-photo`, it focuses `.xd-photo`.
+- **Exceptions**: it skips this when a design dialog is open, the window is unfocused or the page lacks focus.
+
+**F3, Save As:**
+- `ImageExportDialog` takes `kind: "export" | "copy" | "save"`, which replaces the `copy` boolean. It sets the title (Export As / Save a Copy / Save As), the format list and the OK label.
+- PhotoStudio keeps a module-level `savedPaths` map from document id to the last Save As PSD.
+- **⌘S**: saves to that PSD, else to an opened PSD, else opens Save As.
+- **File menu**: Save As… ⇧⌘S goes after Save.
+- **Follow-up, build 25** (owner: "fix that saving issue"):
+  - **Bug**: the in-memory map reset on restart, after which ⌘S fell back to `originalPath` and could save over the opened PSD rather than the Save As copy.
+  - **Where it lives**: `useXDesign.photoSavePaths` is persisted in the project doc and validated by `validatePhotoSavePaths` (ULID keys, PSD/PSB values, at most 1024 entries). It is a separate map because photo documents are versioned snapshots that undo restores. A field on them could bring back an older Save As path and overwrite the wrong file.
+  - **Recording**: `exportImage(path, quality, saveAs)` writes the map inside the export operation, after the native export succeeds. That operation blocks project switches. It also prunes ids that are no longer in `photoDocuments`.
+  - **Autosave**: `pluginContributions` schedules a save when the map changes.
+  - **Archives**: `local_only()` in `xdesign_archive.rs` drops the map in `build_archive_with_photo_sources` (export, clone) and `unpack_archive_managed` (any import, including crafted files), so an imported project can't point ⌘S at an arbitrary path.
+  - **Tests**: `savePaths.test.ts` (persistence through undo and rehydration, exports and non-PSD saves left out, validation). The Rust round-trip test now covers export, crafted import and clone. In `PhotoStudio.tools.test.tsx`, `exportImage` expectations now include the flag.
+  - **Gates**: `cargo test --lib` passes (1439). Build 25 is at `/tmp/xd-build25.log`.
+
+**F4, project status:**
+- `ProjectChangeStatus` shows `role="status"` "Loading project…" 500 ms after `useXDProjects.transitioning` turns true. Its timer resets on each change.
+- `XDesignApp` now renders `<><XDesignWorkspace/><ProjectChangeStatus/></>`, so the status sits outside the inert `.xd-root`.
+- **CSS** (`tokens.css`): `.xd-project-status` uses only existing shell tokens: `--glass-bg-strong`, `--glass-border`, `--r-pill`, `--shadow-window`, `--t-secondary` and `--f-mono`.
+
+**F7 and F8:**
+- **Thumbnail**: type layers render a `Type` icon thumb (`.xd-photo-layer-type-thumb`).
+- **Properties**: the Typography inspector section moved to just after `TransformSection`.
+- **Layout test fixture**: needs `bounds` for Transform to render.
+
+**Not fixed:**
+- F5, memory: not investigated.
+- F6, one image per editor: single-`documentId` architecture.
+
+**Gates:**
+- Typecheck is clean.
+- Focused vitest, 529 tests in 9 suites: PhotoActionDialog, PhotoStudio.tools, PhotoStudio.layout, ImageDialogs, fileMenu.studio, PhotoTextGeometryDialog, AdjustmentProperties, LayerStyleDialog and ProjectChangeStatus.
+- **Build 24** (`npm run tauri build -- --bundles app`, log `/tmp/xd-build24.log`) runs on the scratch HOME.
+- **Live check not possible**: `screencapture` reports "could not create image from display", and osascript and axt get no assistive access.
+
+**Docs:**
+- The smoke-test doc gives each finding's status. The alpha limits drop the fixed items and add the Save As restart caveat.
+- In the parity spec §2.3, the ⇧⌘S "wrong today" clause was removed.
+
 ## 2026-10-27 (cont.) — Claude / XDesign: alpha smoke test on build 23
 
 Owner request: "do all of that then". No code changed. Results and the owner checklist are in `docs/releases/xdesign-alpha-smoke-test.md`.

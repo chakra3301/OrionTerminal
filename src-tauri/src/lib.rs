@@ -51,6 +51,7 @@ mod xdesign_assets;
 mod xdesign_room;
 mod xdesign_state;
 mod xdesign_archive;
+mod xdesign_preview;
 mod xdesign_project_imports;
 mod xdesign_history;
 mod xdesign_photo;
@@ -548,6 +549,9 @@ pub fn run() {
             asset::asset_store_bytes,
             asset::asset_delete_file,
             asset::xdesign_snapshot_write,
+            xdesign_preview::xdesign_preview_write,
+            xdesign_preview::xdesign_preview_list,
+            xdesign_preview::xdesign_preview_delete,
             xdesign_assets::xdesign_asset_request,
             xdesign_assets::xdesign_stock_image,
             xdesign_room::xdesign_room_open,

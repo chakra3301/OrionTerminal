@@ -16,7 +16,7 @@ import { usePhotoWorkspace, controlsLocked, refreshImage, runPhotoCommand, setPh
 import { docTabDetail } from "./docTab";
 import { catchPaste, clipboardImage } from "../pasteCatcher";
 import { useXDProjects } from "../projectsStore";
-import type { LayerColor, PhotoCloneSource, PhotoCloneSources, PhotoDocument, PhotoEffect, PhotoLayer, PhotoState } from "./types";
+import { PSD_PATH, type LayerColor, type PhotoCloneSource, type PhotoCloneSources, type PhotoDocument, type PhotoEffect, type PhotoLayer, type PhotoState } from "./types";
 import "./photo.css";
 import "./photoshop.css";
 import { EditorToolRail, InspectorSection, PanelResize, useEditorPanels } from "../EditorChrome";
@@ -60,6 +60,7 @@ import { previewCoversScreen, tileScale } from "./tiles";
 import { PreviewSurface } from "./previewSurface";
 import { startRowDrag } from "./rowDrag";
 import { beginXDesignActivity } from "../runtimeActivity";
+import { closeImageEditor } from "./resume";
 import { GradientFillDialog } from "./GradientFillDialog";
 import { ImageTypographyPanel, rangeStyle } from "./ImageTypographyPanel";
 import { PhotoActionDialog } from "./PhotoActionDialog";
@@ -327,7 +328,7 @@ function LayerRows({layers,active,busy,editMask,editingMask,selectPixels,menu,th
         const groups=e.metaKey||e.ctrlKey?layers.filter(other=>other.children):[layer];
         fold(e.altKey?groups.flatMap(groupIds):groups.map(other=>other.id),!expanded);}}>{expanded?<ChevronDown size={12}/>:<ChevronRight size={12}/>}</button>}
       {layer.clipped&&<span className="xd-photo-layer-clip" role="img" aria-label="Clipped to the layer below" title="Clipped to the layer below"><CornerLeftDown size={12}/></span>}
-      <button disabled={busy} tabIndex={-1} aria-hidden="true" className={`xd-photo-layer-thumb-button${group?" group":""}${targeted&&!(editingMask&&layer.hasMask)?" targeted":""}`} onPointerDown={e=>drag(e,layer)} onDragStart={e=>e.preventDefault()} onClick={e=>select(e,layer)} onDoubleClick={()=>{if(layer.smartObject&&!busy)attempt(openSmartContents(layer.id));else if(layer.adjustmentKind)openProperties();else if(layer.gradientFill)openFill();else style(layer,"blending");}}>{group?<Folder size={14}/>:thumbnails[layer.id]?<img className="xd-photo-layer-thumb" src={`data:image/png;base64,${thumbnails[layer.id]}`} alt=""/>:AdjustmentIcon?<AdjustmentIcon size={16}/>:<Layers size={13}/>}</button>
+      <button disabled={busy} tabIndex={-1} aria-hidden="true" className={`xd-photo-layer-thumb-button${group?" group":""}${targeted&&!(editingMask&&layer.hasMask)?" targeted":""}`} onPointerDown={e=>drag(e,layer)} onDragStart={e=>e.preventDefault()} onClick={e=>select(e,layer)} onDoubleClick={()=>{if(layer.smartObject&&!busy)attempt(openSmartContents(layer.id));else if(layer.adjustmentKind)openProperties();else if(layer.gradientFill)openFill();else style(layer,"blending");}}>{group?<Folder size={14}/>:layer.kind==="Type"?<span className="xd-photo-layer-thumb xd-photo-layer-type-thumb"><Type size={16}/></span>:thumbnails[layer.id]?<img className="xd-photo-layer-thumb" src={`data:image/png;base64,${thumbnails[layer.id]}`} alt=""/>:AdjustmentIcon?<AdjustmentIcon size={16}/>:<Layers size={13}/>}</button>
       {layer.hasMask&&<><button className="xd-photo-mask-link" disabled={busy||!layer.mask} aria-label={`${layer.mask?.linked===false?"Link":"Unlink"} mask of ${layer.name}`} title={layer.mask?.linked===false?"Link layer and mask":"Unlink layer and mask"} aria-pressed={layer.mask?.linked!==false} onClick={()=>attempt(runPhotoCommand("layer.layerMask.linked",{layer:layer.id,linked:layer.mask?.linked===false}))}>{layer.mask?.linked!==false&&<Link2 size={10}/>}</button>
         <button className={`xd-photo-mask-indicator${targeted&&editingMask?" targeted":""}${layer.mask?.enabled===false?" disabled-mask":""}`} disabled={busy} aria-label={`Edit mask of ${layer.name}`} title="Layer mask · Shift-click to disable, Alt-click to view grayscale, Shift+Alt-click for overlay" onClick={event=>editMask(layer,event)}>{masks[layer.id]?<img className="xd-photo-layer-thumb" src={`data:image/png;base64,${masks[layer.id]}`} alt=""/>:<SquareDashed size={14}/>}</button></>}
       <button disabled={busy} aria-pressed={!!layer.selected||targeted} title="Shift-click a range; Command/Ctrl-click to add; drag to reorder or onto a group to put it inside" className={`xd-photo-layer-name${renaming===layer.id?" renaming":""}${clipBase?" clip-base":""}`} onPointerDown={e=>drag(e,layer)} onDragStart={e=>e.preventDefault()} onDoubleClick={()=>{if(!busy)setRenaming(layer.id);}} onClick={e=>select(e,layer)}>{renaming===layer.id?null:<span>{layer.name}</span>}</button>
@@ -426,7 +427,7 @@ export function PhotoStudio() {
   const [commandDialog,setCommandDialog]=useState<{command:ImageCommand;initial?:Record<string,unknown>}|null>(null);
   const [duplicateDialog,setDuplicateDialog]=useState<{title:string;source:string;name:string|null;document:string;create:(name:string|null)=>Promise<unknown>}|null>(null);
   const [newLayerDialog,setNewLayerDialog]=useState<{title?:string;name:string;kind:"layer"|"group"|"other";create:(request:NewLayerRequest)=>Promise<unknown>}|null>(null),solidFillOptions=useRef<Record<string,unknown>>(undefined);
-  const [exportOpen,setExportOpen]=useState<"export"|"copy"|false>(false);
+  const [exportOpen,setExportOpen]=useState<"export"|"copy"|"save"|false>(false);
   const [customize,setCustomize]=useState<ShortcutsTab|"toolbar"|null>(null),customization=useCustomization(),toolbar=toolbarGroups(IMAGE_TOOL_GROUPS,customization.toolbar);
   const [fileDialog,setFileDialog]=useState<"info"|"fitImage"|"conditionalMode"|"colorLookup"|"paths"|"layersToFiles"|"artboardsPdf"|"photomerge"|"hdr"|null>(null);
   const [textPoint,setTextPoint]=useState<[number,number]|undefined>();
@@ -486,6 +487,8 @@ export function PhotoStudio() {
   useEffect(()=>{const section=stage.current?.closest<HTMLElement>(".xd-photo"),page=section?.ownerDocument,active=page?.activeElement;if(section&&page&&active&&(active===page.body||!section.contains(active)&&active.closest('[aria-hidden="true"]'))&&page.hasFocus()&&!isDesignDialogOpen()&&!section.closest(".ot-window.unfocused"))section.focus({preventScroll:true});},[tool]);
   // Opening an image from the studio File menu leaves focus on that menu's button, outside the editor, where ⇧⌘N opens Quick Capture instead of New Layer.
   useEffect(()=>{const section=stage.current?.closest<HTMLElement>(".xd-photo"),page=section?.ownerDocument,active=page?.activeElement;if(section&&page&&active&&!section.contains(active)&&!active.matches("input,textarea,select,[contenteditable]:not([contenteditable='false'])")&&page.hasFocus()&&!isDesignDialogOpen()&&!section.closest(".ot-window.unfocused"))section.focus({preventScroll:true});},[documentId]);
+  // WebKit doesn't focus a clicked button, so a click on XDesign's header drops focus to the page, where ⌘L and other shortcuts reach the shell instead of the editor.
+  useEffect(()=>{const page=window.document,down=(e:Event)=>{const section=stage.current?.closest<HTMLElement>(".xd-photo"),target=e.target as Node;if(section&&section.closest(".ot-window")?.contains(target)&&!section.contains(target))requestAnimationFrame(()=>{if(page.activeElement===page.body&&page.hasFocus()&&section.isConnected&&!isDesignDialogOpen()&&!section.closest(".ot-window.unfocused"))section.focus({preventScroll:true});});};page.addEventListener("mousedown",down);return()=>page.removeEventListener("mousedown",down);},[]);
   // The engine keeps the painting symmetry per document but does not report it, so the bar remembers what it set.
   const [symmetryChoice,setSymmetryChoice]=useState<Record<string,string>>({});
   // Native feedback is patched into the canvases that show the image: the preview while it holds a
@@ -1143,10 +1146,9 @@ export function PhotoStudio() {
     polygonCursor.current=stroke.current.at(-1)!.slice(0,2) as [number,number];setPolygonVertices(stroke.current.length);draw();
   };
   const exportTo=async(path:string|null,quality?:number)=>{
-    if(path){const warnings=await exportImage(path,quality);toast.info(exportOpen==="copy"?"Copy saved":"Image exported",warnings.length?{body:warnings.join("\n")}:undefined);}
+    if(path){const warnings=await exportImage(path,quality,exportOpen==="save");toast.info(exportOpen==="copy"?"Copy saved":exportOpen==="save"?`Saved ${path.split(/[\\/]/).pop()}`:"Image exported",warnings.length?{body:warnings.join("\n")}:undefined);}
   };
-  const savedPsd=document.originalPath&&/\.(psd|psb)$/i.test(document.originalPath)?document.originalPath:null;
-  const saveImage=()=>{if(savedPsd)attempt(exportImage(savedPsd).then(warnings=>toast.info(`Saved ${savedPsd.split(/[\\/]/).pop()}`,warnings.length?{body:warnings.join("\n")}:undefined)));else setExportOpen("export");};
+  const saveImage=()=>{const savedPsd=useXDesign.getState().photoSavePaths[document.id]??(document.originalPath&&PSD_PATH.test(document.originalPath)?document.originalPath:null);if(savedPsd)attempt(exportImage(savedPsd).then(warnings=>toast.info(`Saved ${savedPsd.split(/[\\/]/).pop()}`,warnings.length?{body:warnings.join("\n")}:undefined)));else setExportOpen("save");};
   const editMask=(layer:PhotoLayer,event:MouseEvent)=>{
     if(event.altKey)attempt(runPhotoCommand("view.layerMask",{layer:layer.id,mode:event.shiftKey?"toggleOverlay":"toggleGray"}));
     else if(event.shiftKey)attempt(runPhotoCommand("layer.layerMask.enabled",{layer:layer.id}));
@@ -1262,9 +1264,10 @@ export function PhotoStudio() {
   const baseMenus:MenuSpec[]=[
     {label:"File",items:[
       // Unhandled, ⌘W reaches the native menu's Close Window and closes the whole app.
-      item("Close",()=>{if(smartTrail.length)attempt(finishSmartContents(true));else usePhotoWorkspace.getState().close();},true,"Mod+W"),
+      item("Close",()=>{if(smartTrail.length)attempt(finishSmartContents(true));else closeImageEditor();},true,"Mod+W"),
       item("New from Clipboard",()=>attempt(createImageFromClipboard()),true),
       item("Save",saveImage,true,"Mod+S"),
+      item("Save As…",()=>setExportOpen("save"),true,"Shift+Mod+S"),
       item("Save a Copy…",()=>setExportOpen("copy"),true,"Alt+Mod+S"),
       ...(!smartTrail.length?[item("Make Independent",()=>attempt(makeImageIndependent()))]:[]),
       "-",
@@ -1953,7 +1956,7 @@ export function PhotoStudio() {
     }
   }}>
     <header className="xd-photo-header xd-ps-menubar" inert={geometryActive&&!warpSession}>
-      <button className="xd-editor-icon-button" disabled={busy||geometryActive} aria-label={smartTrail.length?"Save contents and return to parent":"Back to design"} title={smartTrail.length?"Save contents and return to parent":"Back to design"} onClick={()=>{if(smartTrail.length)attempt(finishSmartContents(true));else usePhotoWorkspace.getState().close();}}><House size={15}/></button>
+      <button className="xd-editor-icon-button" disabled={busy||geometryActive} aria-label={smartTrail.length?"Save contents and return to parent":"Back to design"} title={smartTrail.length?"Save contents and return to parent":"Back to design"} onClick={()=>{if(smartTrail.length)attempt(finishSmartContents(true));else closeImageEditor();}}><House size={15}/></button>
       {/* During a Warp only Edit › Transform stays live; the rest would change the document under it. */}
       <MenuBar label="Image menus" menus={warpSession?menus.map(menu=>({...menu,items:menu.items.map(entry=>entry==="-"||menu.label==="Edit"&&entry.label==="Transform"?entry:{...entry,disabled:true})})):menus}/>
       <span className="xd-ps-spacer"/>
@@ -2005,7 +2008,7 @@ export function PhotoStudio() {
       {tool==="crop"&&cropBox&&<div role="group" aria-label="Crop actions" className="xd-ps-icon-cluster"><button aria-label="Reset crop" title="Reset the crop box and rotation" disabled={busy} onClick={resetCrop}><RotateCcw size={16}/></button>{!cropUntouched&&<><button aria-label="Cancel crop" title="Cancel the current crop (Esc)" onClick={resetCrop}><Ban size={16}/></button><button aria-label="Apply crop" title="Commit the current crop (Enter)" disabled={busy} onClick={commitCrop}><Check size={16}/></button></>}</div>}
     </div>
     <div className="xd-ps-doctabs" inert={geometryActive}>
-      <div className="xd-ps-doctab" role="tab" aria-selected="true" title={`${document.width} × ${document.height} px`}><span>{document.name} @ {Math.round(zoom*100)}% ({docTabDetail(state,currentLayer)})</span><button type="button" aria-label="Close image" title="Close" disabled={busy} onClick={()=>{if(smartTrail.length)attempt(finishSmartContents(true));else usePhotoWorkspace.getState().close();}}><X size={11}/></button></div>
+      <div className="xd-ps-doctab" role="tab" aria-selected="true" title={`${document.width} × ${document.height} px`}><span>{document.name} @ {Math.round(zoom*100)}% ({docTabDetail(state,currentLayer)})</span><button type="button" aria-label="Close image" title="Close" disabled={busy} onClick={()=>{if(smartTrail.length)attempt(finishSmartContents(true));else closeImageEditor();}}><X size={11}/></button></div>
       {!!smartTrail.length&&<div className="xd-photo-contents-actions"><span>{smartTrail.at(-1)!.parent.name} / Contents</span><button disabled={busy} onClick={()=>attempt(finishSmartContents(true))}>Save contents</button><button disabled={busy} onClick={()=>attempt(finishSmartContents(false))}>Discard contents</button></div>}
     </div>
     <div ref={panels.body} className="xd-photo-body xd-editor-body xd-ps-body" data-overlay={panels.overlay} data-tools-wrap={toolsWrap||undefined}>
@@ -2092,11 +2095,10 @@ export function PhotoStudio() {
               {middleTab==="Properties"&&<>{["paint.cloneStamp","paint.healingBrush"].includes(tool)&&cloneSources&&<InspectorSection title="Clone Source" defaultOpen>{cloneSourceControls}</InspectorSection>}
               {(currentLayer?<>
             {currentLayer.adjustmentKind?<AdjustmentProperties layer={currentLayer} document={document} canvas={image.current} untilShown={untilShown}/>:<>
-            <TransformSection layer={currentLayer} size={[document.width,document.height]} resolution={state?.resolution??72} disabled={busy}/><AlignSection layers={state?.selectedLayers?.length??1} hasSelection={!!state?.hasSelection} disabled={busy}/>
+            <TransformSection layer={currentLayer} size={[document.width,document.height]} resolution={state?.resolution??72} disabled={busy}/>{currentLayer.text&&<InspectorSection title="Typography" defaultOpen><ImageTypographyPanel key={currentLayer.id} layer={currentLayer} document={document}/></InspectorSection>}<AlignSection layers={state?.selectedLayers?.length??1} hasSelection={!!state?.hasSelection} disabled={busy}/>
             <InspectorSection title="Quick Actions" defaultOpen><div className="xd-photo-action-list"><button disabled={busy} onClick={()=>startFreeTransform()}>Transform</button>{([["warp","Warp"],["puppet","Puppet Warp"],["perspective","Perspective Warp"]] as const).map(([kind,label])=><button key={kind} disabled={busy} onClick={()=>openGeometry(kind)}>{label}</button>)}<button disabled={busy} onClick={()=>command("layer.arrange.bringForward")}>Forward</button><button disabled={busy} onClick={()=>command("layer.arrange.sendBackward")}>Backward</button><button disabled={busy} onClick={()=>command(currentLayer.clipped?"layer.releaseClippingMask":"layer.createClippingMask")}>{currentLayer.clipped?"Unclip":"Clip to below"}</button><button disabled={busy} onClick={()=>command("layer.new.group")}>New group</button>{currentLayer.smartObject?<button disabled={busy} onClick={()=>attempt(openSmartContents(currentLayer.id))}>Edit contents</button>:<button disabled={busy} onClick={()=>command("layer.smartObjects.convertToSmartObject")}>Smart object</button>}{currentLayer.text&&<button disabled={busy} onClick={()=>{setTextPoint(undefined);setImageDialog("text");}}>Edit text</button>}</div>
             </InspectorSection></>}
             {currentLayer.gradientFill&&<InspectorSection title="Gradient fill" defaultOpen><button disabled={busy} onClick={()=>setImageDialog("gradient")}>Edit gradient fill</button><p className="xd-photo-section-help">Gradient, style, angle, scale and Method. Drag the image to move the gradient.</p></InspectorSection>}
-            {currentLayer.text&&<InspectorSection title="Typography" defaultOpen><ImageTypographyPanel key={currentLayer.id} layer={currentLayer} document={document}/></InspectorSection>}
             {currentLayer.smartObject&&<InspectorSection title="Smart object & filters" defaultOpen><SmartFilters layer={currentLayer} document={document} canvas={image.current}/></InspectorSection>}
             <MaskSection layer={currentLayer} view={state?.layerMaskView?.layer===currentLayer.id?state.layerMaskView.mode:"off"} hasSelection={!!state?.hasSelection} disabled={busy} refine={()=>setSelectionDialog("refine")} colorRange={()=>setSelectionDialog("color")}/>
           </>:<DocumentProperties state={state} disabled={busy} display={selectionDisplay} setDisplay={setSelectionDisplay} imageSize={()=>setImageDialog("size")} addText={()=>{setTextPoint([100,100]);setImageDialog("text");}} profileInfo={()=>setProfileDialog("info")} trim={()=>setImageDialog("trim")}/>)}</>}
@@ -2133,7 +2135,7 @@ export function PhotoStudio() {
     {profileDialog&&<ColorProfileDialog key={`${document.id}/${profileDialog}`} kind={profileDialog} document={document} canvas={image.current} close={()=>setProfileDialog(null)}/>}
     {state&&saveSelection&&<SaveSelectionDialog document={document.name} close={()=>setSaveSelection(false)}/>}
     {state&&compositeDialog&&<ChannelCompositeDialog kind={compositeDialog} document={document} mask={mask} canvas={image.current} close={()=>setCompositeDialog(null)}/>}
-    {dialog&&<PhotoActionDialog document={document} canvas={image.current} key={`${dialog.action.id}/${dialog.layer?.id??"new"}`} action={dialog.action} adjustment={dialog.adjustment} layer={dialog.layer} onClose={()=>setDialog(null)}/>}
+    {dialog&&<PhotoActionDialog document={document} canvas={image.current} key={`${dialog.action.id}/${dialog.layer?.id??"new"}`} action={dialog.action} adjustment={dialog.adjustment} layer={dialog.layer} onClose={()=>setDialog(null)} untilShown={untilShown}/>}
     {state&&(imageDialog==="size"||imageDialog==="canvas")&&<ImageSizeDialog state={state} document={document} canvas={imageDialog==="canvas"} close={()=>setImageDialog(null)}/>}
     {state&&imageDialog==="trim"&&<ImageTrimDialog state={state} close={()=>setImageDialog(null)}/>}
     {state&&imageDialog==="duplicate"&&<DuplicateImageDialog name={state.name} layers={state.layers.length} close={()=>setImageDialog(null)}/>}
@@ -2155,7 +2157,7 @@ export function PhotoStudio() {
     {imageDialog==="text"&&<ImageTextDialog layer={textPoint?undefined:currentLayer?.text?currentLayer:undefined} point={textPoint} close={()=>{setImageDialog(null);setTextPoint(undefined);}}/>}
     {(imageDialog==="gradient"||imageDialog==="newGradient")&&currentLayer?.gradientFill&&<GradientFillDialog document={document} layer={currentLayer} canvas={image.current} close={()=>setImageDialog(null)} cancel={imageDialog==="newGradient"?()=>{setImageDialog(null);const base=newFillBase.current;if(base===undefined)undo();else void command("history.select",{index:base,discardRedo:true});}:undefined}/>}
     {commandDialog&&<ImageCommandDialog key={commandDialog.command.id} document={document} canvas={image.current} command={commandDialog.command} initial={commandDialog.initial} close={()=>setCommandDialog(null)}/>}
-    {exportOpen&&<ImageExportDialog key={exportOpen} name={document.name} copy={exportOpen==="copy"} choose={exportTo} close={()=>setExportOpen(false)}/>}
+    {exportOpen&&<ImageExportDialog key={exportOpen} name={document.name} kind={exportOpen} choose={exportTo} close={()=>setExportOpen(false)}/>}
     {state&&fileDialog==="info"&&<FileInfoDialog close={()=>setFileDialog(null)}/>}
     {state&&fileDialog==="fitImage"&&<FitImageDialog width={state.width} height={state.height} close={()=>setFileDialog(null)}/>}
     {state&&fileDialog==="conditionalMode"&&<ConditionalModeDialog mode={state.mode} close={()=>setFileDialog(null)}/>}

@@ -106,7 +106,7 @@ Order: **File, Edit, Image, Layer, Type, Select, Filter, View, Window.** Full pe
 ### 2.3 Shortcuts
 
 One table generates both the key handler and the glyphs shown in menus. It extends `MENU_SHORTCUTS` in `PhotoStudio.tsx`.
-- Wrong today: ⇧⌘S exports (Photoshop: Save As…). ⌘E always merges (Photoshop: Merge Down when one layer is selected).
+- Wrong today: ⌘E always merges (Photoshop: Merge Down when one layer is selected).
 - To wire (the command already exists): ⇧F5, ⇧⌘N, ⌥⌘G, ⌘[ ⌘] ⇧⌘[ ⇧⌘], ⌘, , ⌘/, ⌥⌘A, ⌥⇧⌘F, ⌥⌘R, ⇧F6, ⇧⌘T, ⌥⇧⌘V, ⌥⌘I, ⌥⌘C, ⇧⌘L, ⌥⇧⌘L, ⇧⌘B, ⌘L, ⌘M, ⌘U, ⌘B, ⌘I, ⇧⌘U, ⌥⇧⌘B, ⇧⌘X, ⌃⌘F, ⌥⇧⌘C, ⇧⌘K.
 
 ### 2.4 Context menus and panel flyouts (none exist today)

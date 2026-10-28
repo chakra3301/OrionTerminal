@@ -495,6 +495,26 @@ async function exportPencilContents(format:PencilExportFormat,scale=1,targetIds?
   });
 }
 
+// A copy, because the raster padding adds a node to the graph it renders, and on the live
+// board that would read as an edit. Autosave's cached encoding keeps the copy cheap.
+export async function capturePencilPreview(maxEdge:number):Promise<Uint8Array|"empty"|null> {
+  const editor=usePencilWorkspace.getState().editor;
+  if(!editor?.renderer)return null;
+  const io=await import("@open-pencil/core/io");
+  const ck=await initializeCanvasKit();
+  const {renderDesignNodes}=await import("./proceduralPaints");
+  if(usePencilWorkspace.getState().editor!==editor||!editor.renderer)return null;
+  const pageId=editor.state.currentPageId,graph=deserializeGraph(persistedGraph(editor)),ids=graph.getChildren(pageId).map(n=>n.id);
+  const baseBounds=ids.length?io.computeContentBounds(graph,ids):null;
+  if(!baseBounds)return "empty";
+  const bounds=expandRasterBounds(graph,ids,baseBounds),scale=Math.min(1,maxEdge/Math.max(bounds.maxX-bounds.minX,bounds.maxY-bounds.minY));
+  const restore=await editor.renderer.prepareForExport(graph,pageId,ids);
+  try {
+    if(usePencilWorkspace.getState().editor!==editor||!editor.renderer)return null;
+    return withRasterBoundsPadding(graph,pageId,ids,baseBounds,bounds,nodeIds=>renderDesignNodes(ck,editor.renderer!,graph,pageId,nodeIds,{format:"PNG",scale,quality:.95}))??null;
+  } finally { restore(); }
+}
+
 export async function editPencilImage(nodeId:string):Promise<void> {
   assertPencilEditable();
   const editor=usePencilWorkspace.getState().editor;
@@ -516,6 +536,7 @@ export async function editPencilImage(nodeId:string):Promise<void> {
   const webp=bytes.length>=12&&String.fromCharCode(...bytes.subarray(0,4))==="RIFF"&&String.fromCharCode(...bytes.subarray(8,12))==="WEBP";
   await openPencilPhoto(nodeId,null,btoa(binary),png?"image.png":webp?"image.webp":"image.jpg");
 }
+export function pencilEditorProject():string|null {return usePencilWorkspace.getState().editor?activeProject:null;}
 export function pencilPhotoDocumentId(nodeId:string):string|null {
   const node=usePencilWorkspace.getState().editor?.graph.getNode(nodeId);
   // Metadata is authoritative after undo, redo, duplication and detachment.

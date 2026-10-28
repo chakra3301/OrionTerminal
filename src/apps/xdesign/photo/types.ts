@@ -139,6 +139,19 @@ export type PhotoReply = { document: PhotoDocument; state: PhotoState; warnings:
 export type PhotoCommand = { id: string; label: string; menu: string[]; shortcut: string | null; params: string; hostDispatch: boolean };
 
 const ID = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i;
+export const PSD_PATH = /\.(psd|psb)$/i;
+export function validatePhotoSavePaths(value: unknown): asserts value is Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length > 1024 ||
+    Object.entries(value).some(([id, path]) => !ID.test(id) || typeof path !== "string" || !PSD_PATH.test(path))) throw new Error("Invalid saved image locations");
+}
+export type PhotoResume = { source: "legacy" | "pencil"; placementId: string; documentId: string };
+// Shape only: an image that no longer exists falls back to the board when reopening, instead of refusing to load the project.
+export function validatePhotoResume(value: unknown): asserts value is PhotoResume {
+  const resume = value as PhotoResume | null;
+  if (!resume || typeof resume !== "object" || Array.isArray(resume) || !["legacy", "pencil"].includes(resume.source) ||
+    typeof resume.placementId !== "string" || !resume.placementId || resume.placementId.length > 128 ||
+    typeof resume.documentId !== "string" || !ID.test(resume.documentId)) throw new Error("Invalid open image");
+}
 export function validatePhotoDocuments(value: unknown): asserts value is Record<string, PhotoDocument> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid image document registry");
   const entries = Object.entries(value);

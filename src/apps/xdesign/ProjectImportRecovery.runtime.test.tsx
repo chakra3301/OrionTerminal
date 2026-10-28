@@ -28,18 +28,20 @@ async function mount() { await act(async () => { root.render(<Workspace />); });
 async function click(label: string) { await act(async () => { [...container.querySelectorAll('button')].find(button => button.textContent === label)!.click(); }); }
 it('opens a post-restart copy from the actual home controls through the typed controller and real project stores', async () => {
   const document = { ...emptyDoc(), pages: [{ id: 'restored-page', name: 'Recovered artwork', shapes: [], past: [], future: [] }], activePageId: 'restored-page' };
-  host.invoke.mockImplementation(async (command, { operation }) => {
-    expect(command).toBe('xdesign_project_import_control');
+  host.invoke.mockImplementation(async (command, args) => {
+    if (command === 'xdesign_preview_list') return {};
+    expect(command).toBe('xdesign_project_import_control'); const { operation } = args;
     if (operation.kind === 'list') return { version: 1, imports: [{ ...receipt, phase: 'staged', name: 'Poster copy', canOpen: true }] };
     expect(operation).toEqual({ kind: 'status', ...receipt }); return { version: 1, ...receipt, phase: 'staged', imported: { name: 'Poster copy', document }, registry: null };
   });
   await mount(); expect(container.textContent).toContain('Start something new'); expect(container.textContent).toContain('Poster copy'); await click('Open recovered copy');
   expect(container.querySelector('output')!.textContent).toBe(receipt.projectId); expect(useXDesign.getState().activePageId).toBe('restored-page'); expect(host.data.get(`xdesign.project.${receipt.projectId}`)).toEqual(document);
-  expect(host.commits).toHaveBeenCalledExactlyOnceWith(expect.any(Array), receipt); expect(host.invoke.mock.calls.map(([, args]) => args.operation.kind)).toEqual(['list', 'status']);
+  expect(host.commits).toHaveBeenCalledExactlyOnceWith(expect.any(Array), receipt); expect(host.invoke.mock.calls.filter(([command]) => command === 'xdesign_project_import_control').map(([, args]) => args.operation.kind)).toEqual(['list', 'status']);
 });
 it('keeps a project registered elsewhere after the recovery list loaded and displays it in Recent', async () => {
   const meta = { id: receipt.projectId, name: 'Saved by another window', createdAt: 1, updatedAt: 2 }; let registered = false;
-  host.invoke.mockImplementation(async (_command, { operation }) => {
+  host.invoke.mockImplementation(async (command, args) => {
+    if (command === 'xdesign_preview_list') return {}; const { operation } = args;
     if (operation.kind === 'list') return { version: 1, imports: registered ? [] : [{ ...receipt, phase: 'staged', name: 'Poster copy', canOpen: true }] };
     expect(operation).toEqual({ kind: 'discard', ...receipt }); registered = true; host.data.set(`xdesign.project.${meta.id}`, emptyDoc()); host.data.set('xdesign.projects', { registry: [meta] });
     return { version: 1, ...receipt, phase: 'committed', imported: { name: meta.name, document: emptyDoc() }, registry: [meta] };

@@ -10,7 +10,7 @@ import {
 } from "./overrides";
 import { resolveVariant } from "./variants";
 import type { ProtoLink } from "./prototype";
-import type { PhotoDocument } from "./photo/types";
+import type { PhotoDocument, PhotoResume } from "./photo/types";
 import type { PhotoDraft } from "./photo/drafts";
 
 export type ToolId =
@@ -275,6 +275,10 @@ export type Mode = {
 type XDesignState = {
   photoDocuments: Record<string, PhotoDocument>;
   photoDrafts: PhotoDraft[];
+  /** Where Save As last put each image as a PSD. Kept beside photoDocuments, not on them, so undoing an edit can't bring back an older location. */
+  photoSavePaths: Record<string, string>;
+  /** The image left open in the image editor, reopened with the project. Beside photoDocuments so undo can't bring back an old one. */
+  photoResume: PhotoResume | null;
   pencilDocument: PencilDocument | null;
   applyPhotoDocument: (document: PhotoDocument, shapeId?: string) => string;
   /** Layer order: index 0 = bottom layer. Render order matches array order;
@@ -402,6 +406,8 @@ type XDesignState = {
           activeModeId?: string;
           photoDocuments?: Record<string, PhotoDocument>;
           photoDrafts?: PhotoDraft[];
+          photoSavePaths?: Record<string, string>;
+          photoResume?: PhotoResume | null;
     pencilDocument?: PencilDocument | null;
         }
       | null,
@@ -494,6 +500,8 @@ export const useXDesign = create<XDesignState>((set, get) => ({
   shapes: [],
   photoDocuments: {},
   photoDrafts: [],
+  photoSavePaths: {},
+  photoResume: null,
   pencilDocument: null,
   applyPhotoDocument: (document, shapeId) => {
     const current = get();
@@ -1157,6 +1165,8 @@ export const useXDesign = create<XDesignState>((set, get) => ({
         coalesce: null,
         photoDocuments: snapshot.photoDocuments ?? {},
         photoDrafts: snapshot.photoDrafts ?? [],
+        photoSavePaths: snapshot.photoSavePaths ?? {},
+        photoResume: snapshot.photoResume ?? null,
         pencilDocument: snapshot.pencilDocument ?? null,
         clipboard: [],
         variables: snapshot.variables ?? [],
@@ -1176,6 +1186,8 @@ export const useXDesign = create<XDesignState>((set, get) => ({
       coalesce: null,
       photoDocuments: {},
       photoDrafts: [],
+      photoSavePaths: {},
+      photoResume: null,
       pencilDocument: null,
       clipboard: [],
       variables: [],

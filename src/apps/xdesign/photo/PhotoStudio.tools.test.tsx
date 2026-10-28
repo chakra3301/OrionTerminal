@@ -80,6 +80,15 @@ describe("Image workspace Photoshop tools",()=>{
     await act(async()=>{field.focus();editor().closest("div")!.classList.add("ot-window","unfocused");field.blur();await new Promise(resolve=>requestAnimationFrame(resolve));});
     expect(document.activeElement).toBe(document.body);
   });
+  it("takes focus back when a click on its window's header drops it to the page, so ⌘L reaches Levels instead of R.O.S.I.E.",async()=>{
+    vi.spyOn(document,"hasFocus").mockReturnValue(true);
+    const frame=document.createElement("div"),header=document.createElement("header"),shell=document.createElement("div");frame.className="ot-window";container.before(frame);frame.append(header,container);document.body.append(shell);
+    const press=(target:Element)=>act(async()=>{editor().focus();editor().blur();target.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));await new Promise(resolve=>requestAnimationFrame(resolve));});
+    await press(header);expect(document.activeElement).toBe(editor());
+    await press(shell);expect(document.activeElement).toBe(document.body);
+    frame.classList.add("unfocused");await press(header);expect(document.activeElement).toBe(document.body);
+    document.body.append(container);frame.remove();shell.remove();
+  });
   it("takes focus from the design canvas that opening the image hid, so ⌘2 reaches Channels instead of the shell",async()=>{
     vi.spyOn(document,"hasFocus").mockReturnValue(true);
     const shell=document.createElement("div"),design=document.createElement("canvas");shell.setAttribute("aria-hidden","true");design.tabIndex=0;shell.append(design);document.body.append(shell);
@@ -283,20 +292,33 @@ describe("Image workspace Photoshop tools",()=>{
     await setState({selectedLayers:[1,2],layers:[layer,{...layer,id:2,name:"Caption",kind:"Type"}]});
     await menu("Edit");expect(["Auto-Align Layers…","Auto-Blend Layers…"].map(label=>row(label).disabled)).toEqual([true,true]);
   });
-  it("saves back to an opened PSD and exports other formats with JPEG quality",async()=>{
-    await key("s",{metaKey:true});expect(exported).not.toHaveBeenCalled();expect(container.querySelector('[role="dialog"][aria-label="Export As"]')).not.toBeNull();
+  it("Close, the house button and the tab's close forget the open image",async()=>{
+    const {shapeId,documentId,projectId,state,stateVersion}=usePhotoWorkspace.getState();
+    const remembered={source:"legacy" as const,placementId:shapeId!,documentId:documentId!};
+    const reopen=async()=>{await act(async()=>{usePhotoWorkspace.setState({shapeId,documentId,projectId,state,stateVersion});useXDesign.setState({photoResume:remembered});});};
+    await reopen();await menu("File","Close");
+    expect(usePhotoWorkspace.getState().documentId).toBeNull();expect(useXDesign.getState().photoResume).toBeNull();
+    await reopen();await click("Back to design");
+    expect(usePhotoWorkspace.getState().documentId).toBeNull();expect(useXDesign.getState().photoResume).toBeNull();
+    await reopen();await click("Close image");
+    expect(usePhotoWorkspace.getState().documentId).toBeNull();expect(useXDesign.getState().photoResume).toBeNull();
+  });
+  it("saves back to an opened PSD, remembers where Save As put one and exports other formats with JPEG quality",async()=>{
+    await key("s",{metaKey:true});expect(exported).not.toHaveBeenCalled();expect(container.querySelector('[role="dialog"][aria-label="Save As"]')).not.toBeNull();
     await click("Cancel");
     const id=usePhotoWorkspace.getState().documentId!;
     await act(async()=>useXDesign.setState(s=>({photoDocuments:{...s.photoDocuments,[id]:{...s.photoDocuments[id]!,originalPath:"/Users/me/Portrait.psd"}}})));
     await key("s",{metaKey:true});expect(exported).toHaveBeenLastCalledWith("/Users/me/Portrait.psd");
-    await key("s",{metaKey:true,shiftKey:true});expect(container.querySelector('[role="dialog"]')).toBeNull();
+    savePath.mockResolvedValueOnce("/tmp/Renamed.psd");await key("s",{metaKey:true,shiftKey:true});
+    await act(async()=>[...container.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Save As"] button')].find(element=>element.textContent==="Save")!.click());expect(exported).toHaveBeenLastCalledWith("/tmp/Renamed.psd",undefined,true);
+    await act(async()=>useXDesign.setState({photoSavePaths:{[id]:"/tmp/Renamed.psd"}}));await key("s",{metaKey:true});expect(container.querySelector('[role="dialog"]')).toBeNull();expect(exported).toHaveBeenLastCalledWith("/tmp/Renamed.psd");
     await key("w",{metaKey:true,shiftKey:true,altKey:true,code:"KeyW"});
     await act(async()=>{const select=container.querySelector<HTMLSelectElement>('[role="dialog"] select')!;select.value="jpg";select.dispatchEvent(new Event("change",{bubbles:true}));});
-    await click("Export");expect(savePath).toHaveBeenLastCalledWith({defaultPath:"Portrait.jpg",filters:[{name:"JPEG",extensions:["jpg","jpeg"]}]});expect(exported).toHaveBeenLastCalledWith("/tmp/out.jpg",90);
+    await click("Export");expect(savePath).toHaveBeenLastCalledWith({defaultPath:"Portrait.jpg",filters:[{name:"JPEG",extensions:["jpg","jpeg"]}]});expect(exported).toHaveBeenLastCalledWith("/tmp/out.jpg",90,false);
     await menu("File","Export","Export As…");
     await act(async()=>{const select=container.querySelector<HTMLSelectElement>('[role="dialog"] select')!;select.value="avif";select.dispatchEvent(new Event("change",{bubbles:true}));});
     await act(async()=>{const input=container.querySelector<HTMLInputElement>('[role="dialog"] input[type="number"]')!;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,"60");input.dispatchEvent(new Event("input",{bubbles:true}));});
-    await click("Export");expect(savePath).toHaveBeenLastCalledWith({defaultPath:"Portrait.avif",filters:[{name:"AVIF",extensions:["avif"]}]});expect(exported).toHaveBeenLastCalledWith("/tmp/out.jpg",60);
+    await click("Export");expect(savePath).toHaveBeenLastCalledWith({defaultPath:"Portrait.avif",filters:[{name:"AVIF",extensions:["avif"]}]});expect(exported).toHaveBeenLastCalledWith("/tmp/out.jpg",60,false);
   });
   it("draws rectangle, ellipse, triangle, polygon, star and line shape layers in the foreground color",async()=>{
     const drawShape=async()=>{await pointer("pointerdown",{clientX:100,clientY:50});await pointer("pointermove",{clientX:200,clientY:150});await pointer("pointerup",{clientX:200,clientY:150});};
@@ -847,6 +869,16 @@ describe("Image workspace Photoshop tools",()=>{
     await act(async()=>{await new Promise(resolve=>setTimeout(resolve,200));});
     expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_layer_thumbnails",expect.objectContaining({size:56}));
     expect(container.querySelector<HTMLImageElement>(".xd-photo-layer-thumb")?.getAttribute("src")).toBe("data:image/png;base64,AAAA");
+  });
+  it("shows a T as a type layer's thumbnail, as Photoshop does, instead of its mostly transparent pixels",async()=>{
+    native.enabled=true;native.invoke.mockImplementation(async(name:string)=>name==="xdesign_photo_layer_thumbnails"?[{layer:1,png:"AAAA"},{layer:2,png:"BBBB"}]:[]);
+    const layer={id:1,name:"Background",kind:"Raster",visible:true,opacity:1,fill:1,blend:"Normal",clipped:false,hasMask:false};
+    await setState({layers:[{...layer,id:2,name:"Caption",kind:"Type",text:{text:"Caption",font:"Arial",sizePt:24}},layer]});
+    await click("Channels");await click("Layers");
+    await act(async()=>{await new Promise(resolve=>setTimeout(resolve,200));});
+    const thumb=(id:number)=>container.querySelector(`.xd-photo-layer[data-layer="${id}"] .xd-photo-layer-thumb-button`)!;
+    expect(thumb(1).querySelector("img")?.getAttribute("src")).toBe("data:image/png;base64,AAAA");
+    expect(thumb(2).querySelector("img")).toBeNull();expect(thumb(2).querySelector(".xd-photo-layer-type-thumb svg")).not.toBeNull();
   });
   it("defaults the Pen to Path mode and applies the Type bar style to new text",async()=>{
     await key("p");expect(container.querySelector<HTMLSelectElement>('[aria-label="Pen mode"]')!.value).toBe("path");

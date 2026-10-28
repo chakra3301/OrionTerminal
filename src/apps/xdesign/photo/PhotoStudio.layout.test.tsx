@@ -964,6 +964,12 @@ describe("Image workspace layout", () => {
     expect(panel.querySelector('[aria-label="Clone source slot"]')).not.toBeNull();
     await pick("Clone source slot","2");expect(command).toHaveBeenLastCalledWith("cloneSource.select",{index:2});
   });
+  it("puts a type layer's character and paragraph controls right under Transform, above Quick Actions, as Photoshop's Properties does",async()=>{
+    await act(async()=>usePhotoWorkspace.setState(s=>({state:{...s.state!,layers:s.state!.layers.map(layer=>({...layer,kind:"Type" as const,bounds:[10,10,40,20] as [number,number,number,number],text:{text:"Hi",font:"Arial",sizePt:12}}))}})));
+    const titles=[...container.querySelectorAll(".xd-editor-section > summary")].map(summary=>summary.textContent);
+    expect(titles.slice(titles.indexOf("Transform"),titles.indexOf("Transform")+2)).toEqual(["Transform","Typography"]);
+    expect(titles.indexOf("Typography")).toBeLessThan(titles.indexOf("Quick Actions"));
+  });
   it("lists a font's glyphs in Window › Glyphs and inserts one at the type caret on double-click",async()=>{
     // A font holding only a cmap that maps A–C.
     const be16=(value:number)=>[value>>8&255,value&255];

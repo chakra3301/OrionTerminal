@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import {
   Plus,
   MoreHorizontal,
@@ -19,6 +20,7 @@ import { log } from "@/lib/log";
 import {
   useXDProjects,
   loadDoc,
+  projectKind,
   type XDDoc,
   type XDProjectMeta,
 } from "./projectsStore";
@@ -28,6 +30,7 @@ import { ProjectNameInput } from "./ProjectNameInput";
 import { useXDesignSaveState } from "./saveState";
 import { openProjectFile } from "./projectFiles";
 import { ProjectImportRecovery } from './ProjectImportRecovery';
+import { useProjectPreviews, type PreviewEntry } from "./projectPreview";
 
 // Project start types. "Blank canvas" is the default normal project; the rest
 // create a project then arm the matching AI flow in the Claude rail.
@@ -77,11 +80,14 @@ function relativeTime(ts: number): string {
 function ProjectCard({
   meta,
   doc,
+  preview,
 }: {
   meta: XDProjectMeta;
   doc: XDDoc | null;
+  preview: PreviewEntry | undefined;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [failedRevision, setFailedRevision] = useState<number | null>(null);
   const [renaming, setRenaming] = useState(false);
   const draft = useXDesignSaveState((s) => s.names[meta.id]);
 
@@ -111,7 +117,12 @@ function ProjectCard({
         title={`Open ${meta.name}`}
         aria-label={`Open ${meta.name}`}
       >
-        <ProjectThumb doc={doc} />
+        {preview && failedRevision !== preview.revision ? (
+          <img className="xd-home-card-image" src={`${convertFileSrc(preview.path)}?v=${preview.revision}`} alt=""
+            draggable={false} decoding="async" onError={() => setFailedRevision(preview.revision)} />
+        ) : (
+          <ProjectThumb doc={doc} />
+        )}
         {meta.kind === "fx" && <span className="xd-fx-badge">FX</span>}
         {meta.kind === "model" && <span className="xd-fx-badge xd-model-badge">3D</span>}
       </button>
@@ -217,20 +228,29 @@ export function XDesignHome() {
   const ready = useXDProjects((s) => s.ready);
   const loadError = useXDProjects((s) => s.loadError);
   const [docs, setDocs] = useState<Record<string, XDDoc | null>>({});
+  const previews = useProjectPreviews((s) => s.entries);
+  const previewsLoaded = useProjectPreviews((s) => s.loaded);
+  const previewed = Object.keys(previews).sort().join(" ");
 
-  // Lazy-load each project's doc for its thumbnail. Re-runs when the registry
-  // changes (new / deleted / renamed-bump) so previews stay fresh.
+  useEffect(() => { void useProjectPreviews.getState().load(); }, []);
+
+  // Full docs only feed the shape fallback, so they're read only for design
+  // projects that have no stored preview, once the stored ones are known.
   useEffect(() => {
+    if (!previewsLoaded) return;
+    const covered = new Set(previewed.split(" "));
     let cancelled = false;
     void Promise.all(
-      registry.map(async (m) => [m.id, await loadDoc(m.id)] as const),
+      registry
+        .filter((m) => projectKind(m) === "design" && !covered.has(m.id))
+        .map(async (m) => [m.id, await loadDoc(m.id)] as const),
     ).then((pairs) => {
       if (!cancelled) setDocs(Object.fromEntries(pairs));
     }).catch((error) => log.warn("XDesign thumbnail load failed", error));
     return () => {
       cancelled = true;
     };
-  }, [registry]);
+  }, [registry, previewsLoaded, previewed]);
 
   if (!ready) return <div className="xd-home">
     <h1 className="xd-home-title">XDesign</h1>
@@ -282,7 +302,7 @@ export function XDesignHome() {
           <h2 className="xd-home-section-title">Recent</h2>
           <div className="xd-home-grid">
             {sorted.map((m) => (
-              <ProjectCard key={m.id} meta={m} doc={docs[m.id] ?? null} />
+              <ProjectCard key={m.id} meta={m} doc={docs[m.id] ?? null} preview={previews[m.id]} />
             ))}
           </div>
         </div>

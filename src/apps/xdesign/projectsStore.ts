@@ -2,7 +2,7 @@ import { livePencilSnapshot, validatePencilDocument, type PencilDocument } from 
 import { readRoomImageBindings } from './pencil/roomImageBindings';
 import { initializeImageStorage } from "./projectStorage";
 import { create } from "zustand";
-import { validatePhotoDocuments, type PhotoDocument } from "./photo/types";
+import { validatePhotoDocuments, validatePhotoResume, validatePhotoSavePaths, type PhotoDocument, type PhotoResume } from "./photo/types";
 import { validatePhotoDrafts, type PhotoDraft } from "./photo/drafts";
 import { ulid } from "ulid";
 import { getAppState, setAppState, setXDesignStateAtomic } from "@/lib/db";
@@ -33,6 +33,8 @@ export type XDDoc = {
   formatVersion?: 2;
   photoDocuments?: Record<string, PhotoDocument>;
   photoDrafts?: PhotoDraft[];
+  photoSavePaths?: Record<string, string>;
+  photoResume?: PhotoResume | null;
   pencilDocument?: PencilDocument | null;
   pages: Page[];
   activePageId: string;
@@ -51,7 +53,11 @@ export type XDProjectMeta = {
   updatedAt: number;
   /** Undefined = "design" (pre-FX metas hydrate cleanly). */
   kind?: XDProjectKind;
+  /** The name came from an image Save As, so later Save As may replace it. */
+  nameFromFile?: true;
 };
+
+export const DEFAULT_PROJECT_NAME = /^(Untitled|Untitled design|Webpage|Deck|Motion|Image|Imported design|Recovered design)( \d+)?$/;
 
 export function projectKind(meta: XDProjectMeta | undefined): XDProjectKind {
   return meta?.kind ?? "design";
@@ -79,6 +85,14 @@ function projectChange<T>(work: () => Promise<T>): Promise<T> {
   });
   void result.catch((e) => toast.error("XDesign project change failed", { body: String(e) }));
   return result;
+}
+
+// Saves first, so the preview sees the save, and captures while the project is still the active one.
+// Loaded on demand: the preview module pulls in the canvas runtimes.
+async function leaveActive(): Promise<void> {
+  const id = useXDProjects.getState().activeId;
+  await flushActive();
+  if (id) await (await import("./projectPreview")).settlePreview(id);
 }
 
 function docKey(id: string): `xdesign.project.${string}` {
@@ -120,6 +134,8 @@ export function snapshotActiveDoc(): XDDoc {
     formatVersion: 2,
     photoDocuments: s.photoDocuments,
     photoDrafts: s.photoDrafts,
+    photoSavePaths: s.photoSavePaths,
+    photoResume: s.photoResume,
     pencilDocument: livePencilSnapshot(s.pencilDocument),
     pages,
     activePageId: s.activePageId,
@@ -146,6 +162,8 @@ export function validateDesignDoc(doc: XDDoc): void {
   if (doc.formatVersion !== undefined && doc.formatVersion !== 2) throw new Error("This XDesign document needs a newer application version");
   if (doc.photoDocuments !== undefined) validatePhotoDocuments(doc.photoDocuments);
   if (doc.photoDrafts !== undefined) validatePhotoDrafts(doc.photoDrafts, doc.photoDocuments ?? {});
+  if (doc.photoSavePaths !== undefined) validatePhotoSavePaths(doc.photoSavePaths);
+  if (doc.photoResume !== undefined && doc.photoResume !== null) validatePhotoResume(doc.photoResume);
   if (doc.pencilDocument) {
     validatePencilDocument(doc.pencilDocument);
     for (const id of Object.values(doc.pencilDocument.photoLinks)) if (!doc.photoDocuments?.[id]) throw new Error("A linked photo document is missing");
@@ -282,6 +300,7 @@ type XDProjectsState = {
   closeTab: (id: string) => Promise<void>;
   goHome: () => Promise<void>;
   renameProject: (id: string, name: string) => Promise<void>;
+  noteImageSaved: (projectId: string, path: string, saveAs: boolean) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
 };
 
@@ -292,7 +311,8 @@ function readRegistry(value: unknown): XDProjectMeta[] {
     if (!entry || typeof entry !== "object" || typeof entry.id !== "string" ||
       !/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i.test(entry.id) || seen.has(entry.id) ||
       typeof entry.name !== "string" || !Number.isFinite(entry.createdAt) || !Number.isFinite(entry.updatedAt) ||
-      (entry.kind !== undefined && !["design", "fx", "model"].includes(entry.kind))) return true;
+      (entry.kind !== undefined && !["design", "fx", "model"].includes(entry.kind)) ||
+      (entry.nameFromFile !== undefined && entry.nameFromFile !== true)) return true;
     seen.add(entry.id); return false;
   })) throw new Error("The XDesign project list is invalid. Restore a database backup; it has not been overwritten.");
   return entries as XDProjectMeta[];
@@ -517,7 +537,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
 
   openProject: (id) => projectChange(async () => {
     if (get().activeId === id) return;
-    await flushActive();
+    await leaveActive();
     await hydrateProjectById(id, get().registry);
     set((s) => ({
       openTabs: s.openTabs.includes(id) ? s.openTabs : [...s.openTabs, id],
@@ -529,7 +549,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
 
   closeTab: (id) => projectChange(async () => {
     const { activeId, openTabs } = get();
-    if (activeId === id) await flushActive();
+    if (activeId === id) await leaveActive();
     const remaining = openTabs.filter((t) => t !== id);
 
     if (activeId !== id) {
@@ -550,7 +570,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
   }),
 
   goHome: () => projectChange(async () => {
-    await flushActive();
+    await leaveActive();
     useHtmlArtifact.getState().setProject(null);
     set({ activeId: null });
   }),
@@ -558,10 +578,20 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
   renameProject: (id, name) => projectChange(async () => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    await updateRegistry((registry) => registry.map((m) =>
-      m.id === id ? { ...m, name: trimmed, updatedAt: Date.now() } : m,
-    ));
+    await updateRegistry((registry) => registry.map((m) => {
+      if (m.id !== id) return m;
+      const { nameFromFile: _, ...rest } = m;
+      return { ...rest, name: trimmed, updatedAt: Date.now() };
+    }));
   }),
+
+  // Not a projectChange: it runs inside a photo operation, which projectChange refuses.
+  noteImageSaved: (projectId, path, saveAs) => updateRegistry((registry) => registry.map((m) => {
+    if (m.id !== projectId) return m;
+    const stem = path.split(/[\\/]/).pop()!.replace(/\.[^.]+$/, "").trim();
+    if (!saveAs || !stem || !(m.nameFromFile || DEFAULT_PROJECT_NAME.test(m.name))) return { ...m, updatedAt: Date.now() };
+    return { ...m, name: uniqueName(registry.filter((other) => other.id !== projectId), stem), nameFromFile: true, updatedAt: Date.now() };
+  })),
 
   deleteProject: (id) => projectChange(async () => {
     const { activeId, openTabs } = get();
@@ -572,6 +602,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
       { key: fxDocKey(id), value: null },
       { key: modelDocKey(id), value: null },
     ]);
+    await (await import("./projectPreview")).deleteProjectPreview(id);
     discardProjectSaveState(id);
     const remaining = openTabs.filter((t) => t !== id);
     if (activeId !== id) { set({ openTabs: remaining }); return; }

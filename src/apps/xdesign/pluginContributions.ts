@@ -389,7 +389,7 @@ export function registerXDesignContributions(
 ): void {
   subscriptions.add(disposeXDesignRuntime);
   subscriptions.add(useXDesign.subscribe((state, previous) => {
-    if (state.pencilDocument !== previous.pencilDocument || state.photoDocuments !== previous.photoDocuments || state.photoDrafts !== previous.photoDrafts || state.shapes !== previous.shapes || state.pages !== previous.pages || state.activePageId !== previous.activePageId || state.variables !== previous.variables || state.modes !== previous.modes || state.activeModeId !== previous.activeModeId) scheduleDesignSave();
+    if (state.pencilDocument !== previous.pencilDocument || state.photoDocuments !== previous.photoDocuments || state.photoDrafts !== previous.photoDrafts || state.photoSavePaths !== previous.photoSavePaths || state.photoResume !== previous.photoResume || state.shapes !== previous.shapes || state.pages !== previous.pages || state.activePageId !== previous.activePageId || state.variables !== previous.variables || state.modes !== previous.modes || state.activeModeId !== previous.activeModeId) scheduleDesignSave();
   }));
   subscriptions.add(useHtmlArtifact.subscribe((state, previous) => {
     if (state.projectId === previous.projectId &&

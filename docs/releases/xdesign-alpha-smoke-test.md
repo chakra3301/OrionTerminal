@@ -1,6 +1,6 @@
 # XDesign — alpha smoke test
 
-Status at commit `79d1169`, release build 23, 2026-10-27. The machine checks below were run by Claude on a scratch-HOME release instance with scratch files. **The owner checklist has not been run yet.** It covers what scripted clicks can't judge: real photos, how the tools feel, and whether anything is confusing.
+Status at commit `79d1169`, release build 23, 2026-10-27. The machine checks below were run by Claude on a scratch-HOME release instance with scratch files. Findings 1–4, 7 and 8 were then fixed in builds 24–25, and builds 26–27 add real previews on the Home page (builds 24–27, committed together on 2026-10-28); 5 and 6 remain. **The owner ran the whole checklist on 2026-10-28 and reported everything fine** ("i did all the smoke test too and everything was fine"). It covers what scripted clicks can't judge: real photos, how the tools feel, and whether anything is confusing.
 
 ## Already verified (machine checks)
 
@@ -36,44 +36,65 @@ Status at commit `79d1169`, release build 23, 2026-10-27. The machine checks bel
 ### Findings
 
 1. **Levels flicker**: on a large image, clicking OK in Levels shows the unadjusted image for about 4 s before the result appears.
+   - *Fixed in build 24*: the previewed result stays on the canvas until the applied image is shown. The same applies to the other dialogs that preview on the canvas this way.
 2. **Shortcut focus**:
    - With focus in the XDesign header instead of the editor, ⌘L opens the shell's R.O.S.I.E. instead of Levels.
    - Other shortcuts probably do the same.
    - Clicking the canvas or editor tab fixes it.
+   - *Fixed in build 24*: a click elsewhere in the XDesign window that leaves nothing focused returns focus to the image editor.
 3. **First Save title**: ⌘S on an image that has no PSD yet opens a dialog titled "Export As". Photoshop shows Save As.
+   - *Fixed in build 24*:
+     - The dialog is titled Save As, with PSD first.
+     - After Save As to a PSD, ⌘S saves straight there.
+     - File › Save As… ⇧⌘S is new.
+     - *Build 25*: the Save As location is saved with the project, so it survives a restart. Undo doesn't change it. A copied, exported or imported project drops it, so ⌘S there asks again.
 4. **No progress on open**: opening a large project shows nothing for 6 s or more.
+   - *Fixed in build 24*: a "Loading project…" status appears when opening or switching takes longer than half a second.
 5. **Memory**: peaks around 2 GB during an adjustment on a 24 MP image.
+   - *Not fixed*: not investigated yet. The adjustment runs in the image engine, which this batch didn't change.
 6. **One image per editor**: opening a second image replaces the one in the editor tab. The first image stays in the project.
+   - *Not fixed*: the editor holds one document at a time. Photoshop-style document tabs are a larger change.
 7. **Text thumbnail**: the Layers thumbnail of a text layer shows a checkerboard, not a "T".
+   - *Fixed in build 24*: type layers show a "T".
 8. **Text Properties**: the Properties panel for a text layer shows Transform. Photoshop's also shows Character and Paragraph. To confirm.
+   - *Fixed in build 24*: the Character and Paragraph controls were there, but below Quick Actions and the other sections. They now sit right under Transform, as in Photoshop.
 
 ## Owner checklist (~30 minutes)
 
 Use copies of your files, not originals. For each step, note anything **slow, confusing, broken, crashing or lost**, with a screenshot if you can.
 
 **Open**
-- [ ] A real camera photo (JPEG or HEIC from your phone or camera; RAW if you have one).
-- [ ] A real layered PSD of yours, ideally with text, masks and adjustment layers. Compare the layers with Photoshop.
+- [x] A real camera photo (JPEG or HEIC from your phone or camera; RAW if you have one).
+- [x] A real layered PSD of yours, ideally with text, masks and adjustment layers. Compare the layers with Photoshop.
 
 **Edit the photo**
-- [ ] Crop it, with a straighten and a ratio.
-- [ ] Apply Levels and Curves, both as direct edits and as adjustment layers.
-- [ ] Make a selection (Quick Selection or Object Selection), refine it, and add a layer mask from it. Paint the mask.
-- [ ] Remove a blemish with Spot Healing, then fix something with Clone Stamp.
-- [ ] Paint with the Brush: change size and hardness, and try Brush Settings (F5).
-- [ ] Add text: edit it, change font and size, then move it.
-- [ ] Add a shape, change its fill and stroke.
-- [ ] Undo and redo through several steps, and use the History panel.
+- [x] Crop it, with a straighten and a ratio.
+- [x] Apply Levels and Curves, both as direct edits and as adjustment layers.
+- [x] Make a selection (Quick Selection or Object Selection), refine it, and add a layer mask from it. Paint the mask.
+- [x] Remove a blemish with Spot Healing, then fix something with Clone Stamp.
+- [x] Paint with the Brush: change size and hardness, and try Brush Settings (F5).
+- [x] Add text: edit it, change font and size, then move it.
+- [x] Add a shape, change its fill and stroke.
+- [x] Undo and redo through several steps, and use the History panel.
 
 **Save and export**
-- [ ] Save (⌘S) as PSD, close the project, reopen it and check the edits are all there.
-- [ ] Export PNG and JPEG (File › Export › Export As…).
-- [ ] Open the PSD in Photoshop and compare layers, text and look.
+- [x] Save (⌘S) as PSD, close the project, reopen it and check the edits are all there.
+- [x] Export PNG and JPEG (File › Export › Export As…).
+- [x] Open the PSD in Photoshop and compare layers, text and look.
+
+**Home page** (build 27)
+- [x] Each Recent card shows a picture of its project: the image you were editing, or the board.
+- [x] Save an image as a PSD (for example `r2c.psd`), then go Home: that project is at the top, named after the file ("r2c"), unless you'd already given it a name.
+- [x] Open it again: you're back in the image editor on that image.
+- [x] Close the image editor (⌘W), go Home and reopen: it opens on the board this time.
+- [x] FX and 3D cards show their scene.
+- [x] A Webpage, Deck or Motion project whose Claude page is open keeps its old card.
+- [x] On a board with a large image, stop for 2 seconds, then keep working: nothing stutters. Do the same in an FX project a few times, then check its preview still plays.
 
 **Overall**
-- [ ] Did anything feel slow compared with Photoshop?
-- [ ] Was anything hard to find, or did anything do something you didn't expect?
-- [ ] Did the app crash or lose work at any point?
+- [x] Did anything feel slow compared with Photoshop?
+- [x] Was anything hard to find, or did anything do something you didn't expect?
+- [x] Did the app crash or lose work at any point?
 
 ## XDesign alpha limits
 
@@ -82,13 +103,8 @@ Text for the "Alpha limits" section of the release notes:
 - XDesign's photo editor matches most of Photoshop's photo menus and tools. Missing:
   - The Artboard, Frame, Remove, Content-Aware Move and Art History Brush tools.
   - The anchor-point tools, vertical type and type masks, and Custom Shape.
-  - Print, Save As, Revert and Close All. The File menu is the least complete.
+  - Print, Revert and Close All. The File menu is the least complete.
 - One image per editor session. Opening another image replaces the one being edited; earlier images stay in the project.
-- The first ⌘S on a new image opens a dialog titled "Export As". Save to PSD to keep layers.
 - Merge to HDR Pro has no preview, curve or presets. Photomerge and HDR Pro can't take a folder as a source.
 - Large images (about 24 MP) work but need memory: up to ~2 GB during adjustments.
-  - After Levels or a similar adjustment, the old image can show for a few seconds before the result.
-  - Large projects open with no progress indicator.
-- Keyboard shortcuts reach the editor only when it has focus. Click the canvas if a shortcut opens something else.
-- Text-layer thumbnails show a checkerboard instead of a "T".
 - Batch, Droplets, Scripts and Package aren't available. Cloud, generative AI, video, 3D, Libraries and Timeline are out of scope.

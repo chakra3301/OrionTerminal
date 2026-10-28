@@ -7222,6 +7222,26 @@ summary:focus-visible,
   background: var(--xd-bg);
 }
 
+.xd-project-status {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-window);
+  color: var(--t-secondary);
+  font-family: var(--f-mono);
+  font-size: 11px;
+  pointer-events: none;
+}
+
 /* ── Tab bar ─────────────────────────────────────────────────────────── */
 .xd-tabs {
   display: flex;
@@ -7403,6 +7423,7 @@ summary:focus-visible,
   box-shadow: 0 16px 34px -16px rgba(0, 0, 0, 0.7);
 }
 .xd-thumb-svg { width: 100%; height: 100%; display: block; }
+.xd-home-card-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
 .xd-thumb-empty {
   width: 100%;
   height: 100%;

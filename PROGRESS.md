@@ -1,3 +1,75 @@
+## 2026-10-28 — XDesign: real project previews on Home, resume the image editor, names from Save As; build 27 (committed and pushed)
+
+Branch: `validation/alpha-2026-09-14`. Owner request: "for the files it should be accessible from the x design home page and the thumbnails should show the actual contents of that file like a real thumbnail that previews the project". Spec `docs/superpowers/specs/2026-10-28-xdesign-home-previews-design.md` and plan `docs/superpowers/plans/2026-10-28-xdesign-home-previews.md` were approved by the owner and run inline, test-first. **Committed** on the owner's go-ahead ("looks good lets commit everything"), together with builds 24–25's fixes and Save As persistence. Pushed to origin on the owner's go-ahead ("sure lets close this"). No new dependencies, no tokens added, no engine changes, and Photoshop was not used.
+
+Done (detail in CLAUDE_LOG_ARCHIVE.md):
+1. **Real previews on Home cards** (`projectPreview.ts`, `previewCapture.ts`, `previewImage.ts`, `XDesignHome.tsx`, `src-tauri/src/xdesign_preview.rs`):
+   - Each card shows a stored PNG (640 px long edge) of what the project opens to: the image being edited, the Pencil or legacy board, the FX scene at its start, or the 3D view.
+   - A project whose Claude page is open keeps its old card.
+   - Capture runs only for the open project, after a save, once you've been idle 1.5 s, at most every 15 s, and never during an image or design operation. Leaving a project tries one last capture, waiting at most 400 ms.
+   - Files live in `app data/assets/xdesign-previews/<project id>.png`, outside archives, and are deleted with the project.
+   - Home reads full project docs only for design projects with no preview.
+   - If a preview can't be shown, the card falls back to the old thumbnail.
+2. **Saving an image moves its project to the top**, and on Save As a project still on its default name takes the file's name (`r2c.psd` gives "r2c"). A name you typed is never replaced (`projectsStore.ts` `noteImageSaved`, `nameFromFile`).
+3. **Reopening resumes the image editor** on the image you were editing (`photo/resume.ts`, `photoResume` in the project doc). Closing the image editor yourself (⌘W, File › Close) clears it. A missing image opens the board quietly. Archives drop it, like `photoSavePaths`.
+
+Gates:
+- `npm run typecheck` is clean.
+- 9 focused vitest files pass, 191/191. A first run beside the `cargo` compile timed out 3 `PhotoStudio.tools` tests at 5 s; they pass when nothing else is running.
+- `cargo test --lib` passes 1442 (1439 + 3 new).
+- Release build 26 built and starts on the scratch HOME (window opens, empty log). Claude could not live-check it (no Accessibility access), so the Home flow went to the owner checklist, which passed on build 27.
+- Final whole-feature review by a fresh opus reviewer: 0 Critical, 2 Important, 5 Minor. Both Important were fixed test-first:
+  - FX captures now give back their WebGL context. Each one used to leave a context alive, and WebKit drops the oldest, which can be the open FX editor's ("WebGL2 unavailable").
+  - Legacy board previews use the board's own photo previews, not a full-resolution render read and base64-encoded on the main thread.
+  - Not fixed: a Pencil board capture still decodes a copy of the board on the main thread, after 1.5 s idle and at most every 15 s. It can't be measured without the live check, so the owner checklist now asks for a stutter check.
+- After the fixes: 14 focused files (every test importing a changed module, plus the set above) pass 223/223, and typecheck is clean. Rust is unchanged, so `cargo` wasn't rerun.
+- Owner smoke test, 2026-10-28: the whole checklist, Home page block included. "i did all the smoke test too and everything was fine".
+- Release build 27 has the fixes. It starts on the scratch HOME (window opens in about 6 s, empty log). Still no live check of the Home flow.
+
+Not fixed:
+- **F5, ~2 GB peak memory**, and **F6, one image per editor**: unchanged.
+- Existing projects get a preview only once they're opened and changed. The owner plans to delete them.
+- 5 minor review findings are deferred; they're listed in the archive entry.
+
+Open questions: none new.
+
+Next:
+1. F5 (memory) and F6 (one image per editor) are still open.
+
+## 2026-10-27 (cont.) — XDesign: smoke-test findings 1–4, 7 and 8 fixed; builds 24–25 (uncommitted)
+
+Branch: `validation/alpha-2026-09-14`. Owner requests: "lets fix those problems you found first then ill test", then "fix that saving issue". **Uncommitted**: not authorised for this batch. No new dependencies, no tokens added, no engine changes, and Photoshop was not used.
+
+Done (detail in CLAUDE_LOG_ARCHIVE.md):
+1. **Levels flicker** (`PhotoActionDialog.tsx`): after OK, the previewed result stays on the canvas until the applied image is shown, with a 2 s cap after the command finishes.
+2. **Shortcut focus** (`PhotoStudio.tsx`): a click elsewhere in the XDesign window that leaves focus on the page returns it to the image editor, so ⌘L reaches Levels, not R.O.S.I.E.
+3. **Save As** (`PhotoStudio.tsx`, `ImageDialogs.tsx`):
+   - The first ⌘S on an image with no PSD opens "Save As", with PSD first.
+   - File › Save As… ⇧⌘S is new.
+   - After Save As to a PSD, ⌘S saves straight there.
+   - **Build 25**: that location is saved with the project as `photoSavePaths` (image id → PSD path), so it survives a restart. It sits beside `photoDocuments`, not on them, so undo can't bring back an older location.
+   - `xdesign_archive.rs` drops it on export, clone and import, as it does `originalPath`, so a copied or imported project asks again.
+4. **Project loading status** (`ProjectChangeStatus.tsx`, `XDesignApp.tsx`, `tokens.css`): "Loading project…" appears when a project change runs past 0.5 s. It renders outside `.xd-root`, so the dimmed, inert workspace doesn't affect it.
+5. **Type layer thumbnail** (`PhotoStudio.tsx`, `photo.css`): a "T".
+6. **Type layer Properties**: the Character and Paragraph controls already existed but sat below Quick Actions. They now come right after Transform, as in Photoshop.
+
+Gates:
+- `npm run typecheck` is clean.
+- 9 focused suites pass (529 tests).
+- The Save As follow-up adds 3 runtime tests and a Rust archive assertion. 11 related suites pass, and `cargo test --lib` passes (1439).
+- Release build 25 built and runs on the scratch HOME.
+- **Not live-checked**: this session has no Accessibility access, and permission prompts weren't touched.
+
+Not fixed:
+- **~2 GB peak memory**: not investigated.
+- **One image per editor**: the editor holds one document; document tabs are a larger change.
+
+Open questions: none new.
+
+Next:
+1. The owner tests build 25 with the checklist in `docs/releases/xdesign-alpha-smoke-test.md`.
+2. Commit and push this batch once authorised.
+
 ## 2026-10-27 (cont.) — XDesign alpha smoke test: machine checks on build 23, owner checklist, alpha limits
 
 Branch: `validation/alpha-2026-09-14`. Owner request: "do all of that then", after asking whether XDesign is good enough for an alpha. That covered: commit and push the build 23 batch (`79d1169`), write a smoke-test checklist and alpha-limits text, and run the checks that don't need a person. No code changed. Photoshop was used read-only on scratch documents and restored afterwards; the owner's open documents were not touched.

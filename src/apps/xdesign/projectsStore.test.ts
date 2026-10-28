@@ -20,7 +20,10 @@ vi.mock("@/lib/db", () => {
   };
 });
 
+vi.mock("./projectPreview", () => ({ settlePreview: vi.fn(async () => {}), deleteProjectPreview: vi.fn(async () => {}) }));
+
 import * as db from "@/lib/db";
+import { settlePreview, deleteProjectPreview } from "./projectPreview";
 import { useXDProjects, emptyDoc, saveDoc, loadDoc, flushActive } from "./projectsStore";
 import { useModelStore } from "./model3d/modelStore";
 import { useFxAssist } from "./fx/fxAssist";
@@ -615,5 +618,114 @@ describe("xdesign projectsStore", () => {
     expect(s.registry).toEqual([]);
     expect(mem.has(`xdesign.project.${a}`)).toBe(false);
     expect(s.activeId).toBeNull();
+  });
+});
+
+describe("image saves", () => {
+  const A = "01ARZ3NDEKTSV4RRFFQ69G5FB0", B = "01ARZ3NDEKTSV4RRFFQ69G5FB1";
+  const meta = (id: string) => useXDProjects.getState().registry.find((m) => m.id === id)!;
+  const noteImageSaved = (id: string, path: string, saveAs: boolean) => useXDProjects.getState().noteImageSaved(id, path, saveAs);
+  beforeEach(() => {
+    useXDProjects.setState({ ready: true, registry: [
+      { id: A, name: "Untitled design", createdAt: 1, updatedAt: 1 },
+      { id: B, name: "Other", createdAt: 1, updatedAt: 5 },
+    ] });
+  });
+
+  it("names a default-named project after its Save As file and moves it to the top", async () => {
+    await noteImageSaved(A, "/Users/me/Desktop/photoshop/r2c.psd", true);
+    expect(meta(A)).toMatchObject({ name: "r2c", nameFromFile: true });
+    expect(meta(A).updatedAt).toBeGreaterThan(5);
+    expect((mem.get("xdesign.projects") as { registry: unknown[] }).registry).toEqual(useXDProjects.getState().registry);
+  });
+
+  it("keeps following later Save As until the owner renames it", async () => {
+    await noteImageSaved(A, "/x/r2c.psd", true);
+    await noteImageSaved(A, "/x/r2c-final.png", true);
+    expect(meta(A).name).toBe("r2c-final");
+    await useXDProjects.getState().renameProject(A, "Poster");
+    expect(meta(A).name).toBe("Poster");
+    expect("nameFromFile" in meta(A)).toBe(false);
+    await noteImageSaved(A, "/x/new.psd", true);
+    expect(meta(A).name).toBe("Poster");
+  });
+
+  it("only Save As renames; ⌘S, copies and exports just move it to the top", async () => {
+    await noteImageSaved(A, "/x/r2c.psd", false);
+    expect(meta(A).name).toBe("Untitled design");
+    expect(meta(A).updatedAt).toBeGreaterThan(5);
+  });
+
+  it("numbers a taken name and doesn't count the project itself", async () => {
+    await useXDProjects.getState().renameProject(B, "r2c");
+    await noteImageSaved(A, "/x/r2c.psd", true);
+    expect(meta(A).name).toBe("r2c 2");
+    await noteImageSaved(A, "/x/r2c.psd", true);
+    expect(meta(A).name).toBe("r2c 2");
+  });
+
+  it("recognises only the app's default names", async () => {
+    const renamed = ["Untitled", "Untitled 3", "Untitled design", "Untitled design 2", "Webpage", "Deck 4", "Motion", "Image", "Imported design", "Recovered design 2"];
+    const kept = ["My Deck", "Deck two", "Untitled-1", "FX Scene", "3D Model"];
+    for (const name of [...renamed, ...kept]) {
+      useXDProjects.setState({ registry: [{ id: A, name, createdAt: 1, updatedAt: 1 }] });
+      await noteImageSaved(A, "/x/r2c.psd", true);
+      expect(meta(A).name, name).toBe(renamed.includes(name) ? "r2c" : name);
+    }
+  });
+
+  it("takes the name from any path and ignores names that would be empty", async () => {
+    await noteImageSaved(A, "C:\\Users\\me\\r2c.psd", true);
+    expect(meta(A).name).toBe("r2c");
+    useXDProjects.setState({ registry: [{ id: A, name: "Untitled", createdAt: 1, updatedAt: 1 }] });
+    await noteImageSaved(A, "/x/.psd", true);
+    expect(meta(A).name).toBe("Untitled");
+    expect(meta(A).updatedAt).toBeGreaterThan(1);
+  });
+
+  it("refuses a project list whose name-origin flag isn't true", async () => {
+    const stored = { registry: [{ id: A, name: "r2c", createdAt: 1, updatedAt: 1, nameFromFile: "yes" }] };
+    mem.set("xdesign.projects", stored);
+    useXDProjects.setState({ ready: false, registry: [] });
+    await expect(useXDProjects.getState().init()).rejects.toThrow(/list is invalid/);
+    expect(useXDProjects.getState().loadError).toMatch(/not been overwritten/);
+    expect(mem.get("xdesign.projects")).toBe(stored);
+  });
+});
+
+describe("project previews", () => {
+  const A = "01ARZ3NDEKTSV4RRFFQ69G5FB0", B = "01ARZ3NDEKTSV4RRFFQ69G5FB1";
+  const page = (name: string) => ({ ...emptyDoc(), pages: [{ id: name, name, shapes: [], past: [], future: [] }], activePageId: name });
+  beforeEach(() => {
+    mem.set(`xdesign.project.${A}`, page("A page")); mem.set(`xdesign.project.${B}`, page("B page"));
+    useXDProjects.setState({ ready: true, openTabs: [A, B], activeId: A, registry: [
+      { id: A, name: "A", createdAt: 1, updatedAt: 1 },
+      { id: B, name: "B", createdAt: 1, updatedAt: 1 },
+    ] });
+    useXDesign.getState().hydrate(page("A page"));
+    useHtmlArtifact.getState().setProject(A);
+  });
+
+  it("lets the leaving project's preview finish after it's saved and before the next project loads", async () => {
+    const seen: Array<{ id: string; activeId: string | null; updatedAt: number; page: string }> = [];
+    vi.mocked(settlePreview).mockImplementation(async (id) => {
+      const { activeId, registry } = useXDProjects.getState();
+      seen.push({ id, activeId, updatedAt: registry.find((m) => m.id === id)!.updatedAt, page: useXDesign.getState().activePageId });
+    });
+    await useXDProjects.getState().openProject(B);
+    await useXDProjects.getState().goHome();
+    await useXDProjects.getState().openProject(A);
+    await useXDProjects.getState().closeTab(A);
+    expect(seen.map(({ id, activeId, page }) => [id, activeId, page])).toEqual([[A, A, "A page"], [B, B, "B page"], [A, A, "A page"]]);
+    expect(seen.every(({ updatedAt }) => updatedAt > 1)).toBe(true);
+    expect(useXDProjects.getState().activeId).toBe(B);
+  });
+
+  it("deletes a project's preview with it, only once the delete is committed", async () => {
+    vi.mocked(db.setXDesignStateAtomic).mockRejectedValueOnce(new Error("disk full"));
+    await expect(useXDProjects.getState().deleteProject(B)).rejects.toThrow("disk full");
+    expect(deleteProjectPreview).not.toHaveBeenCalled();
+    await useXDProjects.getState().deleteProject(B);
+    expect(deleteProjectPreview).toHaveBeenCalledExactlyOnceWith(B);
   });
 });

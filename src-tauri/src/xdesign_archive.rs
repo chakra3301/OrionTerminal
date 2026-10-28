@@ -44,6 +44,8 @@ fn read_bounded(file: &Path, max: usize) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 fn digest(bytes: &[u8]) -> String { format!("{:x}", Sha256::digest(bytes)) }
+// Where Save As put each image is a path on this machine, like originalPath. A copied or imported project asks again rather than saving over another project's files.
+fn local_only(document: &mut Value) { if let Some(document) = document.as_object_mut() { document.remove("photoSavePaths"); document.remove("photoResume"); } }
 
 pub(crate) fn visit_photos(document: &mut Value, mut visit: impl FnMut(&mut Value) -> Result<(), String>) -> Result<(), String> {
     if let Some(photos) = document.get_mut("photoDocuments") {
@@ -156,6 +158,7 @@ pub(crate) fn build_archive(project_dir: &Path, name: String, document: Value) -
 }
 fn build_archive_with_photo_sources(project_dir: &Path, name: String, mut document: Value, photo_sources: &BTreeMap<String, IndependentPhotoCopy>) -> Result<Vec<u8>, String> {
     if name.len() > 16_384 || serde_json::to_vec(&document).map_err(|e| e.to_string())?.len() > MAX_JSON { return Err("Project metadata exceeds 64MB".into()); }
+    local_only(&mut document);
     let mut files = BTreeMap::new(); let mut total = 0usize;
     let mut preview_paths = BTreeMap::new();
     visit_photos(&mut document, |photo| {
@@ -258,6 +261,7 @@ pub(crate) fn unpack_archive_managed(bytes: &[u8], final_dir: &Path, mut managed
     let manifest_bytes = zip.read_by_name("project.json", MAX_JSON).map_err(|e| e.to_string())?;
     let mut manifest: Manifest = serde_json::from_slice(&manifest_bytes).map_err(|e| e.to_string())?;
     if manifest.format != "orion.xdesign" || manifest.version != 1 || manifest.name.len() > 16_384 { return Err("Unsupported XDesign project file".into()); }
+    local_only(&mut manifest.document);
     if manifest.files.len() + 1 != zip.entries.len() { return Err("Project asset inventory does not match its archive".into()); }
     let parent = final_dir.parent().ok_or("Invalid project destination")?;
     std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -535,9 +539,23 @@ mod tests {
         doc["photoDocuments"][text(&child,"id").unwrap()] = changed.clone();
         doc["photoDrafts"] = json!([{"id":child["id"],"shapeId":"image","source":"legacy","updatedAt":1,"trail":[{"parent":parent,"childId":child["id"],"layer":1,"past":[child],"future":[]}]}]);
         doc["pages"][0]["shapes"] = json!([{"id":"image","kind":"image","filePath":parent["previewPath"],"assetId":"old-local-id","photoDocumentId":parent["id"]}]);
+        doc["photoSavePaths"][text(&parent,"id").unwrap()] = json!("/Users/me/Saved.psd");
+        doc["photoResume"] = json!({"source":"legacy","placementId":"image","documentId":parent["id"]});
         let archive = build_archive(&source, "Layered project".into(), doc.clone()).unwrap();
         let destination = temp.0.join("new-project");
         let imported = unpack_archive(&archive, &destination).unwrap();
+        assert!(imported.document.get("photoSavePaths").is_none() && imported.document.get("photoResume").is_none());
+        let zip = ZipReader::new(&archive).unwrap();
+        let mut manifest: Manifest = serde_json::from_slice(&zip.read_by_name("project.json", MAX_JSON).unwrap()).unwrap();
+        assert!(manifest.document.get("photoSavePaths").is_none() && manifest.document.get("photoResume").is_none());
+        manifest.document["photoSavePaths"] = doc["photoSavePaths"].clone();
+        manifest.document["photoResume"] = doc["photoResume"].clone();
+        let mut crafted = ZipWriter::new(); crafted.add("project.json", &serde_json::to_vec(&manifest).unwrap()).unwrap();
+        for record in &manifest.files { crafted.add(&record.name, &zip.read_by_name(&record.name, record.bytes).unwrap()).unwrap(); }
+        let crafted = unpack_archive(&crafted.finish().unwrap(), &temp.0.join("crafted")).unwrap().document;
+        assert!(crafted.get("photoSavePaths").is_none() && crafted.get("photoResume").is_none());
+        let cloned = clone_project(&source, &temp.0.join("clone"), "Clone".into(), doc.clone()).unwrap().document;
+        assert!(cloned.get("photoSavePaths").is_none() && cloned.get("photoResume").is_none());
         assert_eq!(imported.name, "Layered project");
         let new_child = &imported.document["photoDocuments"][text(&child,"id").unwrap()];
         assert_eq!(new_child["version"], changed["version"]);

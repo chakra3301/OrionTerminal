@@ -119,6 +119,18 @@ describe("complete native adjustment controls", () => {
     await act(async () => previewBox().click()); expect(shown()).toBeNull(); await click("Cancel"); expect(close).toHaveBeenCalledOnce(); expect(native.run).not.toHaveBeenCalled();
     act(() => root.unmount()); root = createRoot(container); expect(revoke).toHaveBeenCalledWith("blob:adjustment"); create.mockRestore();
   });
+  it("keeps the previewed result on the canvas after OK until the applied image is shown", async () => {
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:applied"); vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    native.invoke.mockResolvedValue({ width: 100, height: 100, png: "AA==" }); const close = vi.fn();
+    let finish!: () => void, display!: () => void;
+    native.run.mockImplementation(() => { usePhotoWorkspace.setState({ busy: true }); return new Promise(resolve => { finish = () => { usePhotoWorkspace.setState({ busy: false }); resolve({}); }; }); });
+    const untilShown = vi.fn((work: Promise<unknown>) => work.then(() => new Promise<void>(resolve => { display = resolve; })));
+    await act(async () => root.render(<PhotoActionDialog action={ADJUSTMENTS.find(action => action.id === "exposure")!} adjustment={false} document={photo} canvas={canvas} onClose={close} untilShown={untilShown}/>));
+    await input("Adjustment Exposure", "-1.5"); await preview(); expect(shown()).toBe("blob:applied");
+    await submit(); expect(native.run).toHaveBeenCalledOnce(); expect(shown()).toBe("blob:applied");
+    await act(async () => finish()); expect(untilShown).toHaveBeenCalledOnce(); expect(shown()).toBe("blob:applied"); expect(close).not.toHaveBeenCalled();
+    await act(async () => display()); expect(close).toHaveBeenCalledOnce();
+  });
   it("rejects invalid fields and failed edits while retaining the dialog for correction", async () => {
     await render("exposure", false); await input("Adjustment Gamma", ""); await submit(); expect(native.run).not.toHaveBeenCalled(); expect(button("OK").disabled).toBe(true);
     await input("Adjustment Gamma", "-1"); await submit(); expect(native.run).not.toHaveBeenCalled();

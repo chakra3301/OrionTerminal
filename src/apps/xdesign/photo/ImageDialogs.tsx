@@ -160,14 +160,14 @@ export function NewSnapshotDialog({next,close}:{next:string;close:()=>void}) {
 }
 
 const EXPORT_FORMATS:[string,string,string[]][]=[["psd","Photoshop (PSD)",["psd","psb"]],["png","PNG",["png"]],["jpg","JPEG",["jpg","jpeg"]],["webp","WebP (lossless)",["webp"]],["avif","AVIF",["avif"]],["tiff","TIFF",["tiff","tif"]],["pcraft","Native image",["pcraft"]]];
-// Save a Copy also offers Photoshop PDF: one page, the flattened image at the document's resolution.
+// Save As and Save a Copy also offer Photoshop PDF: one page, the flattened image at the document's resolution.
 const COPY_FORMATS:[string,string,string[]][]=[...EXPORT_FORMATS.slice(0,1),["pdf","Photoshop PDF",["pdf"]],...EXPORT_FORMATS.slice(1)];
-export function ImageExportDialog({name,copy=false,choose,close}:{name:string;copy?:boolean;choose:(path:string|null,quality:number|undefined)=>Promise<unknown>;close:()=>void}) {
-  const formats=copy?COPY_FORMATS:EXPORT_FORMATS;
+export function ImageExportDialog({name,kind="export",choose,close}:{name:string;kind?:"export"|"copy"|"save";choose:(path:string|null,quality:number|undefined)=>Promise<unknown>;close:()=>void}) {
+  const formats=kind==="export"?EXPORT_FORMATS:COPY_FORMATS;
   const [format,setFormat]=useState("psd"),[quality,setQuality]=useState(90);
   const [,label,extensions]=formats.find(([id])=>id===format)!;
   const lossy=format==="jpg"||format==="avif";
-  return <Dialog title={copy?"Save a Copy":"Export As"} ok={copy?"Save":"Export"} close={close} reset={()=>{setFormat("psd");setQuality(90);}} apply={()=>save({defaultPath:`${name.replace(/\.[^.]+$/,"")}.${extensions[0]}`,filters:[{name:label,extensions}]}).then(path=>choose(path,lossy?quality:undefined))}>
+  return <Dialog title={kind==="copy"?"Save a Copy":kind==="save"?"Save As":"Export As"} ok={kind==="export"?"Export":"Save"} close={close} reset={()=>{setFormat("psd");setQuality(90);}} apply={()=>save({defaultPath:`${name.replace(/\.[^.]+$/,"")}.${extensions[0]}`,filters:[{name:label,extensions}]}).then(path=>choose(path,lossy?quality:undefined))}>
     <div className="xd-ps-dialog-grid has-sliders">
       <div className="xd-ps-dialog-row"><Field label="Format"><select aria-label="Format" value={format} onChange={e=>setFormat(e.target.value)}>{formats.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></Field></div>
       {lossy&&<div className="xd-ps-dialog-row"><Field label="Quality" unit="%"><input type="number" aria-label="Quality" required min="1" max="100" value={Number.isFinite(quality)?quality:""} onChange={e=>setQuality(e.target.valueAsNumber)}/></Field>

@@ -55,10 +55,11 @@ describe("File menu", () => {
     expect([...rows()].map(el => el.textContent!.replace(/[^\p{L}\p{N}… ]/gu, "").trim())).toEqual(["Export As…", "Artboards to PDF…", "Layers to Files…", "Color Lookup Tables…", "Paths to Illustrator…"]);
   });
 
-  it("offers Save a Copy… after Save, with Photoshop PDF, and Artboards to PDF… only with artboards", async () => {
+  it("offers Save As… and Save a Copy… after Save, with Photoshop PDF, and Artboards to PDF… only with artboards", async () => {
     await openMenu("File");
     const labels = [...rows()].map(el => el.textContent!.replace(/[^\p{L}\p{N}… ]/gu, "").trim());
-    expect(labels.indexOf("Save a Copy…")).toBe(labels.indexOf("Save") + 1);
+    expect(labels.slice(labels.indexOf("Save"), labels.indexOf("Save") + 3)).toEqual(["Save", "Save As…", "Save a Copy…"]);
+    expect(row("Save As…").dataset.shortcut).toBe("⇧⌘S");
     expect(row("Save a Copy…").dataset.shortcut).toBe("⌥⌘S");
     await act(async () => row("Save a Copy…").click());
     const copy = dialog("Save a Copy")!;
