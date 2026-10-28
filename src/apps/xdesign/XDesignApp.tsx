@@ -31,6 +31,7 @@ import { trackXDesignActivity } from "./runtimeActivity";
 import { openProjectFile, saveProjectFile } from "./projectFiles";
 import { DraftRecoveryDialog } from "./photo/DraftRecoveryDialog";
 import { resumeImageEditor, startOpenImageTracking } from "./photo/resume";
+import { staleTabProject } from "./photo/tabs";
 import { startPreviewTracking } from "./projectPreview";
 import { ProjectHistoryDialog } from "./ProjectHistoryDialog";
 import { ProjectChangeStatus } from "./ProjectChangeStatus";
@@ -146,6 +147,7 @@ function XDesignWorkspace() {
   const pencilDocument=useXDesign(s=>s.pencilDocument);
   const importDesignRef=useRef<HTMLInputElement>(null);
   const photoProject=usePhotoWorkspace(s=>s.projectId);
+  const tabProject=usePhotoWorkspace(s=>s.tabProject);
   const photoShapeId = usePhotoWorkspace(s => s.shapeId);
   const photoBusy = usePhotoWorkspace(s => s.busy);
   const pencilImageId=usePencilWorkspace(s=>s.editor?.getSelectedNodes().find(n=>n.fills.some(f=>f.type==="IMAGE"))?.id);
@@ -156,7 +158,7 @@ function XDesignWorkspace() {
   const hasFrames = useXDesign((s) => topLevelFrames(s.shapes).length > 0);
   const activeId = useXDProjects((s) => s.activeId);
   const transitioning = useXDProjects((s) => s.transitioning);
-  useEffect(()=>{if(photoProject&&photoProject!==activeId)usePhotoWorkspace.getState().close();},[activeId,photoProject]);
+  useEffect(()=>{if(staleTabProject(activeId))usePhotoWorkspace.getState().close();},[activeId,photoProject,tabProject]);
   useEffect(()=>startOpenImageTracking(),[]);
   useEffect(()=>startPreviewTracking(),[]);
   const pencilEditor=usePencilWorkspace(s=>s.editor);

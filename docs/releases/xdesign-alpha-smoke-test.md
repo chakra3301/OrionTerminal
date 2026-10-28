@@ -1,6 +1,6 @@
 # XDesign — alpha smoke test
 
-Status at commit `79d1169`, release build 23, 2026-10-27. The machine checks below were run by Claude on a scratch-HOME release instance with scratch files. Findings 1–4, 7 and 8 were then fixed in builds 24–25, and builds 26–27 add real previews on the Home page (builds 24–27, committed together on 2026-10-28). Finding 5 was fixed after build 27; 6 remains. **The owner ran the whole checklist on 2026-10-28 and reported everything fine** ("i did all the smoke test too and everything was fine"). It covers what scripted clicks can't judge: real photos, how the tools feel, and whether anything is confusing.
+Status at commit `79d1169`, release build 23, 2026-10-27. The machine checks below were run by Claude on a scratch-HOME release instance with scratch files. Findings 1–4, 7 and 8 were then fixed in builds 24–25, and builds 26–27 add real previews on the Home page (builds 24–27, committed together on 2026-10-28). Finding 5 was fixed after build 27 and finding 6 after build 28. **The owner ran the whole checklist on 2026-10-28 and reported everything fine** ("i did all the smoke test too and everything was fine"). It covers what scripted clicks can't judge: real photos, how the tools feel, and whether anything is confusing.
 
 ## Already verified (machine checks)
 
@@ -54,7 +54,12 @@ Status at commit `79d1169`, release build 23, 2026-10-27. The machine checks bel
    - *Fixed after build 27*: the engine converted the whole layer to float RGBA three times over. Image › Adjustments on a pixel layer now runs a band at a time. On a 6000×4000 layer the extra peak drops from about 1.56 GB to about 136 MB, with the same result, undo, history and Fade, and about the same time in a debug build.
    - Still on the old route: an adjustment with a single colour channel targeted (for example only Red in the Channels panel).
 6. **One image per editor**: opening a second image replaces the one in the editor tab. The first image stays in the project.
-   - *Not fixed*: the editor holds one document at a time. Photoshop-style document tabs are a larger change.
+   - *Fixed after build 28*: the editor has Photoshop-style document tabs.
+     - Each image you open gets a tab with its name, zoom and mode, and keeps its own zoom and scroll position.
+     - Switch by clicking a tab, with ⌃Tab and ⌃⇧Tab, or from the list of open images at the bottom of the Window menu. In the shell's full screen, ⌃Tab still switches apps.
+     - Each tab has its own close button. File › Close All ⌥⌘W and Close Others ⌥⌘P are new.
+     - Closing a tab with smart-object contents open saves the contents into the image first.
+     - Back to design keeps the tabs. A project closed with the editor open reopens with its tabs, loading only the active one.
 7. **Text thumbnail**: the Layers thumbnail of a text layer shows a checkerboard, not a "T".
    - *Fixed in build 24*: type layers show a "T".
 8. **Text Properties**: the Properties panel for a text layer shows Transform. Photoshop's also shows Character and Paragraph. To confirm.
@@ -104,8 +109,8 @@ Text for the "Alpha limits" section of the release notes:
 - XDesign's photo editor matches most of Photoshop's photo menus and tools. Missing:
   - The Artboard, Frame, Remove, Content-Aware Move and Art History Brush tools.
   - The anchor-point tools, vertical type and type masks, and Custom Shape.
-  - Print, Revert and Close All. The File menu is the least complete.
-- One image per editor session. Opening another image replaces the one being edited; earlier images stay in the project.
+  - Print and Revert. The File menu is the least complete.
+- A ninth open tab, or a 512 MiB total, evicts the least recently edited image from memory. Switching back to it reloads from disk, taking about as long as opening it. Its History panel snapshots are lost; its undo history isn't.
 - Merge to HDR Pro has no preview, curve or presets. Photomerge and HDR Pro can't take a folder as a source.
 - Large images (about 24 MP) work but need memory: about 1.3–1.6 GB with one open. Adjustments on a single colour channel can still peak near 2 GB.
 - Batch, Droplets, Scripts and Package aren't available. Cloud, generative AI, video, 3D, Libraries and Timeline are out of scope.

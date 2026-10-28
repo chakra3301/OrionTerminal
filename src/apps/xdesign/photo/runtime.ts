@@ -6,13 +6,16 @@ import { useXDesign } from "../store";
 import { beginXDesignActivity, trackXDesignActivity } from "../runtimeActivity";
 import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
-import { PSD_PATH, validatePhotoDocuments, type PhotoDocument, type PhotoReply, type PhotoState, type PhotoOpenReply, type PhotoColorDecision, type PhotoPasteDecision, type PhotoClipboardReply } from "./types";
+import { PSD_PATH, validatePhotoDocuments, type PhotoDocument, type PhotoReply, type PhotoState, type PhotoOpenReply, type PhotoColorDecision, type PhotoPasteDecision, type PhotoClipboardReply, type PhotoTab } from "./types";
 import { usePencilWorkspace } from "../pencil/runtime";
 import { channelWorkspaceRequired } from "./channelSources";
 import { recordActionStep } from "./actions";
 
 import { validatePhotoDrafts, type SmartContentsFrame } from "./drafts";
 export type { SmartContentsFrame } from "./drafts";
+export type TabView = { documentId: string; zoom: number; center: [number, number] };
+/** `draftId` is the smart-object contents left open when the tab was switched away from. */
+export type OpenPhotoTab = PhotoTab & { draftId?: string; label?: string; view?: TabView };
 type WorkspaceState = {
   shapeId: string | null;
   documentId: string | null;
@@ -33,12 +36,40 @@ type WorkspaceState = {
   colorDecision:PhotoColorDecision|null;
   colorDecisionBusy:boolean;
   colorDecisionError:string|null;
+  tabs: OpenPhotoTab[];
+  tabProject: string | null;
   close: () => void;
+  /** Leaves the editor for the board but keeps its tabs while the project stays open. */
+  leave: () => void;
 };
 export const usePhotoWorkspace = create<WorkspaceState>(set => ({
-  shapeId: null, documentId: null, projectId:null, source:"legacy", state: null, stateVersion:null, busy: false, quiet: false, error: null, warnings: [],smartTrail:[],pasteDecision:null,pasteDecisionBusy:false,pasteDecisionError:null,colorDecision:null,colorDecisionBusy:false,colorDecisionError:null,
-  close: () => set(s => s.busy ? s : { shapeId: null, documentId: null, projectId:null, state: null, stateVersion:null, error: null, warnings: [],smartTrail:[] }),
+  shapeId: null, documentId: null, projectId:null, source:"legacy", state: null, stateVersion:null, busy: false, quiet: false, error: null, warnings: [],smartTrail:[],pasteDecision:null,pasteDecisionBusy:false,pasteDecisionError:null,colorDecision:null,colorDecisionBusy:false,colorDecisionError:null,tabs:[],tabProject:null,
+  close: () => set(s => s.busy ? s : { shapeId: null, documentId: null, projectId:null, state: null, stateVersion:null, error: null, warnings: [],smartTrail:[],tabs:[],tabProject:null }),
+  leave: () => set(s => s.busy ? s : { shapeId: null, documentId: null, projectId:null, state: null, stateVersion:null, error: null, warnings: [],smartTrail:[] }),
 }));
+
+export function addPhotoTabs(source: PhotoTab["source"], placementIds: string[], projectId: string): void {
+  usePhotoWorkspace.setState(state => {
+    const tabs = state.tabProject === projectId ? [...state.tabs] : [];
+    for (const placementId of placementIds) if (!tabs.some(tab => tab.source === source && tab.placementId === placementId)) tabs.push({ source, placementId });
+    return tabs.length === state.tabs.length && state.tabProject === projectId ? state : { tabs, tabProject: projectId };
+  });
+}
+// Every opener ends by naming its placement, so this is where an opened image gets its tab.
+usePhotoWorkspace.subscribe((state, previous) => {
+  if (state.shapeId && state.projectId && (state.shapeId !== previous.shapeId || state.source !== previous.source || state.projectId !== previous.projectId)) addPhotoTabs(state.source, [state.shapeId], state.projectId);
+});
+
+/** A board image on any page; the active page's shapes live in `shapes`, the others in `pages`. */
+export function findLegacyImage(shapeId: string) {
+  const { shapes, pages, activePageId } = useXDesign.getState();
+  for (const page of pages) {
+    const shape = (page.id === activePageId ? shapes : page.shapes).find(item => item.id === shapeId);
+    if (shape?.kind === "image") return { shape, pageId: page.id };
+  }
+  const shape = shapes.find(item => item.id === shapeId);
+  return shape?.kind === "image" ? { shape, pageId: activePageId } : null;
+}
 
 function requireDesktop() {
   if (!isTauri()) throw new Error("Image editing uses Orion Terminal’s native engine. Open this project in the desktop app.");
@@ -280,14 +311,16 @@ export function removePhotoDraft(draftId: string): void {
 
 export async function editImage(shapeId: string): Promise<void> {
   await operation(async projectId => {
-    const shape = useXDesign.getState().shapes.find(s => s.id === shapeId);
-    if (!shape || shape.kind !== "image") throw new Error("Select an image to edit");
+    const shape = findLegacyImage(shapeId)?.shape;
+    if (!shape) throw new Error("Select an image to edit");
     const document = shape.photoDocumentId ? useXDesign.getState().photoDocuments[shape.photoDocumentId] : null;
     const reply = await openPhoto({
       projectId, photoId: document?.id ?? ulid(), version: document?.version ?? null,
       sourcePath: document?.originalPath ?? shape.filePath, width: null, height: null,
     },projectId);
     receive(reply, projectId);
+    const store = useXDesign.getState(), page = findLegacyImage(shapeId)?.pageId;
+    if (page && page !== store.activePageId) store.switchPage(page);
     if (!document) useXDesign.getState().applyPhotoDocument(reply.document, shapeId);
     usePhotoWorkspace.setState({ shapeId, documentId:reply.document.id, projectId, source:"legacy", smartTrail:[] });
   });
@@ -331,14 +364,15 @@ async function createImages(command:string,params:Record<string,unknown>):Promis
     for(const reply of replies)validatePhotoDocuments({[reply.document.id]:reply.document});
     const registry=useXDesign.getState().photoDocuments,editor=usePencilWorkspace.getState().editor;
     const pencil=useXDesign.getState().pencilDocument?await import("../pencil/runtime"):null;
-    let shapeId="";
+    const shapeIds:string[]=[];
     if(pencil)editor?.undo.beginBatch("Create images");
     try {
-      for(const reply of replies)shapeId=pencil?await pencil.commitPencilPhoto(reply.document):useXDesign.getState().applyPhotoDocument(reply.document);
+      for(const reply of replies)shapeIds.push(pencil?await pencil.commitPencilPhoto(reply.document):useXDesign.getState().applyPhotoDocument(reply.document));
       if(pencil)editor?.undo.commitBatch();
     } catch(error) {if(pencil)editor?.undo.rollbackBatch();useXDesign.setState({photoDocuments:registry});throw error;}
     receive(last,projectId);
-    usePhotoWorkspace.setState({shapeId,documentId:last.document.id,projectId,source:pencil?"pencil":"legacy",smartTrail:[]});
+    addPhotoTabs(pencil?"pencil":"legacy",shapeIds,projectId);
+    usePhotoWorkspace.setState({shapeId:shapeIds.at(-1)!,documentId:last.document.id,projectId,source:pencil?"pencil":"legacy",smartTrail:[]});
     return {documentIds:replies.map(reply=>reply.document.id)};
   });
 }

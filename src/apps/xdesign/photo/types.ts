@@ -144,13 +144,17 @@ export function validatePhotoSavePaths(value: unknown): asserts value is Record<
   if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length > 1024 ||
     Object.entries(value).some(([id, path]) => !ID.test(id) || typeof path !== "string" || !PSD_PATH.test(path))) throw new Error("Invalid saved image locations");
 }
-export type PhotoResume = { source: "legacy" | "pencil"; placementId: string; documentId: string };
+export type PhotoTab = { source: "legacy" | "pencil"; placementId: string };
+export const PHOTO_TAB_LIMIT = 64;
+/** `tabs` is absent when only one image was open, as saved before the editor had tabs. */
+export type PhotoResume = PhotoTab & { documentId: string; tabs?: PhotoTab[] };
+const validTab = (tab: PhotoTab | null) => !!tab && typeof tab === "object" && !Array.isArray(tab) && ["legacy", "pencil"].includes(tab.source) &&
+  typeof tab.placementId === "string" && !!tab.placementId && tab.placementId.length <= 128;
 // Shape only: an image that no longer exists falls back to the board when reopening, instead of refusing to load the project.
 export function validatePhotoResume(value: unknown): asserts value is PhotoResume {
   const resume = value as PhotoResume | null;
-  if (!resume || typeof resume !== "object" || Array.isArray(resume) || !["legacy", "pencil"].includes(resume.source) ||
-    typeof resume.placementId !== "string" || !resume.placementId || resume.placementId.length > 128 ||
-    typeof resume.documentId !== "string" || !ID.test(resume.documentId)) throw new Error("Invalid open image");
+  if (!validTab(resume) || typeof resume!.documentId !== "string" || !ID.test(resume!.documentId) ||
+    resume!.tabs !== undefined && (!Array.isArray(resume!.tabs) || resume!.tabs.length > PHOTO_TAB_LIMIT || !resume!.tabs.every(validTab))) throw new Error("Invalid open image");
 }
 export function validatePhotoDocuments(value: unknown): asserts value is Record<string, PhotoDocument> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid image document registry");

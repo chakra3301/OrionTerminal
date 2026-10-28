@@ -16,7 +16,7 @@ import { usePhotoWorkspace, controlsLocked, refreshImage, runPhotoCommand, setPh
 import { docTabDetail } from "./docTab";
 import { catchPaste, clipboardImage } from "../pasteCatcher";
 import { useXDProjects } from "../projectsStore";
-import { PSD_PATH, type LayerColor, type PhotoCloneSource, type PhotoCloneSources, type PhotoDocument, type PhotoEffect, type PhotoLayer, type PhotoState } from "./types";
+import { PSD_PATH, type LayerColor, type PhotoCloneSource, type PhotoCloneSources, type PhotoDocument, type PhotoEffect, type PhotoLayer, type PhotoState, type PhotoTab } from "./types";
 import "./photo.css";
 import "./photoshop.css";
 import { EditorToolRail, InspectorSection, PanelResize, useEditorPanels } from "../EditorChrome";
@@ -60,7 +60,7 @@ import { previewCoversScreen, tileScale } from "./tiles";
 import { PreviewSurface } from "./previewSurface";
 import { startRowDrag } from "./rowDrag";
 import { beginXDesignActivity } from "../runtimeActivity";
-import { closeImageEditor } from "./resume";
+import { activateTab, activeTab, closeAllTabs, closeOtherTabs, closeTab, closeVanishedTab, cycleTab, leaveImageEditor, liveTabs, pruneTabs, rememberTab, sameTab, tabDocumentId, tabKey } from "./tabs";
 import { GradientFillDialog } from "./GradientFillDialog";
 import { ImageTypographyPanel, rangeStyle } from "./ImageTypographyPanel";
 import { PhotoActionDialog } from "./PhotoActionDialog";
@@ -370,6 +370,10 @@ export function PhotoStudio() {
   const error=usePhotoWorkspace(s=>s.error);
   const warnings=usePhotoWorkspace(s=>s.warnings);
   const documents=useXDesign(s=>s.photoDocuments);
+  const tabs=usePhotoWorkspace(s=>s.tabs);
+  useXDesign(s=>s.shapes);useXDesign(s=>s.pages);
+  const live=liveTabs();
+  useEffect(()=>{if(live.length<tabs.length)pruneTabs();});
   const legacyPlacement=useXDesign(s=>s.shapes.find(shape=>shape.id===shapeId));
   const linkedDocumentId=sourceKind==="pencil"&&shapeId?pencilPhotoDocumentId(shapeId):legacyPlacement?.kind==="image"?legacyPlacement.photoDocumentId:null;
   const displayedId=smartTrail.length?documentId:linkedDocumentId;
@@ -506,7 +510,7 @@ export function PhotoStudio() {
   useEffect(()=>()=>resetStroke(),[projectId,document?.id,document?.version,displayState?.viewKey]);
   const placementExists=sourceKind==="pencil"?!!(shapeId&&pencil?.graph.getNode(shapeId)):!!legacyPlacement;
   useEffect(()=>{
-    if(!document||!placementExists&&!smartTrail.length) {usePhotoWorkspace.getState().close();return;}
+    if(!document||!placementExists&&!smartTrail.length) {closeVanishedTab();return;}
     if(stateVersion!==document.version&&!locked&&!error) {
       attempt(refreshImage(document));
     }
@@ -522,7 +526,20 @@ export function PhotoStudio() {
     const view=stage.current;
     if(view&&document)setZoom(Math.min(16,Math.max(.01,Math.max(view.clientWidth/document.width,view.clientHeight/document.height))));
   };
-  useEffect(()=>{fit();},[document?.id]);
+  // What the last commit showed, so leaving a tab records its label and view rather than the incoming one's.
+  const shownTab=useRef<{tab:PhotoTab;label:string;documentId:string;zoom:number;size:[number,number]}|null>(null),showingTab=useRef(shownTab.current);
+  useEffect(()=>{shownTab.current=showingTab.current;});
+  const measured=useRef<{documentId:string;center:[number,number]}|null>(null);
+  useEffect(()=>{
+    const tab=activeTab(),view=tab&&usePhotoWorkspace.getState().tabs.find(item=>sameTab(item,tab))?.view;
+    if(view&&view.documentId===document?.id){if(view.zoom===zoomRef.current)centerView(...view.center);else{viewCenter.current=view.center;setZoom(view.zoom);}}
+    else fit();
+    return()=>{
+      const last=shownTab.current;if(!last)return;
+      const center=measured.current?.documentId===last.documentId?measured.current.center:[last.size[0]/2,last.size[1]/2] as [number,number];
+      rememberTab(last.tab,{label:last.label,view:{documentId:last.documentId,zoom:last.zoom,center}});
+    };
+  },[document?.id,shapeId,sourceKind]);
   useEffect(()=>{for(const element of [cloneMarker.current,cloneOverlay.current])if(element)element.style.display="none";},[projectId,document?.id,document?.version,displayState?.viewKey,tool,JSON.stringify(cloneSources),JSON.stringify(paintOptions[tool]),zoom,perspectiveCrop,specialDialog,commandsOpen,dialog,channelDialog,compositeDialog,mergeDialog,selectionDialog,profileDialog,colorSettingsOpen,imageDialog,editDialog,fileDialog,picker]);
   const zoomRef=useRef(zoom);zoomRef.current=zoom;
   const zoomAnchor=useRef<{x:number;y:number;px:number;py:number}|null>(null);
@@ -538,6 +555,8 @@ export function PhotoStudio() {
     const scale=zoomRef.current,[width,height]=surfaceSize(surface),area=visibleArea(view,surface,scale,width/scale,height/scale);
     const x0=Math.max(0,area.x),y0=Math.max(0,area.y),x1=Math.min(width/scale,area.x+area.width),y1=Math.min(height/scale,area.y+area.height);
     setNavigatorView(x1>x0&&y1>y0?{x:x0,y:y0,width:x1-x0,height:y1-y0}:null);
+    const center:[number,number]=[area.x+area.width/2,area.y+area.height/2],id=showingTab.current?.documentId;
+    if(id&&center.every(Number.isFinite))measured.current={documentId:id,center};
   };
   const scheduleView=()=>{if(!viewFrame.current)viewFrame.current=requestAnimationFrame(()=>{viewFrame.current=0;measureView();});};
   useEffect(()=>{const view=stage.current;if(!view)return;const observer=new ResizeObserver(scheduleView);observer.observe(view);scheduleView();return()=>{observer.disconnect();cancelAnimationFrame(viewFrame.current);viewFrame.current=0;};},[document?.id]);
@@ -642,6 +661,8 @@ export function PhotoStudio() {
     if(next===zoomRef.current)centerView(...center);else{viewCenter.current=center;setZoom(next);}
   };
   const currentLayer=state&&findLayer(state.layers,state.activeLayer),shownLayer=displayState&&findLayer(displayState.layers,displayState.activeLayer);
+  const docLabel=`${document.name} @ ${Math.round(zoom*100)}% (${docTabDetail(state,currentLayer)})`;
+  if(shapeId)showingTab.current={tab:{source:sourceKind,placementId:shapeId},label:docLabel,documentId:document.id,zoom,size:[document.width,document.height]};
   const pixelLayer=["pixel","raster"].includes(currentLayer?.kind.toLowerCase()??"");
   // Artboards are top-level groups; the active one is the active layer itself or its top-level ancestor.
   const artboards=(state?.layers??[]).flatMap(layer=>layer.artboard?[{id:layer.id,rect:layer.artboard.rect,children:layer.children??[]}]:[]);
@@ -1264,7 +1285,9 @@ export function PhotoStudio() {
   const baseMenus:MenuSpec[]=[
     {label:"File",items:[
       // Unhandled, ⌘W reaches the native menu's Close Window and closes the whole app.
-      item("Close",()=>{if(smartTrail.length)attempt(finishSmartContents(true));else closeImageEditor();},true,"Mod+W"),
+      item("Close",()=>attempt(closeTab()),true,"Mod+W"),
+      item("Close All",()=>attempt(closeAllTabs()),true,"Alt+Mod+W"),
+      item("Close Others",()=>attempt(closeOtherTabs()),live.length>1,"Alt+Mod+P"),
       item("New from Clipboard",()=>attempt(createImageFromClipboard()),true),
       item("Save",saveImage,true,"Mod+S"),
       item("Save As…",()=>setExportOpen("save"),true,"Shift+Mod+S"),
@@ -1659,18 +1682,18 @@ export function PhotoStudio() {
       run("Clear Slices","view.clearSlices",!slicesLocked&&!!state?.analysis?.slices.some(slice=>slice.id!==null)),
     ]},
     {label:"Window",items:[
-      // One document in one view: arrangements that need a second document or view are listed but off.
+      // Open images are tabs and one shows at a time: arrangements that tile, float or match views are listed but off.
       {label:"Arrange",items:[...["Tile All Vertically","Tile All Horizontally","2-up Horizontal","2-up Vertical","3-up Horizontal","3-up Vertical","3-up Stacked","4-up","6-up","Consolidate All to Tabs"].map(label=>({label,disabled:true})),"-",...["Cascade","Tile","Float in Window","Float All in Windows"].map(label=>({label,disabled:true})),"-",...["Match Zoom","Match Location","Match Rotation","Match All"].map(label=>({label,disabled:true})),"-",{label:`New Window for ${document.name}`,disabled:true},"-",
         {label:"Minimize",shortcut:"Ctrl+Mod+M",run:()=>{const window=shellWindow();if(window)useShell.getState().minimizeWindow(window.id);}},{label:"Bring All to Front",run:()=>{const window=shellWindow();if(window)useShell.getState().focusWindow(window.id);}}]},
       // Essentials is the only workspace, so choosing it and resetting it are the same restore of the default panel layout.
       {label:"Workspace",items:[{label:"Essentials (Default)",radio:true,checked:true,run:resetWorkspace},"-",{label:"Reset Essentials",run:resetWorkspace},"-",{label:"Keyboard Shortcuts & Menus…",run:()=>setCustomize("shortcuts")}]},
       "-",...ALL_PANELS.map(name=>({label:name,checked:panelOpen(name),shortcut:PANEL_KEYS[name],run:()=>togglePanel(name)})),
       "-",{label:"Application Frame",checked:true,disabled:true},{label:"Options",checked:chrome.options,run:()=>setChrome(c=>({...c,options:!c.options}))},{label:"Tools",checked:chrome.tools,run:()=>setChrome(c=>({...c,tools:!c.tools}))},{label:"Contextual Task Bar",checked:!taskBar.hidden,run:()=>placeTaskBar({hidden:!taskBar.hidden})},
-      "-",{label:document.name,radio:true,checked:true,run:()=>{const window=shellWindow();if(window)useShell.getState().focusWindow(window.id);}}]},
+      "-",...live.map((tab):MenuItem=>tab.source===sourceKind&&tab.placementId===shapeId?{label:document.name,radio:true,checked:true,run:()=>{const window=shellWindow();if(window)useShell.getState().focusWindow(window.id);}}:{label:documents[tabDocumentId(tab)!]?.name??"Untitled",radio:true,checked:false,disabled:busy,run:()=>attempt(activateTab(tab))})]},
   ];
   const menus=customizeMenus(baseMenus,customization);
   // Photoshop binds these keys without listing them in any menu.
-  const layerKeys:MenuItem[]=([["layer.stampVisible","Alt+Shift+Mod+E"],["layer.stampDown","Alt+Mod+E"],["layer.selectAbove","Alt+]"],["layer.selectBelow","Alt+["],["layer.selectTop","Alt+."],["layer.selectBottom","Alt+,"],["layer.addAboveToSelection","Alt+Shift+]"],["layer.addBelowToSelection","Alt+Shift+["]] as const).map(([id,shortcut])=>run(id,id,!!currentLayer,shortcut));
+  const layerKeys:MenuItem[]=([["layer.stampVisible","Alt+Shift+Mod+E"],["layer.stampDown","Alt+Mod+E"],["layer.selectAbove","Alt+]"],["layer.selectBelow","Alt+["],["layer.selectTop","Alt+."],["layer.selectBottom","Alt+,"],["layer.addAboveToSelection","Alt+Shift+]"],["layer.addBelowToSelection","Alt+Shift+["]] as const).map(([id,shortcut])=>run(id,id,!!currentLayer,shortcut)).concat(item("Next Document",()=>attempt(cycleTab(1)),true,"Ctrl+Tab"),item("Previous Document",()=>attempt(cycleTab(-1)),true,"Ctrl+Shift+Tab"));
   const fromMenu=(path:string[],label?:string):MenuEntry[]=>{
     let found:MenuItem|undefined={label:"",items:menus},disabled=false;
     for(const part of path){found=found?.items?.find((entry):entry is MenuItem=>entry!=="-"&&entry.label===part);disabled=disabled||!!found?.disabled;}
@@ -1917,6 +1940,8 @@ export function PhotoStudio() {
       // Internal copies clear the system clipboard so an older outside image can't win the next paste.
       e.preventDefault();void navigator.clipboard?.writeText("").catch(()=>{});clipboard(clipboardId);return;
     }
+    // Unhandled, ⌘W and ⌥⌘W reach the native menu's Close Window and close the whole app.
+    if((busy||strokeEnd.current)&&e.code==="KeyW"&&(e.metaKey||e.ctrlKey)){e.preventDefault();e.stopPropagation();return;}
     if(busy||strokeEnd.current)return;
     // As in Photoshop, F cycles the screen modes (Shift+F backwards) and Esc leaves Full Screen Mode.
     if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&!e.repeat&&e.key.toLowerCase()==="f"&&!(e.target as HTMLElement).closest("[contenteditable]")){e.preventDefault();e.stopPropagation();chooseScreenMode((screenMode+(e.shiftKey?2:1))%3);return;}
@@ -1956,7 +1981,7 @@ export function PhotoStudio() {
     }
   }}>
     <header className="xd-photo-header xd-ps-menubar" inert={geometryActive&&!warpSession}>
-      <button className="xd-editor-icon-button" disabled={busy||geometryActive} aria-label={smartTrail.length?"Save contents and return to parent":"Back to design"} title={smartTrail.length?"Save contents and return to parent":"Back to design"} onClick={()=>{if(smartTrail.length)attempt(finishSmartContents(true));else closeImageEditor();}}><House size={15}/></button>
+      <button className="xd-editor-icon-button" disabled={busy||geometryActive} aria-label={smartTrail.length?"Save contents and return to parent":"Back to design"} title={smartTrail.length?"Save contents and return to parent":"Back to design"} onClick={()=>{if(smartTrail.length)attempt(finishSmartContents(true));else leaveImageEditor();}}><House size={15}/></button>
       {/* During a Warp only Edit › Transform stays live; the rest would change the document under it. */}
       <MenuBar label="Image menus" menus={warpSession?menus.map(menu=>({...menu,items:menu.items.map(entry=>entry==="-"||menu.label==="Edit"&&entry.label==="Transform"?entry:{...entry,disabled:true})})):menus}/>
       <span className="xd-ps-spacer"/>
@@ -2007,8 +2032,12 @@ export function PhotoStudio() {
       <FreeTransformBar untilShown={untilShown}/>
       {tool==="crop"&&cropBox&&<div role="group" aria-label="Crop actions" className="xd-ps-icon-cluster"><button aria-label="Reset crop" title="Reset the crop box and rotation" disabled={busy} onClick={resetCrop}><RotateCcw size={16}/></button>{!cropUntouched&&<><button aria-label="Cancel crop" title="Cancel the current crop (Esc)" onClick={resetCrop}><Ban size={16}/></button><button aria-label="Apply crop" title="Commit the current crop (Enter)" disabled={busy} onClick={commitCrop}><Check size={16}/></button></>}</div>}
     </div>
-    <div className="xd-ps-doctabs" inert={geometryActive}>
-      <div className="xd-ps-doctab" role="tab" aria-selected="true" title={`${document.width} × ${document.height} px`}><span>{document.name} @ {Math.round(zoom*100)}% ({docTabDetail(state,currentLayer)})</span><button type="button" aria-label="Close image" title="Close" disabled={busy} onClick={()=>{if(smartTrail.length)attempt(finishSmartContents(true));else closeImageEditor();}}><X size={11}/></button></div>
+    <div className="xd-ps-doctabs" role="tablist" aria-label="Open images" inert={geometryActive}>
+      {live.map(tab=>{
+        if(tab.source===sourceKind&&tab.placementId===shapeId)return <div key={tabKey(tab)} className="xd-ps-doctab" role="tab" aria-selected="true" title={`${document.width} × ${document.height} px`}><span>{docLabel}</span><button type="button" aria-label="Close image" title="Close" disabled={busy} onClick={()=>attempt(closeTab())}><X size={11}/></button></div>;
+        const name=documents[tabDocumentId(tab)!]?.name??"Untitled";
+        return <div key={tabKey(tab)} className="xd-ps-doctab" role="tab" aria-selected="false" aria-disabled={busy} onClick={()=>{if(!busy)attempt(activateTab(tab));}}><span>{tab.label??name}</span><button type="button" aria-label={`Close ${name}`} title="Close" disabled={busy} onClick={e=>{e.stopPropagation();attempt(closeTab(tab));}}><X size={11}/></button></div>;
+      })}
       {!!smartTrail.length&&<div className="xd-photo-contents-actions"><span>{smartTrail.at(-1)!.parent.name} / Contents</span><button disabled={busy} onClick={()=>attempt(finishSmartContents(true))}>Save contents</button><button disabled={busy} onClick={()=>attempt(finishSmartContents(false))}>Discard contents</button></div>}
     </div>
     <div ref={panels.body} className="xd-photo-body xd-editor-body xd-ps-body" data-overlay={panels.overlay} data-tools-wrap={toolsWrap||undefined}>

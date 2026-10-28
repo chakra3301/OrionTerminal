@@ -3,7 +3,9 @@ import { projectKind, useXDProjects } from "../projectsStore";
 import { useXDesign } from "../store";
 import { editPencilImage, pencilEditorProject, pencilPhotoDocumentId } from "../pencil/runtime";
 import { editImage, usePhotoWorkspace } from "./runtime";
-import type { PhotoResume } from "./types";
+import { sameTab, tabDocumentId, tabKey } from "./tabs";
+import { PHOTO_TAB_LIMIT, type PhotoResume, type PhotoTab } from "./types";
+export { closeImageEditor } from "./tabs";
 
 export function startOpenImageTracking(): () => void {
   return usePhotoWorkspace.subscribe(workspace => {
@@ -11,17 +13,12 @@ export function startOpenImageTracking(): () => void {
     const { shapeId, documentId, source } = workspace;
     // While smart object contents are open, the image to come back to is still their parent.
     if (!shapeId || !documentId || workspace.projectId !== activeId || transitioning || workspace.smartTrail.length) return;
+    const tabs = workspace.tabs.length > 1 ? workspace.tabs.slice(0, PHOTO_TAB_LIMIT).map(tab => ({ source: tab.source, placementId: tab.placementId })) : undefined;
     const current = useXDesign.getState().photoResume;
-    if (current?.source === source && current.placementId === shapeId && current.documentId === documentId) return;
-    useXDesign.setState({ photoResume: { source, placementId: shapeId, documentId } });
+    if (current?.source === source && current.placementId === shapeId && current.documentId === documentId &&
+      (current.tabs ?? []).map(tabKey).join() === (tabs ?? []).map(tabKey).join()) return;
+    useXDesign.setState({ photoResume: { source, placementId: shapeId, documentId, ...(tabs ? { tabs } : {}) } });
   });
-}
-
-/** Closing the editor yourself means the project reopens on the board. Automatic closes keep it. */
-export function closeImageEditor(): void {
-  if (usePhotoWorkspace.getState().busy) return;
-  usePhotoWorkspace.getState().close();
-  useXDesign.setState({ photoResume: null });
 }
 
 export function resumableImage(): PhotoResume | null {
@@ -50,6 +47,14 @@ export async function resumeImageEditor(projectId: string): Promise<boolean> {
   if (!image) { forget(); return true; }
   try {
     await (image.source === "pencil" ? editPencilImage(image.placementId) : editImage(image.placementId));
+    const shown = usePhotoWorkspace.getState();
+    // The other tabs load when they're clicked.
+    if (active() && image.tabs && shown.shapeId === image.placementId && shown.source === image.source) {
+      const tabs: PhotoTab[] = [];
+      for (const tab of image.tabs) if (!tabs.some(item => sameTab(item, tab)) && (sameTab(tab, image) || tabDocumentId(tab))) tabs.push({ source: tab.source, placementId: tab.placementId });
+      if (!tabs.some(tab => sameTab(tab, image))) tabs.push({ source: image.source, placementId: image.placementId });
+      usePhotoWorkspace.setState({ tabs, tabProject: projectId });
+    }
   } catch (error) {
     log.warn("xdesign: the remembered image didn't reopen", error);
     forget();

@@ -1,3 +1,24 @@
+## 2026-10-28 (cont.) — Claude / XDesign: F6, document tabs in the image editor
+
+Owner request: F6, Photoshop-style document tabs ("skip question": the calls are marked in the spec). Executed inline from the plan, then committed and pushed on the owner's go-ahead. Build 28 predates it.
+
+**Design:**
+- Tabs are front-end only. `usePhotoWorkspace` gains `tabs: OpenPhotoTab[]` (`{source, placementId, draftId?, label?, view?}`) and `tabProject`. A subscriber adds a tab whenever the workspace names a placement, so every opener (board, Pencil, new images, resume) feeds the list without changes.
+- `close()` clears the tabs; the new `leave()` (Back to design) keeps them. `staleTabProject` makes the project-switch effect in `XDesignApp` clear tabs that belong to another project.
+- `tabs.ts`: `activateTab` runs the tab's opener (`editImage` / `editPencilImage`), or `resumeSmartContents` when the tab left open contents behind as a draft. `closeTab` opens the right neighbour, else the left, and drops the tab only after that open succeeds. `closeVanishedTab` replaces the old `close()` when the active image disappears. `liveTabs` / `pruneTabs` drop tabs whose placement is gone.
+- `editImage` finds an image on any page (`findLegacyImage`) and switches the board page before naming the placement.
+- PhotoStudio records the outgoing tab's label and view (`{documentId, zoom, centre}`) when the shown tab changes, from the last committed render, and restores the incoming one's view the way Fit Layers does; otherwise it fits.
+- `photoResume.tabs` is written only with two or more tabs, capped at `PHOTO_TAB_LIMIT` (64); the validator rejects a malformed list. On resume the live tabs come back and only the active one loads.
+
+**Rulings:** in the plan ledger (`.superpowers/sdd/2026-10-28-xdesign-document-tabs/progress.md`) and the session's final message. The main calls: ⌃Tab in the shell's full screen keeps switching apps; Close All / Close Others are now available; Back to design keeps the tabs; closing a tab saves its open contents first (after the final review); background tabs are mouse targets, not keyboard stops.
+
+**Final review** (fresh reviewer, Opus): "with fixes", no Critical.
+- Fixed (Important): Close All, Close Others and a background tab's X dropped a tab whose smart-object contents were open, leaving the edits only in Draft Recovery. `saveContents` now opens each such tab and runs `finishSmartContents(true)` once per trail level before the tab goes; a failed save stops there with that tab shown. This supersedes the earlier Close All ruling.
+- Fixed (Minor re-graded Important): `runPhotoCommand` is a quiet operation, so tab actions guarded on the raw `busy` flag were dropped during every command. They now guard on `controlsLocked` and queue through `operation` like the other controls. `closeImageEditor` keeps its raw guard, as before F6.
+- Deferred minors and the rulings on the reviewer's "declined to judge" list are in the ledger.
+
+**Tests:** `tabs.test.ts` (22), six new `resume.test.ts` cases, `PhotoStudio.tabs.test.tsx` (12). Focused set 347/347, typecheck clean.
+
 ## 2026-10-28 (cont.) — Claude / XDesign: smoke-test finding 5, banded pixel-layer adjustments
 
 Owner request: "okay lets fix it i really wan to move on to the next thing so lets close this and anything else that comes up just fix it". Committed and pushed on that go-ahead.

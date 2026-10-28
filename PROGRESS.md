@@ -1,3 +1,30 @@
+## 2026-10-28 (cont.) — XDesign: document tabs in the image editor, smoke-test finding 6 (committed and pushed)
+
+Branch: `validation/alpha-2026-09-14`. Owner request: F6, Photoshop-style document tabs; the owner skipped the questions ("skip question"), so the calls are marked in the spec. Spec `docs/superpowers/specs/2026-10-28-xdesign-document-tabs-design.md`, plan `docs/superpowers/plans/2026-10-28-xdesign-document-tabs.md`. Committed and pushed on the owner's go-ahead ("lets commit and push"). Release build 28 predates F6 and was not distributed; no build 29 yet. No new dependencies, no tokens, no photocraft or Rust edits.
+
+Done (detail in CLAUDE_LOG_ARCHIVE.md):
+1. **Tabs** (`photo/tabs.ts` new, `photo/runtime.ts`): every image opened gets a tab, one per placement, per project. Switching goes through the existing openers, so one engine session per image stays cached on the Rust side. Open smart-object contents survive a switch as a draft and reopen when you come back. A legacy tab on another board page switches the page.
+2. **Strip, menus, keys** (`photo/PhotoStudio.tsx`, `photo/photoshop.css`):
+   - One tab per open image; background tabs show the label they had when last active, or the image's name.
+   - Each tab keeps its zoom and scroll position; a tab seen for the first time fits.
+   - Per-tab close buttons; File › Close All ⌥⌘W and Close Others ⌥⌘P; ⌃Tab / ⌃⇧Tab; the Window menu lists every open image.
+   - Back to design keeps the tabs. The X and ⌘W close the active tab and end the session only on the last one; Close All ends it.
+   - Closing a tab whose smart-object contents are open saves them into the image first: the active tab saves and stays open, as before; a background tab, Close Others and Close All save, then close.
+   - Tab clicks, ⌃Tab and the close commands wait for a quiet commit (filters, strokes) instead of being dropped.
+   - A deleted image's tab drops out; if it was the active one, its neighbour opens.
+   - ⌘W and ⌥⌘W are swallowed while busy so they never reach the native Close Window.
+3. **Remembered tabs** (`photo/types.ts`, `photo/resume.ts`, `XDesignApp.tsx`): `photoResume.tabs` (at most 64, validated) restores the list on reopen and loads only the active image. Switching projects clears tabs left by Back to design.
+4. **Docs**: smoke-test finding 6, its status line and the alpha limits (Close All dropped from the missing list; the 8-image / 512 MiB eviction limit added).
+
+Final review (fresh reviewer, Opus): "with fixes", 0 Critical, 1 Important (closing tabs could leave open contents unsaved, only in Draft Recovery), 8 Minor. The Important one and one Minor (tab actions dropped during quiet commits, re-graded Important) are fixed; the other minors are deferred in the plan ledger.
+
+Gates: focused vitest set (tabs, runtimeNewImages, resume, PhotoStudio.tabs, fileMenu.studio, PhotoStudio.tools, PhotoStudio.layout, viewAids.studio) 347/347; `npm run typecheck` clean. No live check on the release instance: build 28 doesn't contain F6.
+
+Open questions: none new. Token gaps: none (the strip uses `--xd-panel`, `--xd-text-2`, `--xd-text-3`).
+
+Next:
+1. Owner: try the tabs in a build 29 when one is wanted.
+
 ## 2026-10-28 (cont.) — XDesign: smoke-test finding 5 fixed, pixel-layer adjustments run in bands (committed and pushed)
 
 Branch: `validation/alpha-2026-09-14`. Owner request: "okay lets fix it ... so lets close this and anything else that comes up just fix it". Committed and pushed on that go-ahead. No new dependencies, no tokens, no photocraft edits, no release build, and Photoshop was not used.
@@ -12,6 +39,7 @@ Done (detail in CLAUDE_LOG_ARCHIVE.md):
 Gates:
 - New `xdesign_photo_adjust_pixel_tests.rs`: all 16 adjustments × RGB, Gray, CMYK, Lab × 8, 16, 32 bit × with and without a soft selection (384 cases) give the engine's exact pixels, result, history, journal and Fade, and undo restores the layer. Plus invalid params, an empty layer, Fade after a banded adjustment, and the routes that stay on the engine.
 - `cargo test --lib`: 1446 passed, 0 failed, 20 ignored.
+- Release build 28 (`npm run tauri build -- --bundles app`, after the commit, not notarised) starts on the scratch HOME: window on screen, empty log, quit by pid. The owner handed the memory check to Claude; with no Accessibility it was run as an optimised (`--release`) probe of the same code, 6000×4000 RGB8: extra peak 1560.9 → 136.0 MB for Levels, Curves, Hue/Saturation and Brightness/Contrast, and faster (0.96 → 0.35 s, 1.28 → 0.34 s, 1.33 → 0.53 s, 1.73 → 1.23 s). Probe deleted afterwards. The app itself wasn't clicked through. `/Applications` untouched; no tag or release yet.
 
 Not fixed:
 - **F6, one image per editor**: a separate feature (Photoshop-style document tabs).

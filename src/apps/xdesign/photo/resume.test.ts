@@ -7,7 +7,8 @@ import {usePhotoWorkspace,editImage} from "./runtime";
 import {editPencilImage,pencilPhotoDocumentId,pencilEditorProject} from "../pencil/runtime";
 import {toast} from "@/store/toastStore";
 import {startOpenImageTracking,closeImageEditor,resumeImageEditor} from "./resume";
-import type {PhotoDocument} from "./types";
+import {staleTabProject} from "./tabs";
+import {PHOTO_TAB_LIMIT,validatePhotoResume,type PhotoDocument} from "./types";
 const invoke=vi.hoisted(()=>vi.fn());
 vi.mock("@tauri-apps/api/core",()=>({invoke,isTauri:()=>true,convertFileSrc:(path:string)=>path}));
 vi.mock("./runtime",async original=>({...await original<typeof import("./runtime")>(),editImage:vi.fn(async()=>{})}));
@@ -98,5 +99,56 @@ describe("Picking up the image you were editing",()=>{
     for(const photoResume of [{source:"x",placementId:"a",documentId:doc.id},{source:"legacy",placementId:"",documentId:doc.id},{source:"legacy",placementId:"a",documentId:"not-an-id"},{source:"legacy",placementId:"a".repeat(129),documentId:doc.id},[]])expect(()=>validateDesignDoc({...valid,photoResume} as never)).toThrow();
     expect(()=>validateDesignDoc({...valid,photoResume:null})).not.toThrow();
     expect(()=>validateDesignDoc({...valid,photoResume:{source:"pencil",placementId:"gone",documentId:ulid()}})).not.toThrow();
+  });
+});
+describe("Remembered tabs",()=>{
+  const second=()=>{const version=ulid(),other:PhotoDocument={...doc,id:ulid(),version,name:"Second",bundlePath:`/assets/${version}.pcraft`,previewPath:`/assets/${version}.png`};return {other,id:useXDesign.getState().applyPhotoDocument(other)};};
+  const show=(shapeId:string,documentId:string)=>usePhotoWorkspace.setState({shapeId,documentId,projectId,source:"legacy",smartTrail:[]});
+  it("remembers the tab list when more than one tab is open",()=>{
+    expect(remembered()).not.toHaveProperty("tabs");
+    const {other,id}=second();show(id,other.id);
+    expect(remembered()).toStrictEqual({source:"legacy",placementId:id,documentId:other.id,tabs:[{source:"legacy",placementId:shape},{source:"legacy",placementId:id}]});
+    usePhotoWorkspace.setState(state=>({tabs:state.tabs.map(tab=>({...tab,label:"Second @ 100%",view:{documentId:other.id,zoom:1,center:[1,1]}}))}));
+    expect(remembered()?.tabs).toStrictEqual([{source:"legacy",placementId:shape},{source:"legacy",placementId:id}]);
+    usePhotoWorkspace.setState(state=>({tabs:state.tabs.filter(tab=>tab.placementId===id)}));
+    expect(remembered()).toStrictEqual({source:"legacy",placementId:id,documentId:other.id});
+  });
+  it("caps the remembered tab list",()=>{
+    usePhotoWorkspace.setState({tabs:Array.from({length:70},(_,index)=>({source:"legacy" as const,placementId:`shape-${index}`}))});
+    expect(remembered()?.tabs).toHaveLength(PHOTO_TAB_LIMIT);
+    expect(()=>validatePhotoResume(remembered())).not.toThrow();
+  });
+  it("rejects a malformed tab list",()=>{
+    const base={source:"legacy",placementId:shape,documentId:doc.id};
+    for(const tabs of [{},"tabs",Array.from({length:PHOTO_TAB_LIMIT+1},()=>({source:"legacy",placementId:"a"})),[{source:"legacy"}],[{source:"x",placementId:"a"}],[{source:"legacy",placementId:"a".repeat(129)}],[{source:"legacy",placementId:""}],[null]])
+      expect(()=>validatePhotoResume({...base,tabs})).toThrow();
+    expect(()=>validatePhotoResume(base)).not.toThrow();
+    expect(()=>validatePhotoResume({...base,tabs:[{source:"pencil",placementId:"1:5"},{source:"legacy",placementId:shape}]})).not.toThrow();
+  });
+  it("restores every live tab and opens only the active one",async()=>{
+    const b=second(),c=second();usePhotoWorkspace.getState().close();
+    useXDesign.setState(state=>({shapes:state.shapes.filter(item=>item.id!==c.id),photoResume:{source:"legacy",placementId:b.id,documentId:b.other.id,tabs:[{source:"legacy",placementId:shape},{source:"legacy",placementId:b.id},{source:"legacy",placementId:c.id},{source:"legacy",placementId:shape}]}}));
+    vi.mocked(editImage).mockImplementationOnce(async id=>{show(id,b.other.id);});
+    await expect(resumeImageEditor(projectId)).resolves.toBe(true);
+    expect(editImage).toHaveBeenCalledExactlyOnceWith(b.id);
+    expect(usePhotoWorkspace.getState().tabs).toStrictEqual([{source:"legacy",placementId:shape},{source:"legacy",placementId:b.id}]);
+    expect(usePhotoWorkspace.getState().shapeId).toBe(b.id);expect(usePhotoWorkspace.getState().tabProject).toBe(projectId);
+    usePhotoWorkspace.getState().close();
+    useXDesign.setState({photoResume:{source:"legacy",placementId:b.id,documentId:b.other.id,tabs:[{source:"legacy",placementId:shape}]}});
+    vi.mocked(editImage).mockImplementationOnce(async id=>{show(id,b.other.id);});
+    await resumeImageEditor(projectId);
+    expect(usePhotoWorkspace.getState().tabs.map(tab=>tab.placementId)).toEqual([shape,b.id]);
+  });
+  it("a resume without tabs restores one tab",async()=>{
+    usePhotoWorkspace.getState().close();
+    vi.mocked(editImage).mockImplementationOnce(async id=>{show(id,doc.id);});
+    await resumeImageEditor(projectId);
+    expect(usePhotoWorkspace.getState().tabs).toStrictEqual([{source:"legacy",placementId:shape}]);
+  });
+  it("switching projects clears tabs left by Back to design",()=>{
+    expect(staleTabProject(projectId)).toBe(false);expect(staleTabProject(ulid())).toBe(true);
+    usePhotoWorkspace.getState().leave();
+    expect(staleTabProject(projectId)).toBe(false);expect(staleTabProject(ulid())).toBe(true);expect(staleTabProject(null)).toBe(true);
+    usePhotoWorkspace.getState().close();expect(staleTabProject(ulid())).toBe(false);
   });
 });
