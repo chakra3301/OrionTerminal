@@ -1,11 +1,14 @@
 //! Mask routing and default-valued channel adjustments missing from the pinned
-//! engine. Uses PhotoCraft's checked parameters and native compose evaluator.
+//! engine, and pixel-layer adjustments in bounded bands. Uses PhotoCraft's
+//! checked parameters and native compose evaluator.
 use photocraft_compose::{adjust, Buffer};
 use photocraft_engine::{
-    doc::{ColorMode, Rect, SampleType},
-    Session,
+    channel_cmds::ChannelTarget,
+    doc::{ColorMode, Layer, LayerContent, Rect, SampleType},
+    edit_menu_cmds::FadeSource,
+    EngineError, Session,
 };
-use photocraft_raster::{from_rgba_into, to_rgba, Surface};
+use photocraft_raster::{from_rgba_into, Surface};
 use serde_json::Value;
 
 pub(super) fn execute(
@@ -21,7 +24,7 @@ pub(super) fn execute(
     engine.active()?;
     let target = match super::mask_filters::target(engine, params) {
         Ok(Some(target)) => target,
-        Ok(None) => return None,
+        Ok(None) => return pixel_layer(engine, command, kind, params),
         Err(error) => return Some(Err(error)),
     };
     Some((|| {
@@ -40,68 +43,111 @@ pub(super) fn execute(
         if pixels > super::MAX_PIXELS {
             return Err("The channel adjustment exceeds the image size limit".into());
         }
-        apply(&mut surface, area, &adjustment, selection.as_ref());
+        apply(&mut surface, area, &adjustment, selection.as_ref(), ColorMode::Grayscale);
+        surface.prune();
         super::mask_filters::commit_adjustment(engine, command, params, target, adjustment.label(), surface)
+    })())
+}
+
+/// The engine converts a whole pixel layer to float RGBA three times over
+/// (about 1.5 GB at 24 MP). This is its route and bookkeeping, a band at a time.
+fn pixel_layer(
+    engine: &mut Session,
+    command: &str,
+    kind: &str,
+    params: &Value,
+) -> Option<Result<Value, String>> {
+    let state = engine.active()?;
+    // Colour-channel targets, unmet preconditions and running jobs keep the engine's route.
+    if engine.disabled_reason(command).is_some()
+        || matches!(state.channel_view.target, ChannelTarget::Color(_))
+    {
+        return None;
+    }
+    let id = state.active_layer?;
+    let layer = state.doc.layer(id)?;
+    if !matches!(layer.content, LayerContent::Raster(_)) {
+        return None;
+    }
+    let mut surface = layer.surface()?.clone();
+    let mode = state.doc.mode;
+    let selection = state.doc.selection.clone();
+    Some((|| {
+        let adjustment = photocraft_engine::adjust_params::from_params(kind, params, None, mode)
+            .map_err(|error| error.to_string())?;
+        let area = surface.content_bounds();
+        apply(&mut surface, area, &adjustment, selection.as_ref(), mode);
+        super::mask_filters::edit_history(engine, adjustment.label(), params, |doc, _| {
+            *doc.layer_mut(id)
+                .and_then(Layer::surface_mut)
+                .ok_or(EngineError::NoLayer(id))? = surface;
+            Ok(())
+        })?;
+        engine.journal.push((command.to_owned(), params.clone()));
+        let state = engine.active().ok_or("No image document")?;
+        let fade = FadeSource {
+            doc: state.doc.id,
+            revision: state.revision,
+            layer: id,
+            mask: false,
+            label: state.history.undo_label().unwrap_or(command).to_owned(),
+        };
+        engine.edit_state.fade = Some(fade);
+        Ok(Value::Null)
     })())
 }
 
 #[cfg(test)]
 #[path = "xdesign_photo_adjust_fade_tests.rs"]
 mod fade_tests;
+#[cfg(test)]
+#[path = "xdesign_photo_adjust_pixel_tests.rs"]
+mod pixel_tests;
+
+// Small bands in tests, so fixtures cross band edges in both directions.
+const BAND: (i32, i32) = if cfg!(test) { (40, 32) } else { (4096, 256) };
 
 fn apply(
     surface: &mut Surface,
     area: Rect,
     adjustment: &photocraft_engine::doc::Adjustment,
     selection: Option<&Surface>,
+    mode: ColorMode,
 ) {
     let format = surface.format();
     let channels = format.channels();
-    let transfer = adjust::Transfer::for_document(ColorMode::Grayscale, format.sample);
+    let transfer = adjust::Transfer::for_document(mode, format.sample);
     let depth = (format.sample == SampleType::F32).then_some(format.sample);
-    // Bound transient buffers even for large/sparse masks. Keep absolute
+    // Bound transient buffers for large layers and sparse masks. Keep absolute
     // coordinates in Buffer so ordered dithering is independent of bands.
-    for y in (area.y0..area.y1).step_by(256) {
-        for x in (area.x0..area.x1).step_by(4096) {
+    for y in (area.y0..area.y1).step_by(BAND.1 as usize) {
+        for x in (area.x0..area.x1).step_by(BAND.0 as usize) {
             let rect = Rect::new(
                 x,
                 y,
-                x.saturating_add(4096).min(area.x1),
-                y.saturating_add(256).min(area.y1),
+                x.saturating_add(BAND.0).min(area.x1),
+                y.saturating_add(BAND.1).min(area.y1),
             );
-            let raw = surface.read_region(rect);
-            let mut buffer = Buffer {
-                rect,
-                px: raw
-                    .chunks_exact(channels)
-                    .map(|pixel| to_rgba(&format, pixel))
-                    .collect(),
-            };
+            let pixels = rect.width() as usize * rect.height() as usize;
+            let mut original = vec![[0.0; 4]; pixels];
+            surface.read_rgba_into(rect, &mut original);
+            let mut buffer = Buffer { rect, px: original.clone() };
             adjust::apply_depth(adjustment, &mut buffer, transfer, depth);
-            let width = rect.width() as usize;
-            let mut output = Vec::with_capacity(raw.len());
-            for (index, (edited, original)) in
-                buffer.px.iter().zip(raw.chunks_exact(channels)).enumerate()
-            {
-                let coverage = selection.map_or(1.0, |selection| {
-                    selection.sample_channel(
-                        rect.x0 + (index % width) as i32,
-                        rect.y0 + (index / width) as i32,
-                        0,
-                    )
-                });
-                let original = to_rgba(&format, original);
-                let mixed = std::array::from_fn(|channel| {
-                    original[channel] + (edited[channel] - original[channel]) * coverage
-                });
-                let mut encoded = [0.0; 8];
-                let count = from_rgba_into(&format, mixed, &mut encoded);
-                output.extend_from_slice(&encoded[..count]);
+            let coverage = selection.map(|selection| (selection.read_region(rect), selection.channels()));
+            let mut output = vec![0.0; pixels * channels];
+            for (index, (edited, original)) in buffer.px.iter().zip(&original).enumerate() {
+                let k = coverage.as_ref().map_or(1.0, |(coverage, stride)| coverage[index * stride]);
+                let mixed = [
+                    original[0] + (edited[0] - original[0]) * k,
+                    original[1] + (edited[1] - original[1]) * k,
+                    original[2] + (edited[2] - original[2]) * k,
+                    original[3] + (edited[3] - original[3]) * k,
+                ];
+                from_rgba_into(&format, mixed, &mut output[index * channels..(index + 1) * channels]);
             }
             surface.write_region(rect, &output);
         }
     }
-    surface.prune();
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 # XDesign — alpha smoke test
 
-Status at commit `79d1169`, release build 23, 2026-10-27. The machine checks below were run by Claude on a scratch-HOME release instance with scratch files. Findings 1–4, 7 and 8 were then fixed in builds 24–25, and builds 26–27 add real previews on the Home page (builds 24–27, committed together on 2026-10-28); 5 and 6 remain. **The owner ran the whole checklist on 2026-10-28 and reported everything fine** ("i did all the smoke test too and everything was fine"). It covers what scripted clicks can't judge: real photos, how the tools feel, and whether anything is confusing.
+Status at commit `79d1169`, release build 23, 2026-10-27. The machine checks below were run by Claude on a scratch-HOME release instance with scratch files. Findings 1–4, 7 and 8 were then fixed in builds 24–25, and builds 26–27 add real previews on the Home page (builds 24–27, committed together on 2026-10-28). Finding 5 was fixed after build 27; 6 remains. **The owner ran the whole checklist on 2026-10-28 and reported everything fine** ("i did all the smoke test too and everything was fine"). It covers what scripted clicks can't judge: real photos, how the tools feel, and whether anything is confusing.
 
 ## Already verified (machine checks)
 
@@ -51,7 +51,8 @@ Status at commit `79d1169`, release build 23, 2026-10-27. The machine checks bel
 4. **No progress on open**: opening a large project shows nothing for 6 s or more.
    - *Fixed in build 24*: a "Loading project…" status appears when opening or switching takes longer than half a second.
 5. **Memory**: peaks around 2 GB during an adjustment on a 24 MP image.
-   - *Not fixed*: not investigated yet. The adjustment runs in the image engine, which this batch didn't change.
+   - *Fixed after build 27*: the engine converted the whole layer to float RGBA three times over. Image › Adjustments on a pixel layer now runs a band at a time. On a 6000×4000 layer the extra peak drops from about 1.56 GB to about 136 MB, with the same result, undo, history and Fade, and about the same time in a debug build.
+   - Still on the old route: an adjustment with a single colour channel targeted (for example only Red in the Channels panel).
 6. **One image per editor**: opening a second image replaces the one in the editor tab. The first image stays in the project.
    - *Not fixed*: the editor holds one document at a time. Photoshop-style document tabs are a larger change.
 7. **Text thumbnail**: the Layers thumbnail of a text layer shows a checkerboard, not a "T".
@@ -106,5 +107,5 @@ Text for the "Alpha limits" section of the release notes:
   - Print, Revert and Close All. The File menu is the least complete.
 - One image per editor session. Opening another image replaces the one being edited; earlier images stay in the project.
 - Merge to HDR Pro has no preview, curve or presets. Photomerge and HDR Pro can't take a folder as a source.
-- Large images (about 24 MP) work but need memory: up to ~2 GB during adjustments.
+- Large images (about 24 MP) work but need memory: about 1.3–1.6 GB with one open. Adjustments on a single colour channel can still peak near 2 GB.
 - Batch, Droplets, Scripts and Package aren't available. Cloud, generative AI, video, 3D, Libraries and Timeline are out of scope.

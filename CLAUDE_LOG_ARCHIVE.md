@@ -1,3 +1,34 @@
+## 2026-10-28 (cont.) — Claude / XDesign: smoke-test finding 5, banded pixel-layer adjustments
+
+Owner request: "okay lets fix it i really wan to move on to the next thing so lets close this and anything else that comes up just fix it". Committed and pushed on that go-ahead.
+
+**Investigation:**
+- A temporary probe (counting `#[global_allocator]`, deleted, never committed) on a 6000×4000 filled document showed `image.adjustments.levels` peaking at +1560.9 MB and keeping +96 MB (the undo copy of the layer).
+- Cause: photocraft `pixels::adjust_surface` (private, called from `destructive_adjust`) allocates `raw`, `buf`, `orig` and `out` over the layer's whole `content_bounds()`. photocraft is a git dependency and isn't edited.
+
+**Fix** (`xdesign_photo_adjust.rs`):
+- `execute` sends pixel layers (`Ok(None)` from the coverage check) to the new `pixel_layer`.
+- `pixel_layer` returns `None`, keeping the engine route, when `engine.disabled_reason(command)` is set, the channel target is `ChannelTarget::Color(_)`, or the active layer isn't `LayerContent::Raster`.
+- It replicates the engine: `adjust_params::from_params(kind, params, None, mode)`; the active layer (the engine ignores `params.layer`); the whole `content_bounds()`, unpruned; `mask_filters::edit_history` with `adjustment.label()`, so coalescing matches `Session::edit`; the journal gets `(command, params)` as given; Fade gets `FadeSource { doc, revision, layer, mask: false, label: undo label or command }`.
+- `apply` now takes the document mode for `Transfer::for_document`, decodes each band with photocraft's `read_rgba_into`, reads selection coverage with `read_region`, and no longer prunes (the coverage path prunes itself). Bands are 4096×256, or 40×32 in tests so fixtures cross band edges.
+- Dithering in Gradient Map and Color Lookup uses absolute `Buffer` coordinates, so banding doesn't change it. All 16 adjustments are pointwise.
+
+**Rulings:**
+- The journal entry stays the engine's (params as given), not `commit_host_edit`'s, which would add `target` and `layer`. Cost if wrong: replay sees a different shape from other host edits.
+- `slice_cmds::refresh` and `sync_preset_store` aren't called: an adjustment changes neither alpha-derived slices nor presets.
+- Pixel locks aren't checked, which matches the engine.
+- No `catch_unwind`, like the other Orion host edits.
+- Colour-channel targets keep the engine route and its peak. They're rare, and replicating the channel write path would widen the change.
+
+**Measurements** (6000×4000 RGB8, debug test build, production bands): every adjustment's extra peak went from +1560.9 MB to +136.0 MB, +96 MB kept either way. Levels 1.62 → 2.53 s, Curves 1.81 → 1.72 s, Hue/Saturation 1.45 → 2.09 s, Brightness/Contrast 2.48 → 2.36 s. A first version decoding pixel by pixel in Orion code took 4.5–4.9 s, because Orion is built at opt-level 0 in dev while dependencies are opt-level 3. Release timing wasn't measured.
+
+**Tests** (`xdesign_photo_adjust_pixel_tests.rs`, 4 tests):
+- `pixel_layer_adjustments_match_the_engine_in_every_mode_and_depth`: 16 adjustments × 4 modes × 3 depths × selection on/off, on a layer reaching past the canvas with HDR, transparent and partly transparent pixels. Compares result, pixels, history length and label, revision and coalesce, journal, and Fade (document and layer ids per session, since they're process-wide counters); undo restores the layer. Asserts 384 cases ran.
+- Invalid params and an empty layer; Fade (40%, Multiply) after a banded adjustment; colour-channel targets and adjustment layers stay on the engine route.
+- `cargo test --lib`: 1446 passed, 0 failed, 20 ignored. `rustfmt --check` fails on this file both before and after; no format step is part of the gate, so it was left.
+
+**Docs:** smoke-test finding 5, its status line and the alpha-limits memory line updated.
+
 ## 2026-10-28 — Claude / XDesign: Home previews, image-editor resume, names from Save As; builds 26–27
 
 Owner request: real thumbnails on the XDesign Home page ("i picture seeing that project r2c at the top and a preview of the conten like the image that i was working on, when i click it it should basically pic right back up from the last save"). Brainstormed into the spec, planned in 6 tasks, run inline (owner: "just go native"), each step test-first. Committed and pushed on the owner's go-ahead. The ledger in `.superpowers/sdd/2026-10-28-xdesign-home-previews/` was deleted after the commit; git history is the record.

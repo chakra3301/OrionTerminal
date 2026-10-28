@@ -1,3 +1,27 @@
+## 2026-10-28 (cont.) — XDesign: smoke-test finding 5 fixed, pixel-layer adjustments run in bands (committed and pushed)
+
+Branch: `validation/alpha-2026-09-14`. Owner request: "okay lets fix it ... so lets close this and anything else that comes up just fix it". Committed and pushed on that go-ahead. No new dependencies, no tokens, no photocraft edits, no release build, and Photoshop was not used.
+
+Done (detail in CLAUDE_LOG_ARCHIVE.md):
+1. **F5, ~2 GB peak during Image › Adjustments on 24 MP** (`src-tauri/src/xdesign_photo_adjust.rs`):
+   - Cause: photocraft's `adjust_surface` converts the whole layer to float RGBA three times over (about 1.56 GB at 6000×4000).
+   - Pixel layers now go through Orion's banded `apply` (4096×256 bands), with the engine's bookkeeping replicated: same params parser, label, history coalescing, journal entry and Fade source.
+   - Measured on a 6000×4000 RGB8 layer, debug test build: extra peak 1560.9 MB → 136.0 MB. Time about the same (Levels 1.62 → 2.53 s, Curves 1.81 → 1.72 s, Hue/Saturation 1.45 → 2.09 s, Brightness/Contrast 2.48 → 2.36 s). Release timing not measured.
+   - Still on the engine route: a single colour channel targeted, unmet preconditions or a running job, and non-pixel layers.
+
+Gates:
+- New `xdesign_photo_adjust_pixel_tests.rs`: all 16 adjustments × RGB, Gray, CMYK, Lab × 8, 16, 32 bit × with and without a soft selection (384 cases) give the engine's exact pixels, result, history, journal and Fade, and undo restores the layer. Plus invalid params, an empty layer, Fade after a banded adjustment, and the routes that stay on the engine.
+- `cargo test --lib`: 1446 passed, 0 failed, 20 ignored.
+
+Not fixed:
+- **F6, one image per editor**: a separate feature (Photoshop-style document tabs).
+- Other large-image peaks, not part of F5: Gaussian Blur about +281 MB, opening about +212 MB.
+
+Open questions: none new.
+
+Next:
+1. F6 (document tabs), as its own feature.
+
 ## 2026-10-28 — XDesign: real project previews on Home, resume the image editor, names from Save As; build 27 (committed and pushed)
 
 Branch: `validation/alpha-2026-09-14`. Owner request: "for the files it should be accessible from the x design home page and the thumbnails should show the actual contents of that file like a real thumbnail that previews the project". Spec `docs/superpowers/specs/2026-10-28-xdesign-home-previews-design.md` and plan `docs/superpowers/plans/2026-10-28-xdesign-home-previews.md` were approved by the owner and run inline, test-first. **Committed** on the owner's go-ahead ("looks good lets commit everything"), together with builds 24–25's fixes and Save As persistence. Pushed to origin on the owner's go-ahead ("sure lets close this"). No new dependencies, no tokens added, no engine changes, and Photoshop was not used.
