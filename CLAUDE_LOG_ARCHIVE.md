@@ -1,3 +1,15 @@
+## 2026-10-29 (cont.) — Claude / XDesign: image-to-3D removed
+
+Owner: "remove the image to 3d in x design because it doesnt really work well untill we find something new to replace it." Removed the "3D model" project kind end to end, test-first where behaviour remains (legacy registry entries, Home start list, MCP tool list). Owner DB checked read-only first: its registry holds one design project and no 3D projects.
+
+Rulings:
+1. Old registries with `kind: "model"` entries still pass `readRegistry`, then `init` drops those entries and saves the cleaned list once. Refusing them would block the whole project list; saving the cleaned list right away keeps the native import check (stored list vs in-memory list) consistent. The `xdesign.model.<id>` data is not deleted. Cost if wrong: a few orphan rows in app_state.
+2. Kept the shared MCP-to-UI bridge for `orion_fx_*` and renamed it `tool_fx_bridge`, since it no longer serves 3D.
+3. Removed the img2threejs licence entries, texts and notice, since no shipped code derives from it now. Cost if wrong: restoring three files from git.
+4. No npm dependency became unused (`three` is still used by 16 files outside the removed folder), so package.json is unchanged.
+
+Gates: typecheck exit 0; vitest 68 files 853/853; `cargo test --lib` 1556/0/20 ignored; `npm run licenses:check` verified.
+
 ## 2026-10-29 — Claude / XDesign: controls parity, final review and fix pass
 
 Final whole-branch review of the uncommitted controls-parity work (plan `docs/superpowers/plans/2026-10-28-xdesign-controls-parity.md`; ledger `.superpowers/sdd/2026-10-28-xdesign-controls-parity/final.md`). Three findings were fixed test-first:

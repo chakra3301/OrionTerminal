@@ -68,7 +68,7 @@ async function handleUiAction(action: UiAction & UiActionLifetime): Promise<unkn
   const assertLifetime = uiActionGuard(action);
   const assertActive = () => {
     assertLifetime();
-    if (["xdesign_", "model_", "fx_"].some((prefix) => action.kind.startsWith(prefix)) &&
+    if (["xdesign_", "fx_"].some((prefix) => action.kind.startsWith(prefix)) &&
       !usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign)) {
       throw new Error("XDesign plugin is disabled");
     }
@@ -107,30 +107,6 @@ async function handleUiAction(action: UiAction & UiActionLifetime): Promise<unkn
       const result = JSON.parse(executeFxTool(action.kind, args));
       useFxAssist.getState().recordTool(action.kind, args, result.ok !== false);
       return result;
-    });
-  }
-  // img2model (`orion_model_*` MCP tools — see mcp_server.rs::tool_model_bridge).
-  // One generic bridge for all ~19 tools: the real implementation lives in
-  // `executeModelTool`, which never throws (its own `ok:false` JSON is the
-  // error channel), so we just parse and hand its result straight back.
-  if (action.kind.startsWith("model_")) {
-    const { useXDProjects, projectKind } = await import("@/apps/xdesign/projectsStore");
-    assertActive();
-    useShell.getState().openApp("xdesign");
-    const proj = useXDProjects.getState();
-    const activeKind = projectKind(proj.registry.find((m) => m.id === proj.activeId));
-    if (activeKind !== "model") {
-      await useXDProjects.getState().newProject(undefined, "model");
-    }
-    return runXDesignUiAction(assertActive, async () => {
-      const { executeModelTool } = await import("@/apps/xdesign/model3d/modelAssistTools");
-      assertActive();
-      const result = await executeModelTool(action.kind, (action.payload ?? {}) as Record<string, unknown>);
-      try {
-        return JSON.parse(result.text);
-      } catch {
-        return { ok: false, error: "model tool returned non-JSON text" };
-      }
     });
   }
   log.warn("ui:action unknown kind:", action.kind);

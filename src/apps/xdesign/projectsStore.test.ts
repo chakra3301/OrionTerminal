@@ -25,7 +25,6 @@ vi.mock("./projectPreview", () => ({ settlePreview: vi.fn(async () => {}), delet
 import * as db from "@/lib/db";
 import { settlePreview, deleteProjectPreview } from "./projectPreview";
 import { useXDProjects, emptyDoc, saveDoc, loadDoc, flushActive } from "./projectsStore";
-import { useModelStore } from "./model3d/modelStore";
 import { useFxAssist } from "./fx/fxAssist";
 import { beginXDesignActivity, runXDesignUiAction } from "./runtimeActivity";
 import { useXDesign } from "./store";
@@ -389,14 +388,6 @@ describe("xdesign projectsStore", () => {
     expect(useXDProjects.getState().registry).toHaveLength(1);
   });
 
-  it("keeps model reference metadata across project switches", async () => {
-    const id = await useXDProjects.getState().newProject("Model", "model");
-    useModelStore.getState().setReference({ assetId: "asset", filePath: "/reference.png", dataUrl: "data:image/png;base64,dGVzdA==", w: 32, h: 48 });
-    await useXDProjects.getState().goHome();
-    await useXDProjects.getState().openProject(id);
-    expect(useModelStore.getState().reference).toMatchObject({ assetId: "asset", filePath: "/reference.png", w: 32, h: 48 });
-  });
-
   it("refuses project transitions while an assistant owns the live scene", async () => {
     const id = await useXDProjects.getState().newProject();
     const end = beginXDesignActivity("fx-assist", "Stop FX Assist before switching projects.");
@@ -455,6 +446,17 @@ describe("xdesign projectsStore", () => {
     mem.set("xdesign.projects", { registry: [] });
     await useXDProjects.getState().init();
     expect(useXDProjects.getState().ready).toBe(true); expect(useXDProjects.getState().loadError).toBeNull();
+  });
+
+  it("drops removed 3D model projects from the list without deleting their data", async () => {
+    const design = { id: "01ARZ3NDEKTSV4RRFFQ69G5FAV", name: "Keep", createdAt: 1, updatedAt: 1 };
+    const model = { id: "01ARZ3NDEKTSV4RRFFQ69G5FAW", name: "3D Model", createdAt: 1, updatedAt: 1, kind: "model" };
+    const modelDoc = { reference: null };
+    mem.set("xdesign.projects", { registry: [model, design] }); mem.set(`xdesign.model.${model.id}`, modelDoc);
+    await useXDProjects.getState().init();
+    expect(useXDProjects.getState().registry).toEqual([design]);
+    expect(mem.get("xdesign.projects")).toEqual({ registry: [design] });
+    expect(mem.get(`xdesign.model.${model.id}`)).toBe(modelDoc);
   });
 
   it("legacy adoption is atomic and retryable without orphaning a document", async () => {

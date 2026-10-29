@@ -49,7 +49,7 @@ These are test suggestions, not blanket acceptance. The [bounded alpha scope and
 - Apple-Silicon-only DMG; no Intel/Windows/Linux builds yet.
 - UI is dark-only (light theme cut for beta).
 - XDesign multiplayer is intentionally out of scope.
-- img2model, advanced FX/shader/video export, website reconstruction and untested provider combinations remain **experimental**, not universal subscription parity.
+- Advanced FX/shader/video export, website reconstruction and untested provider combinations remain **experimental**, not universal subscription parity.
 - Full VoiceOver/accessibility, real historical-user upgrades and broader recovery/streaming/provider coverage remain incomplete; these are not blanket release promises.
 - Remote CI and user-reported fresh Apple Silicon installation, core save/reopen/PNG export and ChatGPT onboarding passed at `86ec7cf`. The setup/default logic also had isolated native checks before the final visual simplification. The final minimal setup and titlebar status have not had another human smoke test; automated release checks are tied to the tagged commit.
 - Five native UNIC maintenance advisories remain in the selected target graph; no blocking advisories remained in the patched baseline audit.

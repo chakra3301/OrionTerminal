@@ -11,7 +11,6 @@ import {
   Film,
   ImageIcon,
   Sparkles,
-  Box,
   type LucideIcon,
 } from "lucide-react";
 import { confirmAction } from "@/components/ConfirmModal";
@@ -42,8 +41,8 @@ type StartType = {
   /** Tool flow to arm after creating the project (null = plain canvas). */
   intent: RailIntentMode | null;
   name: string;
-  /** Project kind — "fx" opens the shader compositor, "model" opens the img2model studio, instead of the canvas. */
-  kind?: "fx" | "model";
+  /** Project kind — "fx" opens the shader compositor instead of the canvas. */
+  kind?: "fx";
   beta?: boolean;
 };
 
@@ -54,7 +53,6 @@ const START_TYPES: StartType[] = [
   { id: "motion", label: "Motion", desc: "Animate frames and export video", beta: true, Icon: Film, intent: "motion", name: "Motion" },
   { id: "image", label: "Image generator", desc: "Generate a raster image", Icon: ImageIcon, intent: "image", name: "Image" },
   { id: "fx", label: "FX scene", desc: "Shader and particle scenes", beta: true, Icon: Sparkles, intent: null, name: "FX Scene", kind: "fx" },
-  { id: "model", label: "3D model", desc: "Turn a reference image into a 3D form", beta: true, Icon: Box, intent: null, name: "3D Model", kind: "model" },
 ];
 
 async function startProject(t: StartType): Promise<void> {
@@ -124,7 +122,6 @@ function ProjectCard({
           <ProjectThumb doc={doc} />
         )}
         {meta.kind === "fx" && <span className="xd-fx-badge">FX</span>}
-        {meta.kind === "model" && <span className="xd-fx-badge xd-model-badge">3D</span>}
       </button>
       <div className="xd-home-card-meta">
         <div className="xd-home-card-info">

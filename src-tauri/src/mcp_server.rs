@@ -709,282 +709,6 @@ pub fn tool_definitions() -> Value {
             }
         },
         {
-            "name": "orion_model_get_spec",
-            "description": "img2model — read the full current ObjectSculptSpec: pass status, object class, complexity, quality contract, components, materials, repetition systems, feature targets, and detail-inventory completeness. Call this first each turn you don't already know the state. XDesign must have an open '3D model' project (or call orion_open_app xdesign and create one first).",
-            "inputSchema": { "type": "object", "properties": {} }
-        },
-        {
-            "name": "orion_model_set_object_class",
-            "description": "img2model — set preSpecAssessment.objectClass from direct visual inspection of the reference image. primaryDomain MUST be object|character|hybrid.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "primaryType": { "type": "string" },
-                    "primaryDomain": { "type": "string", "enum": ["object", "character", "hybrid"] },
-                    "formLanguage": { "type": "array", "items": { "type": "string" } },
-                    "structureKind": { "type": "array", "items": { "type": "string" } },
-                    "motionPotential": { "type": "array", "items": { "type": "string" } },
-                    "materialFamilies": { "type": "array", "items": { "type": "string" } },
-                    "notes": { "type": "string" }
-                },
-                "required": ["primaryType", "primaryDomain"]
-            }
-        },
-        {
-            "name": "orion_model_set_complexity",
-            "description": "img2model — set the complexity assessment. tier drives targetMinDetails and minimumSpecDepth (simple/moderate/complex/ultra-complex). Score each axis 0-3: silhouetteComplexity, componentCount, hierarchyDepth, repetitionDensity, materialLayerCount, localDetailDensity, occlusionRisk, actionReadinessNeed. Also pass estimatedCounts: macroComponents, mesoComponents, microFeatureGroups, materialLayers, repetitionSystems.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "tier": { "type": "string", "enum": ["simple", "moderate", "complex", "ultra-complex"] },
-                    "silhouetteComplexity": { "type": "number" }, "componentCount": { "type": "number" }, "hierarchyDepth": { "type": "number" },
-                    "repetitionDensity": { "type": "number" }, "materialLayerCount": { "type": "number" }, "localDetailDensity": { "type": "number" },
-                    "occlusionRisk": { "type": "number" }, "actionReadinessNeed": { "type": "number" },
-                    "macroComponents": { "type": "number" }, "mesoComponents": { "type": "number" }, "microFeatureGroups": { "type": "number" },
-                    "materialLayers": { "type": "number" }, "repetitionSystems": { "type": "number" },
-                    "reasoning": { "type": "array", "items": { "type": "string" } }
-                },
-                "required": ["tier"]
-            }
-        },
-        {
-            "name": "orion_model_set_quality_contract",
-            "description": "img2model — define what 'good enough' means for THIS object: definitionOfDone + antiShallowSpecRules. Replace the generic starter contract with specifics (e.g. 'leaf clusters must form irregular overlapping canopy masses', not 'make leaves look good').",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "definitionOfDone": { "type": "array", "items": { "type": "string" } },
-                    "antiShallowSpecRules": { "type": "array", "items": { "type": "string" } },
-                    "visualDeltaChecks": { "type": "array", "items": { "type": "string" } }
-                }
-            }
-        },
-        {
-            "name": "orion_model_scan_zones",
-            "description": "img2model — get normalized zone rects (grid-3x3 or grid-4x4) to scan systematically for the detail inventory, instead of eyeballing the whole reference image once.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "mode": { "type": "string", "enum": ["grid-3x3", "grid-4x4"] } },
-                "required": ["mode"]
-            }
-        },
-        {
-            "name": "orion_model_add_detail",
-            "description": "img2model — record one identity-defining detail found while scanning a zone (gloss/bevel/fastener/linework/contour/seam/stitch/stain/scratch/chip/decal/emissive/hole/groove/ridge). mapsTo MUST be a real component localFeature id or material localOverride id you already created (or will create this turn) — a detail without mapsTo never reaches the render.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "kind": { "type": "string" },
-                    "region": { "type": "object", "properties": { "x": {"type":"number"}, "y": {"type":"number"}, "w": {"type":"number"}, "h": {"type":"number"} }, "required": ["x","y","w","h"] },
-                    "affects": { "type": "string", "enum": ["geometry", "material"] },
-                    "scale": { "type": "number" }, "evidenceRef": { "type": "string" }, "confidence": { "type": "number" },
-                    "mapsTo": { "type": ["string", "null"] }, "notes": { "type": "string" }
-                },
-                "required": ["kind", "region", "affects", "evidenceRef", "confidence"]
-            }
-        },
-        {
-            "name": "orion_model_add_material",
-            "description": "img2model — add a SculptMaterial (MeshPhysicalMaterial scalars: roughness/metalness/clearcoat/transmission/ior/anisotropy). Returns the material id.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "id": { "type": "string" }, "baseColor": { "type": "string" },
-                    "roughnessBase": { "type": "number" }, "roughnessVariation": { "type": "number" },
-                    "metalness": { "type": "number" }, "opacity": { "type": "number" },
-                    "clearcoat": { "type": "number" }, "clearcoatRoughness": { "type": "number" },
-                    "transmission": { "type": "number" }, "ior": { "type": "number" }, "anisotropy": { "type": "number" },
-                    "emissive": { "type": "string" }, "emissiveIntensity": { "type": "number" }
-                },
-                "required": ["id", "baseColor"]
-            }
-        },
-        {
-            "name": "orion_model_add_material_override",
-            "description": "img2model — add a localOverride region to an existing material (stains/scratches/gloss/emissive/decals). Returns the override id — use it as a detail's mapsTo.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "materialId": { "type": "string" }, "kind": { "type": "string" },
-                    "region": { "type": "object", "properties": { "x": {"type":"number"}, "y": {"type":"number"}, "w": {"type":"number"}, "h": {"type":"number"} }, "required": ["x","y","w","h"] },
-                    "roughnessDelta": { "type": "number" }, "clearcoat": { "type": "number" }, "colorShift": { "type": "string" },
-                    "dirtAmount": { "type": "number" }, "cavityBias": { "type": "boolean" },
-                    "emissive": { "type": "string" }, "emissiveIntensity": { "type": "number" }
-                },
-                "required": ["materialId", "kind", "region"]
-            }
-        },
-        {
-            "name": "orion_model_add_component",
-            "description": "img2model — add a SculptComponent to the tree. level=macro for overall masses, meso for sub-assemblies, micro for tiny/repeated detail groups. Classify topologyClass BEFORE picking primitive — a continuous organic form must not be forced into a box. Appendages (limbs/branches/handles/tubes) need `attachment` (localStart/localEnd/contactType) or they float. Returns the component id.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "name": { "type": "string" }, "level": { "type": "string", "enum": ["macro", "meso", "micro"] }, "role": { "type": "string" },
-                    "importance": { "type": "string", "enum": ["critical", "important", "minor"] }, "confidence": { "type": "number" },
-                    "primitive": { "type": "string", "enum": ["box", "sphere", "cylinder", "cone", "torus", "capsule", "tube", "extrude", "lathe", "plane", "group"] },
-                    "topologyClass": { "type": "string" }, "topologyRationale": { "type": "string" },
-                    "parent": { "type": ["string", "null"] }, "materialId": { "type": "string" },
-                    "position": { "type": "array", "items": { "type": "number" } }, "rotation": { "type": "array", "items": { "type": "number" } }, "scale": { "type": "array", "items": { "type": "number" } },
-                    "width": { "type": "number" }, "height": { "type": "number" }, "depth": { "type": "number" },
-                    "bevelType": { "type": "string", "enum": ["none", "chamfer", "fillet"] }, "bevelRadius": { "type": "number" }, "bevelSegments": { "type": "number" },
-                    "geometryParams": { "type": "object", "description": "Extra numeric knobs the primitive builder reads: radialSegments, profile (lathe [r,y,...]), outline (extrude [[x,y],...]), path (tube [[x,y,z],...])" },
-                    "attachment": {
-                        "type": "object",
-                        "properties": {
-                            "parentSocket": { "type": "string" },
-                            "localStart": { "type": "array", "items": { "type": "number" } }, "localEnd": { "type": "array", "items": { "type": "number" } },
-                            "baseRadius": { "type": "number" }, "endRadius": { "type": "number" },
-                            "contactType": { "type": "string", "enum": ["embedded", "socket", "overlap", "hinge", "surface-contact", "glued"] },
-                            "gapTolerance": { "type": "number" }, "evidenceRefs": { "type": "array", "items": { "type": "string" } }
-                        }
-                    },
-                    "evidenceRefs": { "type": "array", "items": { "type": "string" } }
-                },
-                "required": ["name", "level", "role", "primitive", "topologyClass", "topologyRationale", "materialId", "position", "width", "height", "depth"]
-            }
-        },
-        {
-            "name": "orion_model_add_local_feature",
-            "description": "img2model — add a localFeature to an existing component: a groove/ridge/hole/chamfer geometry effect, or an instanced repetition (e.g. fasteners). Returns the feature id.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "componentId": { "type": "string" }, "kind": { "type": "string" },
-                    "region": { "type": "object", "properties": { "x": {"type":"number"}, "y": {"type":"number"}, "w": {"type":"number"}, "h": {"type":"number"} }, "required": ["x","y","w","h"] },
-                    "geometryEffectType": { "type": "string", "enum": ["groove", "ridge", "hole", "chamfer"] },
-                    "path": { "type": "array", "items": { "type": "array", "items": { "type": "number" } } },
-                    "width": { "type": "number" }, "depth": { "type": "number" },
-                    "instanceCount": { "type": "number" }, "instanceDistribution": { "type": "string", "enum": ["linear", "radial", "grid"] },
-                    "confidence": { "type": "number" }, "evidenceRef": { "type": "string" }
-                },
-                "required": ["componentId", "kind", "region", "confidence", "evidenceRef"]
-            }
-        },
-        {
-            "name": "orion_model_add_repetition_system",
-            "description": "img2model — register a repeated-parts system (rivets/leaves/scales/needles) so the strict-quality gate credits it.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "componentRef": { "type": "string" }, "count": { "type": "number" },
-                    "distribution": { "type": "string", "enum": ["linear", "radial", "grid", "scatter"] },
-                    "scaleVariance": { "type": "number" }, "rotationVariance": { "type": "number" }, "positionJitter": { "type": "number" }
-                },
-                "required": ["componentRef", "count", "distribution"]
-            }
-        },
-        {
-            "name": "orion_model_set_feature_targets",
-            "description": "img2model — REPLACE featureReviewTargets with the object's real identity-defining systems (≤5 critical, ≤3 important per pass). Never leave the generic starter targets — the strict-quality gate rejects generic names.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "targets": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "id": { "type": "string" }, "name": { "type": "string" }, "tier": { "type": "string", "enum": ["critical", "important"] },
-                                "passIds": { "type": "array", "items": { "type": "string" } }, "minimumScore": { "type": "number" },
-                                "evidenceRefs": { "type": "array", "items": { "type": "string" } }
-                            },
-                            "required": ["id", "name", "tier", "passIds"]
-                        }
-                    }
-                },
-                "required": ["targets"]
-            }
-        },
-        {
-            "name": "orion_model_set_anatomy",
-            "description": "img2model — fill the character anatomy block (required when primaryDomain is character/hybrid). Measure in head-units from the actual image — don't assume realistic proportions.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "styleHeads": { "type": "number" }, "headUnit": { "type": "number" }, "torso": { "type": "number" }, "legs": { "type": "number" },
-                    "shoulderWidth": { "type": "number" }, "hipWidth": { "type": "number" }, "poseType": { "type": "string" },
-                    "eyeLine": { "type": "number" }, "eyeSpacing": { "type": "number" }, "noseBase": { "type": "number" }, "mouthLine": { "type": "number" }, "hairline": { "type": "number" },
-                    "confidence": { "type": "number" }
-                },
-                "required": ["styleHeads", "confidence"]
-            }
-        },
-        {
-            "name": "orion_model_validate",
-            "description": "img2model — run structural + strict-quality validation NOW. Call before requesting a render — a shallow spec should be fixed here, not discovered after a failed review. Returns { ok, errors, warnings }.",
-            "inputSchema": { "type": "object", "properties": { "strict": { "type": "boolean" } } }
-        },
-        {
-            "name": "orion_model_solve_camera",
-            "description": "img2model — get a heuristic reference-camera guess (FOV/distance/position) for the reference image — a starting point, not a measurement.",
-            "inputSchema": { "type": "object", "properties": {} }
-        },
-        {
-            "name": "orion_model_extract_pbr",
-            "description": "img2model — extract reference-derived material evidence (palette, de-lit albedo, roughness estimate, confidence) from a normalized crop region of the reference image, and attach it to a material's referencePbr. Confidence < 0.7 is a request-input signal, not a pass.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "materialId": { "type": "string" },
-                    "region": { "type": "object", "properties": { "x": {"type":"number"}, "y": {"type":"number"}, "w": {"type":"number"}, "h": {"type":"number"} }, "required": ["x","y","w","h"] }
-                },
-                "required": ["materialId", "region"]
-            }
-        },
-        {
-            "name": "orion_model_project_texture",
-            "description": "img2model — the single biggest fidelity lever for a reference-matched surface: de-light a reference crop and project it onto a component's mesh UVs via the solved camera, instead of a procedural material approximation. Returns projection coverage — low coverage means the mesh has geometry this one view can't see.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "componentId": { "type": "string" }, "materialId": { "type": "string" },
-                    "region": { "type": "object", "properties": { "x": {"type":"number"}, "y": {"type":"number"}, "w": {"type":"number"}, "h": {"type":"number"} }, "required": ["x","y","w","h"] }
-                },
-                "required": ["componentId", "materialId", "region"]
-            }
-        },
-        {
-            "name": "orion_model_request_render",
-            "description": "img2model — render the CURRENT unlocked pass, package a reference|render comparison sheet, and run the deterministic Divine Eye ensemble (silhouette IoU, scale, proportion, symmetry, pHash, SSIM, edges, objectness). Returns Divine Eye scores plus `comparisonSheetPath` — use YOUR Read tool on that path to actually SEE the comparison before deciding. This does not by itself accept or reject a pass; you still call orion_model_submit_review with your own judgment.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "multiAngle": { "type": "boolean", "description": "Also capture 3 orbit angles and run the degenerate-view gate (recommended for non-planar forms during structural-pass/form-refinement)." }
-                }
-            }
-        },
-        {
-            "name": "orion_model_submit_review",
-            "description": "img2model — record your review decision for the current pass: continue | refine-spec | refine-code | request-input | stop. `continue` on a visual pass is HARD-BLOCKED if the last render's Divine Eye result had a hard-gate failure, or if any critical feature you score is below its threshold — the tool downgrades your action and tells you why.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "fidelity": { "type": "number" }, "action": { "type": "string", "enum": ["continue", "refine-spec", "refine-code", "request-input", "stop"] },
-                    "summary": { "type": "string" },
-                    "matched": { "type": "array", "items": { "type": "string" } }, "mismatches": { "type": "array", "items": { "type": "string" } },
-                    "specFixes": { "type": "array", "items": { "type": "string" } }, "codeFixes": { "type": "array", "items": { "type": "string" } },
-                    "featureScores": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": { "id": { "type": "string" }, "score": { "type": "number" }, "visible": { "type": "boolean" } },
-                            "required": ["id", "score"]
-                        }
-                    },
-                    "layerScores": {
-                        "type": "object",
-                        "properties": {
-                            "silhouetteProportion": { "type": "number" }, "componentStructure": { "type": "number" },
-                            "formDetail": { "type": "number" }, "materialSurface": { "type": "number" }, "lightingCamera": { "type": "number" }
-                        }
-                    },
-                    "aiVisionScore": { "type": "number" }, "aiVisionNotes": { "type": "string" }, "cameraView": { "type": "string" }
-                },
-                "required": ["fidelity", "action", "summary", "aiVisionScore"]
-            }
-        },
-        {
             "name": "orion_recent_activity",
             "description": "Read the ambient activity log — a lightweight trail of \
                 what the user (and Hermes swarms) have been doing across the whole \
@@ -1081,30 +805,7 @@ pub fn dispatch_tool(name: &str, args: &Value) -> Result<String, String> {
         "orion_hermes_move_task" => tool_hermes_move_task(args),
         "orion_hermes_decompose" => tool_hermes_decompose(args),
         "orion_recent_activity" => tool_recent_activity(args),
-        name if name.starts_with("orion_fx_") => tool_model_bridge(&name["orion_".len()..], args),
-        "orion_model_get_spec" => tool_model_bridge("model_get_spec", args),
-        "orion_model_set_object_class" => tool_model_bridge("model_set_object_class", args),
-        "orion_model_set_complexity" => tool_model_bridge("model_set_complexity", args),
-        "orion_model_set_quality_contract" => tool_model_bridge("model_set_quality_contract", args),
-        "orion_model_scan_zones" => tool_model_bridge("model_scan_zones", args),
-        "orion_model_add_detail" => tool_model_bridge("model_add_detail", args),
-        "orion_model_add_material" => tool_model_bridge("model_add_material", args),
-        "orion_model_add_material_override" => {
-            tool_model_bridge("model_add_material_override", args)
-        }
-        "orion_model_add_component" => tool_model_bridge("model_add_component", args),
-        "orion_model_add_local_feature" => tool_model_bridge("model_add_local_feature", args),
-        "orion_model_add_repetition_system" => {
-            tool_model_bridge("model_add_repetition_system", args)
-        }
-        "orion_model_set_feature_targets" => tool_model_bridge("model_set_feature_targets", args),
-        "orion_model_set_anatomy" => tool_model_bridge("model_set_anatomy", args),
-        "orion_model_validate" => tool_model_bridge("model_validate", args),
-        "orion_model_solve_camera" => tool_model_bridge("model_solve_camera", args),
-        "orion_model_extract_pbr" => tool_model_bridge("model_extract_pbr", args),
-        "orion_model_project_texture" => tool_model_bridge("model_project_texture", args),
-        "orion_model_request_render" => tool_model_bridge("model_request_render", args),
-        "orion_model_submit_review" => tool_model_bridge("model_submit_review", args),
+        name if name.starts_with("orion_fx_") => tool_fx_bridge(&name["orion_".len()..], args),
         other => Err(format!("unknown tool: {}", other)),
     }
 }
@@ -1144,7 +845,7 @@ fn plugin_for_tool(name: &str) -> Option<&'static str> {
         | "orion_xdesign_get_canvas"
         | "orion_xdesign_get_selection"
         | "orion_xdesign_apply" => Some(XDESIGN_PLUGIN_ID),
-        name if name.starts_with("orion_model_") || name.starts_with("orion_fx_") => Some(XDESIGN_PLUGIN_ID),
+        name if name.starts_with("orion_fx_") => Some(XDESIGN_PLUGIN_ID),
         "orion_hermes_list_tasks"
         | "orion_hermes_get_task"
         | "orion_hermes_create_task"
@@ -2238,12 +1939,11 @@ fn tool_xdesign_apply(args: &Value) -> Result<String, String> {
     Ok(data.to_string())
 }
 
-/// Generic bridge for every `orion_model_*` (img2model) tool: the real
-/// implementation lives in the frontend (`modelAssistTools.ts::executeModelTool`)
-/// against the live spec/viewport, so we just forward `kind` + raw args over
-/// the UI bridge and pass the JSON text straight back. One function for all
-/// 19 tools — no per-tool Rust logic to keep in sync with the TS schema.
-fn tool_model_bridge(kind: &str, args: &Value) -> Result<String, String> {
+/// Generic bridge for every `orion_fx_*` tool: the real implementation lives in
+/// the frontend (`fxAssist.ts::executeFxTool`) against the live scene, so we
+/// just forward `kind` + raw args over the UI bridge and pass the JSON text
+/// straight back — no per-tool Rust logic to keep in sync with the TS schema.
+fn tool_fx_bridge(kind: &str, args: &Value) -> Result<String, String> {
     let data = send_ui_action(kind, args.clone())?;
     Ok(data.to_string())
 }
@@ -2965,9 +2665,10 @@ mod tests {
             Some(super::XDESIGN_PLUGIN_ID)
         );
         assert_eq!(
-            super::plugin_for_tool("orion_model_request_render"),
+            super::plugin_for_tool("orion_fx_get_scene"),
             Some(super::XDESIGN_PLUGIN_ID)
         );
+        assert_eq!(super::plugin_for_tool("orion_model_request_render"), None);
         assert_eq!(
             super::plugin_for_tool("orion_hermes_create_task"),
             Some(super::HERMES_PLUGIN_ID)
@@ -2998,9 +2699,22 @@ mod tests {
         assert!(!names.contains(&"orion_read_file"));
         assert!(!names.contains(&"orion_run_in_terminal"));
         assert!(!names.contains(&"orion_xdesign_apply"));
-        assert!(!names.contains(&"orion_model_request_render"));
+        assert!(!names.contains(&"orion_fx_get_scene"));
         assert!(!names.contains(&"orion_hermes_create_task"));
         assert!(names.contains(&"orion_get_context"));
+    }
+
+    #[test]
+    fn removed_img2model_tools_are_not_advertised() {
+        let definitions = super::tool_definitions();
+        let names: Vec<&str> = definitions
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|tool| tool.get("name").and_then(serde_json::Value::as_str))
+            .collect();
+        assert!(names.contains(&"orion_fx_get_scene"));
+        assert!(!names.iter().any(|name| name.starts_with("orion_model_")));
     }
 
     #[test]

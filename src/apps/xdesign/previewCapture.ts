@@ -2,7 +2,6 @@ import { computeExportBounds, renderPngBytes } from "./exportXD";
 import { renderFxSnapshot } from "./fx/fxExport";
 import { useFxStore } from "./fx/fxStore";
 import { useHtmlArtifact } from "./htmlArtifactStore";
-import { getModelRenderBridge } from "./model3d/modelRenderBridge";
 import { capturePencilPreview } from "./pencil/runtime";
 import { resumableImage } from "./photo/resume";
 import { loadImageBitmap, scaleToPng } from "./previewImage";
@@ -23,10 +22,6 @@ export async function captureProjectPicture(projectId: string, maxEdge: number):
     const scale = Math.min(1, maxEdge / Math.max(scene.width, scene.height));
     const blob = await renderFxSnapshot(scene, 0, Math.max(1, Math.round(scene.width * scale)), Math.max(1, Math.round(scene.height * scale)));
     return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
-  }
-  if (kind === "model") {
-    const canvas = await getModelRenderBridge()?.captureReviewShot();
-    return canvas ? scaleToPng(canvas, canvas.width, canvas.height, maxEdge) : null;
   }
   const image = resumableImage();
   if (image) {

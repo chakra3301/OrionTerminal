@@ -8,13 +8,12 @@
   .xd-home-menu, .xd-tool, .xd-edit-toolbar, .xd-edit-ai, .xd-artifact-frame,
   .xd-tool-mode-bar, .xd-fx-add-menu,
   .xd-fx-perf, .xd-fx-browser-search,
-  .xd-model-assist-render, .xd-model-assist-loopstop,
   .ot-extras-reset, .ot-extras-style, .ot-extras-choices button
 ) { border-radius: 6.8px; }
 :root body :is(
   .cp-input, .cp-surface .ot-model-select, .cp-surface select,
   .forge-btn, .pm-install, .cp-surface .ot-settings-radio,
-  .xd-home-start-item, .xd-fx-assist-msg, .xd-model-assist-msg
+  .xd-home-start-item, .xd-fx-assist-msg
 ) { border-radius: 7.65px; }
 :root body :is(
   .or-home-btn, .ar-search-results, .ot-mcp-row, .ot-mcp-form,
@@ -24,7 +23,7 @@
   .ot-rosie-msg .bubble, .or-home-card-preview,
   .xd-home-card-preview, .xd-home-start-menu, .xd-home-start-card,
   .ar-mood-tile.selected, .xd-fx-drop-overlay,
-  .xd-fx-modal, .xd-fx-assist, .xd-model-assist,
+  .xd-fx-modal, .xd-fx-assist,
   .cp-form, .cp-surface .ot-theme-card, .cp-surface .ot-wp-overlay-tile,
   .ot-extras-preview-card, .ot-extras-styles
 ) { border-radius: 10.2px; }

@@ -42,3 +42,8 @@ it('only reads full documents for design projects that have no preview', async (
   expect(host.invoke).toHaveBeenCalledWith('xdesign_preview_list');
   expect(vi.mocked(loadDoc).mock.calls).toEqual([[C]]);
 });
+it('offers no 3D model start', async () => {
+  await mount();
+  expect(container.textContent).toContain('FX scene');
+  expect(container.textContent).not.toMatch(/3D model|reference image into a 3D/i);
+});

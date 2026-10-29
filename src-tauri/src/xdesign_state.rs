@@ -19,7 +19,7 @@ pub(crate) fn commit_with_import(conn: &mut Connection, writes: &[StateWrite], l
     let mut keys = std::collections::HashSet::new();
     let mut bytes = 0usize;
     for write in writes {
-        let allowed = write.key == "xdesign.projects" || ["xdesign.project.", "xdesign.fx.", "xdesign.model.", "xdesign.roomGrants."]
+        let allowed = write.key == "xdesign.projects" || ["xdesign.project.", "xdesign.fx.", "xdesign.roomGrants."]
             .iter().any(|prefix| write.key.strip_prefix(prefix).is_some_and(|id| ulid::Ulid::from_string(id).is_ok()));
         if !allowed || !keys.insert(write.key.as_str()) { return Err("Invalid project state key".into()); }
         if let Some(value) = &write.value {

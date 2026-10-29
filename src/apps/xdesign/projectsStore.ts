@@ -20,8 +20,6 @@ import { legacyHtmlKey, readLegacyHtml, validateHtmlArtifact, type HtmlArtifactD
 import { useFxStore, snapshotFxDoc, emptyFxDoc } from "./fx/fxStore";
 import type { FxDoc } from "./fx/fxModel";
 import { trackXDesignActivity, xdesignProjectChangeReason } from "./runtimeActivity";
-import { useModelStore, snapshotModelDoc, emptyModelDoc, type ModelDoc } from "./model3d/modelStore";
-import { useModelAssist } from "./model3d/modelAssist";
 import { useFxAssist } from "./fx/fxAssist";
 import { fxEffect } from "./fx/fxRegistry";
 import { discardProjectSaveState, projectSaveStarted, projectSaveFinished } from "./saveState";
@@ -44,7 +42,7 @@ export type XDDoc = {
   htmlArtifact?: HtmlArtifactData | null;
 };
 
-export type XDProjectKind = "design" | "fx" | "model";
+export type XDProjectKind = "design" | "fx";
 
 export type XDProjectMeta = {
   id: string;
@@ -101,10 +99,6 @@ function docKey(id: string): `xdesign.project.${string}` {
 
 function fxDocKey(id: string): `xdesign.fx.${string}` {
   return `xdesign.fx.${id}`;
-}
-
-function modelDocKey(id: string): `xdesign.model.${string}` {
-  return `xdesign.model.${id}`;
 }
 
 /** Fresh, empty single-page document. */
@@ -230,22 +224,6 @@ export async function saveFxDoc(id: string, doc: FxDoc): Promise<void> {
   );
 }
 
-export async function loadModelDoc(id: string): Promise<ModelDoc | null> {
-  return trackXDesignActivity(
-    "project-load",
-    "Wait for the XDesign model to finish loading before disabling the plugin.",
-    () => getAppState<ModelDoc>(modelDocKey(id), true),
-  );
-}
-
-export async function saveModelDoc(id: string, doc: ModelDoc): Promise<void> {
-  await trackXDesignActivity(
-    "project-save",
-    "Wait for the XDesign model to finish saving before disabling the plugin.",
-    () => saveInOrder(() => setAppState(modelDocKey(id), doc)),
-  );
-}
-
 /** Load a project's doc into the right live store (design vs fx) and scope
  * the HTML artifact panel. Single path used by open/close/delete. */
 async function hydrateProjectById(
@@ -260,18 +238,12 @@ async function hydrateProjectById(
     if (!doc) throw new Error("FX project data is missing. Restore a database backup instead of overwriting it with an empty scene.");
     useFxStore.getState().hydrateFx(doc);
     useHtmlArtifact.getState().setProject(null);
-  } else if (kind === "model") {
-    const doc = await loadModelDoc(id);
-    if (!doc) throw new Error("Model project data is missing. Restore a database backup.");
-    useModelStore.getState().hydrateModel(doc);
-    useHtmlArtifact.getState().setProject(null);
   } else {
     const doc = await loadDoc(id);
     if (!doc) throw new Error("Design project data is missing. Restore a database backup.");
     useXDesign.getState().hydrate(doc);
     useHtmlArtifact.getState().setProject(id, doc.htmlArtifact);
   }
-  useModelAssist.getState().clear();
   useFxAssist.getState().clear();
 }
 
@@ -353,7 +325,6 @@ export async function flushActive(): Promise<void> {
   try {
     const kind = projectKind(registry.find((m) => m.id === activeId));
     if (kind === "fx") await saveFxDoc(activeId, snapshotFxDoc());
-    else if (kind === "model") await saveModelDoc(activeId, snapshotModelDoc());
     else await saveDoc(activeId, snapshotActiveDoc());
     await updateRegistry((registry) => registry.map((m) =>
       m.id === activeId ? { ...m, updatedAt: Date.now() } : m,
@@ -391,7 +362,10 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
     set({ loadError: null });
     initializing = trackXDesignActivity("project-load", "Wait for the project list to load before disabling XDesign.", async () => {
       const stored = await getAppState<unknown>("xdesign.projects", true);
-      let registry = stored === null ? [] : readRegistry(stored);
+      const listed = stored === null ? [] : readRegistry(stored);
+      // 3D model projects were removed from XDesign; their data stays in the database.
+      let registry = listed.filter((meta) => (meta.kind as string | undefined) !== "model");
+      if (registry.length < listed.length) await commitProjectState(registry, []);
       // An explicitly empty registry is not a request to resurrect deleted legacy work.
       if (stored === null) {
         const legacy = await getAppState<XDDoc | unknown[]>("xdesign.doc", true);
@@ -442,19 +416,17 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
     const now = Date.now();
     const meta: XDProjectMeta = {
       id,
-      name: name?.trim() || uniqueName(get().registry, kind === "fx" ? "FX Scene" : kind === "model" ? "3D Model" : "Untitled"),
+      name: name?.trim() || uniqueName(get().registry, kind === "fx" ? "FX Scene" : "Untitled"),
       createdAt: now,
       updatedAt: now,
       ...(kind !== "design" ? { kind } : {}),
     };
     const registry = [meta, ...get().registry];
-    const key = kind === "fx" ? fxDocKey(id) : kind === "model" ? modelDocKey(id) : docKey(id);
-    const doc = kind === "fx" ? emptyFxDoc() : kind === "model" ? emptyModelDoc(name?.trim() || "3D Model") : emptyDoc();
+    const key = kind === "fx" ? fxDocKey(id) : docKey(id);
+    const doc = kind === "fx" ? emptyFxDoc() : emptyDoc();
     await commitProjectState(registry, [{ key, value: doc }]);
-    useModelAssist.getState().clear();
     useFxAssist.getState().clear();
     if (kind === "fx") useFxStore.getState().hydrateFx(doc as FxDoc);
-    else if (kind === "model") useModelStore.getState().hydrateModel(doc as ModelDoc);
     else useXDesign.getState().hydrate(doc as XDDoc);
     useHtmlArtifact.getState().setProject(kind === "design" ? id : null);
     set((s) => ({
@@ -485,7 +457,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
       }
       useXDesign.getState().hydrate(document);
       useHtmlArtifact.getState().setProject(id, document.htmlArtifact);
-      useModelAssist.getState().clear(); useFxAssist.getState().clear();
+      useFxAssist.getState().clear();
       set(s => ({ openTabs: s.openTabs.includes(id) ? s.openTabs : [...s.openTabs, id], activeId: id }));
       return id;
     });
@@ -520,7 +492,7 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
     }
     useXDesign.getState().hydrate(document);
     useHtmlArtifact.getState().setProject(id, document.htmlArtifact);
-    useModelAssist.getState().clear(); useFxAssist.getState().clear();
+    useFxAssist.getState().clear();
     set(s => ({ openTabs: s.openTabs.includes(id) ? s.openTabs : [...s.openTabs, id], activeId: id }));
     return id;
   })),
@@ -600,7 +572,6 @@ export const useXDProjects = create<XDProjectsState>((set, get) => ({
     await commitProjectState(registry, [
       { key: docKey(id), value: null },
       { key: fxDocKey(id), value: null },
-      { key: modelDocKey(id), value: null },
     ]);
     await (await import("./projectPreview")).deleteProjectPreview(id);
     discardProjectSaveState(id);

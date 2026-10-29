@@ -58,33 +58,6 @@ Licensed under the Apache License, Version 2.0. A copy is included at
 OpenAI OAuth and Orion Terminal's subscription bridge are unofficial community
 integrations and are not affiliated with, endorsed by, or sponsored by OpenAI.
 
-## img2threejs
-
-The reconstruction subsystem in `src/apps/xdesign/model3d/` contains adaptations
-of img2threejs by hoainho, including TypeScript ports of Python validation,
-review, and orchestration logic. These are modified implementations integrated
-with Orion's React/Three.js stores, capture pipeline, and agent transport, not
-verbatim upstream programs. Individual source headers identify many of the
-corresponding upstream files; see the subsystem's `NOTICE.md`.
-
-Copyright 2026 hoainho  
-https://github.com/hoainho/img2threejs
-
-Licensed under the Apache License, Version 2.0. A copy is included at
-`THIRD_PARTY_LICENSES/img2threejs-Apache-2.0.txt`.
-
-License evidence checked on 2026-09-11 at upstream revision
-`6e60b5e22419464b4853e01ddb6c0e6f6659a733`; this identifies the inspected license,
-not the exact revision used by the earlier port. No root NOTICE file was listed
-at that inspected revision. Upstream license history shows MIT at revision
-`a27272dfcaa15ce874f29d3a32742b1e7c88fb03`, then Apache-2.0 relicensing in
-`7b1c62ccf34957ac5d68b7863718af9eab777c7e`. The historical MIT grant (copyright
-2026 hoainho) is also retained in `THIRD_PARTY_LICENSES/img2threejs-historical-MIT.txt`;
-this does not assert that either inspected revision was the original port input.
-The 27 corresponding upstream files named by 21 local port headers were reviewed
-at the Apache baseline; no additional file-specific license notices were found.
-The original port commit remains undocumented, rather than reconstructed by inference.
-
 ## RepoLens adaptations
 
 The repository analysis modules under `src/apps/archives/repolens/` and the

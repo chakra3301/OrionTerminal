@@ -21,7 +21,6 @@ import { useAssetsStore } from "@/store/assetsStore";
 import { useXDesign } from "@/apps/xdesign/store";
 import { useXDProjects, projectKind } from "@/apps/xdesign/projectsStore";
 import { FxEditor } from "@/apps/xdesign/fx/FxEditor";
-import { ModelStudio } from "@/apps/xdesign/model3d/ModelStudio";
 import { XDesignHome } from "@/apps/xdesign/XDesignHome";
 import { XDesignTabs } from "@/apps/xdesign/XDesignTabs";
 import { log } from "@/lib/log";
@@ -221,15 +220,6 @@ function XDesignWorkspace() {
       <div ref={stageRef} className="xd-root" {...transitionProps}>
         <XDesignTabs />
         <FxEditor />
-      </div>
-    );
-  }
-
-  if (activeKind === "model") {
-    return (
-      <div ref={stageRef} className="xd-root" {...transitionProps}>
-        <XDesignTabs />
-        <ModelStudio />
       </div>
     );
   }

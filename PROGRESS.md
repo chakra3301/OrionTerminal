@@ -1,3 +1,22 @@
+## 2026-10-29 (cont. 2) — XDesign: image-to-3D removed
+
+Branch: `validation/alpha-2026-09-14`. At the owner's request, the "3D model" project type (img2model) is removed until something better replaces it. The code stays in git history. Committed and pushed at the owner's request.
+
+Done:
+1. Deleted `src/apps/xdesign/model3d/` (45 files) and every hook into it: the Home "3D model" card and its 3D badge, the app shell route, project save/load/new/delete branches, preview capture, save timers, the `model_` UI actions in EventBridge, the 19 `orion_model_*` MCP tools, the `xdesign.model.` native state prefix, the `model3d` AI-model preference, and the `.xd-model-*` styles.
+2. Old project lists that still contain a 3D model entry load normally: the entry is dropped from the list and its stored data is left in the database. Test: `projectsStore.test.ts` "drops removed 3D model projects from the list without deleting their data".
+3. The FX tools still use the same UI bridge, renamed `tool_fx_bridge` in `mcp_server.rs`.
+4. Licences: removed the two img2threejs entries from `resources/adapted-license-upstreams.json` and `resources/distribution-license-manifest.json`, their `THIRD_PARTY_LICENSES/` texts, and the THIRD_PARTY_NOTICES section. `BETA.md` and `docs/setup-and-verification.md` no longer list img2model. The published alpha.1 release notes are left as history.
+
+Gates:
+- `npm run typecheck` exit 0.
+- vitest on the 68 test files that import a changed module: 853/853.
+- `cargo test --lib` 1556 passed, 0 failed, 20 ignored (new: `removed_img2model_tools_are_not_advertised`).
+- `npm run licenses:check` verified.
+
+Next:
+1. Owner to decide whether to commit and push.
+
 ## 2026-10-29 (cont.) — XDesign: controls parity ready for the alpha (committed and pushed)
 
 Branch: `validation/alpha-2026-09-14`. Final whole-branch review done and its fix pass closed. Ledger: `.superpowers/sdd/2026-10-28-xdesign-controls-parity/final.md`. Detail: CLAUDE_LOG_ARCHIVE.md.

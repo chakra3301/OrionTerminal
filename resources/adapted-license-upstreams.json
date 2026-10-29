@@ -66,30 +66,6 @@
     "originalPortRevisionKnown": false
   },
   {
-    "name": "img2threejs Apache baseline",
-    "repository": "https://github.com/hoainho/img2threejs",
-    "inspectedRevision": "6e60b5e22419464b4853e01ddb6c0e6f6659a733",
-    "license": "Apache-2.0",
-    "notice": "THIRD_PARTY_LICENSES/img2threejs-Apache-2.0.txt",
-    "noticeSha256": "4595055948a67e91177115c57e154804046878e77ff223de22accc880012827a",
-    "scope": [
-      "src/apps/xdesign/model3d/"
-    ],
-    "originalPortRevisionKnown": false
-  },
-  {
-    "name": "img2threejs historical MIT",
-    "repository": "https://github.com/hoainho/img2threejs",
-    "inspectedRevision": "a27272dfcaa15ce874f29d3a32742b1e7c88fb03",
-    "license": "MIT",
-    "notice": "THIRD_PARTY_LICENSES/img2threejs-historical-MIT.txt",
-    "noticeSha256": "0b6e35eea2b4ea880511779e4ffca369976847770c71f9babac5fc76d0e992ef",
-    "scope": [
-      "src/apps/xdesign/model3d/"
-    ],
-    "originalPortRevisionKnown": false
-  },
-  {
     "name": "2048 pinned recipe and inert source fixture",
     "repository": "https://github.com/gabrielecirulli/2048",
     "inspectedRevision": "478b6ec346e3787f589e4af751378d06ded4cbbc",

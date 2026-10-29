@@ -235,7 +235,7 @@ export const BUILTIN_APP_PLUGIN_CATALOG: readonly BuiltinAppPluginInfo[] = [
     pluginId: BUILTIN_APP_PLUGIN_IDS.xdesign,
     appId: "xdesign",
     version: "1.0.0",
-    description: "Design canvas, webpages, decks, motion FX, images, and procedural 3D models.",
+    description: "Design canvas, webpages, decks, motion FX, and images.",
     capabilities: ["Design", "Media", "Generation"],
     disableable: true,
   },

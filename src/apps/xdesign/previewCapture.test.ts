@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: () => false, convertFileSrc: (path: string) => path }));
 vi.mock("./exportXD", () => ({ computeExportBounds: vi.fn(), renderPngBytes: vi.fn() }));
 vi.mock("./fx/fxExport", () => ({ renderFxSnapshot: vi.fn() }));
-vi.mock("./model3d/modelRenderBridge", () => ({ getModelRenderBridge: vi.fn() }));
 vi.mock("./previewImage", () => ({ loadImageBitmap: vi.fn(), scaleToPng: vi.fn() }));
 vi.mock("./photo/resume", () => ({ resumableImage: vi.fn() }));
 vi.mock("./pencil/runtime", async (original) => ({ ...await original<typeof import("./pencil/runtime")>(), capturePencilPreview: vi.fn() }));
@@ -10,7 +9,6 @@ vi.mock("./pencil/runtime", async (original) => ({ ...await original<typeof impo
 import { captureProjectPicture } from "./previewCapture";
 import { computeExportBounds, renderPngBytes } from "./exportXD";
 import { renderFxSnapshot } from "./fx/fxExport";
-import { getModelRenderBridge } from "./model3d/modelRenderBridge";
 import { loadImageBitmap, scaleToPng } from "./previewImage";
 import { resumableImage } from "./photo/resume";
 import { capturePencilPreview } from "./pencil/runtime";
@@ -23,7 +21,7 @@ import { useFxStore } from "./fx/fxStore";
 const A = "01ARZ3NDEKTSV4RRFFQ69G5FB0", B = "01ARZ3NDEKTSV4RRFFQ69G5FB1";
 const bytes = new Uint8Array([137, 80, 78, 71]);
 const bounds = { x: 0, y: 0, w: 1200, h: 800 };
-const drawers = [computeExportBounds, renderPngBytes, renderFxSnapshot, getModelRenderBridge, loadImageBitmap, scaleToPng, capturePencilPreview];
+const drawers = [computeExportBounds, renderPngBytes, renderFxSnapshot, loadImageBitmap, scaleToPng, capturePencilPreview];
 const kind = (value: XDProjectKind) => useXDProjects.setState((s) => ({ registry: s.registry.map((m) => m.id === A ? { ...m, kind: value } : m) }));
 
 beforeEach(() => {
@@ -99,21 +97,6 @@ describe("choosing a project's preview picture", () => {
     vi.mocked(renderFxSnapshot).mockResolvedValueOnce({ arrayBuffer: async () => bytes.slice().buffer } as Blob).mockResolvedValueOnce(null);
     expect(await captureProjectPicture(A, 640)).toEqual(bytes);
     expect(renderFxSnapshot).toHaveBeenCalledWith(scene, 0, 640, 360);
-    expect(await captureProjectPicture(A, 640)).toBeNull();
-    expect(renderPngBytes).not.toHaveBeenCalled();
-  });
-
-  it("draws 3D from the open viewport, and nothing when it isn't mounted", async () => {
-    kind("model");
-    const canvas = document.createElement("canvas"); canvas.width = 1280; canvas.height = 960;
-    const captureReviewShot = vi.fn(async (): Promise<HTMLCanvasElement | null> => canvas);
-    vi.mocked(getModelRenderBridge).mockReturnValue({ captureReviewShot, captureOrbit: vi.fn() });
-    vi.mocked(scaleToPng).mockResolvedValue(bytes);
-    expect(await captureProjectPicture(A, 640)).toBe(bytes);
-    expect(scaleToPng).toHaveBeenCalledWith(canvas, 1280, 960, 640);
-    captureReviewShot.mockResolvedValueOnce(null);
-    expect(await captureProjectPicture(A, 640)).toBeNull();
-    vi.mocked(getModelRenderBridge).mockReturnValue(null);
     expect(await captureProjectPicture(A, 640)).toBeNull();
     expect(renderPngBytes).not.toHaveBeenCalled();
   });

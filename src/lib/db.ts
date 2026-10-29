@@ -47,7 +47,6 @@ export type AppStateKey =
   | `xdesign.roomImagePending.${string}`
   | `xdesign.project.${string}`
   | `xdesign.fx.${string}`
-  | `xdesign.model.${string}`
   | "shell.focusedWindowId"
   | "rosie.ttsEnabled"
   | "voice.listenMode"

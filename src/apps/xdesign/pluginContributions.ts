@@ -10,7 +10,6 @@ import { useDesignSystems } from "@/store/designSystemStore";
 import { logActivity } from "@/lib/db";
 import { log } from "@/lib/log";
 import { markProjectDirty, unsavedXDesignReason } from "./saveState";
-import { useModelStore } from "./model3d/modelStore";
 import { useXDesign } from "@/apps/xdesign/store";
 import {
   flushActive,
@@ -39,7 +38,6 @@ export const XDESIGN_CONTRIBUTION_IDS = {
   applyAction: "xdesign_apply",
 } as const;
 
-let modelSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let designSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let fxSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let lastLoggedProjectId: string | null = null;
@@ -267,16 +265,13 @@ async function applyAction(value: unknown, assertActive: () => void = () => {}):
 function clearPersistenceTimers(): void {
   if (designSaveTimer) clearTimeout(designSaveTimer);
   if (fxSaveTimer) clearTimeout(fxSaveTimer);
-  if (modelSaveTimer) clearTimeout(modelSaveTimer);
-  modelSaveTimer = null;
-  setXDesignActivity("model-save-pending", false, "");
   designSaveTimer = null;
   fxSaveTimer = null;
   setXDesignActivity("design-save-pending", false, "");
   setXDesignActivity("fx-save-pending", false, "");
 }
 
-function canSave(kind: "design" | "fx" | "model"): boolean {
+function canSave(kind: "design" | "fx"): boolean {
   const { activeId, registry, transitioning } = useXDProjects.getState();
   return !transitioning && !!activeId && projectKind(registry.find((project) => project.id === activeId)) === kind;
 }
@@ -332,20 +327,6 @@ function scheduleFxSave(): void {
   }, 400);
 }
 
-function scheduleModelSave(): void {
-  if (!canSave("model")) return;
-  const activeId = useXDProjects.getState().activeId!;
-  markProjectDirty(activeId);
-  if (modelSaveTimer) clearTimeout(modelSaveTimer);
-  setXDesignActivity("model-save-pending", true, "Wait for the 3D model to finish saving before disabling the plugin.");
-  modelSaveTimer = setTimeout(() => {
-    modelSaveTimer = null;
-    setXDesignActivity("model-save-pending", false, "");
-    if (useXDProjects.getState().activeId !== activeId || !canSave("model")) return;
-    void flushActive().catch(() => {});
-  }, 400);
-}
-
 function disposeXDesignRuntime(): void {
   clearPersistenceTimers();
   clearXDesignActivities();
@@ -394,9 +375,6 @@ export function registerXDesignContributions(
   subscriptions.add(useHtmlArtifact.subscribe((state, previous) => {
     if (state.projectId === previous.projectId &&
       (state.html !== previous.html || state.title !== previous.title || state.open !== previous.open)) scheduleDesignSave();
-  }));
-  subscriptions.add(useModelStore.subscribe((state, previous) => {
-    if (state.spec !== previous.spec || state.reference !== previous.reference) scheduleModelSave();
   }));
   subscriptions.add(
     useFxStore.subscribe((state, previous) => {

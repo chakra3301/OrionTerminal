@@ -58,7 +58,6 @@ Shared dispatcher turns reject queued UI callbacks after completion/Stop, includ
 | Learn generation + Tutor; RepoLens diagram analysis | Shared provider/model dispatcher | Verified web-link lookup remains explicitly Claude-only |
 | FX Assist | Shared dispatcher; 10 tools via MCP or HTTP runtime | Bounded Terra read/parameter/name edits and restart passed; advanced shader/provider coverage remains open |
 | FX shader generation | Shared selected text model | Generated GLSL still needs validation and visual review |
-| img2model | Claude or Codex with reference image + MCP | Other connectors fail explicitly; no claimed vision parity |
 | XDesign canvas reference image | Claude / Codex | Other connectors receive structured canvas context, not a fictitious screenshot |
 | XDesign raster generation | Native ChatGPT subscription or configured OpenAI/Google image provider | ChatGPT image → Archives/opt-in tagging → canvas edit/restart → PNG/SVG export tested; not every account/model or exact size |
 | Asset/note tags, note inline AI/archive answers, Git commit messages, personalized companion | Shared surface-selected analysis; zero tools; bounded timeout/cancellation | Background uploads require opt-in; images require supported Claude/Codex transport; legacy one-shot commands removed |
