@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type SVGAttributes } from "react";
 import { createPortal } from "react-dom";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { Settings as Gear } from "lucide-react";
+import { Grid2x2, Settings as Gear } from "lucide-react";
 import type { PhotoDocument, PhotoLayer } from "./types";
 import { runPhotoCommand, usePhotoWorkspace } from "./runtime";
 import { usePhotoCommandPreview } from "./commandPreview";
+import { historyId } from "./selectAndMask";
+import type { HistoryFold } from "./freeTransform";
 import { useDesignDialog } from "../useDesignDialog";
 import { beginXDesignActivity } from "../runtimeActivity";
 import { ContextMenu } from "../EditorMenus";
@@ -155,7 +157,7 @@ export function movePlaneCorner(planes:Plane[],plane:number,index:number,destina
   const source=planes[plane]!.src[index]!;
   return planes.map(current=>({...current,dst:current.dst.map((point,i)=>Math.abs(current.src[i]![0]-source[0])<.001&&Math.abs(current.src[i]![1]-source[1])<.001?destination:point)}));
 }
-export function GeometryDialog({kind,document,layer,close,canvas}:{kind:GeometryKind;document:PhotoDocument;layer:PhotoLayer;close:()=>void;canvas?:{element:HTMLElement;zoom:number}}) {
+export function GeometryDialog({kind,document,layer,close,canvas,fold,freeTransform}:{kind:GeometryKind;document:PhotoDocument;layer:PhotoLayer;close:()=>void;canvas?:{element:HTMLElement;zoom:number};fold?:HistoryFold;freeTransform?:(work:Promise<unknown>|null,fold?:HistoryFold)=>void}) {
   const busy=usePhotoWorkspace(state=>state.busy),projectId=usePhotoWorkspace(state=>state.projectId),workspaceError=usePhotoWorkspace(state=>state.error),viewKey=usePhotoWorkspace(state=>state.state?.viewKey);
   const [x,y,width,height]=layer.bounds??[0,0,document.width,document.height],rect=[x,y,x+Math.max(1,width),y+Math.max(1,height)];
   const corners:XY[]=[[rect[0]!,rect[1]!],[rect[2]!,rect[1]!],[rect[2]!,rect[3]!],[rect[0]!,rect[3]!]];
@@ -179,6 +181,14 @@ export function GeometryDialog({kind,document,layer,close,canvas}:{kind:Geometry
   // The pinned engine has no Cylinder style, so its surface goes over as a custom mesh.
   const warp={rect,style:style==="cylinder"?"custom":style,bend,hDistort,vDistort,vertical,...(style==="custom"?{mesh}:style==="cylinder"&&cylinderSurface?{mesh:cylinderSurface}:{})};
   const params:Record<string,unknown>={layer:layer.id,interpolation:"bicubic",...(kind==="liquify"?{strokes:[...strokes,...(draft?.kind==="stroke"?[draft.stroke]:[])]}:kind==="puppet"?{pins,mode,density:"normal",expansion}:kind==="perspective"?{planes}:warp)};
+  const untouched=useRef(JSON.stringify(params));
+  const apply=()=>runPhotoCommand(COMMANDS[kind],params).then(()=>fold&&runPhotoCommand("history.fold",fold));
+  // Photoshop's Cancel ends the whole transform session, so the Free Transform applied before Warp goes too.
+  const cancel=()=>{close();if(fold&&historyId(usePhotoWorkspace.getState().state)!==fold.fromId)void runPhotoCommand("history.select",{id:fold.fromId,discardRedo:true}).catch(()=>{});};
+  const toFreeTransform=()=>{
+    if(JSON.stringify(params)===untouched.current)return freeTransform?.(null,fold);
+    const id=historyId(usePhotoWorkspace.getState().state);freeTransform?.(apply(),fold??(id===null?undefined:{fromId:id,label:"Warp"}));
+  };
   const adopt=(next:Mesh|undefined)=>{if(!next)return;setMesh(next);setStyle("custom");setSplitLine(null);setAnchor(null);return next;};
   const editWarp=async(command:string,extra:Record<string,unknown>)=>((await runPhotoCommand(command,{...warp,...extra})) as {warp?:{mesh?:Mesh}}|undefined)?.warp?.mesh;
   const reshape=(command:string,extra:Record<string,unknown>)=>{void editWarp(command,extra).then(adopt).catch(()=>{});};
@@ -201,7 +211,7 @@ export function GeometryDialog({kind,document,layer,close,canvas}:{kind:Geometry
     // Halfway along the line's first patch, so the native nearest-split search can't pick a crossing line.
     reshape("edit.transform.removeWarpSplit",{at:splitLine.axis==="u"?warpMeshPoint(mesh,mesh.us[splitLine.index]!,middle(mesh.vs)):warpMeshPoint(mesh,middle(mesh.us),mesh.vs[splitLine.index]!)});
   };
-  const preview=usePhotoCommandPreview(document,projectId,COMMANDS[kind],params,{automatic:live,enabled:valid&&!busy&&!stale}),dialog=useDesignDialog<HTMLFormElement>(close,busy,{additionalRoots:()=>canvas?[surface.current]:[]});
+  const preview=usePhotoCommandPreview(document,projectId,COMMANDS[kind],params,{automatic:live,enabled:valid&&!busy&&!stale}),dialog=useDesignDialog<HTMLFormElement>(cancel,busy,{additionalRoots:()=>canvas?[surface.current]:[]});
   const point=(event:{clientX:number;clientY:number}):XY=>geometryPoint(event.clientX,event.clientY,surface.current!.getBoundingClientRect(),document.width,document.height);
   const tolerance=canvas?6/canvas.zoom:Math.max(document.width,document.height)/90;
   const onMesh=(m:Mesh,p:XY,at=warpParamAt(m,p))=>{const q=warpMeshPoint(m,at[0],at[1]);return Math.hypot(q[0]-p[0],q[1]-p[1])<=tolerance;};
@@ -329,12 +339,13 @@ export function GeometryDialog({kind,document,layer,close,canvas}:{kind:Geometry
         }}>{style==="custom"&&warpGridId(mesh)==="custom"&&<option value="custom" hidden>Custom</option>}<option value="customSize">Custom</option>{WARP_GRIDS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
         <label>Warp<select aria-label="Warp style" value={style} onChange={event=>chooseStyle(event.target.value)}>{WARP_STYLE_GROUPS.flatMap((group,index)=>[...(index?[<hr key={`hr${index}`}/>]:[]),...group.map(value=><option key={value} value={value}>{labelFor(value)}</option>)])}</select></label>
         <details className="xd-photo-warp-guides"><summary aria-label="Guide options" title="Guide options"><Gear size={14} aria-hidden="true"/></summary><label>Show guides<select aria-label="Show guides" value={guides.mode} onChange={event=>setGuides(current=>({...current,mode:event.target.value}))}>{GUIDE_MODES.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>{number("Guide density",guides.density,value=>setGuides(current=>({...current,density:value})),1,10)}</details>
-        {style==="cylinder"?null:style==="custom"?<><button type="button" disabled={busy||!splitLine} onClick={removeSplit}>Remove Warp Split</button><button type="button" disabled={busy} onClick={()=>setMesh(current=>fitWarpMesh((s,t)=>[rect[0]!+s*(rect[2]!-rect[0]!),rect[1]!+t*(rect[3]!-rect[1]!)],current.us,current.vs))}>Reset mesh</button></>:<>{number("Warp bend",bend,setBend,-100,100)}{number("Horizontal distortion",hDistort,setH,-100,100)}{number("Vertical distortion",vDistort,setV,-100,100)}<label><input type="checkbox" checked={vertical} onChange={event=>setVertical(event.target.checked)}/>Vertical warp</label></>}</>}
+        {style==="cylinder"?null:style==="custom"?<><button type="button" disabled={busy||!splitLine} onClick={removeSplit}>Remove Warp Split</button><button type="button" disabled={busy} onClick={()=>setMesh(current=>fitWarpMesh((s,t)=>[rect[0]!+s*(rect[2]!-rect[0]!),rect[1]!+t*(rect[3]!-rect[1]!)],current.us,current.vs))}>Reset mesh</button></>:<>{number("Warp bend",bend,setBend,-100,100)}{number("Horizontal distortion",hDistort,setH,-100,100)}{number("Vertical distortion",vDistort,setV,-100,100)}<label><input type="checkbox" checked={vertical} onChange={event=>setVertical(event.target.checked)}/>Vertical warp</label></>}
+        {freeTransform&&<button type="button" aria-label="Switch between free transform and warp modes" title="Switch between free transform and warp modes" disabled={busy||stale||!valid||!!draft} onClick={toFreeTransform}><Grid2x2 size={16} aria-hidden="true"/></button>}</>}
     </div>;
-  const form=<form ref={dialog} role="dialog" aria-modal={canvas?undefined:true} aria-label={TITLES[kind]} className={canvas?"xd-photo-geometry-inspector":"xd-photo-dialog xd-photo-special-dialog"} onSubmit={event=>{event.preventDefault();if(valid&&!busy&&!stale&&!drag.current)void runPhotoCommand(COMMANDS[kind],params).then(close).catch(()=>{});}}>
+  const form=<form ref={dialog} role="dialog" aria-modal={canvas?undefined:true} aria-label={TITLES[kind]} className={canvas?"xd-photo-geometry-inspector":"xd-photo-dialog xd-photo-special-dialog"} onSubmit={event=>{event.preventDefault();if(valid&&!busy&&!stale&&!drag.current)void apply().then(close).catch(()=>{});}}>
     <header><h3>{TITLES[kind]}</h3><p>{kind==="liquify"?"Paint deformation strokes on the image.":kind==="puppet"?"Click to place pins, then drag or use arrow keys to position them.":kind==="perspective"?"Drag plane corners. Shared source corners stay linked.":"Drag mesh points or choose a warp preset. Arrow keys nudge the focused point."}</p></header>
     {canvas?<>{feedback}{controls}</>:<div className="xd-photo-special-body"><div className="xd-photo-special-preview">{stage}{feedback}</div>{controls}</div>}
-    {workspaceError&&<p role="alert">{workspaceError}</p>}<div className="xd-photo-dialog-actions"><button type="button" disabled={busy} onClick={close}>Cancel</button><button type="submit" disabled={busy||!valid||stale||!!draft}>Apply</button></div>
+    {workspaceError&&<p role="alert">{workspaceError}</p>}<div className="xd-photo-dialog-actions"><button type="button" disabled={busy} onClick={cancel}>Cancel</button><button type="submit" disabled={busy||!valid||stale||!!draft}>Apply</button></div>
   </form>;
   const sizeDialog=customGrid&&createPortal(<CustomGridSizeDialog initial={customGrid.initial} apply={sizeGrid} close={()=>setCustomGrid(null)}/>,customGrid.root);
   const contextMenu=menu&&<ContextMenu x={menu.x} y={menu.y} items={canvasMenu(menu)} label="Warp" close={()=>setMenu(null)}/>;

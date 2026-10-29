@@ -42,8 +42,24 @@ pub(super) fn describe(engine:&Session)->Value{
 }
 pub(super) fn redo_labels(engine:&Session)->Value{json!(engine.active().map(|state|state.history.redo_labels().map(str::to_owned).collect::<Vec<_>>()).unwrap_or_default())}
 // History panel rows index past states, then the current state, then redo states (next first).
+// Dialogs name their opening state by snapshot id: at the History limit every step shifts the
+// indexes. Rows number past states, the current one, then redo states, as in `select`. A state
+// found nowhere was dropped past the limit and resolves to the oldest one kept, the nearest left.
+fn position(engine:&mut Session,params:&Value,id_key:&str,index_key:&str)->Result<usize,String>{
+    let Some(id)=params.get(id_key).filter(|value|!value.is_null())else{return params[index_key].as_u64().and_then(|index|usize::try_from(index).ok()).ok_or_else(||"History state must be a nonnegative integer".into());};
+    let id=id.as_str().and_then(|id|id.parse::<ulid::Ulid>().ok()).ok_or("Invalid History state")?.to_string();
+    let state=engine.active().ok_or("No image document")?;let count=state.history.past_len();let redo=state.history.redo_labels().count();
+    if let Some(index)=(0..count).find(|&index|state.history.state(index).is_some_and(|doc|snapshot_id(&doc)==id)){return Ok(index);}
+    if snapshot_id(&state.doc)==id{return Ok(count);}
+    // The engine keeps redo documents private, so they are visited and stepped back from.
+    let mut found=None;let mut stepped=0;
+    while stepped<redo&&found.is_none(){if !engine.redo(){break;}stepped+=1;if engine.active().is_some_and(|state|snapshot_id(&state.doc)==id){found=Some(count+stepped);}}
+    for _ in 0..stepped{if !engine.undo(){return Err("Wait for the current image operation to finish".into());}}
+    if stepped<redo&&found.is_none(){return Err("Wait for the current image operation to finish".into());}
+    Ok(found.unwrap_or(0))
+}
 pub(super) fn select(engine:&mut Session,params:&Value)->Result<Value,String>{
-    let target=params["index"].as_u64().and_then(|index|usize::try_from(index).ok()).ok_or("History state must be a nonnegative integer")?;
+    let target=position(engine,params,"id","index")?;
     let state=engine.active().ok_or("No image document")?;let current=state.history.past_len();
     if target>current+state.history.redo_labels().count(){return Err(format!("History state {target} is no longer available"));}
     for _ in target..current{if !engine.undo(){return Err("Wait for the current image operation to finish".into());}}
@@ -53,9 +69,11 @@ pub(super) fn select(engine:&mut Session,params:&Value)->Result<Value,String>{
 }
 // A dialog's OK records one History step, as Photoshop does, however many edits previewed it.
 pub(super) fn fold(engine:&mut Session,params:&Value)->Result<Value,String>{
-    let from=params["from"].as_u64().and_then(|index|usize::try_from(index).ok()).ok_or("History state must be a nonnegative integer")?;
     let label=params["label"].as_str().filter(|label|!label.is_empty()).ok_or("The History step needs a name")?;
     if engine.active_job().is_some(){return Err("Wait for the current image operation to finish".into());}
+    let from=position(engine,params,"fromId","from")?;
+    // Stepped back past the opening state: nothing the dialog did is left to fold.
+    if params.get("fromId").is_some_and(|id|!id.is_null())&&engine.active().is_some_and(|state|from>state.history.past_len()){return Ok(json!(false));}
     let state=engine.active_mut().ok_or("No image document")?;
     let steps=state.history.past_len().checked_sub(from).ok_or_else(||format!("History state {from} is no longer available"))?;
     if steps==0{return Ok(json!(false));}
@@ -132,6 +150,42 @@ mod tests{
         for params in [json!({"from":2,"label":"Layer Style"}),json!({"from":-1,"label":"Layer Style"}),json!({"from":0}),json!({"from":0,"label":""})]{assert!(super::super::execute_view_command(&mut engine,"history.fold",params).is_err());}
         assert_eq!(engine.active().unwrap().history.entries(),["Open","Layer Style"]);
         engine.execute("edit.undo",json!({})).unwrap();assert!(Arc::ptr_eq(&engine.active().unwrap().doc,&opening));
+    }
+    fn stroke(engine:&mut Session,y:i64){engine.execute("paint.stroke",json!({"points":[[4,y],[27,y]],"size":3,"color":"#102030","seed":7})).unwrap();}
+    #[test]
+    fn a_dialog_opened_at_the_history_limit_folds_and_cancels_by_its_opening_snapshot(){
+        let mut engine=fixture();engine.active_mut().unwrap().history.max_states=3;stroke(&mut engine,2);
+        let opening=engine.active().unwrap().doc.clone();let id=snapshot_id(&opening);
+        for y in [5,11]{stroke(&mut engine,y);}assert_eq!(engine.active().unwrap().history.past_len(),3);
+        assert_eq!(super::super::execute_view_command(&mut engine,"history.fold",json!({"fromId":id,"label":"Layer Style"})).unwrap(),true);
+        assert_eq!(engine.active().unwrap().history.entries().last().map(String::as_str),Some("Layer Style"));
+        engine.execute("edit.undo",json!({})).unwrap();assert!(Arc::ptr_eq(&engine.active().unwrap().doc,&opening));
+        for y in [14,17]{stroke(&mut engine,y);}
+        assert_eq!(super::super::execute_view_command(&mut engine,"history.select",json!({"id":id,"discardRedo":true})).unwrap(),true);
+        let state=engine.active().unwrap();assert!(Arc::ptr_eq(&state.doc,&opening));assert_eq!(state.history.redo_labels().count(),0);
+        assert_eq!(super::super::execute_view_command(&mut engine,"history.fold",json!({"fromId":id,"label":"Layer Style"})).unwrap(),false);
+        assert!(super::super::execute_view_command(&mut engine,"history.fold",json!({"fromId":"not-a-state","label":"Layer Style"})).is_err());
+    }
+    #[test]
+    fn an_opening_snapshot_undone_into_redo_is_not_folded_and_is_redone_to_on_cancel(){
+        let mut engine=fixture();engine.active_mut().unwrap().history.max_states=3;stroke(&mut engine,2);
+        let opening=engine.active().unwrap().doc.clone();let id=snapshot_id(&opening);stroke(&mut engine,5);
+        for _ in 0..2{engine.execute("edit.undo",json!({})).unwrap();}let before=engine.active().unwrap().doc.clone();
+        assert_eq!(super::super::execute_view_command(&mut engine,"history.fold",json!({"fromId":id,"label":"Layer Style"})).unwrap(),false);
+        let state=engine.active().unwrap();assert!(Arc::ptr_eq(&state.doc,&before));assert_eq!(state.history.redo_labels().count(),2);
+        assert_eq!(super::super::execute_view_command(&mut engine,"history.select",json!({"id":id,"discardRedo":true})).unwrap(),true);
+        let state=engine.active().unwrap();assert!(Arc::ptr_eq(&state.doc,&opening));assert_eq!(state.history.redo_labels().count(),0);
+    }
+    #[test]
+    fn an_opening_snapshot_dropped_past_the_limit_folds_and_cancels_to_the_oldest_kept_state(){
+        let mut engine=fixture();engine.active_mut().unwrap().history.max_states=3;
+        let id=snapshot_id(&engine.active().unwrap().doc.clone());for y in [2,5,11,14]{stroke(&mut engine,y);}
+        let oldest=engine.active().unwrap().history.state(0).unwrap();
+        assert_eq!(super::super::execute_view_command(&mut engine,"history.fold",json!({"fromId":id,"label":"Warp"})).unwrap(),true);
+        assert_eq!(engine.active().unwrap().history.past_len(),1);
+        engine.execute("edit.undo",json!({})).unwrap();assert!(Arc::ptr_eq(&engine.active().unwrap().doc,&oldest));engine.execute("edit.redo",json!({})).unwrap();
+        assert_eq!(super::super::execute_view_command(&mut engine,"history.select",json!({"id":id,"discardRedo":true})).unwrap(),true);
+        assert!(Arc::ptr_eq(&engine.active().unwrap().doc,&oldest));
     }
     #[test]
     fn an_adjustment_edit_is_named_after_its_kind_as_photoshop_records_it(){

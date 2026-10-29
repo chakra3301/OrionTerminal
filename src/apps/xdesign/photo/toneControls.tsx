@@ -3,13 +3,15 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { NumberControl } from "./controls";
 import { usePhotoWorkspace } from "./runtime";
 import type { PhotoDocument } from "./types";
-import { CURVE_DISPLAY, curveLut, drawCurve, fitCurve, type CurveDisplay } from "./curveTools";
+import { CURVE_DISPLAY, CURVE_POINTS, curveLut, drawCurve, fitCurve, type CurveDisplay } from "./curveTools";
 import type { ClipTone } from "./toneClipping";
 
 export { curveLut };
 
 export type CurvePoint = [number, number];
-export type HistogramSource = { document: PhotoDocument; layer?: number; below: boolean };
+/** A layer mask (of `layer`), the Quick Mask or an alpha channel, read as one grey plane instead of the image's colours. */
+export type PlaneTarget = "mask" | "quickMask" | { channel: number };
+export type HistogramSource = { document: PhotoDocument; layer?: number; below: boolean; target?: PlaneTarget };
 type Tones = Record<string, unknown>;
 
 // Channel colours mark image content, as Photoshop's channel curves do, so they are literal rather than theme tokens.
@@ -20,13 +22,13 @@ export const histogramIndex = (channels: string[], channel: string) => channel =
 
 export function useHistogram(source: HistogramSource | undefined, space: string): number[][] | null {
   const projectId = usePhotoWorkspace(state => state.projectId), [bins, setBins] = useState<number[][] | null>(null);
-  const key = source && projectId && isTauri() ? JSON.stringify([projectId, source.document.id, source.document.version, source.layer ?? null, source.below, space]) : "";
+  const key = source && projectId && isTauri() ? JSON.stringify([projectId, source.document.id, source.document.version, source.layer ?? null, source.below, space, source.target ?? null]) : "";
   useEffect(() => {
     if (!key || !source) return;
     let alive = true;
     // Live Properties edits bump the version several times a second; only the settled one is worth reading.
     const timer = window.setTimeout(() => {
-      invoke<unknown>("xdesign_photo_histogram", { projectId, photoId: source.document.id, version: source.document.version, layer: source.layer ?? null, below: source.below, space })
+      invoke<unknown>("xdesign_photo_histogram", { projectId, photoId: source.document.id, version: source.document.version, layer: source.layer ?? null, below: source.below, space, ...source.target ? { target: source.target } : {} })
         .then(next => { if (alive && Array.isArray(next) && next.length && next.every(channel => Array.isArray(channel) && channel.length === 256)) setBins(next as number[][]); })
         // A superseded version fails; the histogram is a guide, so the last good one stays until the next read.
         .catch(() => undefined);
@@ -146,7 +148,7 @@ const curveLine = (values: number[]) => "M" + values.map((y, x) => `${x} ${(255 
 /** Which end of the tonal range is being dragged, and whether Alt is held, for Show Clipping. */
 export type ClipSignal = (tone: ClipTone | null, alt: boolean) => void;
 export type CurveView = { pencil?: boolean; pigment?: boolean; display?: CurveDisplay; toggleGrid?: () => void; clip?: ClipSignal };
-export function CurveEditor({ points, disabled, change, maxPoints = 19, label = "Adjustment curve", bins, color, overlays = [], pencil = false, pigment = false, display = CURVE_DISPLAY, toggleGrid, clip, aside }: CurveView & {
+export function CurveEditor({ points, disabled, change, maxPoints = CURVE_POINTS, label = "Adjustment curve", bins, color, overlays = [], pencil = false, pigment = false, display = CURVE_DISPLAY, toggleGrid, clip, aside }: CurveView & {
   points: CurvePoint[]; disabled: boolean; change: (points: CurvePoint[]) => void; maxPoints?: number; label?: string; bins?: number[]; color?: string; overlays?: { color: string; points: CurvePoint[] }[];
   /** Beside the Input and Output fields, where Photoshop's dialog puts the eyedroppers and Show Clipping. */
   aside?: ReactNode;

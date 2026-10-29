@@ -58,6 +58,15 @@ describe("magnetic canvas integration",()=>{
     await act(async()=>usePhotoWorkspace.setState({state:{features:{magneticLasso:true},viewKey:"view"} as PhotoState,busy:true}));await pointer("pointerdown",10,10);expect(xdesignActivityReason()).toBeNull();await act(async()=>usePhotoWorkspace.setState({busy:false}));await key("]");expect(changeWidth).toHaveBeenCalledWith(11);
     await render("v1","replace",true);await pointer("pointerdown",10,10,{},true);await pointer("pointermove",30,20,{},true);await pointer("pointerdown",30,20,{},true);expect(native.invoke.mock.lastCall![1].params.width).toBe(6);await key("Escape");
   });
+  it("hands the Freeform Pen's magnetic outline to the pen: open on Enter, closed by Close path",async()=>{
+    const pen=vi.fn(async(_points:unknown,_closed:boolean)=>undefined);
+    await act(async()=>root.render(<section className="xd-photo"><MagneticLassoOverlay document={doc} projectId="project" viewKey="view" options={{width:10,contrast:10,frequency:0}} mode="replace" zoom={1} ready changeWidth={changeWidth} pen={pen}/></section>));
+    expect(surface().getAttribute("aria-label")).toBe("Magnetic pen canvas");surface().getBoundingClientRect=()=>({left:0,top:0,width:100,height:80} as DOMRect);surface().setPointerCapture=vi.fn();surface().hasPointerCapture=()=>false;
+    const outline=async()=>{await pointer("pointerdown",10,10);await pointer("pointerdown",30,10,{altKey:true});await pointer("pointerup",30,10,{altKey:true});await pointer("pointerdown",30,30,{altKey:true});await pointer("pointerup",30,30,{altKey:true});};
+    await outline();await key("Enter");expect(pen).toHaveBeenLastCalledWith([[10,10],[30,10],[30,30]],false);
+    await outline();await act(async()=>[...container.querySelectorAll("button")].find(button=>button.textContent==="Close path")!.click());expect(pen).toHaveBeenLastCalledWith([[10,10],[30,10],[30,30]],true);
+    expect(pen).toHaveBeenCalledTimes(2);expect(native.run).not.toHaveBeenCalled();expect(xdesignActivityReason()).toBeNull();
+  });
   it("keeps a failed close retryable and prevents duplicate publication",async()=>{
     await pointer("pointerdown",10,10);await pointer("pointerdown",30,10,{altKey:true});await pointer("pointerup",30,10,{altKey:true});await pointer("pointerdown",30,30,{altKey:true});await pointer("pointerup",30,30,{altKey:true});
     native.run.mockRejectedValueOnce(new Error("selection too large"));await key("Enter");expect(container.textContent).toContain("selection too large");expect(xdesignActivityReason()).toContain("magnetic selection");

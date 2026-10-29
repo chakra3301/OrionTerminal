@@ -2,6 +2,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InfoPanel, useInfoCursor } from "./InfoPanel";
+import { useColorSamplers } from "./colorSamplers";
 
 let root: Root, container: HTMLDivElement;
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); container = document.createElement("div"); document.body.append(container); root = createRoot(container); act(() => useInfoCursor.getState().set(null)); });
@@ -50,6 +51,17 @@ describe("InfoPanel", () => {
   it("shows the selection size", () => {
     render(undefined, [10, 20, 64, 48]); expect([val("W"), val("H", 1)]).toEqual(["64", "48"]);
     act(() => root.render(<InfoPanel width={200} height={100} selectionBounds={undefined} sample={async () => null} />)); expect(val("W")).toBe("");
+  });
+  it("reads a CMYK image's inks in percent for the first readout and each color sampler, keeping HSB from the shown colour", async () => {
+    act(() => useColorSamplers.setState({ documents: { doc: [{ x: 9, y: 8 }] } }));
+    const sample = vi.fn(async () => "#ff8000"), ink = vi.fn(async (x: number) => x === 9 ? [10.4, 20, 30, 40.6] : [0, 49.6, 100, 0]);
+    act(() => root.render(<InfoPanel width={200} height={100} selectionBounds={null} sample={sample} ink={ink} documentId="doc"/>)); move(3.7, 4.2); await flush(); await flush();
+    expect(ink).toHaveBeenCalledWith(3, 4); expect(ink).toHaveBeenCalledWith(9, 8);
+    expect([val("C"), val("M"), val("Y"), val("K")]).toEqual(["0%", "50%", "100%", "0%"]);
+    expect(container.querySelector('[aria-label="Info R"]')).toBeNull();
+    expect([val("H"), val("S"), val("B", 0)]).toEqual(["30°", "100%", "100%"]);
+    expect([...container.querySelectorAll('[aria-label="Info sampler 1"] output')].map(output => output.textContent)).toEqual(["10%", "20%", "30%", "41%"]);
+    act(() => useColorSamplers.setState({ documents: {} }));
   });
   it("ignores a result that settles after unmount", async () => {
     let done!: (hex: string | null) => void; const sample = render(vi.fn(() => new Promise<string | null>(resolve => { done = resolve; })));

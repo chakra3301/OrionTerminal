@@ -19,6 +19,19 @@ describe("gradient Method", () => {
     expect(bakeGradient([[0, "#000000"], [.5, "#ff0000"], [1, "#ffffff"]], "stripes")).toEqual([[0, "#000000"], [.2499, "#000000"], [.25, "#ff0000"], [.7499, "#ff0000"], [.75, "#ffffff"], [1, "#ffffff"]]);
   });
 
+  it("bakes colour midpoints into a Method: each segment's half-way colour lands at its midpoint", () => {
+    const black: [number, string][] = [[0, "#000000"], [1, "#ffffff"]];
+    const even = bakeGradient(black, "linear"), bent = bakeGradient(black, "linear", 63, [.25]);
+    expect(bakeGradient(black, "linear", 63, [.5])).toEqual(even);
+    expect(Math.abs(at(bent, .25) - at(even, .5))).toBeLessThan(4);
+    expect(at(bent, .1)).toBeGreaterThan(at(even, .1));
+    // Midpoints follow the sorted stops, one per segment.
+    const three = bakeGradient([[1, "#ffffff"], [0, "#000000"], [.5, "#808080"]], "perceptual", 63, [.5, .8]);
+    expect(at(three, .25)).toBe(at(bakeGradient([[0, "#000000"], [.5, "#808080"], [1, "#ffffff"]], "perceptual"), .25));
+    expect(at(three, .9)).toBeLessThan(at(bakeGradient([[0, "#000000"], [.5, "#808080"], [1, "#ffffff"]], "perceptual"), .9));
+    expect(bakeGradient([[0, "#ff0000"], [1, "#0000ff"]], "stripes", 63, [.3])).toEqual([[0, "#ff0000"], [.2999, "#ff0000"], [.3, "#0000ff"], [1, "#0000ff"]]);
+  });
+
   it("bakes a Gradient Map for the engine and reopens it with the stops and Method the user set", () => {
     const stops: [number, string][] = [[0, "#ff0000"], [1, "#0000ff"]];
     expect(gradientMapParams({ stops, method: "classic", reverse: true })).toEqual({ stops, reverse: true });

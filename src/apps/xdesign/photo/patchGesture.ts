@@ -1,5 +1,15 @@
+import { selectionGestureMode, type GestureModifiers, type SelectionMode } from "./selectionGesture";
+
 export type PatchPoint = readonly [number, number];
 export type PatchBounds = readonly [number, number, number, number];
+
+/** What a Patch press does, as in Photoshop: Shift, Alt or Alt+Shift, no selection, or a press outside it draws a selection; a plain press inside drags the patch. `bounds` stands in for the selection, as the state has no mask to hit-test. */
+export function patchPress(at: PatchPoint, bounds: PatchBounds | null, modifiers: GestureModifiers): SelectionMode | "patch" {
+  if (modifiers.shiftKey || modifiers.altKey) return selectionGestureMode("replace", modifiers, "select.lasso");
+  if (!bounds) return "replace";
+  const [x, y, width, height] = bounds;
+  return at[0] >= x && at[0] < x + width && at[1] >= y && at[1] < y + height ? "patch" : "replace";
+}
 
 export function patchOffset(start: PatchPoint, end: PatchPoint): [number, number] | null {
   if (![...start, ...end].every(value => Number.isFinite(value) && Math.abs(value) <= 268_435_456)) return null;
@@ -49,4 +59,11 @@ export function patchTarget({
   if (channel?.kind === "alpha") return { target: { channel: channel.index } };
   if (layer !== null) return { layer, target: "pixels" };
   return {};
+}
+
+/** The Patch options to send: none for the native patch (Normal, Diffusion 5), which also serves masks, channels and Quick Mask; the engine takes the rest on layer pixels only. */
+export function patchOptions(options: Record<string, unknown>, target: Record<string, unknown>): Record<string, unknown> {
+  if (target.target !== "pixels") return {};
+  if (options.type === "contentAware") return { type: "contentAware", structure: options.structure, colorAdaptation: options.colorAdaptation, sampleAllLayers: options.sampleAllLayers };
+  return options.diffusion === 5 ? {} : { type: "normal", diffusion: options.diffusion };
 }

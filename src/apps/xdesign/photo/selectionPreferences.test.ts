@@ -18,6 +18,13 @@ describe("remembered selection workflow options", () => {
     expect(sanitizeSelectionPreferences("focus", { range: .375, noise: .125, mode: "intersect", sampleAllLayers: false })).toEqual({ range: .375, noise: .125, mode: "intersect", sampleAllLayers: false });
     expect(sanitizeSelectionPreferences("color", { midLow: 170, midHigh: 90, range: 1e30, toneFuzziness: 20 })).toEqual({ toneFuzziness: 20 });
   });
+  it("reads a stale Feather above Photoshop's 250 px as the default and keeps a valid Quick Selection size and Brush Tool size and hardness", () => {
+    expect(sanitizeSelectionPreferences("refine", { feather: 600, quickSize: 12 })).toEqual({ quickSize: 12 });
+    expect(sanitizeSelectionPreferences("refine", { feather: 250, quickSize: 0 })).toEqual({ feather: 250 }); expect(sanitizeSelectionPreferences("refine", { quickSize: 5001 })).toEqual({});
+    expect(sanitizeSelectionPreferences("refine", { brushToolSize: 0, brushToolHardness: 50 })).toEqual({ brushToolHardness: 50 }); expect(sanitizeSelectionPreferences("refine", { brushToolSize: 5000, brushToolHardness: 101 })).toEqual({ brushToolSize: 5000 });
+    localStorage.setItem(SELECTION_PREFERENCES_KEY, JSON.stringify({ schemaVersion: 1, workflows: { refine: { options: { feather: 600, radius: 3, quickSize: "big" }, view: "mask", brushSize: 30 } } }));
+    expect(rememberedSelectionValues("refine", "#000000", readSelectionPreferences().workflows.refine)).toMatchObject({ feather: 0, radius: 3, quickSize: 30 });
+  });
   it.each(['{broken', JSON.stringify({ schemaVersion: 2, workflows: { refine: { options: { radius: 10 } } } }), JSON.stringify({ schemaVersion: 1, workflows: [] }), "x".repeat(17000)])("preserves unreadable/newer preferences without overwrite", raw => {
     localStorage.setItem(SELECTION_PREFERENCES_KEY, raw); const value = readSelectionPreferences();
     expect(value.writable).toBe(false); expect(value.notice).toContain("could not be read");

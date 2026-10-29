@@ -140,6 +140,47 @@ describe("Levels and Curves eyedroppers and Auto options", () => {
     expect(by("On-image adjustment").getAttribute("aria-pressed")).toBe("false");
   });
 
+  it("samples the one Gray channel in Grayscale, with the gray eyedropper off, and drags its curve on the image", async () => {
+    native.tauri = true; respond([50, 50, 50]);
+    const { image, surface } = stage(), move = (y: number, type = "pointermove") => act(async () => { surface.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: 150, clientY: y })); });
+    await render({ id: "levels", mode: "Grayscale", from: source, canvas: image }); await settle();
+    expect(by<HTMLButtonElement>("Sample in image to set gray point").disabled).toBe(true);
+    await act(async () => by<HTMLButtonElement>("Sample in image to set black point").click());
+    await press(surface, 150, 150); await settle();
+    expect(shown.inBlack).toBe(50);
+    await act(async () => root.render(null)); await render({ id: "curves", mode: "Grayscale", from: source, canvas: image }); await settle();
+    await act(async () => by<HTMLButtonElement>("On-image adjustment").click());
+    await press(surface, 150, 150); await settle(); await move(140); await move(140, "pointerup");
+    expect(shown.points).toEqual([[0, 0], [50, 40], [255, 255]]);
+  });
+
+  it("sets Lab Lightness with the black and white eyedroppers, neutralises a and b with the gray one, and drags any Lab curve on the image", async () => {
+    native.tauri = true; respond([40, 60, 80]);
+    const { image, surface } = stage(), move = (type: string) => act(async () => { surface.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: 150, clientY: 150 })); });
+    const sample = async (tone: string, rgb: number[]) => { respond(rgb); await act(async () => by<HTMLButtonElement>(`Sample in image to set ${tone} point`).click()); await press(surface, 150, 150); await settle(); };
+    await render({ id: "levels", mode: "Lab", from: source, canvas: image }); await settle();
+    await sample("black", [40, 60, 80]); await sample("white", [200, 180, 150]);
+    expect(shown.lightness).toMatchObject({ inBlack: 62, outBlack: 0, inWhite: 190, outWhite: 255 });
+    expect(shown.a).toMatchObject({ inBlack: 0, inWhite: 255, gamma: 1 });
+    await sample("gray", [120, 128, 140]);
+    expect([(shown.a as Settings).gamma, (shown.b as Settings).gamma, (shown.lightness as Settings).gamma]).toEqual([1.01, 1.09, 1]);
+    await act(async () => root.render(null)); await render({ id: "curves", mode: "Lab", from: source, canvas: image }); await settle();
+    await sample("black", [40, 60, 80]); expect(shown.lightness).toEqual([[62, 0], [255, 255]]);
+    await act(async () => { const select = by<HTMLSelectElement>("Adjustment Channel"); select.value = "b"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await act(async () => by<HTMLButtonElement>("On-image adjustment").click());
+    await press(surface, 150, 150); await settle(); await move("pointerup");
+    expect(shown.b).toEqual([[0, 0], [113, 113], [255, 255]]);
+    await sample("gray", [120, 128, 140]);
+    expect([shown.a, shown.b, shown.lightness]).toEqual([[[0, 0], [127, 128], [255, 255]], [[0, 0], [113, 113], [120, 128], [255, 255]], [[62, 0], [255, 255]]]);
+  });
+
+  it("keeps the eyedroppers and on-image tool off in CMYK, where the sample would need the document's own inks", async () => {
+    native.tauri = true; respond([40, 60, 80]);
+    const { image } = stage();
+    await render({ id: "curves", mode: "CMYK", from: source, canvas: image }); await settle();
+    expect(["Sample in image to set black point", "Sample in image to set gray point", "Sample in image to set white point", "On-image adjustment"].map(name => by<HTMLButtonElement>(name).disabled)).toEqual([true, true, true, true]);
+  });
+
   it("puts Auto, Options… and the eyedroppers in a dialog's button column and applies the chosen algorithm live", async () => {
     native.tauri = true; respond(null);
     const slot = beside(document.createElement("div"));
@@ -148,8 +189,12 @@ describe("Levels and Curves eyedroppers and Auto options", () => {
     expect(slot.contains(button("Auto"))).toBe(true); expect(slot.contains(by("Sample in image to set gray point"))).toBe(true);
     await act(async () => button("Options…").click());
     const radio = (text: string) => [...document.querySelectorAll<HTMLLabelElement>("[aria-label='Algorithms'] label")].find(label => label.textContent === text)!.querySelector("input")!;
-    expect(radio("Enhance Monochromatic Contrast").checked).toBe(true); expect(radio("Find Dark & Light Colors").disabled).toBe(true);
-    await act(async () => radio("Enhance Per Channel Contrast").click());
+    expect(radio("Enhance Brightness and Contrast").checked).toBe(true);
+    expect([...document.querySelectorAll<HTMLInputElement>(".xd-photo-auto-options input[type=radio], .xd-photo-auto-options input[type=checkbox]")].filter(input => input.disabled)).toEqual([]);
+    await act(async () => radio("Find Dark & Light Colors").click()); expect(shown).toMatchObject({ inBlack: 0, inWhite: 255, red: { inBlack: 30, inWhite: 200 } });
+    const snap = [...document.querySelectorAll<HTMLLabelElement>("label")].find(label => label.textContent === "Snap Neutral Midtones")!.querySelector("input")!;
+    await act(async () => snap.click()); expect(snap.checked).toBe(true);
+    await act(async () => snap.click()); await act(async () => radio("Enhance Per Channel Contrast").click());
     expect(shown).toMatchObject({ inBlack: 0, inWhite: 255, red: { inBlack: 30, inWhite: 200 }, green: { inBlack: 10, inWhite: 240 } });
     await act(async () => button("Cancel").click());
     expect(document.querySelector("[aria-label='Auto Color Correction Options']")).toBeNull(); expect(shown.red).toMatchObject({ inBlack: 0 });
@@ -157,6 +202,29 @@ describe("Levels and Curves eyedroppers and Auto options", () => {
     await act(async () => { root.render(null); }); await render({ id: "levels", from: source, slot }); await settle();
     await act(async () => button("Auto").click());
     expect(shown.red).toMatchObject({ inBlack: 30, inWhite: 200 });
+  });
+
+  it("reads Find Dark & Light Colors and the neutral for Snap Neutral Midtones from the host's pixels, at the chosen clipping", async () => {
+    native.tauri = true;
+    native.invoke.mockImplementation(async (command: string, args: Record<string, unknown>) => command === "xdesign_photo_auto_colors" ? { dark: [12, 40, 8], light: [230, 210, 250], neutral: args.highlightClip === 1 ? null : [100, 120, 140] } : [histogram(20, 230), histogram(30, 200), histogram(10, 240), histogram(0, 255)]);
+    const slot = beside(document.createElement("div"));
+    await render({ id: "levels", from: source, slot }); await settle();
+    const button = (text: string) => [...document.querySelectorAll("button")].find(item => item.textContent === text)!, colors = () => native.invoke.mock.calls.filter(([command]) => command === "xdesign_photo_auto_colors");
+    const radio = (text: string) => [...document.querySelectorAll<HTMLLabelElement>("[aria-label='Algorithms'] label")].find(label => label.textContent === text)!.querySelector("input")!;
+    expect(colors()).toEqual([]);
+    await act(async () => button("Options…").click()); await act(async () => radio("Find Dark & Light Colors").click()); await settle();
+    expect(colors()).toEqual([["xdesign_photo_auto_colors", { projectId: "project", photoId: "photo", version: "v1", layer: 7, below: true, shadowClip: .1, highlightClip: .1 }]]);
+    expect(shown).toMatchObject({ inBlack: 0, inWhite: 255, red: { inBlack: 12, inWhite: 230, gamma: 1 }, green: { inBlack: 40, inWhite: 210 }, blue: { inBlack: 8, inWhite: 250 } });
+    const snap = [...document.querySelectorAll<HTMLLabelElement>("label")].find(label => label.textContent === "Snap Neutral Midtones")!.querySelector("input")!;
+    await act(async () => snap.click()); await settle();
+    expect([(shown.red as Settings).gamma as number > 1, (shown.blue as Settings).gamma as number < 1]).toEqual([true, true]);
+    const clip = by<HTMLInputElement>("Highlights clip");
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(clip, "1"); clip.dispatchEvent(new Event("input", { bubbles: true })); }); await settle();
+    expect(colors().at(-1)![1]).toMatchObject({ shadowClip: .1, highlightClip: 1 });
+    expect([(shown.red as Settings).gamma, (shown.blue as Settings).gamma]).toEqual([1, 1]);
+    await act(async () => button("OK").click()); await act(async () => { root.render(null); }); await render({ id: "levels", from: source, slot }); await settle();
+    await act(async () => button("Auto").click());
+    expect(shown).toMatchObject({ red: { inBlack: 12, inWhite: 230, gamma: 1 }, blue: { inBlack: 8, inWhite: 250 } });
   });
 });
 
@@ -181,7 +249,7 @@ describe("Curves tools and display options", () => {
     expect(shown.points).toEqual([[0, 128], [255, 128]]);
     await at(svg, "pointerdown", 0, 0); await at(svg, "pointermove", 127, 0); await at(svg, "pointerup", 127, 0);
     const drawn = shown.points as [number, number][];
-    expect(drawn.length).toBeGreaterThan(2); expect(drawn.length).toBeLessThanOrEqual(19);
+    expect(drawn.length).toBeGreaterThan(2); expect(drawn.length).toBeLessThanOrEqual(16);
     expect(curveLut(drawn)[64]).toBeCloseTo(0, 0); expect(curveLut(drawn)[200]).toBeCloseTo(128, 0);
     await act(async () => button("Smooth").click());
     expect(shown.points).not.toEqual(drawn); expect(curveLut(shown.points as [number, number][])[127]).toBeGreaterThan(curveLut(drawn)[127]!);
@@ -210,7 +278,18 @@ describe("Curves tools and display options", () => {
     const column = container.querySelector(".xd-photo-tone-column")!;
     for (const label of ["Sample in image to set white point", "Edit points to modify the curve", "Draw to modify the curve"]) expect(column.contains(by(label))).toBe(true);
     expect(column.contains(button("Smooth"))).toBe(true); expect(container.querySelector(".xd-photo-tone-head")!.contains(button("Auto"))).toBe(true);
-    expect(document.querySelector(".xd-photo-curve-display")).toBeNull();
+  });
+
+  it("offers Show Amount of, the grid, the Show options and Show Clipping in Properties too", async () => {
+    await render({ id: "curves", from: source }); await settle();
+    const options = container.querySelector<HTMLDetailsElement>(".xd-photo-curve-display")!;
+    expect(options.open).toBe(false); expect(options.querySelector("summary")!.textContent).toBe("Curve Display Options");
+    expect(check("Show Clipping").disabled).toBe(false); expect(options.contains(check("Show Clipping"))).toBe(false);
+    await act(async () => check("Pigment/Ink %").click()); expect(by<HTMLInputElement>("Curve input").value).toBe("100");
+    await act(async () => check("Histogram").click()); expect(document.querySelector(".xd-photo-curve-histogram")).toBeNull();
+    await act(async () => by<HTMLButtonElement>("Show detailed grid").click()); expect(grid()).toContain("M0 25.5H255");
+    for (const text of ["Channel Overlays", "Baseline", "Intersection Line"]) expect(options.contains(check(text))).toBe(true);
+    await act(async () => by<HTMLButtonElement>("Show detailed grid").click());
   });
 });
 
@@ -263,6 +342,16 @@ describe("Show Clipping", () => {
     await drag(axis(), "pointerup", 40, false); expect(overlay(image)).toBeNull();
     await act(async () => { const select = by<HTMLSelectElement>("Adjustment Channel"); select.value = "green"; select.dispatchEvent(new Event("change", { bubbles: true })); });
     await drag(axis(), "pointerdown", 200, false); expect(drawn.at(-1)).toEqual([0, 0, 0, 255, 255, 255, 255, 255]);
+  });
+
+  it("shows Curves clipping from Properties too", async () => {
+    const image = stage();
+    await render({ id: "curves", from: source, canvas: image }); await settle();
+    const box = [...container.querySelectorAll<HTMLLabelElement>("label")].find(label => label.textContent === "Show Clipping")!.querySelector("input")!;
+    await act(async () => box.click());
+    await drag(strips()[0]!, "pointerdown", 40, false); await settle();
+    expect(drawn.at(-1)).toEqual([0, 0, 0, 255, 0, 255, 255, 255]);
+    await drag(strips()[0]!, "pointerup", 40, false); expect(overlay(image)).toBeNull();
   });
 });
 

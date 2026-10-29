@@ -100,6 +100,7 @@ pub(super) fn activate(dir: &Path, engine: &mut Session) -> Result<Vec<String>, 
         .lock()
         .map_err(|_| "Brush library needs to be restarted")?;
     let tools = stores.entry(dir.into()).or_insert_with(|| loaded(dir));
+    super::brush_library::enter(dir);
     engine.tools = tools.engine.tools.clone();
     engine.presets = tools.engine.presets.clone();
     engine.patterns = tools.engine.patterns.clone();
@@ -113,6 +114,7 @@ pub(super) fn preview_settings(dir: &Path, engine: &mut Session) -> Result<(), S
     let stores = stores()
         .lock()
         .map_err(|_| "Brush library needs to be restarted")?;
+    super::brush_library::enter(dir);
     if let Some(tools)=stores.get(dir){copy_settings(&tools.engine,engine);}else{drop(stores);let staged=load_profile(dir,false);copy_settings(&staged.engine,engine);}
     Ok(())
 }
@@ -129,6 +131,7 @@ pub(super) fn execute(
         .lock()
         .map_err(|_| "Brush library needs to be restarted")?;
     let tools = stores.entry(dir.into()).or_insert_with(|| loaded(dir));
+    super::brush_library::enter(dir);
     engine.tools = tools.engine.tools.clone();
     engine.presets = tools.engine.presets.clone();
     engine.patterns = tools.engine.patterns.clone();
@@ -214,6 +217,7 @@ pub(super) fn execute(
     if [
         "tools.setBrush",
         "brush.presets.select",
+        "brush.texturePattern",
         "tool.presets.select",
     ]
     .contains(&command)
@@ -245,18 +249,22 @@ pub(super) fn inspect(engine: &Session) -> Value {
     if tiled {
         brush.texture.pattern = Pattern::default();
     }
-    json!({"revision":engine.tools.presets_rev,"settings":brush,"sampledTip":sampled,"sampledTexture":tiled,"presets":engine.tools.presets.iter().map(|preset|json!({"name":preset.name,"group":preset.group,"builtin":preset.builtin,"size":preset.brush.size,"hardness":preset.brush.hardness})).collect::<Vec<_>>()})
+    let mut state = json!({"revision":engine.tools.presets_rev,"settings":brush,"sampledTip":sampled,"sampledTexture":tiled,"presets":engine.tools.presets.iter().map(|preset|json!({"name":preset.name,"group":preset.group,"builtin":preset.builtin,"size":preset.brush.size,"hardness":preset.brush.hardness})).collect::<Vec<_>>()});
+    super::brush_library::describe(engine, &mut state);
+    state
 }
 pub(super) fn colors(engine: &Session) -> Value { colors::inspect(engine) }
 pub(super) fn presets(engine: &Session) -> Value {
-    json!({"revision":engine.presets.rev,"gradient":engine.presets.gradient.to_json(),
+    let mut state = json!({"revision":engine.presets.rev,"gradient":engine.presets.gradient.to_json(),
         "cloneSource":{"active":engine.presets.clone.active,"sources":engine.presets.clone.slots.iter().enumerate().map(|(index,slot)|json!({"index":index,"source":slot.source,"anchor":slot.anchor,"offset":slot.offset(),"layer":slot.layer,"width":slot.scale[0],"height":slot.scale[1],"rotation":slot.rotation,"flipH":slot.flip_h,"flipV":slot.flip_v})).collect::<Vec<_>>(),"overlay":engine.presets.clone.overlay},
         "gradients":engine.presets.gradients.iter().map(|group|json!({"name":group.name,"presets":group.items.iter().map(|preset|preset.to_json()).collect::<Vec<_>>()})).collect::<Vec<_>>(),
         "styles":engine.presets.styles.iter().map(|group|json!({"name":group.name,"presets":group.items.iter().map(|preset|preset.to_json()).collect::<Vec<_>>()})).collect::<Vec<_>>(),
         "patterns":engine.presets.pattern_groups.iter().map(|group|json!({"name":group.name,"presets":group.items.iter().filter_map(|id|engine.patterns.items.iter().find(|pattern|&pattern.id==id)).map(|pattern|json!({"id":pattern.id,"name":pattern.display_name(),"width":pattern.width,"height":pattern.height})).collect::<Vec<_>>()})).collect::<Vec<_>>(),
         "pattern":engine.presets.pattern,
         "shapes":photocraft_engine::presets::shapes::all_groups(engine).iter().map(|group|json!({"name":group.name,"presets":group.items.iter().map(|shape|json!({"name":shape.name})).collect::<Vec<_>>()})).collect::<Vec<_>>(),
-        "tools":engine.presets.tool_presets.iter().map(|preset|json!({"name":preset.name,"tool":preset.tool})).collect::<Vec<_>>()})
+        "tools":engine.presets.tool_presets.iter().map(|preset|json!({"name":preset.name,"tool":preset.tool})).collect::<Vec<_>>()});
+    super::gradient_midpoints::describe(&mut state);
+    state
 }
 
 /// Upstream's virtual Custom Shapes group supports rename/delete only. Move

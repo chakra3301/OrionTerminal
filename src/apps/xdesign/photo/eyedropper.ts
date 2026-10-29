@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { PhotoTile } from "./tiles";
 
+export const SAMPLE_SIZES=[[1,"Point Sample"],[3,"3 by 3 Average"],[5,"5 by 5 Average"],[11,"11 by 11 Average"],[31,"31 by 31 Average"],[51,"51 by 51 Average"],[101,"101 by 101 Average"]] as const;
 // Display tiles are the color-managed pixels shown on the canvas, so sampling works for every document mode.
 export async function sampleImageColor(request:{projectId:string;photoId:string;version:string;viewKey:string|null;x:number;y:number;width?:number;height?:number}):Promise<string|null> {
   const width=request.width??1,height=request.height??1;
@@ -23,3 +24,5 @@ export async function sampleLayerColor(request:{projectId:string;photoId:string;
   const rgb=await invoke<[number,number,number]|null>("xdesign_photo_sample",{projectId:request.projectId,photoId:request.photoId,version:request.version,layer:request.layer,below:false,aboveHidden:request.aboveHidden,x:request.x,y:request.y,width:request.width??1,height:request.height??1});
   return rgb?"#"+rgb.map(value=>Math.max(0,Math.min(255,Math.round(value))).toString(16).padStart(2,"0")).join(""):null;
 }
+/** A CMYK image's inks under a document rectangle, 0–100 %, read in the document's own separation by the host. */
+export const sampleImageInks=(request:{projectId:string;photoId:string;version:string;x:number;y:number;width?:number;height?:number})=>invoke<number[]|null>("xdesign_photo_sample",{projectId:request.projectId,photoId:request.photoId,version:request.version,layer:null,below:false,x:request.x,y:request.y,width:request.width??1,height:request.height??1,space:"cmyk"});

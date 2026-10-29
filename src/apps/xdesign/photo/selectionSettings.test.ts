@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { effectiveSelectionOutput, selectionDefaults, selectionRequest, selectionSamplePoint } from "./selectionSettings";
+import { REFINE_FIELDS, effectiveSelectionOutput, selectionDefaults, selectionRequest, selectionSamplePoint } from "./selectionSettings";
 import type { PhotoLayer } from "./types";
 const context = { width: 800, height: 600, hasSelection: true, layer: { kind: "Raster", hasPixels: true } as PhotoLayer };
 describe("selection workspace native settings", () => {
@@ -19,6 +19,13 @@ describe("selection workspace native settings", () => {
     expect(selectionRequest("refine", selectionDefaults("refine", "#000000"), { ...context, hasSelection: false }).problem).toContain("Make a selection");
     expect(selectionRequest("refine", { ...selectionDefaults("refine", "#000000"), output: "layerMask" }, { ...context, layer: null }).problem).toContain("Select a layer");
     expect(selectionRequest("refine", { ...selectionDefaults("refine", "#000000"), output: "newLayer" }, { ...context, layer: { kind: "Text", hasPixels: false } as PhotoLayer }).problem).toContain("layer with pixels");
+  });
+  it("stops Feather at Photoshop's 250 px, keeps the Quick Selection size out of the refinement and opens without a selection", () => {
+    const values = selectionDefaults("refine", "#000000");
+    expect(REFINE_FIELDS.find(field => field.key === "feather")!.max).toBe(250); expect(values.quickSize).toBe(30);
+    expect(selectionRequest("refine", { ...values, feather: 250 }, context).params.feather).toBe(250); expect(selectionRequest("refine", { ...values, feather: 250.5 }, context).problem).toBe("Enter Feather (px) between 0 and 250.");
+    expect(selectionRequest("refine", values, context).params).not.toHaveProperty("quickSize"); expect(selectionRequest("refine", { ...values, quickSize: NaN }, context).problem).toBeNull();
+    expect(selectionRequest("refine", values, { ...context, hasSelection: false }).problem).toBe("Make a selection to refine.");
   });
   it("uses native focus fractions and rejects invalid controls", () => {
     expect(selectionRequest("focus", { range: .375, noise: .125, sampleAllLayers: true, mode: "intersect" }, context)).toEqual({ command: "select.focusArea", params: { range: .375, noise: .125, sampleAllLayers: true, mode: "intersect" }, problem: null });

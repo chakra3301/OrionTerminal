@@ -1,3 +1,70 @@
+## 2026-10-29 (cont.) — XDesign: controls parity ready for the alpha (committed and pushed)
+
+Branch: `validation/alpha-2026-09-14`. Final whole-branch review done and its fix pass closed. Ledger: `.superpowers/sdd/2026-10-28-xdesign-controls-parity/final.md`. Detail: CLAUDE_LOG_ARCHIVE.md.
+
+Done:
+1. Fixed, test-first:
+   - Healing Diffusion smoothing on large brushes (prefix-sum box blur).
+   - Dialogs folding and cancelling at the 50-state History limit: `history.fold {fromId}` and `history.select {id}` by snapshot id.
+   - Gradient colour midpoints dropped under non-Classic Methods: they are now baked into the Method stops.
+2. Removed the orphaned `photo/brushTips.ts` and its test.
+3. Deferred items are listed in `docs/research/xdesign-controls-2026-10-28/post-alpha.md`. The visible ones are in the alpha-limits section of `docs/releases/xdesign-alpha-smoke-test.md`.
+
+Gates:
+- `npm run typecheck` exit 0.
+- `cargo test --lib` 1555 passed, 0 failed, 20 ignored.
+- `npx vitest run src/apps/xdesign`: 4665/4671. The 6 failures were the known full-suite timeouts; `PhotoStudio.layout` 203/203, `.tools` 87/87 and `.vector` 22/22 pass when run alone.
+
+Open questions:
+1. Token gap: pressed brush-tip cells use `--xd-accent` for their border, because there is no "selected cell" token (Hermes).
+
+Next:
+1. The owner authorised the commit and push (2026-10-29) and is trying the dev build (`npm run tauri dev`). The app in /Applications is unchanged.
+2. After the alpha: work through post-alpha.md.
+
+## 2026-10-29 — XDesign: controls-parity Phase 2 UI integration (uncommitted)
+
+Branch: `validation/alpha-2026-09-14`. Phase 2 integrator: every DONE row of `.superpowers/sdd/2026-10-28-xdesign-controls-parity/host-contract.md` is now wired into the React/TS UI, test-first, under `src/apps/xdesign/` only (no `src-tauri/` edits, no cargo, no app launch). Every decision is a `Ruling:` line in `.superpowers/sdd/2026-10-28-xdesign-controls-parity/phase2.md`, which also has a `## Done` entry per item with its test names. **Changes are uncommitted.**
+
+Done:
+1. Contract items 1–11: Spot Healing, Healing Brush/Clone Stamp, Patch, Mixer Brush (solid loads), Paint Bucket, Replace Color, Match Color, HDR Toning, Magic Wand, Object Selection, Shapes.
+2. Host A–E and M–P: HDR Toning preview, CMYK samples, mask/Quick Mask/channel targets, Auto colours, Match Color from this image, the Patch hit test, shape Pattern fill/stroke, the shape tools' Pixels mode (`path.fill`), and the Select and Mask Brush Tool (`select.brush`).
+3. H2-F to H2-L: Brush/Pencil Behind and Clear, clone source in another image, Gradient midpoints, Paint Symmetry presets (`paint.symmetrySet`, with a Radial/Mandala segment-count dialog; the checked row comes from `state.symmetry`), brush New Group, tip pick by preset name, and the brush texture pattern.
+4. UI follow-ups A–C: Free Transform to Warp, and Crop Shield Opacity.
+
+Gates: `npm run typecheck` exit 0. Focused vitest over the 48 touched or added test files: 765/765. `PhotoStudio.layout` (203/203) and `PhotoStudio.tools` (87/87) were run alone.
+
+Open questions:
+1. Token gap: pressed brush-tip cells use `--xd-accent` for their border, because there is no "selected cell" token.
+2. `photo/brushTips.ts` and its test are untracked, pre-existing work and no longer imported. Delete them?
+3. Host gaps that the UI reflects:
+   - The Levels/Curves eyedroppers stay off on CMYK images, because nothing defines their ink targets.
+   - A mask/channel plane is labelled "Gray", and Show Clipping is off for planes.
+   - Pattern fields have no thumbnails, because no host call renders them.
+   - A reload forgets which image a Clone Source slot was set in.
+   - The Mixer Brush ignores Paint Symmetry, so its bar has no symmetry control.
+   - `select.brush` `sampleAllLayers` is a no-op, so no control is offered for it.
+   - Pixels mode refuses mask and channel targets.
+
+Next:
+1. Coordinator/owner: review the uncommitted Phase 2 diff and the phase2.md Rulings, then authorise a commit.
+2. Optional: an on-canvas symmetry guide that sends `center`, `angle` and `size`.
+
+## 2026-10-28 (cont.) — XDesign: tool and adjustment controls audit vs Photoshop 2026 (read-only, uncommitted)
+
+Branch: `validation/alpha-2026-09-14`. Next task after F6: the owner left the next-task question unanswered, so I took the recommended option, "match tool controls" (owner memory: match Photoshop's tools and controls; exact colours don't matter). PLAN.md protocol step: research → audit → **ranked plan (owner approval pending)**. No code changed.
+
+Done:
+1. Three parallel read-only audits of control depth (every slider, field, menu and option) against Photoshop 2026. Reports, with `file:line` evidence and engine support per control: `docs/research/xdesign-controls-2026-10-28/` (`adjustments.md`, `paint-retouch.md`, `select-type-shape-view.md`; new, uncommitted). Adobe helpx blocked automated fetches, so the Photoshop side comes from search extracts and older manuals; unsettled details are marked "unverified" and not counted.
+2. Headline: 365 of 573 in-scope controls fully present (64%): adjustments 112/159 (70%), paint and retouch 125/199 (63%), selection, type, shape and view 128/215 (60%). Of the 208 gaps, 95 need only UI work, 51 are partial and 62 need Rust work (host-side, as photocraft stays read-only).
+3. Spot-checked 9 top findings in the code; all held. The ranked slice list is in CLAUDE_LOG_ARCHIVE.md.
+
+Open questions: none new. Token gaps: none.
+
+Next:
+1. Owner: approve or reorder the ranked slices. Each slice then goes spec → plan → build → review → commit on approval.
+2. Owner: try the tabs in a build 29 when one is wanted.
+
 ## 2026-10-28 (cont.) — XDesign: document tabs in the image editor, smoke-test finding 6 (committed and pushed)
 
 Branch: `validation/alpha-2026-09-14`. Owner request: F6, Photoshop-style document tabs; the owner skipped the questions ("skip question"), so the calls are marked in the spec. Spec `docs/superpowers/specs/2026-10-28-xdesign-document-tabs-design.md`, plan `docs/superpowers/plans/2026-10-28-xdesign-document-tabs.md`. Committed and pushed on the owner's go-ahead ("lets commit and push"). Release build 28 predates F6 and was not distributed; no build 29 yet. No new dependencies, no tokens, no photocraft or Rust edits.

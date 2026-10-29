@@ -2,6 +2,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CROP_PRESETS_KEY, cropPresetName } from "./CropPresets";
+import { DEFAULT_SHAPE_STYLE } from "./shapeStyle";
 import { CropRatioFields, DistributeMenu, PathOpSelect, PerspectiveCropBar, ShapeStyleFields, TypeBar, cropSizePixels, shapeStyleParams, typeStyleParams } from "./toolBars";
 
 let root: Root, container: HTMLDivElement;
@@ -18,8 +19,8 @@ describe("tool bar helpers", () => {
     expect(typeStyleParams("Bold Italic")).toEqual({ weight: 700, italic: true });
   });
   it("sends no fill as null and a stroke only when enabled", () => {
-    expect(shapeStyleParams({ fill: true, stroke: false, strokeColor: "#000000", strokeWidth: 3 }, "#ff0000")).toEqual({ fill: "#ff0000" });
-    expect(shapeStyleParams({ fill: false, stroke: true, strokeColor: "#112233", strokeWidth: 5 }, "#ff0000")).toEqual({ fill: null, stroke: { color: "#112233", width: 5 } });
+    expect(shapeStyleParams(DEFAULT_SHAPE_STYLE, "#ff0000")).toEqual({ fill: "#ff0000" });
+    expect(shapeStyleParams({ ...DEFAULT_SHAPE_STYLE, fill: false, stroke: true, strokeColor: "#112233", strokeWidth: 5 }, "#ff0000")).toEqual({ fill: null, stroke: { color: "#112233", width: 5, align: "inside", cap: "butt", join: "miter", dashes: [] } });
   });
 });
 
@@ -33,14 +34,41 @@ describe("TypeBar", () => {
     act(() => byLabel("Vertical type").click()); expect(patch).toHaveBeenLastCalledWith({ orientation: "vertical" });
     act(() => byLabel("Create warped text").click()); expect(warp).toHaveBeenCalled();
   });
+  it("lists the family's real faces, keeps the size in 0.01-1296 pt and never offers an anti-alias mode the engine drops", () => {
+    const patch = vi.fn(), bar = (props: Partial<React.ComponentProps<typeof TypeBar>>) => render(<TypeBar font="Inter" size={48} style="Regular" align="left" antialias="windowslcd" orientation="horizontal" fonts={{ listId: "f", list: null }} warpDisabled={false} patch={patch} warp={vi.fn()} {...props} />);
+    bar({ faces: [{ weight: 300, italic: false }, { weight: 400, italic: false }, { weight: 900, italic: true }] });
+    expect([...byLabel<HTMLSelectElement>("Text font style").options].map(option => option.value)).toEqual(["Light", "Regular", "Black Italic"]);
+    choose(byLabel<HTMLSelectElement>("Text font style"), "Black Italic"); expect(patch).toHaveBeenLastCalledWith({ style: "Black Italic" });
+    bar({}); expect([...byLabel<HTMLSelectElement>("Text font style").options].map(option => option.value)).toEqual(["Regular", "Italic", "Bold", "Bold Italic"]);
+    const aa = byLabel<HTMLSelectElement>("Text anti-aliasing"), platform = [...aa.options].slice(5);
+    expect(aa.value).toBe("sharp"); expect(aa.options).toHaveLength(7);
+    expect(platform.every(option => option.disabled && option.title === "Not supported by the image engine")).toBe(true);
+    const size = byLabel<HTMLInputElement>("Text size"); expect([size.min, size.max]).toEqual(["0.01", "1296"]);
+    const type = (value: string) => act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(size, value); size.dispatchEvent(new Event("input", { bubbles: true })); });
+    type("0.5"); expect(patch).toHaveBeenLastCalledWith({ size: .5 });
+    type("5000"); expect(patch).toHaveBeenLastCalledWith({ size: 1296 });
+    patch.mockClear(); type(""); expect(patch).not.toHaveBeenCalled();
+  });
+  it("cancels or commits the edit in progress and toggles the Character and Paragraph panels, as Photoshop's bar does", () => {
+    const finish = vi.fn(), togglePanels = vi.fn(), bar = (props: Partial<React.ComponentProps<typeof TypeBar>>) => render(<TypeBar font="Inter" size={48} style="Regular" align="left" antialias="smooth" orientation="horizontal" fonts={{ listId: "f", list: null }} warpDisabled={false} patch={vi.fn()} warp={vi.fn()} finish={finish} panelsOpen={false} togglePanels={togglePanels} {...props} />);
+    bar({}); expect(byLabel("Cancel any current edits")).toBeNull(); expect(byLabel("Commit any current edits")).toBeNull();
+    act(() => byLabel("Toggle the Character and Paragraph panels").click()); expect(togglePanels).toHaveBeenCalledTimes(1);
+    expect(byLabel("Toggle the Character and Paragraph panels").getAttribute("aria-pressed")).toBe("false");
+    bar({ editing: true, panelsOpen: true });
+    expect(byLabel("Toggle the Character and Paragraph panels").getAttribute("aria-pressed")).toBe("true");
+    const down = byLabel("Commit any current edits").dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    expect(down).toBe(false);
+    act(() => byLabel("Cancel any current edits").click()); expect(finish).toHaveBeenLastCalledWith(false);
+    act(() => byLabel("Commit any current edits").click()); expect(finish).toHaveBeenLastCalledWith(true);
+  });
 });
 
 describe("shape bar fields", () => {
   it("toggles fill/stroke and keeps stroke inputs disabled until stroke is on", () => {
     const change = vi.fn();
-    render(<ShapeStyleFields style={{ fill: true, stroke: false, strokeColor: "#000000", strokeWidth: 3 }} change={change} />);
+    render(<ShapeStyleFields style={DEFAULT_SHAPE_STYLE} foreground="#000000" background="#ffffff" change={change} />);
     expect(byLabel<HTMLInputElement>("Stroke width").disabled).toBe(true);
-    act(() => byLabel("Shape stroke").click()); expect(change).toHaveBeenLastCalledWith({ stroke: true });
+    act(() => byLabel("Shape stroke type").click()); act(() => byLabel("Solid Color").click()); expect(change).toHaveBeenLastCalledWith({ stroke: true, strokeKind: "solid" });
   });
   it("lists the path operations", () => {
     const change = vi.fn(); render(<PathOpSelect value="new" change={change} />);
@@ -183,5 +211,17 @@ describe("DistributeMenu", () => {
     expect(container.querySelector('[aria-label="Distribute vertically"]')).toBeNull();
     act(() => byLabel("More alignment and distribute options").click()); act(() => byLabel("Distribute vertically").click());
     expect(run).toHaveBeenCalledWith("layer.distribute.vertically");
+  });
+  it("offers Photoshop's Align To Selection or Canvas in the ... popover", () => {
+    const change = vi.fn(); render(<DistributeMenu disabled={false} run={vi.fn()} alignTo="selection" changeAlignTo={change} />);
+    expect(container.querySelector('[aria-label="Align layers to"]')).toBeNull();
+    act(() => byLabel("More alignment and distribute options").click());
+    const select = byLabel<HTMLSelectElement>("Align layers to");
+    expect([...select.options].map(option => [option.value, option.textContent])).toEqual([["selection", "Selection"], ["canvas", "Canvas"]]);
+    expect(select.value).toBe("selection");
+    choose(select, "canvas"); expect(change).toHaveBeenCalledWith("canvas");
+    render(<DistributeMenu disabled run={vi.fn()} alignTo="canvas" changeAlignTo={change} />);
+    expect(byLabel<HTMLSelectElement>("Align layers to").value).toBe("canvas");
+    expect(byLabel<HTMLSelectElement>("Align layers to").disabled).toBe(true);
   });
 });

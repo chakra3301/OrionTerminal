@@ -62,7 +62,7 @@ describe("image tool controls and command units",()=>{
     const select=container.querySelector<HTMLSelectElement>('[aria-label="Tool Patch mode"]')!;
     expect(select.value).toBe("source");
     await act(async()=>{select.value="destination";select.dispatchEvent(new Event("change",{bubbles:true}));});
-    expect(values).toEqual({mode:"destination"});
+    expect(values).toEqual({type:"normal",mode:"destination",diffusion:5,structure:4,colorAdaptation:0,sampleAllLayers:false});
     expect(sanitizePaintOptions("paint.patch",{mode:"invalid"})).toEqual({});
   });
   it("exposes pinned Magic and Background Eraser settings with their engine enums",async()=>{
@@ -155,6 +155,16 @@ describe("image tool controls and command units",()=>{
     expect(retouch).toMatchObject({opacity:60,hardness:80,seed:42,target:"mask",offset:[-7,-13],sampleLayer:"all"});expect(retouch).not.toHaveProperty("source");
     expect(strokeParameters("paint.cloneStamp",points,20,1,1,"#ff0000",1,42,{aligned:false},false,[5,5],[-7,-13])).toMatchObject({source:[5,5]});
   });
+  it("gives Object Selection its own Rectangle or Lasso Mode and none of the marquee fields",async()=>{
+    await act(async()=>root.render(<Harness tool="select.object"/>));
+    const mode=container.querySelector<HTMLSelectElement>('[aria-label="Tool Mode"]')!;
+    expect([...mode.options].map(option=>[option.value,option.textContent,option.disabled,option.title])).toEqual([["rectangle","Rectangle",false,""],["lasso","Lasso",false,""]]);
+    expect(mode.value).toBe("rectangle");expect(values).toEqual({objectMode:"rectangle",sampleAllLayers:false,hardEdge:false});
+    for(const label of ["Style","Width","Height","Width (px)","Height (px)","Draw from center"])expect(container.querySelector(`[aria-label="Tool ${label}"]`)).toBeNull();
+    expect(container.querySelector('[aria-label="Tool Sample all layers"]')).not.toBeNull();
+    expect(sanitizePaintOptions("select.object",{objectMode:"lasso",style:"fixedRatio",ratioWidth:2,fromCenter:true,sampleAllLayers:true})).toEqual({objectMode:"lasso",sampleAllLayers:true});
+    await act(async()=>root.render(<Harness tool="select.object" disabled/>));expect(container.querySelector<HTMLSelectElement>('[aria-label="Tool Mode"]')!.disabled).toBe(true);
+  });
   it("restores only valid tool-specific preset settings",()=>{
     expect(sanitizePaintOptions("paint.colorReplacement",{mode:"hue",sampling:"once",tolerance:75,antiAlias:false,source:[0,0],flow:900})).toEqual({mode:"hue",sampling:"once",tolerance:75,antiAlias:false});
     expect(sanitizePaintOptions("paint.blur",{strength:NaN,sampleAllLayers:true,mode:"hue"})).toEqual({sampleAllLayers:true});
@@ -176,7 +186,7 @@ describe("image tool controls and command units",()=>{
     const single={brush:{settings:{flow:Math.fround(.1),spacing:Math.fround(.07),smoothing:{amount:Math.fround(.1)},mixer:{wet:Math.fround(.1)}}}} as unknown as PhotoState;
     expect(paintToolDefaults("paint.stroke",single)).toMatchObject({flow:10,spacing:7,smoothing:10});expect(paintToolDefaults("paint.mixerBrush",single)).toMatchObject({wet:10});
     expect(sanitizePaintOptions("paint.cloneStamp",{mode:"soft_light"})).toEqual({mode:"Soft Light"});
-    expect(sanitizePaintOptions("paint.healingBrush",{mode:"lineardodge"})).toEqual({mode:"Linear Dodge (Add)"});
+    expect(sanitizePaintOptions("paint.cloneStamp",{mode:"lineardodge"})).toEqual({mode:"Linear Dodge (Add)"});expect(sanitizePaintOptions("paint.healingBrush",{mode:"lineardodge"})).toEqual({});
     expect(sanitizePaintOptions("paint.colorReplacement",{mode:"SoftLight"})).toEqual({});
   });
   it("lets a newly selected brush replace inherited controls without losing unrelated tool choices",()=>{

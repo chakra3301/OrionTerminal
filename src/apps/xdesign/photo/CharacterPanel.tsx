@@ -3,13 +3,9 @@ import { runPhotoCommand } from "./runtime";
 import { useFontFamilies } from "./fontFamilies";
 import { NumberField, ToggleButton, TypeEmpty, useTypeTarget } from "./typePanelFields";
 import type { PhotoLayer } from "./types";
+import { antialiasEntries, faceName, typeAntialias, type Face } from "./typeOptions";
 
-type Face = { weight: number; italic: boolean };
-const WEIGHTS: Record<number, string> = { 100: "Thin", 200: "ExtraLight", 300: "Light", 400: "Regular", 500: "Medium", 600: "SemiBold", 700: "Bold", 800: "ExtraBold", 900: "Black" };
-export const faceName = ({ weight, italic }: Face) => {
-  const name = WEIGHTS[Math.round(weight / 100) * 100] ?? String(weight);
-  return italic ? (name === "Regular" ? "Italic" : `${name} Italic`) : name;
-};
+export { faceName };
 // Each button runs the engine command that owns its feature; the two ligature kinds have dedicated style fields instead of feature tags.
 const OPEN_TYPE = [
   { command: "standardLigatures", label: "Standard Ligatures", glyph: "fi", field: "ligatures" },
@@ -23,7 +19,6 @@ const OPEN_TYPE = [
   { command: "ordinals", label: "Ordinals", glyph: "1st", tag: "ordn" },
   { command: "fractions", label: "Fractions", glyph: "½", tag: "frac" },
 ] as const;
-const ANTIALIAS = [["none", "None"], ["sharp", "Sharp"], ["crisp", "Crisp"], ["strong", "Strong"], ["smooth", "Smooth"], ["windowsLcd", "Windows LCD"], ["windows", "Windows"]] as const;
 
 export function CharacterPanel({ layer }: { layer: PhotoLayer | undefined }) {
   const { off, value, update, error, setError } = useTypeTarget(layer), fonts = useFontFamilies();
@@ -51,7 +46,7 @@ export function CharacterPanel({ layer }: { layer: PhotoLayer | undefined }) {
       <label className="xd-type-field wide">Style<select aria-label="Font style" disabled={off || mixedStyle && !known.length} value={mixedStyle ? "" : styleKey({ weight, italic })}
         onChange={event => { const face = known.find(item => styleKey(item) === event.target.value); if (face) update({ weight: face.weight, italic: face.italic }); }}>
         {mixedStyle && <option value="" disabled>Mixed</option>}{known.map(face => <option key={styleKey(face)} value={styleKey(face)}>{faceName(face)}</option>)}</select></label>
-      <NumberField label="Font size" field="size" current={value("size")} min={.1} max={10000} update={update} off={off} unit="pt"/>
+      <NumberField label="Font size" field="size" current={value("size")} min={.01} max={1296} update={update} off={off} unit="pt"/>
       <label className="xd-type-field">Leading<input aria-label="Leading" key={String(leading)} placeholder="Mixed" disabled={off} defaultValue={typeof leading === "number" ? leading : leading === "auto" ? "Auto" : ""}
         onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }}
         onBlur={event => { const input = event.target.value.trim().toLowerCase(), next = input === "auto" ? "auto" : Number(input); if (input && (next === "auto" ? leading !== "auto" : Number.isFinite(next) && next > 0 && next !== leading)) update({ leading: next }); }}/><span className="xd-type-unit">pt</span></label>
@@ -79,9 +74,9 @@ export function CharacterPanel({ layer }: { layer: PhotoLayer | undefined }) {
       {OPEN_TYPE.map(item => { const on = openType(item); return <ToggleButton key={item.command} label={item.label} pressed={on} off={off}
         run={() => { setError(null); void runPhotoCommand(`type.openType.${item.command}`, { layer: layer.id, on: !on }).catch(reason => setError(String(reason))); }}>{item.glyph}</ToggleButton>; })}
     </div>
-    <label className="xd-type-field">Anti-aliasing<select aria-label="Anti-aliasing" disabled={off} value={ANTIALIAS.find(([id]) => id.toLowerCase() === (layer.text?.antialias ?? "smooth"))?.[0] ?? "smooth"}
+    <label className="xd-type-field">Anti-aliasing<select aria-label="Anti-aliasing" disabled={off} value={typeAntialias(layer.text?.antialias)}
       onChange={event => { setError(null); void runPhotoCommand(`type.antiAlias.${event.target.value}`, { layer: layer.id }).catch(reason => setError(String(reason))); }}>
-      {ANTIALIAS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+      {antialiasEntries().map(([id, label, supported]) => <option key={id} value={id} disabled={!supported} title={supported ? undefined : "Not supported by the image engine"}>{label}</option>)}</select></label>
     {error && <p className="xd-type-error" role="alert">{error}</p>}
   </fieldset>;
 }

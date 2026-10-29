@@ -55,8 +55,18 @@ describe("Character and Paragraph panels", () => {
     await act(async () => by("All Caps").click()); expect(native.run).toHaveBeenLastCalledWith("type.setStyle", { layer: 4, caps: "all" });
     expect(by("Swash").getAttribute("aria-pressed")).toBe("true"); await act(async () => by("Swash").click());
     expect(native.run).toHaveBeenLastCalledWith("type.openType.swash", { layer: 4, on: false });
-    await pick("Anti-aliasing", "windowsLcd"); expect(native.run).toHaveBeenLastCalledWith("type.antiAlias.windowsLcd", { layer: 4 });
+    await pick("Anti-aliasing", "crisp"); expect(native.run).toHaveBeenLastCalledWith("type.antiAlias.crisp", { layer: 4 });
     await act(async () => root.render(<CharacterPanel layer={undefined}/>)); expect(container.textContent).toContain("Select a type layer");
+  });
+  it("lists the platform anti-alias pair off, reads a stale one as the Sharp it draws, and takes Photoshop's 0.01-1296 pt sizes", async () => {
+    await act(async () => root.render(<CharacterPanel layer={{ ...layer, text: { ...layer.text!, antialias: "windowslcd" } }}/>));
+    const aa = by<HTMLSelectElement>("Anti-aliasing"), platform = [...aa.options].slice(5);
+    expect(aa.value).toBe("sharp"); expect(aa.options).toHaveLength(7);
+    expect(platform.every(option => option.disabled && option.title === "Not supported by the image engine")).toBe(true);
+    const size = by<HTMLInputElement>("Font size"); expect([size.min, size.max]).toEqual(["0.01", "1296"]);
+    native.run.mockClear(); act(() => { size.value = "0.05"; size.dispatchEvent(new FocusEvent("focusout", { bubbles: true })); });
+    expect(native.run).toHaveBeenLastCalledWith("type.setStyle", { layer: 4, size: .05 });
+    native.run.mockClear(); act(() => { size.value = "2000"; size.dispatchEvent(new FocusEvent("focusout", { bubbles: true })); }); expect(native.run).not.toHaveBeenCalled();
   });
   it("sets paragraph alignment and hyphenation", async () => {
     await act(async () => root.render(<ParagraphPanel layer={layer}/>));

@@ -41,18 +41,27 @@ function evaluate(stops: [number, Vec3][], smooth: number, t: number): Vec3 {
  * engine's own PSD import bake: Perceptual blends in Oklab, Linear in linear light, Classic in sRGB at the classic
  * 100% Smoothness. Smooth (Oklab at full Smoothness) and Stripes (each colour held to the middle of its segment) are
  * approximations of Photoshop's later additions. The blends give `samples + 1` stops, inside the engine's 64-stop limit.
+ * `midpoints`, one per segment between sorted stops, move each segment's half-way point as the engine bends Classic ones.
  */
-export function bakeGradient(stops: GradientStop[], method: GradientMethod, samples = 63): GradientStop[] {
+export function bakeGradient(stops: GradientStop[], method: GradientMethod, samples = 63, midpoints: number[] = []): GradientStop[] {
   const sorted = [...stops].sort((a, b) => a[0] - b[0]);
   if (sorted.length < 2) return sorted;
+  const midpoint = (at: number) => Math.min(.95, Math.max(.05, midpoints[at] ?? .5));
   if (method === "stripes") return [sorted[0]!, ...sorted.slice(1).flatMap(([t, color], at) => {
-    const [before, held] = sorted[at]!, middle = (before + t) / 2;
+    const [before, held] = sorted[at]!, middle = midpoints[at] === undefined ? (before + t) / 2 : before + (t - before) * midpoint(at);
     return [[Math.max(before, middle - 1e-4), held], [middle, color]] as GradientStop[];
   }), sorted[sorted.length - 1]!];
+  // The engine's `midpoint_remap`: piecewise linear either side of the midpoint.
+  const bent = (t: number) => {
+    const at = sorted.findIndex(([start], k) => k < sorted.length - 1 && t >= start && t <= sorted[k + 1]![0]);
+    if (at < 0 || (midpoints[at] ?? .5) === .5) return t;
+    const start = sorted[at]![0], h = sorted[at + 1]![0] - start, m = midpoint(at), u = h > 0 ? (t - start) / h : 0;
+    return start + (u <= m ? .5 * u / m : .5 + .5 * (u - m) / (1 - m)) * h;
+  };
   const space = method === "linear" ? (rgb: Vec3) => rgb.map(lin) as Vec3 : method === "classic" ? (rgb: Vec3) => rgb : toOklab;
   const back = method === "linear" ? (v: Vec3) => v.map(enc) as Vec3 : method === "classic" ? (v: Vec3) => v : fromOklab;
   const points = sorted.map(([t, color]) => [t, space(rgbOf(color))] as [number, Vec3]), smooth = method === "classic" || method === "smooth" ? 1 : 0;
-  return Array.from({ length: samples + 1 }, (_, k) => { const t = k / samples; return [Math.round(t * 1e4) / 1e4, hexOf(back(evaluate(points, smooth, t)))] as GradientStop; });
+  return Array.from({ length: samples + 1 }, (_, k) => { const t = k / samples; return [Math.round(t * 1e4) / 1e4, hexOf(back(evaluate(points, smooth, bent(t))))] as GradientStop; });
 }
 
 // Memory of baked gradients, keyed by what the engine stores, so reopening one shows the stops the user set.
@@ -77,12 +86,15 @@ try {
     if (hexStops(stops) && method !== "classic" && GRADIENT_METHODS.some(([id]) => id === method)) remember(stops, method, bakeGradient(stops, method));
 } catch { /* an unreadable store starts empty */ }
 
-/** `stops` baked for `method` and remembered for `unbaked`; null for Classic, which the engine draws itself, or past its 64-stop limit. */
-export function bakeRemembered(stops: GradientStop[], method: GradientMethod): GradientStop[] | null {
+/**
+ * `stops` baked for `method` and remembered for `unbaked`; null for Classic, which the engine draws itself, or past its
+ * 64-stop limit. A bake with bent `midpoints` isn't remembered: the memory rebuilds each entry from stops and Method alone.
+ */
+export function bakeRemembered(stops: GradientStop[], method: GradientMethod, midpoints: number[] = []): GradientStop[] | null {
   if (method === "classic") return null;
-  const result = bakeGradient(stops, method);
+  const result = bakeGradient(stops, method, 63, midpoints);
   if (result.length > 64) return null;
-  remember(stops, method, result); save();
+  if (midpoints.every(midpoint => midpoint === .5)) { remember(stops, method, result); save(); }
   return result;
 }
 

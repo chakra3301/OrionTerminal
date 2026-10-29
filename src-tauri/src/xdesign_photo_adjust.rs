@@ -105,7 +105,7 @@ mod fade_tests;
 mod pixel_tests;
 
 // Small bands in tests, so fixtures cross band edges in both directions.
-const BAND: (i32, i32) = if cfg!(test) { (40, 32) } else { (4096, 256) };
+pub(super) const BAND: (i32, i32) = if cfg!(test) { (40, 32) } else { (4096, 256) };
 
 fn apply(
     surface: &mut Surface,

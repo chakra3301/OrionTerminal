@@ -86,7 +86,7 @@ export function MaskSection({ layer, view, hasSelection, disabled, refine, color
   ])}</InspectorSection>;
   return <InspectorSection title="Layer Mask" defaultOpen>
     <label className="xd-photo-property">View<select aria-label="Layer mask view" disabled={disabled} value={view} onChange={event => run("view.layerMask", { layer: layer.id, mode: event.target.value })}><option value="off">Composite</option><option value="gray">Grayscale mask</option><option value="overlay">Red overlay</option></select></label>
-    <div className="xd-photo-action-list"><button type="button" disabled={disabled || !hasSelection} onClick={refine}>Select and Mask…</button><button type="button" disabled={disabled} onClick={colorRange}>Color Range…</button></div>
+    <div className="xd-photo-action-list"><button type="button" disabled={disabled} onClick={refine}>Select and Mask…</button><button type="button" disabled={disabled} onClick={colorRange}>Color Range…</button></div>
     {footer([
       ["Load Selection from Mask", SquareDashed, () => run("select.loadSelection", { channel: "mask", layer: layer.id })],
       ["Apply Mask", Check, () => run("layer.layerMask.apply")],

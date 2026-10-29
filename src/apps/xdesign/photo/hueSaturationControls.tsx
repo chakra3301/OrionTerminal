@@ -29,6 +29,12 @@ export function hueOf([r, g, b]: RGB): { hue: number; saturation: number } {
   return { hue: turn(sector * 60), saturation: span / max };
 }
 
+/** Ticking Colorize, as Photoshop does: the foreground's hue (red for black, white or gray) at 25% saturation; lightness is kept. */
+export function colorizeFrom(current: Settings, foreground: unknown): Settings {
+  const color = Array.isArray(foreground) && foreground.length >= 3 && foreground.slice(0, 3).every(v => typeof v === "number" && Number.isFinite(v)) ? foreground.slice(0, 3).map(v => clamp(v, 0, 1) * 255) as RGB : null;
+  return { ...current, colorize: true, hue: color ? Math.round(hueOf(color).hue) % 360 : 0, saturation: 25 };
+}
+
 /** The colour range whose centre lies nearest a hue. */
 export function nearestHueRange(values: Settings, hue: number): string {
   let nearest = HUE_RANGES[0]!, best = Infinity;

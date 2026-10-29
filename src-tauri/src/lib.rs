@@ -594,6 +594,7 @@ pub fn run() {
             xdesign_photo::xdesign_photo_layer_thumbnails,
             xdesign_photo::xdesign_photo_channel_thumbnails,
             xdesign_photo::xdesign_photo_histogram,
+            xdesign_photo::xdesign_photo_auto_colors,
             xdesign_photo::xdesign_photo_sample,
             xdesign_photo::xdesign_photo_tone_pixels,
             xdesign_photo::xdesign_photo_view_preview,

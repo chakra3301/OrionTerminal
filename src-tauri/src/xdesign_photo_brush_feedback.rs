@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 pub(super) struct BrushDraft {
     live: LiveStroke,
+    copies: Option<super::super::symmetry::Copies>,
     source: Arc<Document>,
     before: ToolState,
     preset_revision: u64,
@@ -15,6 +16,7 @@ pub(super) struct BrushDraft {
     symmetry: Option<(String, Vec<[[f64; 2]; 2]>)>,
     restriction: Option<usize>,
     label: &'static str,
+    behind: Option<super::super::paint_modes::Behind>,
     #[cfg(test)] samples_pushed: usize,
 }
 
@@ -30,17 +32,23 @@ impl BrushDraft {
                 _ => {}
             }
         }
+        let mode = super::super::paint_modes::begin(engine, command, &mut effective)?;
         let brush = photocraft_engine::brush_cmds::resolve_brush(engine, &effective, command).map_err(|error| error.to_string())?;
-        let label = if brush.erase { "Eraser" } else if command == "paint.pencil" { "Pencil" } else { "Brush Tool" };
+        let label = if let Some(mode) = &mode { mode.label } else if brush.erase { "Eraser" } else if command == "paint.pencil" { "Pencil" } else { "Brush Tool" };
         let restriction = if matches!(effective["target"].as_str(), Some("mask" | "quickMask")) || effective["target"]["channel"].as_u64().is_some() {
             None
         } else {
             match state.channel_view.target { ChannelTarget::Color(index) => Some(index), _ => None }
         };
-        let live = LiveStroke::begin_with(engine, command, &effective).map_err(|error| error.to_string())?;
-        let mut draft = Self { live, source: state.doc.clone(), before: super::feedback_tools(&engine.tools),
+        let base = mode.as_ref().and_then(|mode| mode.scratch.as_ref()).unwrap_or(engine);
+        let plan = super::super::symmetry::plan(base, command, &mut effective)?;
+        let live = LiveStroke::begin_with(plan.as_ref().map_or(base, |plan| plan.session()), command, &effective).map_err(|error| error.to_string())?;
+        let copies = plan.map(|plan| plan.begin(command, &effective, &live)).transpose()?;
+        let painted = copies.as_ref().map_or(&live.doc, |copies| copies.document());
+        let behind = mode.and_then(|mode| mode.behind(&state.doc, painted, copies.as_ref().map_or_else(|| live.bounds(), |copies| copies.bounds(&live))));
+        let mut draft = Self { live, copies, source: state.doc.clone(), before: super::feedback_tools(&engine.tools),
             preset_revision: engine.presets.rev, active_layer: state.active_layer, channel_view: state.channel_view.clone(),
-            symmetry: state.symmetry_path.as_ref().map(|axis| (axis.source.clone(), axis.segments.clone())), restriction, label,
+            symmetry: state.symmetry_path.as_ref().map(|axis| (axis.source.clone(), axis.segments.clone())), restriction, label, behind,
             #[cfg(test)] samples_pushed: params["points"].as_array().map_or(0, Vec::len),
         };
         draft.restore_channels();
@@ -61,20 +69,26 @@ impl BrushDraft {
     }
 
     pub fn seed(&self) -> u64 { self.live.seed }
-    pub fn document(&self) -> Arc<Document> { self.live.doc.clone() }
-    pub fn bounds(&self) -> Rect { self.live.bounds() }
+    pub fn document(&self) -> Arc<Document> { self.behind.as_ref().map_or_else(|| self.painted().clone(), |behind| behind.document()) }
+    pub fn bounds(&self) -> Rect { self.copies.as_ref().map_or_else(|| self.live.bounds(), |copies| copies.bounds(&self.live)) }
+    /// The stroke with every symmetry copy, before Behind shows the layer over it.
+    fn painted(&self) -> &Arc<Document> { self.copies.as_ref().map_or(&self.live.doc, |copies| copies.document()) }
     /// Returns the rectangle these samples changed (including the redrawn smoothing tail).
     pub fn push(&mut self, points: &[StrokePoint]) -> Result<Rect, String> {
         let damage = self.live.push(points).map_err(|error| error.to_string())?;
+        let regions = match &mut self.copies { Some(copies) => copies.push(&self.live, damage, points)?, None => vec![damage] };
+        let painted = self.copies.as_ref().map_or(&self.live.doc, |copies| copies.document());
+        if let Some(behind) = &mut self.behind { for region in &regions { behind.update(&self.source, painted, *region); } }
         self.restore_channels();
         #[cfg(test)] { self.samples_pushed += points.len(); }
-        Ok(damage)
+        Ok(regions.iter().fold(Rect::EMPTY, |all, region| all.union(region)))
     }
 
     fn restore_channels(&mut self) {
         let (Some(channel), Some(layer)) = (self.restriction, self.active_layer) else { return };
         let Some(original) = self.source.layer(layer).and_then(|layer| layer.surface()) else { return };
-        let Some(target) = Arc::make_mut(&mut self.live.doc).layer_mut(layer).and_then(|layer| layer.surface_mut()) else { return };
+        let painted = match &mut self.copies { Some(copies) => copies.document_mut(), None => &mut self.live.doc };
+        let Some(target) = Arc::make_mut(painted).layer_mut(layer).and_then(|layer| layer.surface_mut()) else { return };
         if original.format() != target.format() { return; }
         let mut coords: Vec<_> = target.tiles().filter(|(coord, tile)| original.tile(**coord).is_none_or(|old| !Arc::ptr_eq(old, tile))).map(|(coord, _)| *coord).collect();
         coords.extend(original.tiles().filter(|(coord, _)| target.tile(**coord).is_none()).map(|(coord, _)| *coord));

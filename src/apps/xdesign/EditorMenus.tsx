@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { ChevronDown, type LucideIcon } from "lucide-react";
 import { DOCK_REACH } from "@/shell/store/useShell";
 import { ariaShortcut, shortcutGlyphs, type MenuEntry, type MenuItem, type MenuSpec } from "./menuModel";
@@ -206,8 +206,9 @@ export function MenuBar({ label, menus }: { label: string; menus: MenuSpec[] }) 
   </div>;
 }
 
-export function MenuButton({ label, items, icon: Icon, iconOnly = false, align = "start", className, disabled }: {
-  label: string; items: MenuEntry[]; icon?: LucideIcon; iconOnly?: boolean; align?: "start" | "end"; className?: string; disabled?: boolean;
+/** `children` (a swatch, say) stands in for the label on the trigger, which then names itself with `label`. */
+export function MenuButton({ label, items, icon: Icon, iconOnly = false, align = "start", className, disabled, children }: {
+  label: string; items: MenuEntry[]; icon?: LucideIcon; iconOnly?: boolean; align?: "start" | "end"; className?: string; disabled?: boolean; children?: ReactNode;
 }) {
   const [open, setOpen] = useState<Focus | null>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -215,14 +216,14 @@ export function MenuButton({ label, items, icon: Icon, iconOnly = false, align =
   const dismiss = (refocus: boolean) => { setOpen(null); if (refocus) trigger.current?.focus(); };
   const choose = (item: MenuItem) => { dismiss(true); item.run?.(); };
   useDismiss(root, open !== null, dismiss);
-  const icon = iconOnly && Icon;
+  const icon = iconOnly && Icon, named = !!icon || !!children;
   const base = icon ? "xd-editor-icon-button" : "xd-editor-menu-trigger";
   return <div ref={root} className="xd-editor-menu" onBlur={leaves(root, dismiss)}>
     <button ref={trigger} type="button" className={className ? `${base} ${className}` : base} disabled={disabled} aria-haspopup="menu" aria-expanded={open !== null}
-      aria-label={icon ? label : undefined} title={icon ? label : undefined}
+      aria-label={named ? label : undefined} title={named ? label : undefined}
       onClick={event => setOpen(previous => previous ? null : event.detail === 0 ? "first" : "self")}
       onKeyDown={event => { if (event.key === "ArrowDown" && !event.metaKey && !event.ctrlKey) { event.preventDefault(); event.stopPropagation(); setOpen("first"); } }}>
-      {icon ? <Icon size={16}/> : <>{Icon && <Icon size={14}/>}<span>{label}</span><ChevronDown size={11}/></>}
+      {children ? <>{children}<ChevronDown size={9}/></> : icon ? <Icon size={16}/> : <>{Icon && <Icon size={14}/>}<span>{label}</span><ChevronDown size={11}/></>}
     </button>
     {open && <Popup items={items} label={label} place={{ kind: "below", el: trigger.current!, align }} focus={open} choose={choose} dismiss={dismiss}/>}
   </div>;

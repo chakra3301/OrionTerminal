@@ -1,13 +1,16 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
-import { ChevronDown, Info } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ChevronDown, ChevronRight, Folder, FolderPlus, Info } from "lucide-react";
 import { positionPopup } from "../EditorMenus";
 import { PresetPreview } from "./PresetPreview";
+import { brushPresetFolders } from "./brushPresetFolders";
+import { PresetPrompt, type Prompt } from "./PresetManager";
 import "./optionsBar.css";
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 type Point = { x: number; y: number };
-function usePopover<T extends HTMLElement>(open: boolean, close: (refocus: boolean) => void, point?: Point | null) {
+export function usePopover<T extends HTMLElement>(open: boolean, close: (refocus: boolean) => void, point?: Point | null) {
   const root = useRef<T>(null), anchor = useRef<HTMLButtonElement>(null), pop = useRef<HTMLDivElement>(null), closeRef = useRef(close);
   closeRef.current = close;
   useLayoutEffect(() => { if (open) positionPopup(pop.current!, point ? { kind: "point", ...point } : { kind: "below", el: anchor.current!, align: "start" }); }, [open, point]);
@@ -129,17 +132,19 @@ type Patch = { size?: number; hardness?: number };
 export type BrushPreset = { name: string; group: string; size: number; hardness: number };
 type BrushPickerProps = {
   size: number; hardness: number; maxSize: number; showHardness?: boolean; presets: BrushPreset[]; revision?: number; disabled?: boolean;
+  /** Every group in panel order, empty ones included; `newGroup` adds one, as Photoshop's Create new group does. */
+  groups?: string[]; newGroup?: (name: string) => Promise<unknown>;
   change: (patch: Patch) => void; commit: (patch: Patch) => void; selectPreset: (name: string) => void;
   /** Opens the picker at this point, as a paint tool's canvas right-click does; `dismiss` clears it. */
   at?: Point | null; dismiss?: () => void;
 };
 
-export function BrushPresetPicker({ size, hardness, maxSize, showHardness = true, presets, revision, disabled, change, commit, selectPreset, at, dismiss }: BrushPickerProps) {
-  const [opened, setOpened] = useState(false), sizeInput = useRef<HTMLInputElement>(null), open = opened || !!at;
+export function BrushPresetPicker({ size, hardness, maxSize, showHardness = true, presets, revision, disabled, groups, newGroup, change, commit, selectPreset, at, dismiss }: BrushPickerProps) {
+  const [opened, setOpened] = useState(false), [folded, setFolded] = useState<string[]>([]), [prompt, setPrompt] = useState<Prompt | null>(null), sizeInput = useRef<HTMLInputElement>(null), open = opened || !!at;
   const close = (refocus: boolean) => { setOpened(false); dismiss?.(); if (refocus) anchor.current?.focus(); };
   const { anchor, pop, rootProps } = usePopover<HTMLDivElement>(open, close, at);
   useLayoutEffect(() => { if (open) sizeInput.current?.focus(); }, [open, at]);
-  const tip = Math.max(3, Math.min(size, 18)), percent = Math.round(hardness * 100);
+  const tip = Math.max(3, Math.min(size, 18)), percent = Math.round(hardness * 100), folders = brushPresetFolders(presets, groups);
   const sizeOf = (v: number) => clamp(Math.round(v) || 1, 1, maxSize), hardOf = (v: number) => clamp(Math.round(v) || 0, 0, 100) / 100;
   const sizePatch = (v: number): Patch => ({ size: sizeOf(v) }), hardPatch = (v: number): Patch => ({ hardness: hardOf(v) });
   return <div className="xd-ps-brush-picker" {...rootProps}>
@@ -165,11 +170,16 @@ export function BrushPresetPicker({ size, hardness, maxSize, showHardness = true
           onBlur={() => commit({ hardness })} onKeyDown={commitKeys(() => commit({ hardness }))} />
         <span className="xd-ps-unit">%</span>
       </label>}
-      {presets.length > 0 && <div className="xd-ps-brush-presets">
-        {presets.map(preset => <button key={preset.name} type="button" aria-label={`Use brush ${preset.name}`} title={`${preset.group} · ${Math.round(preset.size)} px`} onClick={() => selectPreset(preset.name)}>
-          <PresetPreview kind="brush" preset={preset.name} revision={revision} /><small>{Math.round(preset.size)}</small>
-        </button>)}
+      {newGroup && <button type="button" aria-label="Create new group" title="Create new group" disabled={disabled} onClick={() => setPrompt({ title: "Group Name", initial: `Group ${folders.filter(folder => folder.group).length + 1}`, submit: newGroup })}><FolderPlus size={14} /></button>}
+      {folders.length > 0 && <div className="xd-ps-brush-folders">
+        {folders.map(({ group, presets: members }) => { const unfolded = !group || !folded.includes(group); return <div key={group} role="group" aria-label={group || "Ungrouped brushes"}>
+          {group && <button type="button" className="xd-ps-brush-folder" aria-expanded={unfolded} onClick={() => setFolded(list => unfolded ? [...list, group] : list.filter(name => name !== group))}>{unfolded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}<Folder size={12} /><span>{group}</span></button>}
+          {unfolded && <div className="xd-ps-brush-presets">{members.map(preset => <button key={preset.name} type="button" aria-label={`Use brush ${preset.name}`} title={`${preset.group} · ${Math.round(preset.size)} px`} onClick={() => selectPreset(preset.name)}>
+            <PresetPreview kind="brush" preset={preset.name} revision={revision} /><small>{Math.round(preset.size)}</small>
+          </button>)}</div>}
+        </div>; })}
       </div>}
     </div>}
+    {prompt && (anchor.current?.closest(".xd-photo") ? createPortal(<PresetPrompt prompt={prompt} close={() => setPrompt(null)} />, anchor.current.closest(".xd-photo")!) : <PresetPrompt prompt={prompt} close={() => setPrompt(null)} />)}
   </div>;
 }

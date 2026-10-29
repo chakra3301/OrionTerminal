@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useReducer, useRef, useState, type PointerEvent } from "react";
 import { convertFileSrc, isTauri } from "@tauri-apps/api/core";
 import { useDesignDialog } from "../useDesignDialog";
 import { PhotoDialog } from "./photoDialog";
@@ -9,6 +9,8 @@ import { beginXDesignActivity } from "../runtimeActivity";
 import { readSelectionPreferences, rememberedSelectionValues, saveSelectionPreferences } from "./selectionPreferences";
 import { MAX_EDGE_BRUSH_POINTS, MAX_EDGE_BRUSH_STROKES, type SelectionBrush } from "./selectionSettings";
 import type { PhotoDocument, PhotoLayer } from "./types";
+import { SelectionModeCluster } from "./OptionsBarControls";
+import { SELECT_AND_MASK_TOOLS, brushSelectionParams, historyId, quickSelectionParams, selectAndMaskFold, selectAndMaskRevert, strokeMode, type SelectAndMaskMode, type SelectAndMaskTool } from "./selectAndMask";
 import { FOCUS_FIELDS, REFINE_FIELDS, SELECTION_MODES, SELECTION_OUTPUTS, SELECTION_TITLES, effectiveSelectionOutput, selectionRequest, selectionSamplePoint, type SelectionNumber, type SelectionPreviewView, type SelectionWorkflow } from "./selectionSettings";
 
 const title = (text: string) => text.replace(/\b[a-z]/g, char => char.toUpperCase());
@@ -28,11 +30,22 @@ export function SelectionDialog({ kind, document, close }: { kind: Exclude<Selec
   const draft = useRef<SelectionBrush | null>(null), brushPointer = useRef<number | null>(null), brushImage = useRef<HTMLImageElement | null>(null), brushLease = useRef<(() => void) | null>(null);
   const [live, setLive] = useState(isTauri() && document.width * document.height <= 16_777_216), [localError, setLocalError] = useState("");
   const [sampleX, setSampleX] = useState(0), [sampleY, setSampleY] = useState(0);
+  const [tool, setTool] = useState<SelectAndMaskTool>("quick"), [mode, setMode] = useState<SelectAndMaskMode>("add");
+  const base = useRef(historyId(state)), edited = useRef(false), own = useRef(0), [, rebased] = useReducer((count: number) => count + 1, 0);
   const context = useRef({ projectId, id: document.id, version: document.version, viewKey: state?.viewKey });
   const currentContext = () => { const workspace = usePhotoWorkspace.getState(); return projectId === context.current.projectId && document.id === context.current.id && document.version === context.current.version && workspaceVersion === context.current.version && workspaceDocument === context.current.id && state?.viewKey === context.current.viewKey && workspace.projectId === context.current.projectId && workspace.documentId === context.current.id && workspace.stateVersion === context.current.version && workspace.state?.viewKey === context.current.viewKey; };
   const sameContext = currentContext();
   const edgeBrushSupported = state?.features?.selectionEdgeBrush === true;
-  useEffect(() => { if (!sameContext && !busy) close(); }, [sameContext, busy, close]);
+  // The dialog's own selection edits move the image version too; it follows them instead of closing.
+  useEffect(() => { if (!sameContext && !busy && !own.current) close(); }, [sameContext, busy, close]);
+  const edit = (command: string, params: Record<string, unknown>) => {
+    if (busy || !currentContext()) return; own.current++; setLocalError("");
+    void runPhotoCommand(command, params).then(() => { edited.current = true; }, error => setLocalError(String(error))).finally(() => {
+      const workspace = usePhotoWorkspace.getState();
+      if (workspace.stateVersion && workspace.projectId === context.current.projectId && workspace.documentId === context.current.id) context.current = { ...context.current, version: workspace.stateVersion, viewKey: workspace.state?.viewKey };
+      own.current--; rebased();
+    });
+  };
   const layer = state && findLayer(state.layers, state.activeLayer), request = selectionRequest(kind, kind === "refine" ? { ...values, edgeBrushes: brushes } : values, { width: document.width, height: document.height, hasSelection: state?.hasSelection === true, layer });
   const valid = !request.problem && sameContext && (!brushes.length || edgeBrushSupported), previewAllowed = document.width * document.height <= 16_777_216;
   const preview = usePhotoCommandPreview(document, projectId, request.command, request.params, { automatic: live, enabled: !busy && valid && previewAllowed, viewKey: state?.viewKey, selectionView: view });
@@ -42,22 +55,30 @@ export function SelectionDialog({ kind, document, close }: { kind: Exclude<Selec
     brushLease.current?.(); brushLease.current = null;
   };
   useEffect(() => () => { brushLease.current?.(); brushLease.current = null; }, []);
-  const cancelOrClose = () => { if (draft.current) cancelBrush(); else close(); };
+  const cancelOrClose = () => {
+    if (draft.current) { cancelBrush(); return; }
+    const revert = selectAndMaskRevert(base.current, usePhotoWorkspace.getState().state, edited.current);
+    if (revert) void runPhotoCommand(...revert).catch(() => {});
+    close();
+  };
   const dialog = useDesignDialog<HTMLFormElement>(cancelOrClose, busy);
-  const brushValid = Number.isFinite(brushSize) && brushSize >= 1 && brushSize <= 5000;
+  const brushValid = Number.isFinite(brushSize) && brushSize >= 1 && brushSize <= 5000, quickSize = Number(values.quickSize), quickValid = Number.isFinite(quickSize) && quickSize >= 1 && quickSize <= 5000;
+  const paintSize = Number(values.brushToolSize), paintHardness = Number(values.brushToolHardness), paintValid = Number.isFinite(paintSize) && paintSize >= 1 && paintSize <= 5000 && Number.isFinite(paintHardness) && paintHardness >= 0 && paintHardness <= 100;
   const brushPointCount = brushes.reduce((count, brush) => count + brush.points.length, 0);
   const appendBrushPoint = (event: PointerEvent<HTMLImageElement>) => {
     if (!draft.current || brushPointer.current !== (event.pointerId ?? 0)) return;
     const point = selectionSamplePoint(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect(), document.width, document.height);
     if (!point || draft.current.points.at(-1)?.every((value, axis) => value === point[axis])) return;
-    if (brushPointCount + draft.current.points.length >= MAX_EDGE_BRUSH_POINTS) { cancelBrush(); setLocalError("Use at most 8192 edge brush points before applying."); return; }
+    if ((tool === "edge" ? brushPointCount : 0) + draft.current.points.length >= MAX_EDGE_BRUSH_POINTS) { cancelBrush(); setLocalError(tool === "edge" ? "Use at most 8192 edge brush points before applying." : `Use at most 8192 points in one ${tool === "quick" ? "Quick Selection" : "Brush Tool"} stroke.`); return; }
     draft.current = { ...draft.current, points: [...draft.current.points, point] }; setBrushDraft(draft.current);
   };
   const finishBrush = (event: PointerEvent<HTMLImageElement>) => {
     if (!draft.current || brushPointer.current !== (event.pointerId ?? 0)) return;
-    appendBrushPoint(event); const finished = draft.current;
-    if (finished && currentContext() && !busy) setBrushes(current => [...current, finished]);
+    appendBrushPoint(event); const finished = draft.current, kept = !!finished && currentContext() && !busy;
+    if (kept && tool === "edge") setBrushes(current => [...current, finished]);
     cancelBrush();
+    if (kept && tool === "quick") edit("select.quick", quickSelectionParams(finished.points, finished.size, finished.erase ? "subtract" : "add", values.sampleAllLayers === true));
+    if (kept && tool === "brush") edit("select.brush", brushSelectionParams(finished.points, finished.size, paintHardness, finished.erase ? "subtract" : "add"));
   };
   const change = (key: string, value: unknown) => { setValues(current => ({ ...current, [key]: value })); setLocalError(""); };
   const number = (field: SelectionNumber) => {
@@ -74,18 +95,23 @@ export function SelectionDialog({ kind, document, close }: { kind: Exclude<Selec
     event.preventDefault(); if (busy || !valid || draft.current) return;
     if (!currentContext()) { setLocalError("The image changed. Reopen this selection workflow."); return; }
     setLocalError(""); void runPhotoCommand(request.command, request.params).then(() => {
+      const fold = selectAndMaskFold(base.current, usePhotoWorkspace.getState().state, edited.current);
+      return fold ? runPhotoCommand(...fold).catch(() => {}) : undefined;
+    }).then(() => {
       const notice = saveSelectionPreferences(kind, remember, values, view, brushSize);
       if (notice) usePhotoWorkspace.setState({ error: notice });
       close();
     }).catch(error => setLocalError(String(error)));
   }}>
     <div className="xd-photo-special-body"><div className="xd-photo-special-preview">
+      {kind === "refine" && <div className="xd-photo-preview-actions xd-photo-selection-tools" role="toolbar" aria-label="Select and Mask tools">{SELECT_AND_MASK_TOOLS.map(entry => <button key={entry.id} type="button" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={busy || !!brushDraft || (entry.id === "edge" && !edgeBrushSupported)} onClick={() => setTool(entry.id)}>{entry.label.replace(/ Tool$/, "")}</button>)}<SelectionModeCluster value={mode} modes={["add", "subtract"]} disabled={busy || !!brushDraft} change={next => setMode(next as SelectAndMaskMode)}/>{tool === "brush" ? <><label>Size:<input aria-label="Selection brush tool size" type="number" min="1" max="5000" step="1" value={Number.isFinite(paintSize) ? paintSize : ""} disabled={busy || !!brushDraft} onChange={event => change("brushToolSize", event.target.valueAsNumber)}/>px</label><label>Hardness:<input aria-label="Selection brush tool hardness" type="number" min="0" max="100" step="1" value={Number.isFinite(paintHardness) ? paintHardness : ""} disabled={busy || !!brushDraft} onChange={event => change("brushToolHardness", event.target.valueAsNumber)}/>%</label></> : <label>Size:<input aria-label="Selection quick selection size" type="number" min="1" max="5000" step="1" value={Number.isFinite(quickSize) ? quickSize : ""} disabled={busy || !!brushDraft} onChange={event => change("quickSize", event.target.valueAsNumber)}/>px</label>}<button type="button" disabled={busy || !!brushDraft} onClick={() => edit("select.subject", { sampleAllLayers: values.sampleAllLayers === true })}>Select Subject</button><button type="button" disabled={busy || !!brushDraft || state?.hasSelection !== true} onClick={() => edit("select.inverse", {})}>Invert</button></div>}
       <div className="xd-photo-selection-image"><img ref={brushImage} src={previewURL} alt={`${SELECTION_TITLES[kind]} ${shown ? `${view} preview` : "source image"}`} draggable={false} style={{ cursor: kind === "refine" ? "crosshair" : undefined, touchAction: kind === "refine" ? "none" : undefined }} onPointerDown={event => {
         if (busy || event.button !== 0 || !currentContext()) return; const point = selectionSamplePoint(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect(), document.width, document.height);
         if (kind === "refine") {
-          if (!point || draft.current || !brushValid || !valid || !edgeBrushSupported) return;
-          if (brushes.length >= MAX_EDGE_BRUSH_STROKES || brushPointCount >= MAX_EDGE_BRUSH_POINTS) { setLocalError("Apply or clear the edge strokes before drawing more."); return; }
-          event.preventDefault(); draft.current = { size: brushSize, erase: event.altKey || brushErase, points: [point] }; brushPointer.current = event.pointerId ?? 0; setBrushDraft(draft.current); setLocalError("");
+          const edge = tool === "edge";
+          if (!point || draft.current || (tool === "quick" ? !quickValid : tool === "brush" ? !paintValid : !brushValid || !valid || !edgeBrushSupported)) return;
+          if (edge && (brushes.length >= MAX_EDGE_BRUSH_STROKES || brushPointCount >= MAX_EDGE_BRUSH_POINTS)) { setLocalError("Apply or clear the edge strokes before drawing more."); return; }
+          event.preventDefault(); draft.current = edge ? { size: brushSize, erase: event.altKey || brushErase, points: [point] } : { size: tool === "quick" ? quickSize : paintSize, erase: strokeMode(mode, event.altKey) === "subtract", points: [point] }; brushPointer.current = event.pointerId ?? 0; setBrushDraft(draft.current); setLocalError("");
           brushLease.current = beginXDesignActivity("photo-operation", "Finish or cancel the selection edge stroke before switching projects or disabling XDesign.");
           event.currentTarget.setPointerCapture?.(event.pointerId); return;
         }

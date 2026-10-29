@@ -93,9 +93,9 @@ describe("Layer mask properties", () => {
     expect(refine).toHaveBeenCalled(); expect(colorRange).toHaveBeenCalled();
   });
 
-  it("needs a selection for Select and Mask and is inert while busy", async () => {
+  it("opens Select and Mask without a selection, like Photoshop, and is inert while busy", async () => {
     await render(true, { hasSelection: false });
-    expect(text("Select and Mask…").disabled).toBe(true);
+    expect(text("Select and Mask…").disabled).toBe(false);
     await render(true, { disabled: true });
     expect([...container.querySelectorAll<HTMLButtonElement>("button")].every(button => button.disabled)).toBe(true);
   });

@@ -1,3 +1,28 @@
+## 2026-10-29 — Claude / XDesign: controls parity, final review and fix pass
+
+Final whole-branch review of the uncommitted controls-parity work (plan `docs/superpowers/plans/2026-10-28-xdesign-controls-parity.md`; ledger `.superpowers/sdd/2026-10-28-xdesign-controls-parity/final.md`). Three findings were fixed test-first:
+1. Healing Diffusion smoothing cost grew with brush radius per pixel. `box_blur` in `xdesign_photo_healing_options.rs` now uses prefix sums (O(1) per pixel); 1024² at Diffusion 7 finishes inside the 3 s test bound.
+2. Dialogs folded and cancelled by History index, which breaks at the 50-state limit: there each new step keeps the current index while the oldest state drops. `history.fold` takes `fromId` and `history.select` takes `id` (ULID snapshot ids from `historySources`). The host looks for the id among past states, then the current one, then redo (photocraft keeps redo documents private, so it steps forward and back). An id dropped past the limit resolves to the oldest kept state. Free Transform, Warp, Layer Style, Select and Mask, the selection dialogs, Perspective Crop, Crop, layer options and new Gradient Fill all hold their opening state by id now.
+3. Gradient colour midpoints were dropped when the Gradient tool painted with a Method other than Classic. `bakeGradient(stops, method, samples, midpoints)` bends each sample with the engine's `midpoint_remap`, and Stripes moves its switch point. Bent bakes aren't remembered for `unbaked`.
+
+Minors deferred and the reviewer's declined-to-judge items are ruled in final.md. Users see them in `docs/research/xdesign-controls-2026-10-28/post-alpha.md` and in the alpha-limits section of `docs/releases/xdesign-alpha-smoke-test.md`.
+
+## 2026-10-28 (cont.) — Claude / XDesign: tool and adjustment controls audit vs Photoshop 2026
+
+Read-only. Three general-purpose agents audited control depth in parallel; reports in `docs/research/xdesign-controls-2026-10-28/`. 365/573 controls fully present (64%): adjustments 70%, paint and retouch 63%, selection/type/shape/view 60%. Vector tools are weakest: Pen 1/12, Path Selection 0/9, Shapes 8/26, though the engine accepts most of what they lack.
+
+Spot-checked and confirmed: saved adjustment presets never reach the Preset menu (`AdjustmentPresetRow.tsx`); Colorize keeps the current hue instead of the foreground's (`actionControls.tsx`); shape stroke sends only colour and width though the engine takes align/cap/join/dashes (`toolBars.tsx` `shapeStyleParams`); Object Selection shows the marquee fields (`PaintToolOptions.tsx`); Character "Windows LCD"/"Windows" anti-aliasing silently saves as Smooth (engine `type_cmds.rs` falls through); Smoothing defaults to 0% (Photoshop 10%); Healing Brush reuses the clone list's 27 blend modes; Spot Healing is forced to Current layer and Normal (`xdesign_photo_retouch.rs`); Brush Settings Color Dynamics jitters show raw fractions (`LayerEffects.tsx` PERCENT set).
+
+Ranked slices proposed to the owner (impact ÷ effort):
+1. Wrong values and silent bugs (all S): anti-aliasing save, Object Selection fields, Smoothing 10%, Brush Settings units, Healing Mode list, Eraser Block hides Opacity/Flow, Brightness/Contrast legacy Contrast 100, saved presets in the Preset menu.
+2. Shapes and Pen (UI only): stroke options (align, caps, corners, dashes), fill/stroke type, W/H with link, gear constraints, per-corner radii, Make: buttons on the Pen bar, path operations in Path mode, Path Selection ops/Merge/W/H, Freeform Curve Fit, Rubber Band, Auto Add/Delete.
+3. Brushes: tool-preset dropdown, Smoothing options menu, preset groups in the picker, texture pattern picker, Dual Brush tip, Mixer Load/Clean menu and combination presets.
+4. Type, Move, Transform: real font styles, Cancel/Commit, Character/Paragraph toggle, Align To Selection/Canvas, Free Transform ↔ Warp.
+5. Adjustments: Brightness/Contrast Auto in Properties, Colorize foreground hue, Curves display options in Properties, Match Color source layer, HDR Toning preview and Toning Curve, Auto Options algorithms, eyedroppers outside RGB.
+6. Retouch and selection: Spot Healing Sample All Layers and Mode, Patch drawing its own selection, live-gradient on-canvas stops, Select and Mask Invert and Select Subject.
+7. Host Rust work: Paint Bucket All Layers and Clear mode, Replace Color Add/Subtract and Localized Color Clusters, Ignore Adjustment Layers for clone/heal, Magic Wand Sample Size, Line arrowheads, Triangle/Polygon corner radius, Match Color Ignore Selection, Patch Content-Aware, HDR Toning's other methods.
+Left out as ML-backed in Photoshop (out of scope): Object Finder, Object Aware refine mode, Refine Hair.
+
 ## 2026-10-28 (cont.) — Claude / XDesign: F6, document tabs in the image editor
 
 Owner request: F6, Photoshop-style document tabs ("skip question": the calls are marked in the spec). Executed inline from the plan, then committed and pushed on the owner's go-ahead. Build 28 predates it.

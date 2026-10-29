@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ImageTransformOverlay } from "./ImageTransformOverlay";
 import { FreeTransformBar } from "./FreeTransformBar";
-import { beginFreeTransform, cancelFreeTransform, useFreeTransform } from "./freeTransform";
+import { TRANSFORM_REFERENCE_KEY, beginFreeTransform, cancelFreeTransform, loadShowReference, setShowReference, useFreeTransform } from "./freeTransform";
 import { usePhotoWorkspace } from "./runtime";
 import { xdesignActivityReason } from "../runtimeActivity";
 import type { PhotoDocument, PhotoLayer } from "./types";
@@ -14,9 +14,10 @@ const image:PhotoDocument={id:"photo",version:"v1",name:"Image",width:300,height
 const layer:PhotoLayer={id:1,name:"Layer",kind:"Raster",visible:true,opacity:1,fill:1,blend:"Normal",clipped:false,hasMask:false,bounds:[20,30,100,60]};
 let root:Root,container:HTMLDivElement;
 beforeEach(()=>{vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);native.run.mockReset().mockResolvedValue({});usePhotoWorkspace.setState({busy:false,quiet:false,projectId:"project",state:null});container=document.createElement("div");document.body.append(container);root=createRoot(container);});
-afterEach(()=>{act(()=>{cancelFreeTransform();root.unmount();});useFreeTransform.setState({held:null});container.remove();vi.unstubAllGlobals();});
+afterEach(()=>{act(()=>{cancelFreeTransform();root.unmount();});useFreeTransform.setState({held:null});setShowReference(false);localStorage.removeItem(TRANSFORM_REFERENCE_KEY);container.remove();vi.unstubAllGlobals();});
 const shown=(work:Promise<unknown>)=>work.then(()=>{},()=>{});
-const render=(doc=image)=>act(async()=>root.render(<><FreeTransformBar untilShown={shown}/><ImageTransformOverlay document={doc} layer={layer} zoom={1} untilShown={shown}/></>));
+const warp=vi.fn();
+const render=(doc=image)=>act(async()=>root.render(<><FreeTransformBar untilShown={shown} warp={warp}/><ImageTransformOverlay document={doc} layer={layer} zoom={1} untilShown={shown}/></>));
 const pointer=(type:string,x:number,y:number,init:MouseEventInit={})=>Object.assign(new MouseEvent(type,{bubbles:true,clientX:x,clientY:y,button:0,...init}),{pointerId:1,isPrimary:true});
 function stage(){const svg=container.querySelector("svg.xd-photo-main-transform")!;svg.getBoundingClientRect=()=>({left:0,top:0,width:300,height:200} as DOMRect);svg.setPointerCapture=vi.fn();svg.hasPointerCapture=()=>true;svg.releasePointerCapture=vi.fn();return svg;}
 const el=(label:string)=>container.querySelector(`[aria-label="${label}"]`)!;
@@ -72,7 +73,8 @@ it("cancels on Escape, a stale version and a cancelled pointer without creating 
 });
 it("enters from the menu with a centre reference point, commits on double-click and ignores an unchanged box",async()=>{
   await render();await act(async()=>{beginFreeTransform(image,layer,undefined);});
-  expect(container.querySelector("circle[data-pivot]")).not.toBeNull();await keydown("Enter");expect(native.run).not.toHaveBeenCalled();expect(session()).toBeNull();expect(usePhotoWorkspace.getState().busy).toBe(false);
+  expect(container.querySelector("circle[data-pivot]")).toBeNull();await act(async()=>(el("Toggle reference point") as HTMLInputElement).click());
+  expect(["cx","cy"].map(name=>container.querySelector("circle[data-pivot]")!.getAttribute(name))).toEqual(["70","60"]);await act(async()=>(el("Toggle reference point") as HTMLInputElement).click());await keydown("Enter");expect(native.run).not.toHaveBeenCalled();expect(session()).toBeNull();expect(usePhotoWorkspace.getState().busy).toBe(false);
   await act(async()=>{beginFreeTransform(image,layer,undefined);});await drag("Move selected image layer",[70,60],[80,60]);expect(native.run).not.toHaveBeenCalled();
   await act(async()=>el("Move selected image layer").dispatchEvent(new MouseEvent("dblclick",{bubbles:true})));
   expect(native.run).toHaveBeenCalledOnce();expect(round(native.run.mock.calls[0]![1].matrix)).toEqual([1,0,0,1,10,0]);
@@ -156,4 +158,57 @@ it("lets the click through the Move tool's box when Auto-Select is on, but not d
   await act(async()=>{window.dispatchEvent(new KeyboardEvent("keydown",{key:"Meta",metaKey:true}));});expect(polygon().style.pointerEvents).toBe("");
   await act(async()=>{window.dispatchEvent(new KeyboardEvent("keyup",{key:"Meta"}));});
   await act(async()=>{beginFreeTransform(image,layer,undefined);});expect(polygon().style.pointerEvents).toBe("");
+});
+const pressed=(label:string)=>el(label).getAttribute("aria-pressed");
+const corner=(label:string)=>["cx","cy"].map(name=>Math.round(Number(el(label).getAttribute(name))*1000)/1000);
+it("hides the reference point locator behind its checkbox, which is kept across relaunches and read as off when stale",async()=>{
+  expect(loadShowReference()).toBe(false);
+  await render();await act(async()=>{beginFreeTransform(image,layer,undefined);});
+  const toggle=el("Toggle reference point") as HTMLInputElement,spot=(name:string)=>el(`Reference point ${name}`) as HTMLButtonElement;
+  expect(toggle.checked).toBe(false);expect(el("Reference point location").querySelectorAll("button")).toHaveLength(9);expect(spot("top left").disabled).toBe(true);
+  await act(async()=>toggle.click());expect(toggle.checked).toBe(true);expect(loadShowReference()).toBe(true);expect(spot("top left").disabled).toBe(false);expect(pressed("Reference point center")).toBe("true");
+  await act(async()=>spot("bottom right").click());expect(pressed("Reference point bottom right")).toBe("true");expect(pressed("Reference point center")).toBe("false");
+  await act(async()=>cancelFreeTransform());await act(async()=>{beginFreeTransform(image,layer,undefined);});expect(pressed("Reference point center")).toBe("true");
+  for(const stale of ["yes","{bad","0"]){localStorage.setItem(TRANSFORM_REFERENCE_KEY,stale);expect(loadShowReference()).toBe(false);}
+  await act(async()=>usePhotoWorkspace.setState({busy:true,quiet:false}));expect((el("Toggle reference point") as HTMLInputElement).disabled).toBe(true);expect(spot("top left").disabled).toBe(true);
+});
+it("reads X and Y at the reference point and scales, rotates and skews about it, typed or dragged",async()=>{
+  await render();await act(async()=>{beginFreeTransform(image,layer,undefined);});
+  await act(async()=>(el("Toggle reference point") as HTMLInputElement).click());await act(async()=>(el("Reference point top left") as HTMLButtonElement).click());
+  expect(["cx","cy"].map(name=>container.querySelector("circle[data-pivot]")!.getAttribute(name))).toEqual(["20","30"]);
+  expect([(el("Transform X (px)") as HTMLInputElement).value,(el("Transform Y (px)") as HTMLInputElement).value]).toEqual(["20","30"]);
+  await type("Transform width (%)","200");expect(session()!.settings).toMatchObject({width:200,height:200,x:120,y:90});expect(corner("Resize image layer top left")).toEqual([20,30]);
+  await type("Transform X (px)","50");expect(session()!.settings.x).toBe(150);expect(corner("Resize image layer top left")).toEqual([50,30]);
+  await type("Transform angle (°)","30");expect(corner("Resize image layer top left")).toEqual([50,30]);
+  await type("Transform horizontal skew (°)","10");expect(corner("Resize image layer top left")).toEqual([50,30]);
+  await drag("Rotate image layer bottom right",[262,227],[200,260]);expect(session()!.settings.angle).not.toBe(30);expect(corner("Resize image layer top left")).toEqual([50,30]);
+  await act(async()=>(el("Toggle reference point") as HTMLInputElement).click());expect(container.querySelector("circle[data-pivot]")).toBeNull();
+  expect((el("Transform Y (px)") as HTMLInputElement).value).toBe(String(Math.round(session()!.settings.y*100)/100));
+});
+it("switches to Warp from the bar: an untouched box just opens it, a changed one is committed first, and a failed commit stays out of Warp",async()=>{
+  warp.mockReset();await render();await act(async()=>{beginFreeTransform(image,layer,undefined);});
+  const button=()=>el("Switch between free transform and warp modes") as HTMLButtonElement;
+  await act(async()=>button().click());expect(warp).toHaveBeenCalledOnce();expect(native.run).not.toHaveBeenCalled();expect(session()).toBeNull();expect(usePhotoWorkspace.getState().busy).toBe(false);
+  await act(async()=>{beginFreeTransform(image,layer,undefined);});await type("Transform angle (°)","20");
+  await act(async()=>button().click());expect(native.run).toHaveBeenCalledOnce();expect(native.run.mock.calls[0]![0]).toBe("edit.transform");expect(warp).toHaveBeenCalledTimes(2);expect(session()).toBeNull();
+  native.run.mockRejectedValueOnce(new Error("engine said no"));await act(async()=>{beginFreeTransform(image,layer,undefined);});await type("Transform angle (°)","20");
+  await act(async()=>button().click());expect(native.run).toHaveBeenCalledTimes(2);expect(warp).toHaveBeenCalledTimes(2);
+  await act(async()=>{beginFreeTransform(image,layer,undefined);});await act(async()=>usePhotoWorkspace.setState({busy:true,quiet:false}));expect(button().disabled).toBe(true);
+});
+it("hands Warp the step before a committed box, and folds or undoes a session that came back from Warp as one step",async()=>{
+  warp.mockReset();await render();await act(async()=>usePhotoWorkspace.setState({state:{historySources:[{id:"h3",index:3,current:true}]} as never}));
+  const toggle=()=>el("Switch between free transform and warp modes") as HTMLButtonElement;
+  await act(async()=>{beginFreeTransform(image,layer,undefined);});await type("Transform angle (°)","20");
+  await act(async()=>toggle().click());expect(warp).toHaveBeenLastCalledWith({fromId:"h3",label:"Free Transform"});
+  await act(async()=>{beginFreeTransform(image,layer,undefined);});await act(async()=>toggle().click());expect(warp).toHaveBeenLastCalledWith(undefined);
+  const fold={fromId:"h2",label:"Warp"};native.run.mockClear();
+  await act(async()=>{beginFreeTransform(image,layer,undefined,"free",fold);});await act(async()=>toggle().click());expect(warp).toHaveBeenLastCalledWith(fold);expect(native.run).not.toHaveBeenCalled();
+  await act(async()=>{beginFreeTransform(image,layer,undefined,"free",fold);});await type("Transform angle (°)","20");
+  await act(async()=>(el("Commit transform") as HTMLButtonElement).click());
+  expect(native.run.mock.calls.map(call=>call[0])).toEqual(["edit.transform","history.fold"]);expect(native.run).toHaveBeenLastCalledWith("history.fold",fold);
+  native.run.mockClear();await act(async()=>{beginFreeTransform(image,layer,undefined,"free",fold);});await act(async()=>(el("Cancel transform") as HTMLButtonElement).click());
+  expect(session()).toBeNull();expect(native.run.mock.calls).toEqual([["history.select",{id:"h2",discardRedo:true}]]);
+  native.run.mockClear();await act(async()=>{beginFreeTransform(image,layer,undefined,"free",fold);});await keydown("Escape");
+  expect(session()).toBeNull();expect(native.run.mock.calls).toEqual([["history.select",{id:"h2",discardRedo:true}]]);
+  native.run.mockClear();await act(async()=>{beginFreeTransform(image,layer,undefined);});await keydown("Escape");expect(native.run).not.toHaveBeenCalled();
 });

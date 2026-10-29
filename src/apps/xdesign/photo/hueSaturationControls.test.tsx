@@ -86,6 +86,19 @@ describe("Photoshop 2026 Hue/Saturation layout", () => {
     expect(shown.range).toBe("master"); expect(swatch("Reds").disabled).toBe(true); expect(by("Eyedropper")).toHaveProperty("disabled", true); expect(by("On-image adjustment")).toHaveProperty("disabled", true);
   });
 
+  it("colorizes with the foreground's hue at 25% saturation, red when the foreground is black, white or gray, and keeps lightness", async () => {
+    const foreground = (color: [number, number, number, number] | null) => usePhotoWorkspace.setState({ state: color && { tools: { foreground: color, background: [1, 1, 1, 1] } } as never });
+    foreground([0, 0, 1, 1]); await render();
+    await act(async () => { const field = by<HTMLInputElement>("Adjustment Lightness"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "-20"); field.dispatchEvent(new Event("input", { bubbles: true })); });
+    await click("Adjustment Colorize");
+    expect(shown).toMatchObject({ colorize: true, hue: 240, saturation: 25, lightness: -20 });
+    for (const color of [[.5, .5, .5, 1], [1, 1, 1, 1], [0, 0, 0, 1], null] as const) {
+      await click("Adjustment Colorize"); foreground(color && [...color]); await click("Adjustment Colorize");
+      expect(shown).toMatchObject({ colorize: true, hue: 0, saturation: 25, lightness: -20 });
+    }
+    usePhotoWorkspace.setState({ state: null });
+  });
+
   it("drags in the image to set the nearest range's saturation, or its hue with ⌘", async () => {
     native.tauri = true; respond([255, 128, 0]);
     const { image, surface } = stage();

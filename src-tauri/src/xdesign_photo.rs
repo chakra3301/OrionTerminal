@@ -76,6 +76,32 @@ mod straighten;
 mod perspective_crop;
 #[path = "xdesign_photo_fill_modes.rs"]
 mod fill_modes;
+#[path = "xdesign_photo_mixer_reservoir.rs"]
+mod mixer_reservoir;
+#[path = "xdesign_photo_bucket.rs"]
+mod bucket;
+#[path = "xdesign_photo_replace_color.rs"]
+mod replace_color;
+#[path = "xdesign_photo_match_color.rs"]
+mod match_color;
+#[path = "xdesign_photo_hdr_toning.rs"]
+mod hdr_toning;
+#[path = "xdesign_photo_magic_wand.rs"]
+mod magic_wand;
+#[path = "xdesign_photo_object_selection.rs"]
+mod object_selection;
+#[path = "xdesign_photo_shape_geometry.rs"]
+mod shape_geometry;
+#[path = "xdesign_photo_samples.rs"]
+mod samples;
+#[path = "xdesign_photo_selection_hit.rs"]
+mod selection_hit;
+#[path = "xdesign_photo_shape_pattern.rs"]
+mod shape_pattern;
+#[path = "xdesign_photo_path_fill.rs"]
+mod path_fill;
+#[path = "xdesign_photo_selection_paint.rs"]
+mod selection_paint;
 #[path = "xdesign_photo_red_eye.rs"]
 mod red_eye;
 #[path = "xdesign_photo_pattern_stamp.rs"]
@@ -84,6 +110,16 @@ mod pattern_stamp;
 mod layer_colors;
 #[path = "xdesign_photo_layer_code.rs"]
 mod layer_code;
+#[path = "xdesign_photo_brush_library.rs"]
+mod brush_library;
+#[path = "xdesign_photo_gradient_midpoints.rs"]
+mod gradient_midpoints;
+#[path = "xdesign_photo_paint_modes.rs"]
+mod paint_modes;
+#[path = "xdesign_photo_clone_document.rs"]
+mod clone_document;
+#[path = "xdesign_photo_symmetry.rs"]
+mod symmetry;
 #[path = "xdesign_photo_selection_brush.rs"]
 mod selection_brush;
 #[path = "xdesign_photo_magnetic.rs"]
@@ -606,6 +642,7 @@ fn reply(
     state["canCancelPreview"] = json!(true);
     state["colorView"] = color_views::Snapshot::capture(&session.engine)?.describe(&session.engine.active().ok_or("No image document")?.doc);
     state["brush"] = tools::inspect(&session.engine);
+    state["symmetry"] = symmetry::describe(&session.engine);
     state["tools"] = tools::colors(&session.engine);
     if let Some(context)=&session.color_settings{state["colorSettings"]=context.describe();}
     state["colorProfile"] = profiles::describe(&session.engine.active().ok_or("No image document")?.doc);
@@ -855,6 +892,7 @@ fn command_supported(command: &str) -> bool {
             "history.snapshot.select",
             "history.snapshot.rename",
             "history.snapshot.delete",
+            selection_hit::COMMAND,
             "edit.contentAwareScale",
             "edit.transform",
             "edit.puppetWarp",
@@ -928,7 +966,14 @@ fn crop_rotated(engine: &mut Session, params: &Value) -> Result<Value, String> {
     engine.execute("image.crop", json!({"x": (cx - width / 2.0).round() as i64, "y": (cy - height / 2.0).round() as i64, "width": width.round() as i64, "height": height.round() as i64, "deleteCroppedPixels": params["deleteCroppedPixels"].as_bool().unwrap_or(false)})).map_err(|e| e.to_string())
 }
 
-fn execute_view_command(
+fn execute_view_command(engine: &mut Session, command: &str, params: Value) -> Result<Value, String> {
+    let before = shape_pattern::before(engine);
+    let result = dispatch_view_command(engine, command, params);
+    shape_pattern::refresh(engine, before);
+    result
+}
+
+fn dispatch_view_command(
     engine: &mut Session,
     command: &str,
     params: Value,
@@ -939,6 +984,9 @@ fn execute_view_command(
     if command == "layer.new.layerViaCopy" { return layer_via_copy(engine, params); }
     if command == "edit.purge.clipboard" || command == "edit.purge.all" { return clipboard::purge(engine, command); }
     if let Some(result) = exports::execute(engine, command, &params) { return result; }
+    if let Some(result) = mixer_reservoir::execute(engine, command, &params) { return result; }
+    if let Some(result) = brush_library::execute(engine, command, &params) { return result; }
+    if let Some(result) = symmetry::execute(engine, command, &params) { return result; }
     let params = preview::prepare_lens_edit(engine, command, params)?;
     preview::validate_filter_input(command, &params)?;
     if !mask_filters::separate(command) || !mask_filters::targets_coverage(engine, &params) { preview::validate_lens_input(engine, command, &params)?; }
@@ -1002,15 +1050,30 @@ fn execute_view_command(
     if let Some(result) = adjust::execute(engine, command, &params) {
         return result;
     }
+    if let Some(result) = replace_color::execute(engine, command, &params) { return result; }
+    if let Some(result) = match_color::execute(engine, command, &params) { return result; }
+    if let Some(result) = hdr_toning::execute(engine, command, &params) { return result; }
+    if let Some(result) = magic_wand::execute(engine, command, &params) { return result; }
+    if let Some(result) = object_selection::execute(engine, command, &params) { return result; }
+    if let Some(result) = selection_paint::execute(engine, command, &params) { return result; }
+    if let Some(result) = shape_geometry::query(command, &params) { return result; }
+    if let Some(result) = selection_hit::query(engine, command, &params) { return result; }
+    let params = shape_geometry::prepare(engine, command, params)?;
+    if let Some(result) = shape_pattern::execute(engine, command, &params) { return result; }
     if let Some(result) = mask_filters::execute(engine, command, &params) { return result; }
     if let Some(result) = linked_replay::execute(engine, command, &params) { return result; }
     if let Some(result) = place::execute(engine, command, &params) { return result; }
     if let Some(result) = image_size::execute(engine, command, &params) { return result; }
+    if let Some(result) = bucket::execute(engine, command, &params) { return result; }
+    if let Some(result) = path_fill::execute(engine, command, &params) { return result; }
     if let Some(result) = fill_modes::execute(engine, command, &params) { return result; }
+    if let Some(result) = stroke::host_retouch(engine, command, &params) { return result; }
+    if let Some(result) = stroke::host_paint_mode(engine, command, &params) { return result; }
     if let Some(result) = red_eye::execute(engine, command, &params) { return result; }
     if let Some(result) = pattern_stamp::execute(engine, command, &params) { return result; }
     if let Some(result) = layer_colors::execute(engine, command, &params) { return result; }
     if let Some(result) = layer_code::execute(engine, command, &params) { return result; }
+    if let Some(result) = gradient_midpoints::execute(engine, command, &params) { return result; }
     let mut params = params;
     let coverage_fade = mask_filters::prepare_paint_fade(engine, command, &mut params);
     let adjusted = if command == "layer.setAdjustment" { params["layer"].as_u64().map(photocraft_engine::doc::LayerId).or_else(|| engine.active().and_then(|state| state.active_layer)) } else { None };
@@ -1061,17 +1124,14 @@ pub async fn xdesign_photo_command(
         return Err("Invalid image operation parameters".into());
     }
     if command.starts_with("paint.")&&params["points"].as_array().is_some_and(|points|points.len()>131_072){return Err("Finish the paint gesture before it exceeds 131072 samples".into());}
-    // Match Color reads its source statistics from a second engine document: load that image beside
+    // Match Color reads another image's statistics from a second engine document: load that image beside
     // this one for the command and close it before publishing.
     let mut params = params;
-    let match_source = match (command == "image.adjustments.matchColor").then(|| params.as_object_mut().and_then(|object| object.remove("sourcePhoto"))).flatten() {
-        Some(source) => {
-            let (Some(source_id), Some(source_version)) = (source["id"].as_str(), source["version"].as_str()) else { return Err("Choose a source image for Match Color".into()); };
-            id(source_version)?;params["source"] = json!(1);
-            Some((root(&app, &project_id, source_id)?, source_version.to_string()))
-        }
+    let match_source = match match_color::source_photo(&command, &mut params, &photo_id, &version)? {
+        Some((source_id, source_version)) => { id(&source_version)?; Some((root(&app, &project_id, &source_id)?, source_version)) }
         None => None,
     };
+    let clone_source = clone_document::reference(&command, &mut params, &project_id, &photo_id, |source| root(&app, &project_id, source))?;
     tauri::async_runtime::spawn_blocking(move || {
         if command=="pattern.import" {
             if let Some(path)=params["path"].as_str() {
@@ -1086,6 +1146,7 @@ pub async fn xdesign_photo_command(
             if sessions.get(&cache_key).is_none_or(|session|session.version!=version){return Err("The image changed; reopen it before changing color settings".into());}
             let context=color_settings::update(&tool_dir,&params)?;sessions.color_settings(&context);let session=sessions.get(&cache_key).ok_or("No image session")?;let mut response=reply(&dir,&photo_id,session,Vec::new())?;response.result=Some(context.describe());return Ok(response);
         }
+        let _clone_source = clone_document::provide(&sessions, clone_source.as_ref())?;
         let session = sessions.get_mut(&cache_key).ok_or("Reopen the image document before editing")?;
         if session.version != version { return Err("The image changed; reopen its current version before editing".into()); }
         preview::validate_geometry_input(&session.engine, &command, &params)?;
@@ -1106,7 +1167,7 @@ pub async fn xdesign_photo_command(
         let color_before=if color_views::COMMANDS.contains(&command.as_str()){Some(color_views::Snapshot::capture(&session.engine)?.native(&before.doc)?)}else{None};
         let stroke_identity=format!("{project_id}/{photo_id}/{version}/{}",color_views::key(&session.engine)?);
         let output_path = linked_replay::output_path(&command, &params);
-        let result = tools::execute(&tool_dir,&mut session.engine,&command,|engine|match stroke::commit_feedback(engine,&stroke_identity,&command,&params){Some(result)=>result,None=>match snapshots::execute(engine,&photo_id,&command,&params){Some(result)=>result,None=>execute_view_command(engine, &command, params)}}).and_then(|(value,warnings)| linked_replay::persist_output(output_path.as_deref(), || {
+        let result = tools::execute(&tool_dir,&mut session.engine,&command,|engine|{let after=mixer_reservoir::begin(&cache_key,engine,&command,&params)?;let value=match stroke::commit_feedback(engine,&stroke_identity,&command,&params){Some(result)=>result,None=>match snapshots::execute(engine,&photo_id,&command,&params){Some(result)=>result,None=>execute_view_command(engine, &command, params)}}?;mixer_reservoir::end(&cache_key,engine,after).map(|()|value)}).and_then(|(value,warnings)| linked_replay::persist_output(output_path.as_deref(), || {
             if match_source.is_some() { while session.engine.documents().len() > 1 { session.engine.close(session.engine.documents().len() - 1); } session.engine.set_active(0); }
             if session.engine.documents().len()!=1||session.engine.active_index()!=Some(0) {return Err("This operation creates another image document and needs a workspace integration".into());}
             persist_command(&dir, &photo_id, session, &before, &command)?;
@@ -2563,12 +2624,8 @@ pub async fn xdesign_photo_command_preview(
     }
     let dir = root(&app, &project_id, &photo_id)?;
     let mut params = params;
-    let match_source = match (command == "image.adjustments.matchColor").then(|| params.as_object_mut().and_then(|object| object.remove("sourcePhoto"))).flatten() {
-        Some(source) => {
-            let (Some(source_id), Some(source_version)) = (source["id"].as_str(), source["version"].as_str()) else { return Err("Choose a source image for Match Color".into()); };
-            id(source_id)?;id(source_version)?;params["source"] = json!(1);
-            Some((root(&app, &project_id, source_id)?, source_version.to_string()))
-        }
+    let match_source = match match_color::source_photo(&command, &mut params, &photo_id, &version)? {
+        Some((source_id, source_version)) => { id(&source_id)?; id(&source_version)?; Some((root(&app, &project_id, &source_id)?, source_version)) }
         None => None,
     };
     let lease=preview_requests::acquire(&owner,request_id.as_deref())?;
@@ -2626,7 +2683,10 @@ pub async fn xdesign_photo_stroke_preview(
     height: u32,
     scale: u32,
 ) -> Result<Vec<PhotoTile>, String> {
+    let mut params = params;
+    let clone_source = clone_document::reference(&command, &mut params, &project_id, &photo_id, |source| root(&app, &project_id, source))?;
     stroke_preview_run(app, project_id, photo_id, version, view_key, command, move |engine, identity, command| {
+        let _clone_source = clone_document::provide_unlocked(clone_source.as_ref())?;
         stroke::render_with_identity(engine, Some(identity), command, &params, x, y, width, height, scale)
     })
     .await
@@ -2649,7 +2709,10 @@ pub async fn xdesign_photo_stroke_pixels(
     height: u32,
     scale: u32,
 ) -> Result<tauri::ipc::Response, String> {
+    let mut params = params;
+    let clone_source = clone_document::reference(&command, &mut params, &project_id, &photo_id, |source| root(&app, &project_id, source))?;
     stroke_preview_run(app, project_id, photo_id, version, view_key, command, move |engine, identity, command| {
+        let _clone_source = clone_document::provide_unlocked(clone_source.as_ref())?;
         stroke::render_pixels(engine, identity, command, &params, x, y, width, height, scale)
     })
     .await
@@ -2671,7 +2734,10 @@ pub async fn xdesign_photo_stroke_preview_pixels(
     params: Value,
     view: bool,
 ) -> Result<tauri::ipc::Response, String> {
+    let mut params = params;
+    let clone_source = clone_document::reference(&command, &mut params, &project_id, &photo_id, |source| root(&app, &project_id, source))?;
     stroke_preview_run(app, project_id, photo_id, version, view_key, command, move |engine, identity, command| {
+        let _clone_source = clone_document::provide_unlocked(clone_source.as_ref())?;
         stroke::render_preview_pixels(engine, identity, command, &params, view)
     })
     .await
@@ -2726,6 +2792,7 @@ async fn stroke_preview_run<T: Send + 'static>(
         }
         let engine=&mut slot.as_mut().ok_or("No preview image")?.1;
         tools::preview_settings(&tool_dir, engine)?;
+        mixer_reservoir::install(&key(&project_id, &photo_id), engine)?;
         render(engine, &identity, &command)
     })
     .await
@@ -2791,14 +2858,31 @@ fn channel_thumbnails(doc: &photocraft_engine::doc::Document, size: u32) -> Resu
 }
 
 /// Levels, Curves and Threshold histograms: what an adjustment layer receives (`below`), or the
-/// target layer on its own for Image ▸ Adjustments, binned per tone channel of `space`.
+/// target layer on its own for Image ▸ Adjustments, binned per tone channel of `space`; a `target`
+/// (layer mask, Quick Mask or alpha channel) gives its one grey histogram instead.
 #[tauri::command]
-pub async fn xdesign_photo_histogram(app: AppHandle, project_id: String, photo_id: String, version: String, layer: Option<u64>, below: bool, space: String) -> Result<Vec<Vec<u32>>, String> {
+#[allow(clippy::too_many_arguments)]
+pub async fn xdesign_photo_histogram(app: AppHandle, project_id: String, photo_id: String, version: String, layer: Option<u64>, below: bool, space: String, target: Option<Value>) -> Result<Vec<Vec<u32>>, String> {
     let dir = root(&app, &project_id, &photo_id)?;
     id(&version)?;
     tauri::async_runtime::spawn_blocking(move || {
         let (doc, _, _) = view_snapshot(&dir, &project_id, &photo_id, &version, None)?;
-        histograms(&doc, layer, below, &space)
+        samples::histogram(&doc, layer, below, &space, target.as_ref())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Levels and Curves Auto: Find Dark & Light Colors' shadow and highlight colours (the darkest and lightest
+/// clip percentages by luminosity) and Snap Neutral Midtones' nearly neutral average, 0–255.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn xdesign_photo_auto_colors(app: AppHandle, project_id: String, photo_id: String, version: String, layer: Option<u64>, below: bool, shadow_clip: f64, highlight_clip: f64) -> Result<Value, String> {
+    let dir = root(&app, &project_id, &photo_id)?;
+    id(&version)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let (doc, _, _) = view_snapshot(&dir, &project_id, &photo_id, &version, None)?;
+        samples::auto_colors(&doc, layer, below, shadow_clip, highlight_clip)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -2806,22 +2890,15 @@ pub async fn xdesign_photo_histogram(app: AppHandle, project_id: String, photo_i
 
 /// The Levels and Curves eyedroppers: the mean straight colour (0–255) of a document rectangle, read from the same
 /// pixels as the histogram so the image under an adjustment layer is sampled without that adjustment.
+/// `space: "cmyk"` reads a CMYK image's inks (0–100 %), and a `target` one grey (0–255).
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-pub async fn xdesign_photo_sample(app: AppHandle, project_id: String, photo_id: String, version: String, layer: Option<u64>, below: bool, x: u32, y: u32, width: u32, height: u32, above_hidden: Option<bool>) -> Result<Option<[f32; 3]>, String> {
+pub async fn xdesign_photo_sample(app: AppHandle, project_id: String, photo_id: String, version: String, layer: Option<u64>, below: bool, x: u32, y: u32, width: u32, height: u32, above_hidden: Option<bool>, space: Option<String>, target: Option<Value>) -> Result<Option<Vec<f32>>, String> {
     let dir = root(&app, &project_id, &photo_id)?;
     id(&version)?;
     tauri::async_runtime::spawn_blocking(move || {
         let (doc, _, _) = view_snapshot(&dir, &project_id, &photo_id, &version, None)?;
-        // Current & Below: the layer stays and everything stacked over it goes.
-        match layer.filter(|_| above_hidden == Some(true)) {
-            Some(id) => {
-                let mut doc = doc;
-                if !hide_above(&mut std::sync::Arc::make_mut(&mut doc).layers, photocraft_engine::doc::LayerId(id)) { return Err("That layer no longer exists".into()); }
-                sample_layer_view(&doc, None, false, x, y, width, height)
-            }
-            None => sample_layer_view(&doc, layer, below, x, y, width, height),
-        }
+        samples::sample(doc, layer, below, above_hidden, [x, y, width, height], space.as_deref(), target.as_ref())
     })
     .await
     .map_err(|e| e.to_string())?

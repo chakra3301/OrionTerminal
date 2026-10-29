@@ -50,6 +50,18 @@ pub(super) fn heal_region<'a>(
     mask: &[bool],
     ctl: &Interrupt,
 ) -> Result<Paint<'a>, String> {
+    heal_region_diffused(fmt, src, dst, mask, 5, 0.0, ctl)
+}
+/// `heal_region` with Photoshop's Diffusion (1..=7); 5 is the native solve.
+pub(super) fn heal_region_diffused<'a>(
+    fmt: &PixelFormat,
+    src: &Region,
+    dst: &'a Region,
+    mask: &[bool],
+    diffusion: u8,
+    scale: f32,
+    ctl: &Interrupt,
+) -> Result<Paint<'a>, String> {
     admission::check(ctl)?;
     admission::area(dst.rect)?;
     let w = dst.width();
@@ -96,9 +108,11 @@ pub(super) fn heal_region<'a>(
         let start = dst.index(rect.x0, y);
         cropped_mask.extend_from_slice(&mask[start..start + width]);
     }
+    super::healing_options::smooth_mismatch(&mut delta, &cropped_mask, width, height, n, diffusion, scale);
     let mut data = poisson::membrane_fill_with(width, height, n, &delta, &cropped_mask, ctl)
         .map_err(|_| "The retouch feedback was canceled".to_string())?;
     drop(delta);
+    super::healing_options::confine_correction(&mut data, &cropped_mask, width, height, n, diffusion, scale);
     let alpha = alpha_index(fmt);
     let float = fmt.sample == SampleType::F32;
     for y in 0..height {

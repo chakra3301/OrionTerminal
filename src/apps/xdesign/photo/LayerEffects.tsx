@@ -7,6 +7,8 @@ const EFFECTS=[["dropShadow","Drop Shadow"],["innerShadow","Inner Shadow"],["out
 export const BLENDS=["Normal","Dissolve","Darken","Multiply","ColorBurn","LinearBurn","DarkerColor","Lighten","Screen","ColorDodge","LinearDodge","LighterColor","Overlay","SoftLight","HardLight","VividLight","LinearLight","PinLight","HardMix","Difference","Exclusion","Subtract","Divide","Hue","Saturation","Color","Luminosity"];
 const ENUMS:Record<string,string[]>={blend:BLENDS,technique:["Softer","Precise"],source:["Edge","Center"],position:["Outside","Inside","Center"],style:["Linear","Radial","Angle","Reflected","Diamond"]};
 const PERCENT=new Set(["opacity","spread","range","noise","jitter","depth","scale","alpha"]);
+// Brush Settings fields whose engine fraction Photoshop shows on another scale: [multiplier, displayed min, displayed max].
+const BRUSH_SCALES:Record<string,[number,number,number]>={hueJitter:[100,0,100],saturationJitter:[100,0,100],brightnessJitter:[100,0,100],purity:[100,-100,100],"smoothing.amount":[100,0,100],"texture.brightness":[150,-150,150],"texture.contrast":[150,-150,150]};
 const labelFor=(key:string)=>key.replaceAll("_"," ").replace(/([a-z])([A-Z])/g,"$1 $2").replace(/^./,value=>value.toUpperCase());
 type Commit=(path:string[],value:unknown)=>void;
 type Live={show:Commit;end:()=>void};
@@ -29,8 +31,10 @@ export function EffectSettings({value,path=[],commit,colors={},effectType="",dis
   }
   if(typeof value==="boolean")return <label className="xd-photo-effect-field"><span>{label}</span><input aria-label={accessible} disabled={disabled} type="checkbox" checked={value} onChange={event=>commit(path,event.target.checked)}/></label>;
   if(typeof value==="number") {
-    const multiplier=effectType==="FilterParams"?1:(PERCENT.has(field)||displayLabel==="Opacity"||(effectType==="BrushSettings"&&["hardness","spacing","flow","roundness","minimum","tiltScale","wet","load","mix"].includes(field))?100:1),display=Number((value*multiplier).toFixed(3));
-    return <label className="xd-photo-effect-field"><span>{label}{multiplier===100?" (%)":""}</span><input aria-label={accessible} disabled={disabled} key={display} type="number" step="any" defaultValue={display} onChange={event=>{const next=event.target.valueAsNumber/multiplier;if(Number.isFinite(next)&&Math.abs(next)<=100000)live?.show(path,next);}} onBlur={event=>{const next=event.target.valueAsNumber/multiplier;if(Number.isFinite(next)&&Math.abs(next)<=100000&&next!==value)commit(path,next);else live?.end();}} onKeyDown={event=>{if(event.key==="Enter")event.currentTarget.blur();}}/></label>;
+    const scale=effectType==="BrushSettings"?BRUSH_SCALES[field]??BRUSH_SCALES[path.slice(-2).join(".")]:undefined;
+    const multiplier=scale?scale[0]:effectType==="FilterParams"?1:(PERCENT.has(field)||displayLabel==="Opacity"||(effectType==="BrushSettings"&&["hardness","spacing","flow","roundness","minimum","tiltScale","wet","load","mix"].includes(field))?100:1),display=Number((value*multiplier).toFixed(3));
+    const valid=(shown:number)=>Number.isFinite(shown)&&(scale?shown>=scale[1]&&shown<=scale[2]:Math.abs(shown/multiplier)<=100000);
+    return <label className="xd-photo-effect-field"><span>{label}{multiplier===100?" (%)":""}</span><input aria-label={accessible} disabled={disabled} key={display} type="number" step="any" min={scale?.[1]} max={scale?.[2]} defaultValue={display} onChange={event=>{const next=event.target.valueAsNumber/multiplier;if(valid(event.target.valueAsNumber))live?.show(path,next);}} onBlur={event=>{const next=event.target.valueAsNumber/multiplier;if(valid(event.target.valueAsNumber)&&next!==value)commit(path,next);else live?.end();}} onKeyDown={event=>{if(event.key==="Enter")event.currentTarget.blur();}}/></label>;
   }
   if(typeof value==="string") {
     let choices=ENUMS[field];

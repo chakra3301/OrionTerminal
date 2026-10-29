@@ -18,7 +18,7 @@ export type SelectionNumber = { key: string; label: string; min: number; max: nu
 export const REFINE_FIELDS: SelectionNumber[] = [
   { key: "radius", label: "Radius (px)", min: 0, max: 250, step: .1 },
   { key: "smooth", label: "Smooth", min: 0, max: 100, step: .1 },
-  { key: "feather", label: "Feather (px)", min: 0, max: 1000, step: .1 },
+  { key: "feather", label: "Feather (px)", min: 0, max: 250, step: .1 },
   { key: "contrast", label: "Contrast (%)", min: 0, max: 100, step: .1 },
   { key: "shiftEdge", label: "Shift edge (%)", min: -100, max: 100, step: .1 },
 ];
@@ -27,7 +27,7 @@ export const FOCUS_FIELDS: SelectionNumber[] = [
   { key: "noise", label: "Image noise", min: 0, max: 1, step: .01 },
 ];
 export function selectionDefaults(kind: SelectionWorkflow, foreground: PhotoColor): SelectionSettings {
-  if (kind === "refine") return { radius: 0, smartRadius: false, smooth: 0, feather: 0, contrast: 0, shiftEdge: 0, decontaminate: false, amount: 100, output: "selection", sampleAllLayers: false };
+  if (kind === "refine") return { radius: 0, smartRadius: false, smooth: 0, feather: 0, contrast: 0, shiftEdge: 0, decontaminate: false, amount: 100, output: "selection", sampleAllLayers: false, quickSize: 30, brushToolSize: 30, brushToolHardness: 100 };
   if (kind === "focus") return { range: .5, noise: 0, sampleAllLayers: true, mode: "replace" };
   return { select: "sampledColors", colors: [foreground], points: [], subtractPoints: [], sampleFuzziness: 40, toneFuzziness: 20, shadowLevel: 65, highlightLevel: 190, midLow: 105, midHigh: 150, localized: false, range: 100, invert: false, sampleAllLayers: true, mode: "replace" };
 }
@@ -52,7 +52,7 @@ export function selectionRequest(kind: SelectionWorkflow, settings: SelectionSet
     params.smartRadius = settings.smartRadius === true; params.decontaminate = settings.decontaminate === true;
     if (params.decontaminate) number("amount", "decontamination amount", 0, 100);
     params.output = effectiveSelectionOutput(settings);
-    if (!context.hasSelection) errors.push("Make a selection before opening Select and Mask.");
+    if (!context.hasSelection) errors.push("Make a selection to refine.");
     if (params.output !== "selection" && !context.layer) errors.push("Select a layer for this output.");
     if (["newLayer", "newLayerWithMask"].includes(String(params.output)) && context.layer && context.layer.hasPixels !== true && !(context.layer.hasPixels === undefined && context.layer.kind === "Raster")) errors.push("This output needs a layer with pixels.");
     if (settings.edgeBrushes !== undefined) {

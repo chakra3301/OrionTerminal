@@ -7,7 +7,8 @@ import { autoLevels, channelColor, CurveEditor, histogramIndex, histogramSpace, 
 import { ToneAdjustment } from "./ToneTools";
 import { smoothCurve } from "./curveTools";
 import { balanceSlider, blackWhiteTrack, hueSaturationTrack, PhotoFilterUse, trackStyle } from "./colorControls";
-import { HueSaturationLayout } from "./hueSaturationControls";
+import { colorizeFrom, HueSaturationLayout } from "./hueSaturationControls";
+import { usePhotoWorkspace } from "./runtime";
 import { BlackWhiteLayout } from "./blackWhiteControls";
 import { psSlider, psTrack } from "./psSliders";
 import { bakeGradient, GRADIENT_METHODS } from "./gradientMethod";
@@ -70,7 +71,8 @@ export type AdjustmentControlsProps = {
 };
 export function AdjustmentControls({ action, values, setValues, change, locked, mode, layer, fields = action.fields ?? [], anyStep, channel, setChannel, range, setRange, loadingFile, setLoadingFile, setLocalError, source, canvas, toolSlot, psSliders = false, hold }: AdjustmentControlsProps): ReactNode {
   const { number, numericFields, toggle, selector } = controlKit({ action, values, change, locked, anyStep, ps: psSliders });
-  const channels = toneChannels(mode, values), toneChannel = channel || (channels[0] === "lightness" ? "lightness" : "composite");
+  // A mask, Quick Mask or alpha channel is one grey plane whatever the image's mode.
+  const plane = !!source?.target, channels = toneChannels(mode, values), toneChannel = channel || (channels[0] === "lightness" && !plane ? "lightness" : "composite");
   const tones = toneChannel === "composite" ? values : object(values[toneChannel]);
   const patchTone = (patch: Settings) => toneChannel === "composite" ? Object.entries(patch).forEach(([key, value]) => change(key, value)) : change(toneChannel, { ...tones, ...patch });
   const histograms = useHistogram(["levels", "curves", "threshold"].includes(action.id) ? source : undefined, action.id === "threshold" ? "luminosity" : histogramSpace(channels));
@@ -88,10 +90,10 @@ export function AdjustmentControls({ action, values, setValues, change, locked, 
   let controls: ReactNode;
   if (action.id === "levels" || action.id === "curves") {
     // Grayscale, Duotone and Bitmap documents have one tonal channel, which Photoshop calls Gray.
-    const gray = ["grayscale", "duotone", "bitmap"].includes(mode.toLowerCase()), composite = gray ? "Gray" : channels[0] === "cyan" ? "CMYK" : "RGB";
+    const grayMode = ["grayscale", "duotone", "bitmap"].includes(mode.toLowerCase()), gray = grayMode || plane, composite = gray ? "Gray" : channels[0] === "cyan" ? "CMYK" : "RGB";
     const overlays = toneChannel === "composite" ? channels.filter(key => Array.isArray(values[key]) && JSON.stringify(values[key]) !== JSON.stringify(IDENTITY_CURVE)).map(key => ({ color: channelColor(key) ?? "var(--xd-text-2)", points: values[key] as CurvePoint[] })) : [];
     const channelAuto = autoRange ? () => { if (action.id === "levels") patchTone({ inBlack: autoRange[0], inWhite: autoRange[1], gamma: 1 }); else change(curveKey, [[autoRange[0], 0], [autoRange[1], 255]]); } : null;
-    controls = <ToneAdjustment kind={action.id === "levels" ? "levels" : "curves"} values={values} setValues={setValues} channel={toneChannel} rgb={channels[0] === "red"} gray={gray} pigmentDefault={gray || channels[0] === "cyan"} smooth={() => change(curveKey, smoothCurve(curve))} histograms={histograms} channelAuto={channelAuto} locked={locked} source={source} canvas={canvas} slot={toolSlot} fail={setLocalError}
+    controls = <ToneAdjustment kind={action.id === "levels" ? "levels" : "curves"} values={values} setValues={setValues} channel={toneChannel} rgb={!plane && channels[0] === "red"} gray={gray} lab={!plane && channels[0] === "lightness"} pigmentDefault={grayMode || channels[0] === "cyan"} smooth={() => change(curveKey, smoothCurve(curve))} histograms={histograms} channelAuto={channelAuto} locked={locked} source={source} canvas={canvas} slot={toolSlot} fail={setLocalError}
       head={selector("Channel", toneChannel, gray ? ["composite"] : channels[0] === "lightness" ? channels : ["composite", ...channels], setChannel, { show: value => value === "composite" ? composite : humanize(value) })}
       editor={action.id === "levels" ? view => <LevelsEditor tones={tones} fields={fields} bins={bins} color={tint} locked={locked} anyStep={anyStep} prefix="Adjustment" patch={patchTone} clip={view.clip}/> : view => <CurveEditor key={curveKey} points={curve} disabled={locked} change={points => change(curveKey, points)} bins={bins} color={tint} overlays={overlays} {...view}/>}/>;
   }
@@ -112,7 +114,7 @@ export function AdjustmentControls({ action, values, setValues, change, locked, 
   }
   else if (action.id === "hueSaturation") controls = <HueSaturationLayout values={values} change={change} range={range} setRange={setRange} locked={locked} anyStep={anyStep} source={source} canvas={canvas} fail={setLocalError}
     sliders={numericFields(hue, (key, value) => range === "master" ? change(key, value) : change(range, { ...hue, [key]: value }), hueFields, field => hueSaturationTrack(field.key, values, range))}
-    colorize={toggle("colorize", "Colorize", value => { setRange("master"); setValues(current => ({ ...current, colorize: value, hue: value ? (Number(current.hue) % 360 + 360) % 360 : Math.max(-180, Math.min(180, Number(current.hue))), saturation: value ? Math.max(0, Number(current.saturation)) : current.saturation })); })}/>;
+    colorize={toggle("colorize", "Colorize", value => { setRange("master"); const foreground = usePhotoWorkspace.getState().state?.tools?.foreground; setValues(current => value ? colorizeFrom(current, foreground) : { ...current, colorize: false, hue: Math.max(-180, Math.min(180, Number(current.hue))) }); })}/>;
   else if (action.id === "gradientMap") {
     const method = GRADIENT_METHODS.find(([id]) => id === values.method)?.[0] ?? "classic";
     const hexStops = stops.map(([at, color]): [number, string] => [at, rgbHex(color, "#000000")]);
@@ -126,6 +128,6 @@ export function AdjustmentControls({ action, values, setValues, change, locked, 
   </div>{selector("Interpolation", String(values.interpolation), ["trilinear", "tetrahedral"], value => change("interpolation", value))}{toggle("dither", "Dither")}</>;
   else if (action.id === "blackWhite") controls = <BlackWhiteLayout values={values} change={change} setValues={setValues} locked={locked} dialog={psSliders} tint={toggle("tint", "Tint")} tintColor={rgbHex(values.tintColor, "#e1d3b3")} slot={toolSlot} source={source} canvas={canvas} fail={setLocalError}
     sliders={numericFields(values, change, fields, field => blackWhiteTrack(field.key))} slider={(field, value, commit, track) => number(field, value, commit, { track })}/>;
-  else controls = <>{action.id === "photoFilter" && <PhotoFilterUse color={rgbHex(values.color, "#ec8a00")} presets={PHOTO_FILTER_PRESETS} locked={locked} change={value => change("color", value)}/>}{action.id === "filter.blur.motionBlur" ? fields.map(field => number(field, values[field.key] ?? field.value, value => change(field.key, value), field.key === "angle" ? { aside: <AngleDial label="Angle" value={Number(values.angle)} disabled={locked} change={value => change("angle", value)}/> } : {})) : numericFields(values, change, fields.map(field => action.id === "brightnessContrast" && field.key === "contrast" && values.legacy ? { ...field, min: -100, max: 99 } : field))}{action.id === "brightnessContrast" && toggle("legacy", "Use legacy", value => setValues(current => ({ ...current, legacy: value, contrast: Math.max(value ? -100 : -50, Math.min(value ? 99 : 100, Number(current.contrast) || 0)) })), "Use Legacy")}{action.id === "brightnessContrast" && psSliders && <AutoBrightnessContrast slot={toolSlot} source={source} legacy={values.legacy === true} locked={locked} setValues={setValues}/>}{action.id === "exposure" && psSliders && <ExposureEyedroppers slot={toolSlot} source={source} canvas={canvas} mode={mode} locked={locked} setValues={setValues} fail={setLocalError}/>}{action.id === "photoFilter" && toggle("preserveLuminosity", "Preserve luminosity", undefined, "Preserve Luminosity")}{action.id === "invert" && <p className="xd-photo-section-help">Invert the colors of this layer.</p>}</>;
+  else controls = <>{action.id === "brightnessContrast" && <AutoBrightnessContrast slot={toolSlot} inline={!psSliders} source={source} legacy={values.legacy === true} locked={locked} setValues={setValues}/>}{action.id === "photoFilter" && <PhotoFilterUse color={rgbHex(values.color, "#ec8a00")} presets={PHOTO_FILTER_PRESETS} locked={locked} change={value => change("color", value)}/>}{action.id === "filter.blur.motionBlur" ? fields.map(field => number(field, values[field.key] ?? field.value, value => change(field.key, value), field.key === "angle" ? { aside: <AngleDial label="Angle" value={Number(values.angle)} disabled={locked} change={value => change("angle", value)}/> } : {})) : numericFields(values, change, fields.map(field => action.id === "brightnessContrast" && field.key === "contrast" && values.legacy ? { ...field, min: -100 } : field))}{action.id === "brightnessContrast" && toggle("legacy", "Use legacy", value => setValues(current => ({ ...current, legacy: value, contrast: Math.max(value ? -100 : -50, Math.min(100, Number(current.contrast) || 0)) })), "Use Legacy")}{action.id === "exposure" && psSliders && <ExposureEyedroppers slot={toolSlot} source={source} canvas={canvas} mode={mode} locked={locked} setValues={setValues} fail={setLocalError}/>}{action.id === "photoFilter" && toggle("preserveLuminosity", "Preserve luminosity", undefined, "Preserve Luminosity")}{action.id === "invert" && <p className="xd-photo-section-help">Invert the colors of this layer.</p>}</>;
   return controls;
 }

@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentType, type CSSProperties, type PointerEvent, type MouseEvent } from "react";
 import { flushSync } from "react-dom";
+import { create } from "zustand";
 import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
 import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ArrowLeftRight, RotateCcw, SquareDashed, Undo2, Redo2, Plus, Trash2, Eye, EyeOff, Layers, ZoomIn, ZoomOut, Search, SlidersHorizontal, Lock, Link2, CornerLeftDown, House, ChevronDown, ChevronRight, ChevronsRight, X, History as HistoryIcon, Compass, Brush, Sparkles, Shapes, Bookmark, Grid2x2, Move, Contrast, Folder, Menu, Info as InfoIcon, SunMedium, ChartColumn, ChartSpline, Diff, Triangle, Palette, Scale, Camera, Blend, Grid3x3, SquareSplitVertical, ChartNoAxesColumnIncreasing, Mountain, Rainbow, Target, Type, Box, Maximize, Pilcrow, Ruler, StickyNote, Ban, Check, type LucideIcon } from "lucide-react";
 import { pencilPhotoDocumentId, usePencilWorkspace } from "../pencil/runtime";
@@ -69,17 +70,21 @@ import { ChannelMergeDialog } from "./ChannelMergeDialog";
 import { ImageTransformOverlay } from "./ImageTransformOverlay";
 import { MoveDragPreview, type MoveDragUpdate } from "./MoveDragPreview";
 import { FreeTransformBar } from "./FreeTransformBar";
-import { beginFreeTransform, cancelFreeTransform, useFreeTransform, type TransformMode } from "./freeTransform";
+import { beginFreeTransform, cancelFreeTransform, useFreeTransform, type HistoryFold, type TransformMode } from "./freeTransform";
 import { BrushPresetPicker, GradientTypeIcons, PopupSlider, SelectionModeCluster } from "./OptionsBarControls";
-import { PaintToolOptions, PAINT_TOOL_FIELDS, NATIVE_STROKE_TOOLS, RETOUCH_PREVIEW_TOOLS, CONTINUOUS_RETOUCH_TOOLS, brushOptionBasis, paintToolDefaults, rebaseBrushOptions, sanitizePaintOptions, strokeParameters, type PaintOptions } from "./PaintToolOptions";
+import { PaintToolOptions, PAINT_TOOL_FIELDS, PIXEL_LAYER_OPTIONS, NATIVE_STROKE_TOOLS, RETOUCH_PREVIEW_TOOLS, CONTINUOUS_RETOUCH_TOOLS, brushOptionBasis, paintToolDefaults, rebaseBrushOptions, sanitizePaintOptions, strokeParameters, TRANSPARENCY_MODES, type PaintOptions } from "./PaintToolOptions";
+import { smoothingMenu } from "./smoothingOptions";
+import { ToolPresetPicker } from "./ToolPresetPicker";
 import { cloneOverlayTransform, cloneSourcePoint } from "./cloneSourceGeometry";
 import { usePaintToolPreferences } from "./paintToolPreferences";
+import { alignParams, useAlignTo } from "./moveAlign";
+import { antialiasEntries, layerFaceName, typeAntialias, useFamilyFaces } from "./typeOptions";
 import { nativePaintColor, paintColorHex, paintColorRGBA } from "./imageColors";
 import { isDesignDialogOpen } from "../useDesignDialog";
 import { historyBrushSource } from "./HistoryBrushSource";
 import { ImagePlaceDialog } from "./ImagePlaceDialog";
 import { constrain, snap45, type Axis, type XY as StrokeXY } from "./strokeConstraint";
-import { LINE_SELECTION_TOOLS, RECTANGLE_TOOLS, SELECTION_TOOLS, gestureRectangle, lineSelection, polygonPoint, selectionGestureCommand, selectionGestureMode, type GestureModifiers } from "./selectionGesture";
+import { LINE_SELECTION_TOOLS, RECTANGLE_TOOLS, SELECTION_TOOLS, gestureRectangle, lineSelection, polygonPoint, selectionGestureCommand, selectionGestureMode, type GestureModifiers, type SelectionMode } from "./selectionGesture";
 import { polygonPoints, polygonRect } from "./polygonShape";
 import { SelectionDialog } from "./SelectionDialog";
 import { ColorRangeDialog } from "./ColorRangeDialog";
@@ -88,7 +93,8 @@ import { PreferencesDialog, type PreferencesSection } from "./PreferencesDialog"
 import { PASTEBOARD_COLORS, RULER_UNITS, currentPreferences, pasteboardFill, savePreferences, usePreferences, type Pasteboard } from "./preferences";
 import { ColorProfileDialog, type ColorProfileWorkflow } from "./ColorProfileDialog";
 import type { SelectionWorkflow } from "./selectionSettings";
-import { patchOffset, patchOffsetFitsCanvas, patchTarget } from "./patchGesture";
+import { patchOffset, patchOffsetFitsCanvas, patchOptions, patchPress, patchTarget } from "./patchGesture";
+import { MixerBrushLoad, mixerLoadAfterStroke, mixerLoadOf, useMixerLoads } from "./mixerCombinations";
 import { BACKGROUND_ERASER_COMMIT_SAMPLES, backgroundEraserCommitAllowed, backgroundEraserPreviewAllowed, backgroundEraserPreviewSampleAllowed, eraserTargetProblem, magicEraserParams, sameEraserGesture, type EraserGestureContext, type EraserTargetState } from "./eraserGesture";
 import { historyActions, PhotoHistory } from "./PhotoHistory";
 import { PhotoPaths, pathsPanelMenu, selectedPath, usePathTargets } from "./PhotoPaths";
@@ -109,26 +115,31 @@ import { ContextualTaskBar, TASK_BAR_HOME, type TaskBarPlace } from "./Contextua
 import { penKnots, simplifyPath, smoothHandles, type XY } from "./penPath";
 import { PhotoNavigator, type NavigatorView } from "./PhotoNavigator";
 import { applyCropPreset, matchingCropPreset, useCropPresets } from "./CropPresets";
-import { TypeBar, ShapeStyleFields, PathOpSelect, DistributeMenu, GradientToolPick, typeStyleParams, shapeStyleParams, CropRatioFields, CropRatioSelect, PerspectiveCropBar, cropResolution, CropFillField, CROP_SIZES, cropSizeChoice, cropSizeName, cropSizePixels, BrushBarItems, BrushSettingsToggle, BRUSH_BAR_ITEMS, type BrushBarSettings, type CropSizeValues, type ShapeStyle, type PathOp, type TypeBarProps, type TypeStyle, type TypeAlign } from "./toolBars";
+import { TypeBar, DistributeMenu, GradientToolPick, typeStyleParams, shapeStyleParams, CropRatioFields, CropRatioSelect, PerspectiveCropBar, cropResolution, CropFillField, CROP_SIZES, cropSizeChoice, cropSizeName, cropSizePixels, BrushBarItems, BrushSettingsToggle, BRUSH_BAR_ITEMS, type BrushBarSettings, type CropSizeValues, type TypeBarProps, type TypeStyle, type TypeAlign } from "./toolBars";
+import { withPatterns } from "./shapeStyle";
 import { PhotoTextGeometryDialog } from "./PhotoTextGeometryDialog";
 import { CanvasTextEditor, findTextLayer, lastTextCaret, type CanvasText } from "./CanvasTextEditor";
 import { useFontFamilies } from "./fontFamilies";
 import { PathEditOverlay, TargetPathOverlay, type PathData } from "./PathEditOverlay";
+import { GradientStopsOverlay } from "./GradientStopsOverlay";
 import { addImageSwatch, PhotoSwatches } from "./PhotoSwatches";
 import { ColorPanel, colorPanelMenu, type ColorPanelMode } from "./ColorPanel";
 import { ColorPickerDialog } from "./ColorPickerDialog";
-import { grayHex, sampleImageColor, sampleLayerColor } from "./eyedropper";
+import { SAMPLE_SIZES, grayHex, sampleImageColor, sampleImageInks, sampleLayerColor } from "./eyedropper";
 import { SamplingRing } from "./SamplingRing";
 import { GRADIENT_METHODS, bakeRemembered, type GradientMethod, type GradientStop } from "./gradientMethod";
 import { GuideDialogs, ViewAids } from "./viewAids";
 import { SNAP_PX, boxTargets, documentGuides, guideInside, guidesVisible, layerEdgesVisible, pixelGridVisible, selectionEdgesVisible, shapeGuides, snapMove, targetPathVisible, snapBox, snapContext, snapXY, useViewAids, type MoveSnap } from "./viewGuides";
 import { NO_TURN, surfaceClient, surfaceFraction, surfaceOffset, surfaceSize, turnTransform, turnedSize, useViewTurn, visibleArea, type ViewTurn } from "./viewTurn";
+import { useVectorToolPreferences } from "./vectorToolPreferences";
+import { VectorToolBar } from "./VectorToolBar";
+import { constraintGestureOptions, deleteKnot, insertKnot, nearestKnot, nearestSegment, shapeGeometryPath, type ShapeGeometry } from "./vectorGeometry";
 
 type Point = [number, number, number, number, number, number, number];
 type HeldSample={clientX:number;clientY:number;pressure:number;pointerType:string;tiltX:number;tiltY:number;twist:number;timeStamp:number;shiftKey:boolean;altKey:boolean;metaKey:boolean;ctrlKey:boolean};
 type HeldStroke={pointerId:number;tool:string;down:HeldSample;moves:HeldSample[];up:HeldSample|null;until:number};
 const heldSample=(e:HeldSample):HeldSample=>({clientX:e.clientX,clientY:e.clientY,pressure:e.pressure,pointerType:e.pointerType,tiltX:e.tiltX,tiltY:e.tiltY,twist:e.twist,timeStamp:e.timeStamp,shiftKey:e.shiftKey,altKey:e.altKey,metaKey:e.metaKey,ctrlKey:e.ctrlKey});
-type PatchDrag = {pointerId:number;start:[number,number];current:[number,number];projectId:string;photoId:string;version:string;viewKey:string;mode:"source"|"destination";target:Record<string,unknown>;bounds:[number,number,number,number]|null};
+type PatchDrag = {pointerId:number;start:[number,number];current:[number,number];projectId:string;photoId:string;version:string;viewKey:string;mode:"source"|"destination";target:Record<string,unknown>;options:Record<string,unknown>;bounds:[number,number,number,number]|null;inside:Promise<boolean>};
 type PanDrag = {pointerId:number;x:number;y:number;left:number;top:number;spin?:{cx:number;cy:number;from:number;angle:number}};
 type StrokeGesture = {feedback:NativeStrokePreview;space:PreviewSurface|TileSurface|null;end:(()=>void)|null};
 const IMAGE_TOOLS=IMAGE_TOOL_GROUPS.flatMap(group=>group.tools);
@@ -149,7 +160,6 @@ function ClearSamplers({documentId}:{documentId:string}) {
   const count=useDocumentSamplers(documentId).length;
   return <button aria-label="Clear all color samplers" disabled={!count} onClick={()=>useColorSamplers.getState().clear(documentId)}>Clear All</button>;
 }
-const SAMPLE_SIZES=[[1,"Point Sample"],[3,"3 by 3 Average"],[5,"5 by 5 Average"],[11,"11 by 11 Average"],[31,"31 by 31 Average"],[51,"51 by 51 Average"],[101,"101 by 101 Average"]] as const;
 const ALIGN_EDGES=[["topEdges","Top Edges"],["verticalCenters","Vertical Centers"],["bottomEdges","Bottom Edges"],"-",["leftEdges","Left Edges"],["horizontalCenters","Horizontal Centers"],["rightEdges","Right Edges"]] as const;
 const MODIFY_ORDER=["select.modify.border","select.modify.smooth","select.modify.expand","select.modify.contract","select.modify.feather"];
 const FILTER_MENU=["Blur","Blur Gallery","Distort","Noise","Pixelate","Render","Sharpen","Stylize","Video","Other"];
@@ -182,7 +192,7 @@ const CROP_RATIOS:[string,number,number][]=[["1 : 1 (Square)",1,1],["4 : 5 (8 : 
 const PEN_TOOLS=["pen","pen.freeform","pen.curvature"],PEN_DRAFT_TOOLS=["pen","pen.curvature"],PATH_SELECT_TOOLS=["path.select","path.direct"];
 // Photoshop's Command key springs to the Move tool from every tool but these.
 const NO_SPRING_MOVE=["move","hand","rotateView","zoom","text","crop","perspectiveCrop","straighten","magneticLasso",...SHAPE_TOOLS,...PEN_TOOLS,...PATH_SELECT_TOOLS];
-const SAMPLING_TOOLS=["paint.stroke","paint.pencil","paint.mixerBrush","paint.colorReplacement","paint.gradient","paint.bucket"];
+const SAMPLING_TOOLS=["paint.stroke","paint.pencil","paint.colorReplacement","paint.gradient","paint.bucket"];
 // Photoshop's bracket steps grow with the brush, so large brushes resize in a few presses.
 const BRUSH_STEPS=[[10,1],[100,10],[200,25],[300,50],[1000,100],[2500,250],[Infinity,500]] as const;
 const stepBrushSize=(size:number,up:boolean,max:number)=>{const step=BRUSH_STEPS.find(([limit])=>up?size<limit:size<=limit)![1];return Math.max(1,Math.min(max,up?Math.floor(size/step)*step+step:Math.ceil(size/step)*step-step));};
@@ -222,7 +232,7 @@ function CloneSourceSettings({slot,context,disabled,commit,reset}:{slot:PhotoClo
     if(changed&&!disabled&&captured===context&&draft.every(value=>value.trim()!=="")&&pair.every(Number.isFinite))commit(captured,{offset:pair});
     else setDraft(values);
   };
-  return <><p className="xd-photo-section-help">Saved source transform applies to this source slot. Tool transform overrides it when enabled. Sources sample the current image.</p>{(["X","Y"] as const).map((axis,index)=><label key={axis}>Offset {axis} (px)<input aria-label={`Clone source offset ${axis}`} type="number" step="any" disabled={disabled} value={draft[index]} onFocus={()=>{editing.current=context;dirty.current=false;pending.current=null;}} onChange={event=>{if(disabled)return;editing.current??=context;dirty.current=true;const value=event.target.value,next:[string,string]=index===0?[value,draft[1]]:[draft[0],value],pair=next.map(Number);setDraft(next);pending.current=next.every(value=>value.trim()!=="")&&pair.every(Number.isFinite)?{context,params:{offset:pair}}:null;}} onBlur={event=>{if((event.relatedTarget as HTMLElement|null)?.dataset.cloneSourceReset){editing.current=null;dirty.current=false;pending.current=null;setDraft(values);}else finish();}} onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();finish();event.currentTarget.blur();}}}/></label>)}{(["width","height","rotation"] as const).map(key=><CloneSourceValue key={key} label={`Saved source ${key}${key==="rotation"?" (°)":" (%)"}`} value={slot?.[key]??(key==="rotation"?0:100)} min={key==="rotation"?-180:-1000} max={key==="rotation"?180:1000} valid={value=>key==="rotation"?value>=-180&&value<=180:Math.abs(value)>=1&&Math.abs(value)<=1000} context={context} disabled={disabled} commit={(captured,value)=>commit(captured,{[key]:value})} pending={(captured,value)=>{pending.current=value===null?null:{context:captured,params:{[key]:value}};}}/>)}{(["flipH","flipV"] as const).map(key=><label key={key} onMouseDown={event=>event.preventDefault()}><input aria-label={`Saved source flip ${key==="flipH"?"H":"V"}`} type="checkbox" disabled={disabled} checked={slot?.[key]??false} onChange={event=>{const patch=pending.current?.context===context?pending.current.params:{};pending.current=null;commit(context,{...patch,[key]:event.target.checked});}}/>Saved source flip {key==="flipH"?"H":"V"}</label>)}<button data-clone-source-reset="true" disabled={disabled} onClick={()=>{editing.current=null;dirty.current=false;pending.current=null;setDraft(values);reset(context);}}>Reset saved-slot transform</button></>;
+  return <><p className="xd-photo-section-help">Saved source transform applies to this source slot. Tool transform overrides it when enabled. Sources sample the image they were set in.</p>{(["X","Y"] as const).map((axis,index)=><label key={axis}>Offset {axis} (px)<input aria-label={`Clone source offset ${axis}`} type="number" step="any" disabled={disabled} value={draft[index]} onFocus={()=>{editing.current=context;dirty.current=false;pending.current=null;}} onChange={event=>{if(disabled)return;editing.current??=context;dirty.current=true;const value=event.target.value,next:[string,string]=index===0?[value,draft[1]]:[draft[0],value],pair=next.map(Number);setDraft(next);pending.current=next.every(value=>value.trim()!=="")&&pair.every(Number.isFinite)?{context,params:{offset:pair}}:null;}} onBlur={event=>{if((event.relatedTarget as HTMLElement|null)?.dataset.cloneSourceReset){editing.current=null;dirty.current=false;pending.current=null;setDraft(values);}else finish();}} onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();finish();event.currentTarget.blur();}}}/></label>)}{(["width","height","rotation"] as const).map(key=><CloneSourceValue key={key} label={`Saved source ${key}${key==="rotation"?" (°)":" (%)"}`} value={slot?.[key]??(key==="rotation"?0:100)} min={key==="rotation"?-180:-1000} max={key==="rotation"?180:1000} valid={value=>key==="rotation"?value>=-180&&value<=180:Math.abs(value)>=1&&Math.abs(value)<=1000} context={context} disabled={disabled} commit={(captured,value)=>commit(captured,{[key]:value})} pending={(captured,value)=>{pending.current=value===null?null:{context:captured,params:{[key]:value}};}}/>)}{(["flipH","flipV"] as const).map(key=><label key={key} onMouseDown={event=>event.preventDefault()}><input aria-label={`Saved source flip ${key==="flipH"?"H":"V"}`} type="checkbox" disabled={disabled} checked={slot?.[key]??false} onChange={event=>{const patch=pending.current?.context===context?pending.current.params:{};pending.current=null;commit(context,{...patch,[key]:event.target.checked});}}/>Saved source flip {key==="flipH"?"H":"V"}</label>)}<button data-clone-source-reset="true" disabled={disabled} onClick={()=>{editing.current=null;dirty.current=false;pending.current=null;setDraft(values);reset(context);}}>Reset saved-slot transform</button></>;
 }
 
 const isBackgroundLayer=(layer:PhotoLayer)=>layer.name==="Background"&&!!layer.locks?.transparency;
@@ -352,6 +362,14 @@ function findLayer(layers:PhotoLayer[],id:number|null):PhotoLayer|undefined {
 }
 const hasLayerKind=(layers:PhotoLayer[],kind:string):boolean=>layers.some(layer=>layer.kind===kind||!!layer.children&&hasLayerKind(layer.children,kind));
 const DEFINE_COMMANDS:Record<PresetKind,string>={brushes:"edit.defineBrushPreset",patterns:"edit.definePattern",customShapes:"edit.defineCustomShape"};
+// The engine's Clone Source slots are shared by every open image but do not say which image each source point was set in.
+type CloneSourceImage={project:string|null;image:string};
+const useCloneSourceImages=create<{images:Record<number,CloneSourceImage>;set:(index:number,from:CloneSourceImage|null)=>void}>(set=>({images:{},set:(index,from)=>set(state=>{const images={...state.images};if(from)images[index]=from;else delete images[index];return {images};})}));
+/** A stroke's `sourceDocument` for slot `index`: undefined while the source is in this image, null once the image it was set in has closed. */
+const cloneSourceDocument=(project:string|null,image:string,index:number)=>{
+  const from=useCloneSourceImages.getState().images[index];if(!from||from.project!==project||from.image===image)return undefined;
+  const source=useXDesign.getState().photoDocuments[from.image];return source?{id:source.id,version:source.version}:null;
+};
 
 
 export function PhotoStudio() {
@@ -396,11 +414,11 @@ export function PhotoStudio() {
   // Photoshop's Toggle Last State reverses the last undo or redo; the engine's would keep redoing.
   const toggleLastState=()=>(lastStep.current&&lastStep.current.at===historyAt()?!lastStep.current.redo:!canUndo)?redo():undo();
   const [tool,setTool]=useState<string>("paint.stroke"),[zoomOut,setZoomOut]=useState(false),[autoSelect,setAutoSelect]=useState(false),[autoSelectTarget,setAutoSelectTarget]=useState<"layer"|"group">("layer"),[transformControls,setTransformControls]=useState(true),[sampleSize,setSampleSize]=useState(1),[cropGuide,setCropGuide]=useState<CropGuide>("thirds"),[cropOrientation,setCropOrientation]=useState(0);
-  const panels=useEditorPanels();
+  const panels=useEditorPanels(),[alignTo,setAlignTo]=useAlignTo();
   const [upperTab,setUpperTab]=useState<UpperPanel>("Color"),[middleTab,setMiddleTab]=useState<MiddlePanel>("Properties"),[layersTab,setLayersTab]=useState<LayersPanel>("Layers"),[flyout,setFlyout]=useState<StripPanel|null>(null);
   const [collapsed,setCollapsed]=useState({upper:false,middle:false,layers:false});
   const activePath=usePathTargets(s=>document?s[document.id]??null:null),setActivePath=(path:string|null)=>{if(document)usePathTargets.setState({[document.id]:path});},[brushPickerAt,setBrushPickerAt]=useState<{x:number;y:number;tool:string}|null>(null),[layerDraft,setLayerDraft]=useState<LayerPropsDraft|null>(null),[fillDraft,setFillDraft]=useState<CanvasDraft|null>(null),[contextMenu,setContextMenu]=useState<{x:number;y:number;kind:"layer"|"selection"|"path"|"picker"|"crop"|"fx"|"adjustment"|"ruler"|"pasteboard";layers?:{layer:number;name:string}[]}|null>(null);
-  const [penMode,setPenMode]=useState<"shape"|"path">("path"),[lineWeight,setLineWeight]=useState(4),[shapeStyle,setShapeStyle]=useState<ShapeStyle>({fill:true,stroke:false,strokeColor:"#000000",strokeWidth:3}),[cornerRadius,setCornerRadius]=useState(0),[polygonSides,setPolygonSides]=useState(5),[starRatio,setStarRatio]=useState(100),[gradientTransparency,setGradientTransparency]=useState(true),[pathOp,setPathOp]=useState<PathOp>("new");
+  const {options:vector,setOption:setVector,notice:vectorNotice}=useVectorToolPreferences(),{penMode,lineWeight,shapeStyle,polygonSides,starRatio,pathOp}=vector,[gradientTransparency,setGradientTransparency]=useState(true);
   const [size,setSize]=useState(24);
   const [opacity,setOpacity]=useState(1);
   const [hardness,setHardness]=useState(0.8);
@@ -417,7 +435,7 @@ export function PhotoStudio() {
   const [commandsOpen,setCommandsOpen]=useState(false);
   const [placeDialog,setPlaceDialog]=useState<"embedded"|"linked"|null>(null);
   const [dialog,setDialog]=useState<{action:PhotoAction;adjustment:boolean;layer?:PhotoLayer}|null>(null);
-  const [specialDialog,setSpecialDialog]=useState<GeometryKind|"develop"|null>(null);
+  const [specialDialog,setSpecialDialog]=useState<GeometryKind|"develop"|null>(null),[geometryFold,setGeometryFold]=useState<HistoryFold>(),[transformNext,setTransformNext]=useState<{fold?:HistoryFold}|null>(null);
   const [perspectiveCrop,setPerspectiveCrop]=useState<CropQuad|null>(null);
   const [channelDialog,setChannelDialog]=useState<{channel:number|"quickMask"|null;spot:boolean}|null>(null);
   const [compositeDialog,setCompositeDialog]=useState<ChannelCompositeKind|null>(null),[saveSelection,setSaveSelection]=useState(false);
@@ -426,7 +444,7 @@ export function PhotoStudio() {
   const [profileDialog,setProfileDialog]=useState<ColorProfileWorkflow|null>(null);
   const [colorSettingsOpen,setColorSettingsOpen]=useState(false);
   const [preferencesSection,setPreferencesSection]=useState<PreferencesSection|null>(null),screenResolution=usePreferences(s=>s.screenResolution),rulerUnit=usePreferences(s=>s.rulerUnit),pasteboards=usePreferences(s=>s.pasteboard);
-  const [imageDialog,setImageDialog]=useState<"size"|"canvas"|"text"|"gradient"|"newGradient"|"trim"|"duplicate"|"duotone"|"colorTable"|"snapshot"|null>(null),newFillBase=useRef<number>(undefined);
+  const [imageDialog,setImageDialog]=useState<"size"|"canvas"|"text"|"gradient"|"newGradient"|"trim"|"duplicate"|"duotone"|"colorTable"|"snapshot"|null>(null),newFillBase=useRef<string>(undefined);
   const [editDialog,setEditDialog]=useState<PurgeCommand|PresetKind|"findReplace"|"spelling"|"presets"|"autoAlign"|"autoBlend"|null>(null);
   const [commandDialog,setCommandDialog]=useState<{command:ImageCommand;initial?:Record<string,unknown>}|null>(null);
   const [duplicateDialog,setDuplicateDialog]=useState<{title:string;source:string;name:string|null;document:string;create:(name:string|null)=>Promise<unknown>}|null>(null);
@@ -467,7 +485,7 @@ export function PhotoStudio() {
   const stroke=useRef<Point[]>([]);
   const lastStrokeEnd=useRef<{document:string;point:StrokeXY}|null>(null),strokeAxis=useRef<Axis|null>(null),lineHint=useRef(false);
   const eraserGesture=useRef<EraserGestureContext|null>(null),eraserCommitOverflow=useRef(false),eraserPreviewCapped=useRef(false);
-  const patchDrag=useRef<PatchDrag|null>(null),patchPreviewCount=useRef(0);
+  const patchDrag=useRef<PatchDrag|null>(null),patchPreviewCount=useRef(0),patchLasso=useRef<SelectionMode|null>(null);
   const gestureStart=useRef<GestureModifiers>({shiftKey:false,altKey:false}),gestureCurrent=useRef<GestureModifiers>({shiftKey:false,altKey:false});
   const polygonDraft=useRef(false),polygonCursor=useRef<[number,number]|null>(null),[polygonVertices,setPolygonVertices]=useState(0);
   // Pen anchors live in stroke.current; each anchor's outgoing handle is mirrored for its incoming one.
@@ -493,8 +511,6 @@ export function PhotoStudio() {
   useEffect(()=>{const section=stage.current?.closest<HTMLElement>(".xd-photo"),page=section?.ownerDocument,active=page?.activeElement;if(section&&page&&active&&!section.contains(active)&&!active.matches("input,textarea,select,[contenteditable]:not([contenteditable='false'])")&&page.hasFocus()&&!isDesignDialogOpen()&&!section.closest(".ot-window.unfocused"))section.focus({preventScroll:true});},[documentId]);
   // WebKit doesn't focus a clicked button, so a click on XDesign's header drops focus to the page, where ⌘L and other shortcuts reach the shell instead of the editor.
   useEffect(()=>{const page=window.document,down=(e:Event)=>{const section=stage.current?.closest<HTMLElement>(".xd-photo"),target=e.target as Node;if(section&&section.closest(".ot-window")?.contains(target)&&!section.contains(target))requestAnimationFrame(()=>{if(page.activeElement===page.body&&page.hasFocus()&&section.isConnected&&!isDesignDialogOpen()&&!section.closest(".ot-window.unfocused"))section.focus({preventScroll:true});});};page.addEventListener("mousedown",down);return()=>page.removeEventListener("mousedown",down);},[]);
-  // The engine keeps the painting symmetry per document but does not report it, so the bar remembers what it set.
-  const [symmetryChoice,setSymmetryChoice]=useState<Record<string,string>>({});
   // Native feedback is patched into the canvases that show the image: the preview while it holds a
   // pixel per screen pixel, the detail tiles otherwise. The committed image then replaces the same
   // pixels in place, so nothing swaps or redraws on release.
@@ -503,7 +519,7 @@ export function PhotoStudio() {
     for(const element of [cloneMarker.current,cloneOverlay.current])if(element)element.style.display="none";
     if(!strokeEnd.current&&!nativeStroke.current&&!stroke.current.length&&!patchDrag.current)return;
     const capturedPointer=strokePointer.current,canvas=overlay.current;strokePointer.current=null;if(capturedPointer!==null&&capturedPointer!==undefined&&canvas?.hasPointerCapture(capturedPointer))canvas.releasePointerCapture(capturedPointer);
-    nativeStroke.current?.dispose();nativeStroke.current=null;strokeSurface.current?.restore();strokeSurface.current=null;stroke.current=[];springMove.current=false;patchDrag.current=null;eraserGesture.current=null;cloneGesture.current=null;eraserCommitOverflow.current=false;eraserPreviewCapped.current=false;strokeCount.current=0;seed.current=null;strokePointer.current=null;polygonDraft.current=false;polygonCursor.current=null;setPolygonVertices(0);penHandles.current=[];penDragging.current=false;
+    nativeStroke.current?.dispose();nativeStroke.current=null;strokeSurface.current?.restore();strokeSurface.current=null;stroke.current=[];springMove.current=false;patchDrag.current=null;patchLasso.current=null;eraserGesture.current=null;cloneGesture.current=null;eraserCommitOverflow.current=false;eraserPreviewCapped.current=false;strokeCount.current=0;seed.current=null;strokePointer.current=null;polygonDraft.current=false;polygonCursor.current=null;setPolygonVertices(0);penHandles.current=[];penDragging.current=false;
     const end=strokeEnd.current;strokeEnd.current=null;end?.();
     if(!keepDrawing){canvas?.getContext("2d")?.clearRect(0,0,canvas.width,canvas.height);movePreview.current?.(null);}setPreviewStatus(null);
   };
@@ -632,6 +648,7 @@ export function PhotoStudio() {
   const [canvasText,setCanvasText]=useState<CanvasText|null>(null),[textFont,setTextFont]=useState("Arial"),[textSize,setTextSize]=useState(48),fonts=useFontFamilies(),[textStyle,setTextStyle]=useState<TypeStyle>("Regular"),[textAlign,setTextAlign]=useState<TypeAlign>("left"),[textAntialias,setTextAntialias]=useState("smooth"),[textOrientation,setTextOrientation]=useState("horizontal"),[textWarp,setTextWarp]=useState(false);
   useEffect(()=>{setCanvasText(null);},[tool,document?.id]);
   const activeKind=state&&findLayer(state.layers,state.activeLayer)?.kind;
+  const typeFaces=useFamilyFaces(tool==="text"?(state&&findLayer(state.layers,state.activeLayer)?.text?.font)||textFont:""),canvasTextControl=useRef<((commit:boolean)=>void)|null>(null);
   const pathTarget=activeKind==="Shape"?"layer":state?selectedPath(state,activePath):null;
   const [editPath,setEditPath]=useState<{name:string;layer?:number;path:PathData}|null>(null);
   useEffect(()=>{
@@ -646,9 +663,12 @@ export function PhotoStudio() {
   const shownWaiters=useRef<(()=>void)[]>([]);
   const freeTransforming=useFreeTransform(store=>!!store.session||!!store.held);
   const warpSession=useWarpSession(store=>store.session);
+  const mixerLoads=useMixerLoads(store=>store.loads);
   // The flyout menus read these selections, so the studio re-renders when they change.
   useLayerComps(store=>store.selected);useMeasurementLog(store=>store.selected);useTypeStyles(store=>store.selected);
   useEffect(()=>cancelFreeTransform,[tool,document?.id,document?.version,state?.activeLayer,state?.viewKey]);
+  // Warp's switch hands over once its result is shown, so the box frames the warped layer.
+  useEffect(()=>{const layer=state&&findLayer(state.layers,state.activeLayer);if(!transformNext||specialDialog||!document||!layer||busy)return;setTransformNext(null);beginFreeTransform(document,layer,state.viewKey,"free",transformNext.fold);},[transformNext,specialDialog,document,state,busy]);
   if(!document) return null;
   const selectedBoxes=()=>!state?[]:(state.selectedLayers?.length?state.selectedLayers:[state.activeLayer]).map(id=>findLayer(state.layers,id)?.bounds).filter((box):box is [number,number,number,number]=>!!box&&box[2]>0&&box[3]>0);
   const boxUnion=(boxes:[number,number,number,number][]):[number,number,number,number]|null=>{
@@ -670,7 +690,7 @@ export function PhotoStudio() {
   const pixelLayers=(state?.selectedLayers??[]).filter(id=>["pixel","raster"].includes(findLayer(state!.layers,id)?.kind.toLowerCase()??"")).length;
   const startFreeTransform=(mode:TransformMode="free")=>{if(currentLayer)beginFreeTransform(document,currentLayer,state?.viewKey,mode);};
   const geometryActive=!!perspectiveCrop||!!specialDialog&&specialDialog!=="develop"&&!!currentLayer;
-  const openGeometry=(kind:GeometryKind)=>{setSpecialDialog(kind);if(!panels.left)panels.toggle("left");if(propertiesScroll.current)propertiesScroll.current.scrollTop=0;};
+  const openGeometry=(kind:GeometryKind,fold?:HistoryFold)=>{setSpecialDialog(kind);setGeometryFold(fold);if(!panels.left)panels.toggle("left");if(propertiesScroll.current)propertiesScroll.current.scrollTop=0;};
   const openPerspectiveCrop=(quad:CropQuad)=>{setSpecialDialog(null);setPerspectiveCrop(quad);if(!panels.left)panels.toggle("left");if(propertiesScroll.current)propertiesScroll.current.scrollTop=0;};
   const paintingMask=mask||!!state?.layerMaskView;
   const grayscaleTarget=paintingMask||!!state?.quickMask||!!(state?.channels?.target&&state.channels.target.kind!=="composite");
@@ -710,12 +730,20 @@ export function PhotoStudio() {
   const nativeStrokeTool=NATIVE_STROKE_TOOLS.includes(tool);
   const retouchPreview=RETOUCH_PREVIEW_TOOLS.includes(tool),continuousRetouch=CONTINUOUS_RETOUCH_TOOLS.includes(tool),feedbackAvailable=!retouchPreview||document.width*document.height<=16_777_216;
   const historyChoice=historyBrushSource(displayState?.historySources,historySource);
-  const toolOptions:PaintOptions={...paintToolDefaults(tool,state),...paintOptions[tool],...(tool==="paint.historyBrush"&&historyChoice?{historySource:historyChoice.id}:{})};
+  const savedToolOptions:PaintOptions={...paintToolDefaults(tool,state),...paintOptions[tool],...(tool==="paint.historyBrush"&&historyChoice?{historySource:historyChoice.id}:{})};
+  // A mask, a channel or a layer with locked transparency has none for Behind or Clear to use: a saved choice paints Normal there and comes back on a layer that has transparency.
+  const opaqueTarget=grayscaleTarget||!!currentLayer?.locks?.transparency,toolOptions:PaintOptions=opaqueTarget&&TRANSPARENCY_MODES.includes(String(savedToolOptions.mode))?{...savedToolOptions,mode:"Normal"}:savedToolOptions;
+  const healingPattern=tool==="paint.healingBrush"&&toolOptions.sourceType==="pattern";
+  const cloneSourceFrom=()=>["paint.cloneStamp","paint.healingBrush"].includes(tool)&&!healingPattern?cloneSourceDocument(projectId,document.id,cloneSources?.active??0):undefined;
+  const withCloneSource=(params:Record<string,unknown>)=>{const from=cloneSourceFrom();return from?{...params,sourceDocument:from}:params;};
+  const mixerLoad=mixerLoads[document.id]??null;
+  const toolPresetOptions={toolOptions:{gradientStyle,gradientReverse,liveGradient,selectionMode,paintOptions:sanitizePaintOptions(tool,toolOptions)},foreground:grayscaleTarget?paintColorRGBA(channelColor):nativeForeground??paintColorRGBA(color),background:nativeBackground??paintColorRGBA(background)};
   const imagePpi=state?.resolution||72,cropSize=tool==="crop"?cropSizePixels(toolOptions,imagePpi):null;
   const perspectiveOptions:PaintOptions={...paintToolDefaults("perspectiveCrop",state),...paintOptions.perspectiveCrop},perspectiveSize=cropSizePixels({...perspectiveOptions,style:"size"},imagePpi);
   // A crop ratio or W x H x Resolution size holds the box's shape for handle drags and for drawing a new box.
   const cropRatio=tool!=="crop"?undefined:toolOptions.style==="fixedRatio"?Number(toolOptions.ratioWidth)/Number(toolOptions.ratioHeight):cropSize?cropSize.width/cropSize.height:undefined;
-  const gestureOptions:PaintOptions=cropSize?{...toolOptions,style:"fixedRatio",ratioWidth:cropSize.width,ratioHeight:cropSize.height}:toolOptions;
+  const gestureOptions:PaintOptions=cropSize?{...toolOptions,style:"fixedRatio",ratioWidth:cropSize.width,ratioHeight:cropSize.height}:SHAPE_TOOLS.includes(tool)?{...toolOptions,...constraintGestureOptions(vector.constraint)}:toolOptions;
+  const boxTool=RECTANGLE_TOOLS.includes(tool)&&!(tool==="select.object"&&toolOptions.objectMode==="lasso");
   const eraseToHistory=tool==="erase"&&toolOptions.eraseToHistory===true;
   const tipSize=(brushTool?size:tool==="select.quick"?Number(toolOptions.size)||0:0)*zoom,springReady=metaHeld&&!NO_SPRING_MOVE.includes(tool),precise=capsLock&&!STANDARD_CURSOR_TOOLS.includes(tool),showTip=tipSize>0&&(!precise||!!resizeReadout)&&!spacePan&&!springReady&&!geometryActive&&!(viewPreview.active&&!viewPreview.url);
   const toolLabel=IMAGE_TOOL_GROUPS.flatMap(group=>group.tools).find(option=>option.id===tool)?.label??tool,ToolIcon=IMAGE_TOOLS.find(option=>option.id===tool)?.icon;
@@ -726,7 +754,7 @@ export function PhotoStudio() {
     switch(tool){
       case "paint.cloneStamp":case "paint.healingBrush":return "Alt-click to set a source";
       case "move":return `Drag to move the selected layer${transformControls?" · ⌘-drag a corner to distort or a side to skew":""}`;
-      case "paint.patch":return !currentState?.hasSelection?"Make a selection before using the Patch tool.":toolOptions.mode==="destination"?"Copy selected texture to the place you drag toward; that destination is repaired.":"Repair the selected area with texture from the place you drag toward.";
+      case "paint.patch":return !currentState?.hasSelection?"Drag to select the area to repair · Shift-start adds · Alt-start subtracts · Shift+Alt-start intersects":toolOptions.mode==="destination"?"Copy selected texture to the place you drag toward; that destination is repaired.":"Repair the selected area with texture from the place you drag toward.";
       case "paint.redEye":return "Click a red pupil to darken it, or drag a box around the eyes to correct every red pupil inside it";
       case "paint.magicEraser":return "Click a color region on the active pixel layer to erase it to transparency. Click location controls the result.";
       case "paint.backgroundEraser":return "Drag over the active pixel layer to erase sampled colors. Feedback is limited to 4,096 samples and 1 MiB; up to 131,072 samples and 16 MiB are committed on release.";
@@ -744,6 +772,7 @@ export function PhotoStudio() {
       case "note":return "Click to add a note · Drag a note to move it · Double-click opens it in the Notes panel";
       case "slice":return "Drag to create a user slice · Shift makes it square";
       case "slice.select":return "Click a slice to select it · Drag a user slice or its handles · Double-click for Slice Options";
+      case "paint.mixerBrush":return "Drag to paint · Alt-click to load the brush from the image";
       case "paint.spotHealing":return "Click or drag over a blemish to repair it from the surrounding area";
       case "paint.patternStamp":return "Drag to paint with the chosen pattern";
       case "paint.historyBrush":return "Drag to paint from the History Brush source · Set the source in the History panel";
@@ -757,7 +786,7 @@ export function PhotoStudio() {
     }
     if(SAMPLING_TOOLS.includes(tool))return "Alt-click to sample a color";
     if(PEN_TOOLS.includes(tool))return `${tool==="pen"?"Click for corner points · Drag for curves":tool==="pen.curvature"?"Click to place smooth points":"Drag to draw a path"} · ${penMode==="shape"?"Finishing creates a shape layer":"Finishing sets the work path (Paths panel)"}`;
-    if(SHAPE_TOOLS.includes(tool))return `Drag to draw a shape layer in the foreground color${tool==="shape.line"?"":" · Shift constrains proportions"}`;
+    if(SHAPE_TOOLS.includes(tool))return `${vector.shapeMode==="pixels"?"Drag to fill a shape with":"Drag to draw a shape layer in"} the foreground color${tool==="shape.line"?"":" · Shift constrains proportions"}`;
     if(PATH_SELECT_TOOLS.includes(tool))return !pathTarget?"Select a shape layer or draw a path with the Pen tool":tool==="path.select"?"Drag the path to move it":"Drag points or handles · Alt-drag a handle for a corner";
     return "";
   })();
@@ -771,10 +800,11 @@ export function PhotoStudio() {
     else{setFlyout(name as StripPanel);if(!panels.left&&!panels.right)panels.toggle("right");}
   };
   const command=(id:string,params:Record<string,unknown>={})=>runPhotoCommand(id,params).then(()=>{},()=>{});
+  const loadMixer=(id:string,params:Record<string,unknown>={})=>{const image=document.id;runPhotoCommand(id,params).then(reply=>useMixerLoads.getState().set(image,mixerLoadOf(reply)),()=>{});};
+  const symmetry=state?.symmetry,symmetryCurrent=!symmetry?"":symmetry.type!=="Path"?symmetry.type:symmetry.path==="work"||symmetry.path==="layer"?symmetry.path:`saved:${symmetry.path}`;
   const chooseSymmetry=(choice:string|null)=>{
-    const id=document.id,remember=(value:string)=>setSymmetryChoice(current=>({...current,[id]:value}));
-    if(choice===null){if(symmetryChoice[id])attempt(runPhotoCommand("paint.symmetryDisable").then(()=>remember("")));return;}
-    attempt(runPhotoCommand("paint.symmetryFromPath",{name:choice.startsWith("saved:")?choice.slice(6):choice}).then(()=>remember(choice)));
+    if(choice===null){if(symmetry)attempt(runPhotoCommand("paint.symmetryDisable"));return;}
+    attempt(runPhotoCommand("paint.symmetryFromPath",{name:choice.startsWith("saved:")?choice.slice(6):choice}));
   };
   // The engine has no one-step background removal; this is Select Subject followed by a mask from that selection, as in Photoshop.
   const removeBackground=()=>attempt((async()=>{if(currentLayer&&isBackgroundLayer(currentLayer))await runPhotoCommand("layer.new.layerFromBackground");await runPhotoCommand("select.subject");await runPhotoCommand("layer.layerMask.revealSelection");})());
@@ -787,7 +817,8 @@ export function PhotoStudio() {
     else command("type.setStyle",{layer,...(patch.font!==undefined?{font:patch.font}:{}),...(patch.size!==undefined?{size:patch.size}:{}),...(patch.style?typeStyleParams(patch.style,true):{}),...(patch.align?{align:patch.align}:{})});
   };
   const openCommand=(command:ImageCommand,initial?:Record<string,unknown>)=>setCommandDialog({command,initial});
-  const openFillDialog=()=>openCommand(fillCommand(state?.presets?.patterns?.flatMap(group=>group.presets)??[],state?.presets?.pattern,historyBrushSource(state?.historySources,historySource)?.id));
+  const patternPresets=state?.presets?.patterns?.flatMap(group=>group.presets)??[];
+  const openFillDialog=()=>openCommand(fillCommand(patternPresets,state?.presets?.pattern,historyBrushSource(state?.historySources,historySource)?.id));
   // The scale is read from the engine (no params = query) so both dialogs open on the document's current values.
   const withScale=(then:(scale:{pixelLength:number;logicalLength:number;units:string;factor:number})=>void)=>attempt(runPhotoCommand("image.analysis.setMeasurementScale",{}).then(reply=>then(reply as Parameters<typeof then>[0])));
   const openMarker=()=>withScale(({factor})=>{const target=document.width/5*factor,unit=10**Math.floor(Math.log10(target));openCommand(SCALE_MARKER,{length:Number(([5,2,1].map(step=>step*unit).find(length=>length<=target)??unit).toPrecision(6))});});
@@ -802,7 +833,7 @@ export function PhotoStudio() {
   const commitCrop=()=>{
     if(!cropBox||cropUntouched||usePhotoWorkspace.getState().busy)return;if(cropBox.width*cropBox.height>256_000_000){setPreviewStatus("Choose a nonempty area within the image editing limits.");return;}
     const deleteCroppedPixels=toolOptions.deleteCroppedPixels===true,crop=Math.abs(cropAngle)>.01?runPhotoCommand("image.cropRotated",{...cropBox,angle:cropAngle,deleteCroppedPixels}):runPhotoCommand("image.crop",{...cropBox,deleteCroppedPixels});
-    const size=cropSize&&(cropSize.width!==cropBox.width||cropSize.height!==cropBox.height||cropSize.ppi!==imagePpi)?cropSize:null,base=usePhotoWorkspace.getState().state?.historySources?.find(source=>source.current)?.index;
+    const size=cropSize&&(cropSize.width!==cropBox.width||cropSize.height!==cropBox.height||cropSize.ppi!==imagePpi)?cropSize:null,base=usePhotoWorkspace.getState().state?.historySources?.find(source=>source.current)?.id;
     const area=size?size.width*size.height-cropBox.width*cropBox.height:0,resample=!size||size.width===cropBox.width&&size.height===cropBox.height?"none":area>0?"preserveDetails":area<0?"lanczos":"bicubic";
     const added=cropAddedCanvas(cropBox,Math.abs(cropAngle)>.01?cropAngle:0,document.width,document.height),backgroundLayer=deleteCroppedPixels?state?.layers.find(isBackgroundLayer):undefined;
     const fill=!added?null:toolOptions.fill==="contentAware"?{contents:"contentAware"}:backgroundLayer?{contents:"background",layer:backgroundLayer.id}:null;
@@ -810,8 +841,8 @@ export function PhotoStudio() {
     if(fill)steps.push(["select.lasso",{points:added}],["select.inverse",{}],["edit.fill",fill],["select.deselect",{}]);
     if(size)steps.push(["image.imageSize",{width:size.width,height:size.height,resolution:size.ppi,resample}]);
     void untilShown(crop.then(()=>steps.length?steps.reduce<Promise<unknown>>((done,[id,params])=>done.then(()=>runPhotoCommand(id,params)),Promise.resolve()).then(
-      ()=>base!==undefined&&runPhotoCommand("history.fold",{from:base,label:"Crop"}),
-      error=>{if(base!==undefined)void command("history.select",{index:base,discardRedo:true});throw error;}):undefined)).then(()=>{setCropBox(null);setCropAngle(0);setCropShift([0,0]);});
+      ()=>base!==undefined&&runPhotoCommand("history.fold",{fromId:base,label:"Crop"}),
+      error=>{if(base!==undefined)void command("history.select",{id:base,discardRedo:true});throw error;}):undefined)).then(()=>{setCropBox(null);setCropAngle(0);setCropShift([0,0]);});
   };
   const resetCrop=()=>{setCropBox(fullCrop);setCropAngle(0);setCropShift([0,0]);};
   const snapCrop=(box:CropBox,from:CropBox)=>snapBox(cropAngle?null:snapContext(document.id,document.width,document.height,zoom,state?.resolution),box,from);
@@ -834,7 +865,7 @@ export function PhotoStudio() {
   const point=(e:PointerEvent<HTMLCanvasElement>):Point=>{
     const [fx,fy]=surfaceFraction(e.currentTarget,e.clientX,e.clientY),x=fx*document.width,y=fy*document.height;
     // Snap acts only on box-drag tools (marquee, crop draw); other tools keep raw positions.
-    const [px,py]=RECTANGLE_TOOLS.includes(tool)||LINE_SELECTION_TOOLS.includes(tool)?snapXY(snapContext(document.id,document.width,document.height,zoom,state?.resolution),x,y):[x,y];
+    const [px,py]=boxTool||LINE_SELECTION_TOOLS.includes(tool)?snapXY(snapContext(document.id,document.width,document.height,zoom,state?.resolution),x,y):[x,y];
     return [px,py,e.pointerType==="pen"?e.pressure:1,e.tiltX||0,e.tiltY||0,e.twist||0,e.timeStamp];
   };
   /** The Sample Size square around a pixel, clipped to the image; the Info panel reads with it too, as in Photoshop. */
@@ -854,7 +885,7 @@ export function PhotoStudio() {
   };
   const clearCloneMarker=()=>{for(const element of [cloneMarker.current,cloneOverlay.current])if(element)element.style.display="none";};
   const drawCloneMarker=(at:readonly number[])=>{
-    const element=cloneMarker.current;if(!element||isDesignDialogOpen()||geometryActive||viewPreview.active&&!viewPreview.url||!["paint.cloneStamp","paint.healingBrush"].includes(tool)||at[0]!<0||at[1]!<0||at[0]!>document.width||at[1]!>document.height){clearCloneMarker();return;}
+    const element=cloneMarker.current;if(!element||isDesignDialogOpen()||geometryActive||viewPreview.active&&!viewPreview.url||!["paint.cloneStamp","paint.healingBrush"].includes(tool)||cloneSourceFrom()!==undefined||at[0]!<0||at[1]!<0||at[0]!>document.width||at[1]!>document.height){clearCloneMarker();return;}
     const first=stroke.current[0],params=strokeParameters(tool,[],size,opacity,hardness,paintColorValue,zoom,null,toolOptions,paintingMask,null,null);
     const source=cloneSourcePoint(cloneSource,[at[0]!,at[1]!],first?[first[0],first[1]]:null,params);if(!source){clearCloneMarker();return;}
     const [x,y]=source,arm=7/zoom;for(const path of element.querySelectorAll("path"))path.setAttribute("d",`M${x-arm} ${y}H${x+arm}M${x} ${y-arm}V${y+arm}`);
@@ -872,6 +903,7 @@ export function PhotoStudio() {
     const id=document.id,from=document.version;
     return work.then(()=>{},()=>{}).then(()=>{if(useXDesign.getState().photoDocuments[id]?.version!==from)return new Promise<void>(resolve=>{shownWaiters.current.push(resolve);window.setTimeout(resolve,2000);});});
   };
+  const warpToFreeTransform=(work:Promise<unknown>|null,fold?:HistoryFold)=>{const next=()=>{setSpecialDialog(null);setTransformNext({fold});};if(!work)return next();void work.then(()=>untilShown(work)).then(next,()=>{});};
   const clearWhenShown=(work:Promise<unknown>)=>{void untilShown(work).then(()=>{if(!stroke.current.length)clear();});};
   // Snap To › Layers and Smart Guides pull the moving layers' edges and centres onto other layers', the canvas's and guides'.
   const moveSnap=(dx:number,dy:number):MoveSnap=>{
@@ -901,7 +933,7 @@ export function PhotoStudio() {
     const all=stroke.current;if(!all.length||strokeCount.current>=all.length)return;const points=all.slice(Math.max(0,strokeCount.current-1));
     // Native pixels already show the stroke; a placeholder line would flash over them.
     if(nativeStroke.current)return;
-    ctx.strokeStyle=tool==="erase"?"rgba(255,255,255,.65)":paintColor;ctx.lineWidth=tool==="select.quick"?Number(toolOptions.size)*sx:size*sx;ctx.lineCap="round";ctx.globalAlpha=selectionTool||tool==="crop"||tool==="straighten"||SHAPE_TOOLS.includes(tool)||tool==="pen.freeform"?1:opacity;
+    ctx.strokeStyle=tool==="erase"?"rgba(255,255,255,.65)":paintColor;ctx.lineWidth=tool==="select.quick"?Number(toolOptions.size)*sx:size*sx;ctx.lineCap="round";ctx.globalAlpha=selectionTool||patchLasso.current||tool==="crop"||tool==="straighten"||SHAPE_TOOLS.includes(tool)||tool==="pen.freeform"?1:opacity;
     ctx.beginPath();
     if(tool==="move"||springMove.current){
       const p=points.at(-1)!,moved=moveSnap(p[0]-points[0]![0],p[1]-points[0]![1]);
@@ -918,14 +950,14 @@ export function PhotoStudio() {
       const control=(index:number,incoming:boolean):readonly number[]=>{const anchor=anchors[index]!,handle=handles[index];return handle?incoming?[2*anchor[0]!-handle[0],2*anchor[1]!-handle[1]]:handle:anchor;};
       ctx.lineWidth=1;ctx.strokeStyle="#fff";ctx.globalAlpha=1;ctx.moveTo(anchors[0]![0]!*sx,anchors[0]![1]!*sy);
       for(let index=1;index<anchors.length;index++){const from=control(index-1,false),to=control(index,true),anchor=anchors[index]!;ctx.bezierCurveTo(from[0]!*sx,from[1]!*sy,to[0]!*sx,to[1]!*sy,anchor[0]!*sx,anchor[1]!*sy);}
-      if(cursor&&!curvature){const from=control(anchors.length-1,false);ctx.bezierCurveTo(from[0]!*sx,from[1]!*sy,cursor[0]*sx,cursor[1]*sy,cursor[0]*sx,cursor[1]*sy);}
+      if(cursor&&!curvature&&vector.rubberBand){const from=control(anchors.length-1,false);ctx.bezierCurveTo(from[0]!*sx,from[1]!*sy,cursor[0]*sx,cursor[1]*sy,cursor[0]*sx,cursor[1]*sy);}
       const last=all.at(-1)!,handle=curvature?null:handles.at(-1);if(handle){ctx.moveTo((2*last[0]-handle[0])*sx,(2*last[1]-handle[1])*sy);ctx.lineTo(handle[0]*sx,handle[1]*sy);}
     }
     else if(LINE_SELECTION_TOOLS.includes(tool)){const line=lineSelection(tool,points.at(-1)!,document);ctx.lineWidth=1;ctx.strokeStyle="#fff";if(line)ctx.rect(line.x*sx,line.y*sy,line.width*sx,line.height*sy);}
-    else if(RECTANGLE_TOOLS.includes(tool)||tool==="shape.rect"||tool==="shape.ellipse"||POLYGON_TOOLS.includes(tool)) {const rect=gestureRectangle(points[0]!,points.at(-1)!,gestureOptions,gestureStart.current,gestureCurrent.current);ctx.lineWidth=1;ctx.strokeStyle="#fff";if(rect){if(POLYGON_TOOLS.includes(tool)){const sides=tool==="shape.triangle"?3:polygonSides,ratio=tool==="shape.triangle"?1:starRatio/100;polygonPoints(polygonRect(rect,sides,ratio),sides,ratio).forEach(([x,y],index)=>index?ctx.lineTo(x*sx,y*sy):ctx.moveTo(x*sx,y*sy));ctx.closePath();}else if(tool==="ellipseSelection"||tool==="shape.ellipse")ctx.ellipse((rect.x+rect.width/2)*sx,(rect.y+rect.height/2)*sy,rect.width/2*sx,rect.height/2*sy,0,0,Math.PI*2);else ctx.rect(rect.x*sx,rect.y*sy,rect.width*sx,rect.height*sy);}}
+    else if(boxTool||tool==="shape.rect"||tool==="shape.ellipse"||POLYGON_TOOLS.includes(tool)) {const rect=gestureRectangle(points[0]!,points.at(-1)!,gestureOptions,gestureStart.current,gestureCurrent.current);ctx.lineWidth=1;ctx.strokeStyle="#fff";if(rect){if(POLYGON_TOOLS.includes(tool)){const sides=tool==="shape.triangle"?3:polygonSides,ratio=tool==="shape.triangle"?1:starRatio/100;polygonPoints(polygonRect(rect,sides,ratio),sides,ratio).forEach(([x,y],index)=>index?ctx.lineTo(x*sx,y*sy):ctx.moveTo(x*sx,y*sy));ctx.closePath();}else if(tool==="ellipseSelection"||tool==="shape.ellipse")ctx.ellipse((rect.x+rect.width/2)*sx,(rect.y+rect.height/2)*sy,rect.width/2*sx,rect.height/2*sy,0,0,Math.PI*2);else ctx.rect(rect.x*sx,rect.y*sy,rect.width*sx,rect.height*sy);}}
     else if(tool==="perspectiveCrop"||tool==="paint.redEye"){const a=all[0]!,b=all.at(-1)!;ctx.lineWidth=1;ctx.strokeStyle="#fff";ctx.globalAlpha=1;ctx.rect(a[0]*sx,a[1]*sy,(b[0]-a[0])*sx,(b[1]-a[1])*sy);}
     else if(tool==="straighten"||tool==="shape.line"||tool==="crop"&&cropStraighten){ctx.lineWidth=1;ctx.strokeStyle="#fff";ctx.moveTo(all[0]![0]*sx,all[0]![1]*sy);ctx.lineTo(all.at(-1)![0]*sx,all.at(-1)![1]*sy);}
-    else {ctx.moveTo(points[0]![0]*sx,points[0]![1]*sy);if(selectionTool||tool==="pen.freeform"){ctx.strokeStyle="#fff";if(tool!=="select.quick")ctx.lineWidth=1;}for(const p of points) ctx.lineTo(p[0]*sx,p[1]*sy);if(polygonDraft.current&&polygonCursor.current)ctx.lineTo(polygonCursor.current[0]*sx,polygonCursor.current[1]*sy);}
+    else {ctx.moveTo(points[0]![0]*sx,points[0]![1]*sy);if(selectionTool||patchLasso.current||tool==="pen.freeform"){ctx.strokeStyle="#fff";if(tool!=="select.quick")ctx.lineWidth=1;}for(const p of points) ctx.lineTo(p[0]*sx,p[1]*sy);if(polygonDraft.current&&polygonCursor.current)ctx.lineTo(polygonCursor.current[0]*sx,polygonCursor.current[1]*sy);}
     ctx.stroke();
   };
   redrawStroke.current=draw;
@@ -973,7 +1005,7 @@ export function PhotoStudio() {
     if(tool==="paint.patch"){
       const drag=patchDrag.current,offset=drag&&patchOffset(drag.start,drag.current);
       if(!drag||!offset||!patchOffsetFitsCanvas(offset,drag.bounds,document.width,document.height)){preview.clearReplacement();return;}
-      preview.replace({count:++patchPreviewCount.current,params:{offset,mode:drag.mode,...drag.target},viewport});return;
+      preview.replace({count:++patchPreviewCount.current,params:{offset,mode:drag.mode,...drag.target,...drag.options},viewport});return;
     }
     if(tool==="paint.magicEraser"||tool==="paint.backgroundEraser"){
       const drag=eraserGesture.current;if(!drag)return;
@@ -985,7 +1017,7 @@ export function PhotoStudio() {
       if(tool==="paint.backgroundEraser"&&!backgroundEraserPreviewAllowed(params)){eraserPreviewCapped.current=true;preview.clearReplacement();setPreviewStatus("Background Eraser feedback is limited to 4,096 samples and 1 MiB; the full stroke will be applied on release.");return;}
       preview.replace({count:tool==="paint.magicEraser"?1:stroke.current.length,params,viewport});return;
     }
-    preview.request({count:stroke.current.length,params:strokeParameters(tool,stroke.current,size,opacity,hardness,paintColorValue,zoom,seed.current,toolOptions,paintingMask,null,null),viewport});
+    preview.request({count:stroke.current.length,params:withCloneSource(strokeParameters(tool,stroke.current,size,opacity,hardness,paintColorValue,zoom,seed.current,toolOptions,paintingMask,null,null)),viewport});
   };
   const beginStrokeSurface=()=>{const space=previewCoversScreen(document,zoom,window.devicePixelRatio||1)?surface:tileSurface;space.begin();strokeSurface.current=space;return space;};
   const strokePixels=(space:PreviewSurface|TileSurface,command:string)=>{
@@ -1000,11 +1032,11 @@ export function PhotoStudio() {
   const dropGesture=(gesture:StrokeGesture|null)=>{if(!gesture)return;gesture.feedback.dispose();gesture.space?.restore();endGesture(gesture);};
   // The gesture stays busy until the feedback still in flight has painted, so the last samples
   // never land after the commit and the released stroke shows exactly what commits.
-  const commitGesture=(gesture:StrokeGesture|null,id:string,params:Record<string,unknown>)=>{
+  const commitGesture=(gesture:StrokeGesture|null,id:string,params:Record<string,unknown>,done?:()=>void)=>{
     const from=document.version,space=gesture?.space;
     const run=async()=>{
       if(gesture)try{await gesture.feedback.end();}finally{endGesture(gesture);}
-      await runPhotoCommand(id,params);
+      await runPhotoCommand(id,params);done?.();
       if(useXDesign.getState().photoDocuments[document.id]?.version===from)space?.restore();else space?.settle();
     };
     attempt(run().catch(error=>{space?.restore();throw error;}).finally(()=>{gesture?.feedback.releaseFeedback();clear();}));
@@ -1035,7 +1067,7 @@ export function PhotoStudio() {
       if(!sameContext){dropGesture(gesture);setPreviewStatus("The image changed; start the Patch drag again.");return;}
       if(!offset){dropGesture(gesture);setPreviewStatus("Drag the selection by at least one image pixel.");return;}
       if(!patchOffsetFitsCanvas(offset,patch.bounds,document.width,document.height)){dropGesture(gesture);setPreviewStatus("The translated selection must stay inside the image.");return;}
-      commitGesture(gesture,"paint.patch",{offset,mode:patch.mode,...patch.target});return;
+      void patch.inside.then(inside=>inside?commitGesture(gesture,"paint.patch",{offset,mode:patch.mode,...patch.target,...patch.options}):dropGesture(gesture));return;
     }
     if((tool==="paint.magicEraser"||tool==="paint.backgroundEraser")&&eraserGesture.current){
       if(strokePointer.current!==e.pointerId)return;
@@ -1056,7 +1088,7 @@ export function PhotoStudio() {
     if(!stroke.current.length||strokePointer.current!==e.pointerId)return;
     gestureCurrent.current={shiftKey:e.shiftKey,altKey:e.altKey};
     const end=constrained(point(e),e.shiftKey),previous=stroke.current.at(-1)!;if(end&&(end[0]!==previous[0]||end[1]!==previous[1]))stroke.current.push(end);
-    const moving=tool==="move"||springMove.current,selection=!moving&&(selectionTool||tool==="crop"||tool==="straighten")?selectionGestureCommand(tool,stroke.current,gestureOptions,selectionGestureMode(selectionMode,gestureStart.current,tool),gestureStart.current,gestureCurrent.current,document):null;
+    const lassoMode=patchLasso.current,moving=tool==="move"||springMove.current,selection=!moving&&(selectionTool||lassoMode||tool==="crop"||tool==="straighten")?selectionGestureCommand(lassoMode?"select.lasso":tool,stroke.current,gestureOptions,lassoMode??selectionGestureMode(selectionMode,gestureStart.current,tool),gestureStart.current,gestureCurrent.current,document):null;
     const points=stroke.current,strokeSeed=seed.current,cloneContext=cloneGesture.current;
     if(nativeStroke.current)previewStroke();
     const gesture=takeGesture();resetStroke(true);
@@ -1064,17 +1096,23 @@ export function PhotoStudio() {
     const first=points[0]!,last=points.at(-1)!;if(brushTool&&!moving)lastStrokeEnd.current={document:document.id,point:[last[0],last[1]]};
     if(moving){const {dx,dy}=moveSnap(last[0]-first[0],last[1]-first[1]);movePreview.current?.(dx||dy?"hold":null);if(dx||dy)clearWhenShown(command("layer.translate",{dx,dy}));return;}
     if(tool==="pen.freeform"){
-      const anchors=simplifyPath(points.map(point=>[point[0],point[1]] as XY),1.5/zoom),[shownWidth,shownHeight]=surfaceSize(e.currentTarget);
+      const anchors=simplifyPath(points.map(point=>[point[0],point[1]] as XY),vector.curveFit/zoom),[shownWidth,shownHeight]=surfaceSize(e.currentTarget);
       if(anchors.length<2||anchors.length<3&&Math.hypot(last[0]-first[0],last[1]-first[1])<1){clear();setPreviewStatus("Drag to draw a path at least one image pixel long.");return;}
       const closed=anchors.length>3&&Math.hypot((last[0]-first[0])*shownWidth/document.width,(last[1]-first[1])*shownHeight/document.height)<=6;
       if(closed)anchors.pop();
       createPenPath(anchors,smoothHandles(anchors,closed),closed);return;
     }
     if(SHAPE_TOOLS.includes(tool)){
-      const rect=tool==="shape.line"?null:gestureRectangle(first,last,toolOptions,gestureStart.current,gestureCurrent.current);
+      const rect=tool==="shape.line"?null:gestureRectangle(first,last,gestureOptions,gestureStart.current,gestureCurrent.current);
       if(tool==="shape.line"?Math.hypot(last[0]-first[0],last[1]-first[1])<1:!rect||rect.width<1||rect.height<1){clear();setPreviewStatus("Drag to draw a shape at least one image pixel in size.");return;}
-      const sides=tool==="shape.triangle"?3:polygonSides,ratio=tool==="shape.triangle"?1:starRatio/100;
-      clearWhenShown(command("shape.create",shapeCreateParams(tool==="shape.line"?{kind:"line",from:first.slice(0,2),to:last.slice(0,2),weight:lineWeight}:POLYGON_TOOLS.includes(tool)?{kind:"polygon",rect:polygonRect(rect!,sides,ratio),sides,...(ratio<1?{starRatio:ratio}:{})}:{kind:tool==="shape.ellipse"?"ellipse":cornerRadius>0?"roundedRect":"rect",rect:[rect!.x,rect!.y,rect!.width,rect!.height],...(tool==="shape.rect"&&cornerRadius>0?{radii:cornerRadius}:{})})));return;
+      const sides=tool==="shape.triangle"?3:polygonSides,ratio=tool==="shape.triangle"?1:starRatio/100,radii=vector.radii,rounded=tool==="shape.rect"&&radii.some(radius=>radius>0);
+      const geometry:ShapeGeometry=tool==="shape.line"?{kind:"line",from:first.slice(0,2),to:last.slice(0,2),weight:lineWeight}:POLYGON_TOOLS.includes(tool)?{kind:"polygon",rect:polygonRect(rect!,sides,ratio),sides,...(ratio<1?{starRatio:ratio}:{})}:{kind:tool==="shape.ellipse"?"ellipse":rounded?"roundedRect":"rect",rect:[rect!.x,rect!.y,rect!.width,rect!.height],...(rounded?{radii:radii.every(radius=>radius===radii[0])?radii[0]:[...radii]}:{})};
+      const extras=POLYGON_TOOLS.includes(tool)&&vector.polygonRadius>0?{cornerRadius:vector.polygonRadius}:tool==="shape.line"&&(vector.arrowStart||vector.arrowEnd)?{arrowStart:vector.arrowStart,arrowEnd:vector.arrowEnd,arrowWidth:vector.arrowWidth,arrowLength:vector.arrowLength,arrowConcavity:vector.arrowConcavity}:null;
+      // Only the host can round a polygon or add arrowheads, so just those outlines come from shape.path.
+      // A layer whose transparency is locked has none for Behind or Clear to use, so a saved choice fills Normal there.
+      const fill=(path:PathData)=>clearWhenShown(command("path.fill",{path,color:paintColorValue,mode:opaqueTarget&&TRANSPARENCY_MODES.includes(vector.pixelMode)?"Normal":vector.pixelMode,opacity:vector.pixelOpacity,antiAlias:vector.pixelAntiAlias})),outline=vector.shapeMode==="path"?setWorkPath:fill;
+      if(vector.shapeMode!=="shape"&&extras)void runPhotoCommand("shape.path",{...geometry,...extras}).then(result=>{const path=(result as {path?:PathData}|undefined)?.path;if(path)outline(path);else clear();},clear);
+      else if(vector.shapeMode!=="shape")outline(shapeGeometryPath(geometry));else clearWhenShown(command("shape.create",shapeCreateParams({...geometry,...extras})));return;
     }
     if(tool==="perspectiveCrop"){
       clear();
@@ -1093,21 +1131,21 @@ export function PhotoStudio() {
       }else setPreviewStatus("Draw a reference line at least one image pixel long.");
       setCropStraighten(false);clear();return;
     }
-    if(selectionTool||tool==="crop"||tool==="straighten"){if(selection&&tool==="crop"){const {x,y,width,height}=selection.params as CropBox;setCropBox({x,y,width,height});setCropAngle(0);}else if(tool==="crop")setCropBox(box=>box??fullCrop);else if(selection){clearWhenShown(command(selection.id,selection.params));return;}else setPreviewStatus(tool==="straighten"?"Draw a reference line at least one image pixel long.":"Choose a nonempty area within the image editing limits.");clear();return;}
+    if(selectionTool||lassoMode||tool==="crop"||tool==="straighten"){if(selection&&tool==="crop"){const {x,y,width,height}=selection.params as CropBox;setCropBox({x,y,width,height});setCropAngle(0);}else if(tool==="crop")setCropBox(box=>box??fullCrop);else if(selection){clearWhenShown(command(selection.id,selection.params));return;}else setPreviewStatus(tool==="straighten"?"Draw a reference line at least one image pixel long.":"Choose a nonempty area within the image editing limits.");clear();return;}
     if(tool==="paint.redEye"){
       // A drag of a few screen pixels or more is a box; anything less is a click at the press point.
       const [shownWidth,shownHeight]=surfaceSize(e.currentTarget),box=Math.abs(last[0]-first[0])*shownWidth/document.width>=3&&Math.abs(last[1]-first[1])*shownHeight/document.height>=3;
       clearWhenShown(command("paint.redEye",{...(box?{x:Math.min(first[0],last[0]),y:Math.min(first[1],last[1]),width:Math.abs(last[0]-first[0]),height:Math.abs(last[1]-first[1])}:{x:first[0],y:first[1]}),pupilSize:toolOptions.pupilSize,darken:toolOptions.darken}));return;
     }
     // Omit target for automatic native routing to color/alpha/Quick Mask.
-    const params=strokeParameters(tool,points,size,opacity,hardness,paintColorValue,zoom,strokeSeed,toolOptions,paintingMask,null,null);
+    const params=withCloneSource(strokeParameters(tool,points,size,opacity,hardness,paintColorValue,zoom,strokeSeed,toolOptions,paintingMask,null,null));
     let id=tool;
     delete params.eraseToHistory;
     if(tool==="erase"){
       if(eraseToHistory){id="paint.historyBrush";delete params.erase;Object.assign(params,{opacity:Math.round(opacity*100),hardness:Math.round(hardness*100),historySource:historyChoice!.id});delete params.smoothing;params.flow=toolOptions.flow;params.spacing=toolOptions.spacing;}
       else{id="paint.stroke";params.erase=true;}
     }
-    if(tool==="paint.bucket")Object.assign(params,{x:first[0],y:first[1]});
+    if(tool==="paint.bucket")Object.assign(params,{x:first[0],y:first[1]},grayscaleTarget?{mode:"Normal",sampleAllLayers:false}:{});
     if(tool==="paint.gradient"){
       const editing=liveGradient&&!grayscaleTarget&&currentLayer?.gradientFill;
       if(liveGradient&&!grayscaleTarget)id=editing?"gradient.fill.set":"gradient.fill.create";
@@ -1115,21 +1153,47 @@ export function PhotoStudio() {
       const method=params.method;delete params.method;
       Object.assign(params,{from:first.slice(0,2),to:last.slice(0,2),style:gradientStyle,reverse:gradientReverse,...(!editing?(state?.presets?{...gradientPaintParams(state.presets.gradient,paintColorValue,backgroundValue),...(gradientTransparency||liveGradient&&!grayscaleTarget?{}:{transparency:[[0,100],[1,100]]})}:{stops:[[0,paintColorValue],[1,backgroundValue]]}):{})});
       if(editing)params.layer=currentLayer.id;
-      // The engine blends stops linearly in sRGB, so other Methods go as dense baked stops (not for an existing fill, which keeps its stops).
+      // The engine blends stops linearly in sRGB, so other Methods go as dense baked stops, midpoints bent in (not for an existing fill, which keeps its stops).
       const stops=params.stops as GradientStop[]|undefined;
-      if(!editing&&stops&&method!=="classic"&&GRADIENT_METHODS.some(([id])=>id===method)&&stops.every(stop=>typeof stop[1]==="string"&&/^#[\da-f]{6}$/i.test(stop[1]))){const baked=bakeRemembered(stops,method as GradientMethod);if(baked)params.stops=baked;}
+      const midpoints=state?.presets?.gradient.midpoints;if(id==="paint.gradient"&&state?.presets&&midpoints?.length)params.midpoints=midpoints;
+      if(!editing&&stops&&method!=="classic"&&GRADIENT_METHODS.some(([id])=>id===method)&&stops.every(stop=>typeof stop[1]==="string"&&/^#[\da-f]{6}$/i.test(stop[1]))){const baked=bakeRemembered(stops,method as GradientMethod,params.midpoints as number[]|undefined);if(baked){params.stops=baked;delete params.midpoints;}}
     }
-    if(tool==="paint.cloneStamp"||tool==="paint.healingBrush"){
+    if((tool==="paint.cloneStamp"||tool==="paint.healingBrush")&&!healingPattern){
       if(!cloneSource?.source){dropGesture(gesture);clear();usePhotoWorkspace.setState({error:"Alt-click the image to choose a source point first."});return;}
-      const live=usePhotoWorkspace.getState();if(cloneContext!==JSON.stringify([live.projectId,live.documentId,live.stateVersion,live.state?.viewKey,live.state?.presets?.cloneSource])){dropGesture(gesture);clear();setPreviewStatus("The Clone Source changed; start the stroke again.");return;}
+      const live=usePhotoWorkspace.getState(),liveSlots=live.state?.presets?.cloneSource;if(cloneContext!==JSON.stringify([live.projectId,live.documentId,live.stateVersion,live.state?.viewKey,liveSlots,cloneSourceDocument(live.projectId,live.documentId??"",liveSlots?.active??0)??null])){dropGesture(gesture);clear();setPreviewStatus("The Clone Source changed; start the stroke again.");return;}
     }
-    commitGesture(gesture,id,params);
+    const image=document.id,load=mixerLoad;
+    commitGesture(gesture,id,params,tool==="paint.mixerBrush"?()=>useMixerLoads.getState().set(image,mixerLoadAfterStroke(load,params.color,toolOptions)):undefined);
   };
-  const shapeCreateParams=(geometry:Record<string,unknown>)=>({...geometry,...shapeStyleParams(shapeStyle,paintColorValue),...(pathOp!=="new"&&activeKind==="Shape"&&state?.activeLayer!=null?{addTo:state.activeLayer,op:pathOp}:{})});
+  const shapeCreateParams=(geometry:Record<string,unknown>)=>({...geometry,...shapeStyleParams(withPatterns(shapeStyle,patternPresets),paintColorValue),...(pathOp!=="new"&&activeKind==="Shape"&&state?.activeLayer!=null?{addTo:state.activeLayer,op:pathOp}:{})});
+  // As in Photoshop, New Shape Layer starts a new Work Path; the other operations add to the targeted path.
+  const setWorkPath=(path:unknown)=>{
+    const name=pathOp!=="new"&&pathTarget&&pathTarget!=="layer"?pathTarget:"work";if(name==="work")setActivePath(null);
+    clearWhenShown(command("path.set",{name,path,...(pathOp!=="new"?{op:pathOp}:{})}));
+  };
   const createPenPath=(anchors:XY[],handles:readonly (XY|null)[],closed:boolean)=>{
     const path={subpaths:[{closed,knots:penKnots(anchors,handles)}]};
     if(penMode==="shape")clearWhenShown(command("shape.create",shapeCreateParams({kind:"path",path})));
-    else{setActivePath(null);clearWhenShown(command("path.set",{name:"work",path}));}
+    else setWorkPath(path);
+  };
+  const magneticPen=(points:readonly (readonly number[])[],closed:boolean)=>{
+    const anchors=simplifyPath(points.map(point=>[point[0]!,point[1]!] as XY),vector.curveFit/zoom),first=anchors[0],end=anchors.at(-1);
+    if(closed&&anchors.length>2&&first&&end&&first[0]===end[0]&&first[1]===end[1])anchors.pop();
+    if(anchors.length<2)setPreviewStatus("Trace a path at least two anchor points long.");else createPenPath(anchors,smoothHandles(anchors,closed),closed);
+    return Promise.resolve();
+  };
+  const makeFromPath=(what:"selection"|"mask"|"shape")=>{
+    if(!pathTarget)return;
+    if(what==="selection")command("path.toSelection",{name:pathTarget});
+    else if(what==="mask")command("layer.vectorMask.fromPath",{name:pathTarget});
+    else attempt(runPhotoCommand("path.info",{name:pathTarget}).then(result=>{const path=(result as {path?:PathData}|undefined)?.path;if(path)return runPhotoCommand("shape.create",shapeCreateParams({kind:"path",path}));}));
+  };
+  const pickShapeLayer=(e:PointerEvent<HTMLCanvasElement>)=>{
+    const [fx,fy]=surfaceFraction(e.currentTarget,e.clientX,e.clientY);
+    attempt(runPhotoCommand("layer.pickAt",{x:Math.floor(fx*document.width),y:Math.floor(fy*document.height),list:true}).then(result=>{
+      const live=usePhotoWorkspace.getState().state,hit=(result as {layers?:{layer:number}[]}|null)?.layers?.find(entry=>live&&findLayer(live.layers,entry.layer)?.kind==="Shape");
+      if(hit&&hit.layer!==live?.activeLayer)return runPhotoCommand("layer.select",{layer:hit.layer});
+    }));
   };
   const finishPen=(closed:boolean)=>{
     const anchors=stroke.current.map(point=>[point[0],point[1]] as XY),handles=tool==="pen.curvature"?smoothHandles(anchors,closed):[...penHandles.current];
@@ -1138,6 +1202,12 @@ export function PhotoStudio() {
   };
   const addPenPoint=(e:PointerEvent<HTMLCanvasElement>)=>{
     const next=point(e),[shownWidth,shownHeight]=surfaceSize(e.currentTarget),screen=(a:readonly number[],b:readonly number[])=>Math.hypot((a[0]!-b[0]!)*shownWidth/document.width,(a[1]!-b[1]!)*shownHeight/document.height);
+    // Auto Add/Delete: a click on the shown target path's point deletes it, on its segment adds one; elsewhere a new path starts.
+    if(!polygonDraft.current&&tool==="pen"&&vector.autoAddDelete&&editPath&&targetPathVisible(aids)){
+      const at:XY=[next[0],next[1]],tolerance=6*document.width/shownWidth,knot=nearestKnot(editPath.path,at,tolerance),segment=knot?null:nearestSegment(editPath.path,at,tolerance);
+      const path=knot?deleteKnot(editPath.path,knot.subpath,knot.knot):segment?insertKnot(editPath.path,segment.subpath,segment.segment,segment.t):null;
+      if(path){clearWhenShown(editPath.layer!==undefined?command("shape.edit",{layer:editPath.layer,path}):command("path.set",{name:editPath.name,path}));return;}
+    }
     if(!polygonDraft.current){stroke.current=[next];penHandles.current=[null];polygonDraft.current=true;strokeEnd.current=beginXDesignActivity("photo-operation","Finish or cancel the path before switching projects or disabling XDesign.");setPreviewStatus(null);}
     else {
       if(stroke.current.length>=2&&screen(next,stroke.current[0]!)<=6){finishPen(true);return;}
@@ -1189,9 +1259,9 @@ export function PhotoStudio() {
   const newAdjustmentLayer=(action:PhotoAction)=>attempt(addAdjustmentLayer(action).then(()=>openPanel("Properties")));
   // Photoshop records a layer made through its New Layer dialog as one step, so the dialog's options fold into the creation.
   const withLayerOptions=(create:()=>Promise<unknown>,props:Record<string,unknown>,label:string)=>{
-    const base=usePhotoWorkspace.getState().state?.historySources?.find(source=>source.current)?.index;
+    const base=usePhotoWorkspace.getState().state?.historySources?.find(source=>source.current)?.id;
     const {color,...rest}=props,steps=[...Object.keys(rest).length?[()=>runPhotoCommand("layer.setProps",rest)]:[],...color?[()=>runPhotoCommand("layer.setColor",{color})]:[]];
-    return create().then(async()=>{if(!steps.length)return;for(const step of steps)await step();if(base!==undefined)await runPhotoCommand("history.fold",{from:base,label});});
+    return create().then(async()=>{if(!steps.length)return;for(const step of steps)await step();if(base!==undefined)await runPhotoCommand("history.fold",{fromId:base,label});});
   };
   const codeLayers=!!state&&(state.selectedLayers?.length?state.selectedLayers:[state.activeLayer]).some(id=>["Shape","Type"].includes(findLayer(state.layers,id)?.kind??""));
   const copyLayerCode=(id:"layer.copyCSS"|"layer.copySVG")=>{
@@ -1246,7 +1316,7 @@ export function PhotoStudio() {
   // Photoshop shows the new fill layer while its colour is picked; it is only added on OK.
   const solidFill=(hex:string,committing=false):CanvasDraft=>{const props=solidFillOptions.current;return {command:"layer.newFillLayer.solidColor",params:{color:hex,...props&&Object.keys(props).length&&{props}},committing};};
   const pickSolidFill=(options?:Record<string,unknown>)=>{solidFillOptions.current=options;setPicker("fillLayer");setFillDraft(solidFill(color));};
-  const newGradientFill=(options:Record<string,unknown>={})=>{const base=usePhotoWorkspace.getState().state?.historySources?.find(source=>source.current)?.index;return withLayerOptions(()=>runPhotoCommand("layer.newFillLayer.gradient",{from:color,to:background,angle:90,style:"linear"}),options,"New Gradient Fill Layer").then(()=>{newFillBase.current=base;setImageDialog("newGradient");});};
+  const newGradientFill=(options:Record<string,unknown>={})=>{const base=usePhotoWorkspace.getState().state?.historySources?.find(source=>source.current)?.id;return withLayerOptions(()=>runPhotoCommand("layer.newFillLayer.gradient",{from:color,to:background,angle:90,style:"linear"}),options,"New Gradient Fill Layer").then(()=>{newFillBase.current=base;setImageDialog("newGradient");});};
   const fillLayerItems=(ask=false):MenuItem[]=>ask?[
     item("Solid Color…",()=>{if(state)setNewLayerDialog({name:nextLayerName(state.layers,"Color Fill"),kind:"other",create:async({name,renamed,props})=>pickSolidFill({...props,...renamed&&{name}})});}),
     item("Gradient…",()=>{if(state)setNewLayerDialog({name:nextLayerName(state.layers,"Gradient Fill"),kind:"other",create:({name,renamed,props})=>newGradientFill({...props,...renamed&&{name}})});}),
@@ -1396,7 +1466,7 @@ export function PhotoStudio() {
         item("HDR Toning…",()=>openCommand(HDR_TONING),!!currentLayer),
         "-",
         run("Desaturate","image.adjustments.desaturate",!!currentLayer,"Shift+Mod+U"),
-        item("Match Color…",()=>openCommand(matchColorCommand(Object.values(documents).filter(other=>other.id!==document.id))),!!currentLayer),
+        item("Match Color…",()=>openCommand(matchColorCommand(Object.values(documents))),!!currentLayer),
         item("Replace Color…",()=>openCommand(REPLACE_COLOR,{color:paintColor}),!!currentLayer),
         run("Equalize","image.adjustments.equalize",!!currentLayer),
       ]},
@@ -1568,7 +1638,7 @@ export function PhotoStudio() {
     {label:"Type",items:[
       {label:"Panels",items:[item("Character Panel",()=>openPanel("Character")),item("Paragraph Panel",()=>openPanel("Paragraph")),"-",item("Glyphs Panel",()=>openPanel("Glyphs")),"-",item("Character Styles Panel",()=>openPanel("Character Styles")),item("Paragraph Styles Panel",()=>openPanel("Paragraph Styles"))]},
       "-",
-      {label:"Anti-Alias",disabled:busy||!typeText,items:([["none","None"],["sharp","Sharp"],["crisp","Crisp"],["strong","Strong"],["smooth","Smooth"],["windowsLcd","Windows LCD"],["windows","Windows"]] as const).map(([id,label])=>radio(label,`type.antiAlias.${id}`,(typeText?.antialias??"smooth")===id))},
+      {label:"Anti-Alias",disabled:busy||!typeText,items:antialiasEntries().map(([id,label,supported])=>radio(label,`type.antiAlias.${id}`,typeAntialias(typeText?.antialias)===id,supported))},
       {label:"Orientation",disabled:busy||!typeText,items:([["horizontal","Horizontal"],["vertical","Vertical"]] as const).map(([id,label])=>radio(label,`type.orientation.${id}`,(typeText?.orientation??"horizontal")===id))},
       {label:"OpenType",disabled:busy||!typeText,items:OPEN_TYPE.map(([id,label])=>run(label,`type.openType.${id}`))},
       "-",
@@ -1600,7 +1670,7 @@ export function PhotoStudio() {
       run("Subject","select.subject"),
       run("Sky","select.sky"),
       "-",
-      item("Select and Mask…",()=>setSelectionDialog("refine"),hasSelection,"Alt+Mod+R"),
+      item("Select and Mask…",()=>setSelectionDialog("refine"),true,"Alt+Mod+R"),
       {label:"Modify",disabled:busy||!hasSelection,items:MODIFY_ORDER.map(id=>{const modify=SELECTION_MODIFY.find(entry=>entry.id===id)!;return item(`${modify.title.replace(" Selection","")}…`,()=>openCommand(modify),true,id==="select.modify.feather"?"Shift+F6":undefined);})},
       "-",
       run("Grow","select.grow",hasSelection),
@@ -1803,7 +1873,7 @@ export function PhotoStudio() {
     else if(brushTool)setBrushPickerAt({...at,tool});
     else if((PEN_TOOLS.includes(tool)||PATH_SELECT_TOOLS.includes(tool))&&selectedPath(currentState,activePath))setContextMenu({...at,kind:"path"});
   };
-  const opacitySlider=(brushTool||colorTool)&&tool!=="paint.backgroundEraser"?<PopupSlider label="Opacity" ariaLabel="Brush opacity" unit="%" min={1} max={100} value={Math.round(opacity*100)} disabled={busy} change={value=>setOpacity(value/100)} commit={value=>command("tools.setBrush",{opacity:value/100})}/>:null;
+  const opacitySlider=(brushTool||colorTool)&&tool!=="paint.backgroundEraser"&&!(tool==="erase"&&toolOptions.eraserMode==="block")?<PopupSlider label="Opacity" ariaLabel="Brush opacity" unit="%" min={1} max={100} value={Math.round(opacity*100)} disabled={busy} change={value=>setOpacity(value/100)} commit={value=>command("tools.setBrush",{opacity:value/100})}/>:null;
   const toolFields=!!PAINT_TOOL_FIELDS[tool];
   // Scrubbing shows on the canvas as a preview; the layer changes once on release, so a scrub is one history step.
   const layerSlider=(key:"opacity"|"fill",label:string)=>{
@@ -1843,27 +1913,35 @@ export function PhotoStudio() {
         gestureStart.current=gestureCurrent.current={shiftKey:e.shiftKey,altKey:e.altKey};e.currentTarget.setPointerCapture(e.pointerId);strokePointer.current=e.pointerId;stroke.current=[point(e)];seed.current=null;springMove.current=true;
         strokeEnd.current=holdImageGesture("Finish or cancel the image gesture before switching projects or disabling XDesign.");draw();return;
       }
+      if(PATH_SELECT_TOOLS.includes(tool)&&vector.selectScope==="all"){pickShapeLayer(e);return;}
       if(tool==="magneticLasso"||PATH_SELECT_TOOLS.includes(tool))return;
       if(tool==="eyedropper"||e.altKey&&SAMPLING_TOOLS.includes(tool)){
         const key=tool==="eyedropper"&&e.altKey?"background":"foreground";
         if(tool==="eyedropper"){e.currentTarget.setPointerCapture(e.pointerId);sampleDrag.current={pointerId:e.pointerId,key,busy:true};const previous=key==="background"?background:paintColor;if(showRing)setRing({x:e.clientX,y:e.clientY,color:previous,previous});sampleColor(e,key)?.finally(()=>{if(sampleDrag.current&&sampleDrag.current.pointerId===e.pointerId)sampleDrag.current.busy=false;});return;}
         sampleColor(e,key);return;
       }
+      if(e.altKey&&tool==="paint.mixerBrush"){const [x,y]=point(e);loadMixer("paint.mixerBrush.load",{x,y,size,sampleAllLayers:toolOptions.sampleAllLayers===true});return;}
       if(tool==="polygonLasso"){addPolygonPoint(e);return;}
       if(PEN_DRAFT_TOOLS.includes(tool)){addPenPoint(e);return;}
       if(tool==="text"){if(canvasText)return;const [x,y]=point(e),layer=state&&findTextLayer(state.layers,x,y);setCanvasText(layer?{layer}:{point:[x,y]});return;}
       if(tool==="move"&&autoSelect!==e.metaKey){const [x,y]=point(e);command("layer.pickAt",{x:Math.round(x),y:Math.round(y),target:autoSelectTarget});}
-      if(e.altKey&&["paint.cloneStamp","paint.healingBrush"].includes(tool)){command("cloneSource.set",{...(cloneSources?{index:cloneSources.active}:{}),source:point(e).slice(0,2)});return;}
-      if(["paint.cloneStamp","paint.healingBrush"].includes(tool)&&!cloneSource?.source){usePhotoWorkspace.setState({error:"Alt-click the image to choose a source point first."});return;}
-      if(["paint.cloneStamp","paint.healingBrush"].includes(tool))cloneGesture.current=JSON.stringify([projectId,document.id,document.version,displayState?.viewKey,cloneSources]);
+      if(e.altKey&&["paint.cloneStamp","paint.healingBrush"].includes(tool)){const index=cloneSources?.active??0,from={project:projectId,image:document.id};runPhotoCommand("cloneSource.set",{...(cloneSources?{index}:{}),source:point(e).slice(0,2)}).then(()=>useCloneSourceImages.getState().set(index,from),()=>{});return;}
+      if(["paint.cloneStamp","paint.healingBrush"].includes(tool)&&!cloneSource?.source&&!healingPattern){usePhotoWorkspace.setState({error:"Alt-click the image to choose a source point first."});return;}
+      if(cloneSourceFrom()===null){useCloneSourceImages.getState().set(cloneSources?.active??0,null);usePhotoWorkspace.setState({error:"The image this clone source was set in is closed. Alt-click to set the source again."});return;}
+      if(["paint.cloneStamp","paint.healingBrush"].includes(tool))cloneGesture.current=JSON.stringify([projectId,document.id,document.version,displayState?.viewKey,cloneSources,cloneSourceFrom()??null]);
       if(tool==="paint.colorReplacement"&&grayscaleTarget){usePhotoWorkspace.setState({error:"Color replacement edits layer pixels. Select the layer pixels before painting."});return;}
+      if(SHAPE_TOOLS.includes(tool)&&vector.shapeMode==="pixels"&&grayscaleTarget){usePhotoWorkspace.setState({error:"Pixels mode fills layer pixels. Select the layer pixels before drawing."});return;}
       if(tool==="paint.historyBrush"||eraseToHistory){if(!historyChoice?.available){setPreviewStatus(historyChoice?historyChoice.reason??"The paint target did not exist in this history state.":historySource?"The History Brush source is no longer retained. Set another in the History panel.":"Set a History Brush source in the History panel before painting.");return;}if(!historySource)setHistorySource(historyChoice.id);}
-      if(tool==="paint.patch"){
+      const patchSelect=tool==="paint.patch"&&patchPress(point(e).slice(0,2) as [number,number],currentState?.hasSelection?currentState.selectionBounds:null,{shiftKey:e.shiftKey,altKey:e.altKey});
+      if(patchSelect&&patchSelect!=="patch")patchLasso.current=patchSelect;
+      else if(tool==="paint.patch"){
         if(!projectId||activeProjectId!==projectId){setPreviewStatus("Open this image from the current project before using Patch.");return;}
         if(!currentState?.hasSelection||!currentState.selectionBounds){setPreviewStatus("Make a bounded selection before using the Patch tool.");return;}
         if(state?.channels?.target?.kind==="color"){setPreviewStatus("Patch can target pixels, masks, alpha channels, or Quick Mask. Return to the composite to patch layer pixels.");return;}
         const pointerId=e.pointerId??1,start=point(e).slice(0,2) as [number,number],target=patchTarget({layer:state?.layerMaskView?.layer??currentLayer?.id??null,mask:paintingMask,quickMask:!!state?.quickMask&&state?.channels?.target?.kind!=="alpha",channel:state?.channels?.target});
-        const drag:PatchDrag={pointerId,start,current:start,projectId,photoId:document.id,version:document.version,viewKey:displayState?.viewKey??"",mode:toolOptions.mode==="destination"?"destination":"source",target,bounds:currentState.selectionBounds};patchDrag.current=drag;
+        const drag:PatchDrag={pointerId,start,current:start,projectId,photoId:document.id,version:document.version,viewKey:displayState?.viewKey??"",mode:toolOptions.mode==="destination"?"destination":"source",target,options:patchOptions(toolOptions,target),bounds:currentState.selectionBounds,inside:runPhotoCommand("selection.contains",{x:start[0],y:start[1]}).then(result=>(result as {inside?:unknown}|undefined)?.inside!==false,()=>true)};patchDrag.current=drag;
+        // The bounds hold more than the selection (a ring's hole, an ellipse's corners); pressed outside the selection itself, the drag selects anew, as in Photoshop.
+        const pressed=point(e),lassoPointer=e.pointerId;void drag.inside.then(inside=>{if(inside||patchDrag.current!==drag)return;strokePointer.current=lassoPointer;nativeStroke.current?.dispose();nativeStroke.current=null;strokeSurface.current?.restore();strokeSurface.current=null;patchDrag.current=null;patchLasso.current="replace";gestureStart.current=gestureCurrent.current={shiftKey:false,altKey:false};stroke.current=[pressed];draw();});
         e.currentTarget.focus();e.currentTarget.setPointerCapture(e.pointerId);strokePointer.current=pointerId;stroke.current=[];seed.current=null;patchPreviewCount.current=0;setPreviewStatus(null);
         strokeEnd.current=holdImageGesture("Finish or cancel the Patch drag before switching projects or disabling XDesign.");
         if(nativeFeedback&&isTauri()&&displayState?.viewKey){const pixels=strokePixels(beginStrokeSurface(),"paint.patch");nativeStroke.current=new NativeStrokePreview(pixels.load,(_tiles,count,error)=>{strokeCount.current=count;setPreviewStatus(error);redrawStroke.current();},undefined,1_000_000,undefined,pixels.paint);}
@@ -1989,47 +2067,43 @@ export function PhotoStudio() {
       <button className="xd-editor-icon-button" aria-label="Browse all image actions" title="Search image actions" disabled={busy||geometryActive} onClick={()=>setCommandsOpen(true)}><Search size={15}/></button>
       <div className="xd-editor-panel-toggles" inert={geometryActive}><button className="xd-editor-icon-button" aria-label={`${panels.left?"Hide":"Show"} properties panel`} title={`${panels.left?"Hide":"Show"} Properties`} aria-expanded={panels.left} aria-controls={panels.rightId} disabled={busy} onClick={()=>panels.toggle("left")}><SlidersHorizontal size={15}/></button><button className="xd-editor-icon-button" aria-label={`${panels.right?"Hide":"Show"} layers panel`} title={`${panels.right?"Hide":"Show"} Layers`} aria-expanded={panels.right} aria-controls={panels.rightId} disabled={busy} onClick={()=>panels.toggle("right")}><Layers size={15}/></button></div>
     </header>
-    <div className="xd-photo-options xd-ps-options" hidden={!chrome.options} inert={busy||geometryActive&&!(perspectiveCrop&&tool==="perspectiveCrop")}><span className="xd-ps-tool-preset" role="img" aria-label={`Current tool: ${toolLabel}`} title={toolLabel}>{ToolIcon&&<ToolIcon size={16}/>}<ChevronDown size={9}/></span>
-      {brushTool&&<BrushPresetPicker size={size} hardness={hardness} maxSize={tool==="paint.backgroundEraser"?5000:1000} presets={state?.brush?.presets??[]} revision={state?.brush?.revision} disabled={busy} at={brushPickerAt?.tool===tool?brushPickerAt:null} dismiss={()=>setBrushPickerAt(null)}
+    <div className="xd-photo-options xd-ps-options" hidden={!chrome.options} inert={busy||geometryActive&&!(perspectiveCrop&&tool==="perspectiveCrop")}><ToolPresetPicker icon={ToolIcon&&<ToolIcon size={16}/>} toolLabel={toolLabel} state={state} tool={tool} options={toolPresetOptions} choose={chooseToolPreset}/>
+      {brushTool&&<BrushPresetPicker size={size} hardness={hardness} maxSize={tool==="paint.backgroundEraser"?5000:1000} presets={state?.brush?.presets??[]} groups={state?.brush?.groups} newGroup={group=>runPhotoCommand("brush.presets.newGroup",{group})} revision={state?.brush?.revision} disabled={busy} at={brushPickerAt?.tool===tool?brushPickerAt:null} dismiss={()=>setBrushPickerAt(null)}
         change={patch=>{if(patch.size!==undefined)setSize(patch.size);if(patch.hardness!==undefined)setHardness(patch.hardness);}} commit={patch=>command("tools.setBrush",patch)}
         selectPreset={name=>attempt(runPhotoCommand("tools.setBrush",{preset:name}).then(()=>{const settings=usePhotoWorkspace.getState().state?.brush?.settings;if(settings)changedBrush(settings);}))}/>}
       {brushTool&&BRUSH_BAR_ITEMS[tool]&&<BrushSettingsToggle open={flyout==="Brush Settings"} toggle={()=>flyout==="Brush Settings"?setFlyout(null):openPanel("Brush Settings")}/>}
       {!toolFields&&opacitySlider}
-      {PEN_TOOLS.includes(tool)&&<label>Mode<select aria-label="Pen mode" value={penMode} onChange={event=>setPenMode(event.target.value as "shape"|"path")}><option value="shape">Shape</option><option value="path">Path</option></select></label>}
-      {(SHAPE_TOOLS.includes(tool)||PEN_TOOLS.includes(tool)&&penMode==="shape")&&<><ShapeStyleFields style={shapeStyle} change={patch=>setShapeStyle(current=>({...current,...patch}))}/><PathOpSelect value={pathOp} change={setPathOp} merge={currentLayer?.kind==="Shape"&&!busy?()=>command("layer.combineShapes.mergeShapeComponents"):undefined}/></>}
-      {tool==="shape.rect"&&<label>Radius<input aria-label="Corner radius" className="xd-ps-number" type="number" min="0" max="10000" value={cornerRadius} onChange={event=>setCornerRadius(Math.max(0,Math.min(10000,event.target.valueAsNumber||0)))}/><span>px</span></label>}
-      {tool==="shape.polygon"&&<><label>Sides<input aria-label="Number of sides" className="xd-ps-number" type="number" min="3" max="100" value={polygonSides} onChange={event=>setPolygonSides(Math.max(3,Math.min(100,Math.round(event.target.valueAsNumber)||3)))}/></label><label>Star Ratio<input aria-label="Star ratio" className="xd-ps-number" type="number" min="1" max="100" value={starRatio} onChange={event=>setStarRatio(Math.max(1,Math.min(100,Math.round(event.target.valueAsNumber)||100)))}/><span>%</span></label></>}
-      {tool==="shape.line"&&<label>Weight<input aria-label="Line weight" type="number" min="1" max="1000" value={lineWeight} onChange={event=>setLineWeight(Math.max(1,Math.min(1000,event.target.valueAsNumber||1)))}/><span>px</span></label>}
+      {(SHAPE_TOOLS.includes(tool)||PEN_TOOLS.includes(tool)||PATH_SELECT_TOOLS.includes(tool))&&<VectorToolBar kind={SHAPE_TOOLS.includes(tool)?"shape":PEN_TOOLS.includes(tool)?"pen":"select"} tool={tool} options={vector} setOption={setVector} busy={busy} version={stateVersion??undefined} shapeLayer={activeKind==="Shape"?state!.activeLayer:null} target={editPath} canvas={{width:document.width,height:document.height}} foreground={paintColor} background={grayscaleTarget?"#ffffff":background} foregroundValue={paintColorValue} patterns={patternPresets} opaque={opaqueTarget} make={{mask:pathTarget!=="layer"&&!!currentLayer,shape:pathTarget!=="layer",disabled:busy||!pathTarget,run:makeFromPath}} merge={currentLayer?.kind==="Shape"&&!busy?()=>command("layer.combineShapes.mergeShapeComponents"):undefined} run={command}/>}
       {colorTool&&grayscaleTarget&&<div className="xd-photo-mask-tones" aria-label="Channel paint tones"><button aria-label="Paint black" title="Paint black (X swaps black/white)" aria-pressed={channelColor==="#000000"} onClick={()=>setChannelColor("#000000")}><span style={{background:"#000000"}}/></button><button aria-label="Paint white" title="Paint white (X swaps black/white)" aria-pressed={channelColor==="#ffffff"} onClick={()=>setChannelColor("#ffffff")}><span style={{background:"#ffffff"}}/></button></div>}
       {selectionTool&&<SelectionModeCluster value={tool==="select.quick"&&selectionMode==="intersect"?"replace":selectionMode} modes={tool==="select.quick"?["replace","add","subtract"]:["replace","add","subtract","intersect"]} change={setSelectionMode}/>}
       {tool==="crop"&&document&&<CropRatioFields values={toolOptions} ratios={CROP_RATIOS} original={[document.width,document.height]} resolution={imagePpi} disabled={busy} apply={cropToRatio} applySize={cropToSize} clear={()=>cropOptions({style:"normal"})}/>}
       {tool==="paint.gradient"&&<><select aria-label="Gradient mode" disabled={grayscaleTarget} value={grayscaleTarget||!liveGradient?"classic":"live"} onChange={event=>setLiveGradient(event.target.value==="live")}><option value="live">Gradient</option><option value="classic">Classic gradient</option></select>{state?.presets&&<GradientToolPick current={state.presets.gradient} live={liveGradient&&!grayscaleTarget} foreground={paintColor} background={background} disabled={busy} select={params=>command("gradient.presets.select",params)}/>}<GradientTypeIcons value={gradientStyle} change={setGradientStyle}/></>}
       {tool==="perspectiveCrop"&&document&&<PerspectiveCropBar values={toolOptions} original={[document.width,document.height]} resolution={imagePpi} disabled={busy} change={values=>setPaintOptions(current=>({...current,perspectiveCrop:sanitizePaintOptions("perspectiveCrop",{...toolOptions,...values})}))}/>}
-      {toolFields&&tool!=="crop"&&tool!=="perspectiveCrop"&&<div className="xd-ps-tool-options"><PaintToolOptions tool={tool} lead={opacitySlider} hide={tool==="paint.gradient"&&liveGradient&&!grayscaleTarget?["mode"]:undefined} before={tool==="paint.gradient"?{dither:<label><input type="checkbox" checked={gradientReverse} onChange={event=>setGradientReverse(event.target.checked)}/>Reverse</label>,method:(grayscaleTarget||!liveGradient)&&<label><input type="checkbox" aria-label="Gradient transparency" checked={gradientTransparency} onChange={event=>setGradientTransparency(event.target.checked)}/>Transparency</label>}:undefined} values={toolOptions} disabled={busy} presets={state?.presets} selectPattern={pattern=>command("pattern.presets.select",{pattern})} change={values=>setPaintOptions(current=>({...current,[tool]:sanitizePaintOptions(tool,values)}))}/></div>}<BrushBarItems tool={tool} settings={(state?.brush?.settings??{}) as BrushBarSettings} patch={patch=>command("tools.setBrush",patch)} symmetry={{current:symmetryChoice[document.id]??"",saved:state?.paths?.saved??[],hasWorkPath:!!state?.paths?.work,choose:chooseSymmetry}}/>
-      {(nativeStrokeTool||tool==="paint.patch")&&<MenuButton label="Brush options" icon={GearIcon} iconOnly items={[{label:"Native feedback",checked:nativeFeedback&&feedbackAvailable,disabled:!feedbackAvailable,run:()=>setNativeFeedback(value=>!value)}]}/>}
+      {toolFields&&tool!=="crop"&&tool!=="perspectiveCrop"&&<div className="xd-ps-tool-options"><PaintToolOptions tool={tool} lead={opacitySlider} opaque={opaqueTarget} locked={grayscaleTarget?PIXEL_LAYER_OPTIONS[tool]:undefined} hide={tool==="paint.gradient"&&liveGradient&&!grayscaleTarget?["mode"]:undefined} before={tool==="paint.mixerBrush"?{wet:<MixerBrushLoad load={mixerLoad} disabled={busy} run={id=>loadMixer(id)}/>}:tool==="paint.gradient"?{dither:<label><input type="checkbox" checked={gradientReverse} onChange={event=>setGradientReverse(event.target.checked)}/>Reverse</label>,method:(grayscaleTarget||!liveGradient)&&<label><input type="checkbox" aria-label="Gradient transparency" checked={gradientTransparency} onChange={event=>setGradientTransparency(event.target.checked)}/>Transparency</label>}:undefined} values={toolOptions} disabled={busy} presets={state?.presets} selectPattern={pattern=>command("pattern.presets.select",{pattern})} change={values=>setPaintOptions(current=>({...current,[tool]:sanitizePaintOptions(tool,values)}))}/></div>}<BrushBarItems tool={tool} settings={(state?.brush?.settings??{}) as BrushBarSettings} patch={patch=>command("tools.setBrush",patch)} symmetry={{current:symmetryCurrent,segments:symmetry?.segments,saved:state?.paths?.saved??[],hasWorkPath:!!state?.paths?.work,choose:chooseSymmetry,preset:(type,segments)=>attempt(runPhotoCommand("paint.symmetrySet",segments===undefined?{type}:{type,segments}))}}/>
+      {(nativeStrokeTool||tool==="paint.patch")&&<MenuButton label="Brush options" icon={GearIcon} iconOnly items={[{label:"Native feedback",checked:nativeFeedback&&feedbackAvailable,disabled:!feedbackAvailable,run:()=>setNativeFeedback(value=>!value)},...PAINT_TOOL_FIELDS[tool]?.some(field=>field.key==="smoothing")?["-" as const,...smoothingMenu(state?.brush?.settings,busy,smoothing=>command("tools.setBrush",{smoothing}))]:[]]}/>}
       {tool==="move"&&<><label><input type="checkbox" aria-label="Auto-Select" checked={autoSelect} onChange={event=>setAutoSelect(event.target.checked)}/>Auto-Select:</label><select aria-label="Auto-Select target" disabled={!autoSelect} value={autoSelectTarget} onChange={event=>setAutoSelectTarget(event.target.value as "layer"|"group")}><option value="layer">Layer</option><option value="group">Group</option></select>
         <label><input type="checkbox" aria-label="Show Transform Controls" checked={transformControls} onChange={event=>setTransformControls(event.target.checked)}/>Show Transform Controls</label>
-        <div role="group" aria-label="Align" className="xd-ps-icon-cluster">{ALIGN_BUTTONS.map(([edge,label,Icon])=><button key={edge} aria-label={label} title={label} disabled={busy||!currentLayer} onClick={()=>command(`layer.align.${edge}`)}><Icon size={16}/></button>)}</div><DistributeMenu disabled={busy||!currentLayer} run={id=>command(id)}/>
+        <div role="group" aria-label="Align" className="xd-ps-icon-cluster">{ALIGN_BUTTONS.map(([edge,label,Icon])=><button key={edge} aria-label={label} title={label} disabled={busy||!currentLayer} onClick={()=>command(`layer.align.${edge}`,alignParams(alignTo,hasSelection))}><Icon size={16}/></button>)}</div><DistributeMenu disabled={busy||!currentLayer} run={id=>command(id)} alignTo={alignTo} changeAlignTo={setAlignTo}/>
         </>}
-      {tool==="text"&&<><TypeBar font={textLayer?.text?.font??textFont} size={textLayer?.text?.sizePt??textSize} style={textStyle} align={textAlign} antialias={textLayer?.text?.antialias??textAntialias} orientation={textLayer?.text?.orientation??textOrientation} fonts={fonts} warpDisabled={!textLayer} color={typeColorDraft??(textLayer?.text?(()=>{const value=rangeStyle(textLayer.text.runs??[],[0,Number.MAX_SAFE_INTEGER],"color");return typeof value==="string"?value.slice(0,7):typeColor??paintColor;})():typeColor??paintColor)} changeColor={setTypeColorDraft} commitColor={()=>{if(typeColorDraft===null)return;if(textLayer)command("type.setStyle",{layer:textLayer.id,color:typeColorDraft});else setTypeColor(typeColorDraft);setTypeColorDraft(null);}} patch={typePatch} warp={()=>setTextWarp(true)}/></>}
+      {tool==="text"&&<><TypeBar font={textLayer?.text?.font??textFont} size={textLayer?.text?.sizePt??textSize} style={textLayer&&layerFaceName(textLayer.text?.runs)||textStyle} faces={typeFaces} editing={!!canvasText} finish={commit=>canvasTextControl.current?.(commit)} panelsOpen={flyout==="Character"||flyout==="Paragraph"} togglePanels={()=>flyout==="Character"||flyout==="Paragraph"?setFlyout(null):openPanel("Character")} align={textAlign} antialias={textLayer?.text?.antialias??textAntialias} orientation={textLayer?.text?.orientation??textOrientation} fonts={fonts} warpDisabled={!textLayer} color={typeColorDraft??(textLayer?.text?(()=>{const value=rangeStyle(textLayer.text.runs??[],[0,Number.MAX_SAFE_INTEGER],"color");return typeof value==="string"?value.slice(0,7):typeColor??paintColor;})():typeColor??paintColor)} changeColor={setTypeColorDraft} commitColor={()=>{if(typeColorDraft===null)return;if(textLayer)command("type.setStyle",{layer:textLayer.id,color:typeColorDraft});else setTypeColor(typeColorDraft);setTypeColorDraft(null);}} patch={typePatch} warp={()=>setTextWarp(true)}/></>}
       {ANALYSIS_TOOLS.includes(tool)&&<AnalysisOptions tool={tool} analysis={displayState?.analysis} toggleNotes={()=>flyout==="Notes"?setFlyout(null):openPanel("Notes")}/>}
       {tool==="eyedropper"&&<label>Sample:<select aria-label="Sample layers" value={sampleLayer} onChange={event=>setSampleLayer(event.target.value as "all"|"current"|"currentBelow")}><option value="current">Current Layer</option><option value="currentBelow">Current &amp; Below</option><option value="all">All Layers</option></select></label>}
       {tool==="eyedropper"&&<label><input type="checkbox" aria-label="Show Sampling Ring" checked={showRing} onChange={event=>setShowRing(event.target.checked)}/>Show Sampling Ring</label>}
       {(tool==="eyedropper"||tool==="colorSampler")&&<label>Sample Size:<select aria-label="Sample size" value={sampleSize} onChange={event=>setSampleSize(Number(event.target.value))}>{SAMPLE_SIZES.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>}
       {tool==="colorSampler"&&<ClearSamplers documentId={document.id}/>}
-      {PATH_SELECT_TOOLS.includes(tool)&&<><span className="xd-ps-label">Make:</span><button disabled={busy||!pathTarget} onClick={()=>command("path.toSelection",{name:pathTarget})}>Selection…</button><button disabled={busy||!pathTarget||pathTarget==="layer"||!currentLayer} onClick={()=>command("layer.vectorMask.fromPath",{name:pathTarget})}>Mask</button><button disabled={busy||!pathTarget||pathTarget==="layer"} onClick={()=>attempt(runPhotoCommand("path.info",{name:pathTarget}).then(result=>{const path=(result as {path?:PathData}|undefined)?.path;if(path)return runPhotoCommand("shape.create",shapeCreateParams({kind:"path",path}));}))}>Shape</button><ShapeStyleFields style={shapeStyle} change={patch=>{setShapeStyle(current=>({...current,...patch}));if(pathTarget==="layer"&&state?.activeLayer!=null){const next={...shapeStyle,...patch};command("shape.edit",{layer:state.activeLayer,...shapeStyleParams(next,paintColorValue)});}}}/></>}
       {tool==="zoom"&&<div role="group" aria-label="Zoom mode" className="xd-ps-icon-cluster"><button aria-label="Zoom in mode" title="Zoom in" aria-pressed={!zoomOut} onClick={()=>setZoomOut(false)}><ZoomIn size={16}/></button><button aria-label="Zoom out mode" title="Zoom out" aria-pressed={zoomOut} onClick={()=>setZoomOut(true)}><ZoomOut size={16}/></button></div>}
       {tool==="zoom"&&<label><input type="checkbox" aria-label="Scrubby Zoom" checked={scrubbyZoom} onChange={event=>setScrubbyZoom(event.target.checked)}/>Scrubby Zoom</label>}
       {tool==="rotateView"&&<><label>Rotation Angle:<input key={turn.angle} type="number" aria-label="Rotation Angle" min={-180} max={180} defaultValue={turn.angle} onBlur={event=>turnView({angle:Number(event.target.value)||0})} onKeyDown={event=>{if(event.key==="Enter")event.currentTarget.blur();}}/>°</label><button disabled={!turn.angle} onClick={()=>turnView({angle:0})}>Reset View</button></>}
       {(tool==="hand"||tool==="zoom")&&<><button onClick={()=>zoomAt(()=>1)}>100%</button><button onClick={fit}>Fit Screen</button><button onClick={fill}>Fill Screen</button></>}
-      {selectionTool&&<>{["select.object","select.quick","select.magicWand"].includes(tool)&&<button disabled={busy} onClick={()=>command("select.subject")}>Select Subject</button>}<button disabled={busy||!hasSelection} onClick={()=>setSelectionDialog("refine")}>Select and Mask…</button></>}
+      {selectionTool&&<>{["select.object","select.quick","select.magicWand"].includes(tool)&&<button disabled={busy} onClick={()=>command("select.subject")}>Select Subject</button>}<button disabled={busy} onClick={()=>setSelectionDialog("refine")}>Select and Mask…</button></>}
       {tool==="crop"&&<button type="button" aria-label="Straighten crop" title="Draw a line along the horizon to level the crop" aria-pressed={cropStraighten} disabled={busy} onClick={()=>setCropStraighten(value=>!value)}><Ruler size={14}/>Straighten</button>}
       {tool==="crop"&&<MenuButton label="Crop overlay" icon={CROP_GUIDES[0]![2]} iconOnly items={[...CROP_GUIDES.map(([value,label,icon])=>({label,icon,radio:true,checked:cropGuide===value,run:()=>setCropGuide(value)})),"-",...CROP_OVERLAY_SHOWS.map(([value,label])=>({label,radio:true,checked:cropOverlayShow===value,run:()=>setCropOverlayShow(value)})),"-",{label:"Cycle Overlay",run:cycleCropGuide},{label:"Cycle Orientation",disabled:cropGuide!=="triangle"&&cropGuide!=="spiral",run:turnCropGuide}]}/>}
-      {tool==="crop"&&<MenuButton label="Crop options" icon={GearIcon} iconOnly items={[{label:"Show Cropped Area",shortcut:"H",checked:cropShowCropped,run:()=>setCropShowCropped(value=>!value)},"-",{label:"Enable Crop Shield",checked:cropShield,run:()=>setCropShield(value=>!value)},{label:"Shield Opacity",disabled:!cropShield,items:[.25,.5,.75,1].map(value=>({label:`${value*100}%`,radio:true,checked:cropShieldOpacity===value,run:()=>setCropShieldOpacity(value)}))}]}/>}
+      {tool==="crop"&&<MenuButton label="Crop options" icon={GearIcon} iconOnly items={[{label:"Show Cropped Area",shortcut:"H",checked:cropShowCropped,run:()=>setCropShowCropped(value=>!value)},"-",{label:"Enable Crop Shield",checked:cropShield,run:()=>setCropShield(value=>!value)}]}/>}
+      {tool==="crop"&&<PopupSlider label="Shield Opacity:" ariaLabel="Crop shield opacity" unit="%" min={0} max={100} value={Math.round(cropShieldOpacity*100)} disabled={!cropShield} change={value=>setCropShieldOpacity(value/100)} commit={value=>setCropShieldOpacity(value/100)}/>}
       {tool==="crop"&&<div className="xd-ps-tool-options"><PaintToolOptions tool="crop" values={toolOptions} disabled={busy} change={values=>setPaintOptions(current=>({...current,crop:sanitizePaintOptions("crop",values)}))}/></div>}
       {tool==="crop"&&<CropFillField value={String(toolOptions.fill)} deleteCroppedPixels={toolOptions.deleteCroppedPixels===true} disabled={busy} change={fill=>cropOptions({fill})}/>}
       {selectionBox&&<><button disabled={busy} onClick={commitSelectionTransform}>Apply transform</button><button onClick={()=>setSelectionBox(null)}>Cancel transform</button></>}
-      <FreeTransformBar untilShown={untilShown}/>
+      <FreeTransformBar untilShown={untilShown} warp={fold=>openGeometry("warp",fold)}/>
       {tool==="crop"&&cropBox&&<div role="group" aria-label="Crop actions" className="xd-ps-icon-cluster"><button aria-label="Reset crop" title="Reset the crop box and rotation" disabled={busy} onClick={resetCrop}><RotateCcw size={16}/></button>{!cropUntouched&&<><button aria-label="Cancel crop" title="Cancel the current crop (Esc)" onClick={resetCrop}><Ban size={16}/></button><button aria-label="Apply crop" title="Commit the current crop (Enter)" disabled={busy} onClick={commitCrop}><Check size={16}/></button></>}</div>}
     </div>
     <div className="xd-ps-doctabs" role="tablist" aria-label="Open images" inert={geometryActive}>
@@ -2059,6 +2133,7 @@ export function PhotoStudio() {
       <PhotoTiles key={`${document.id}/${displayState?.viewKey}`} document={document} projectId={projectId} zoom={zoom} hasSelection={!!displayState?.hasSelection} selectionDisplay={selectionDisplay} edges={selectionEdgesVisible(aids)} viewKey={displayState?.viewKey} stage={stage} image={image} status={setPreviewStatus} surface={tileSurface}/>
       <CanvasDraftPreview document={document} draft={fillDraft??layerPropsDraft(layerDraft)} canvas={image.current}/>
       {tool==="magneticLasso"&&!geometryActive&&<MagneticLassoOverlay key={`${projectId}/${document.id}/${document.version}/${displayState?.viewKey}`} document={document} projectId={projectId} viewKey={displayState?.viewKey} options={toolOptions} mode={selectionMode} zoom={zoom} ready={stateVersion===document.version&&(!viewPreview.active||!!viewPreview.url)} changeWidth={width=>setPaintOptions(current=>({...current,magneticLasso:{...current.magneticLasso,width}}))}/> }
+      {tool==="pen.freeform"&&vector.magnetic&&!geometryActive&&<MagneticLassoOverlay key={`pen/${projectId}/${document.id}/${document.version}/${displayState?.viewKey}`} document={document} projectId={projectId} viewKey={displayState?.viewKey} options={{width:vector.magneticWidth,contrast:vector.magneticContrast,frequency:vector.magneticFrequency,stylusPressure:vector.magneticPressure}} mode="replace" zoom={zoom} ready={stateVersion===document.version&&(!viewPreview.active||!!viewPreview.url)} changeWidth={width=>setVector("magneticWidth",width)} pen={magneticPen}/>}
       {viewPreview.active&&!viewPreview.url&&<div className="xd-photo-view-loading" role="status">{viewPreview.error?<button onClick={viewPreview.retry}>Retry image view</button>:"Rendering image view…"}</div>}
       {pixelGridVisible(aids,zoom)&&<div className="xd-photo-pixel-grid" style={{backgroundSize:`${zoom}px ${zoom}px`}}/>}
       {layerEdgesVisible(aids)&&<svg className="xd-photo-layer-edges" viewBox={`0 0 ${document.width} ${document.height}`} aria-hidden="true">{selectedBoxes().map((box,index)=><rect key={index} x={box[0]} y={box[1]} width={box[2]} height={box[3]}/>)}</svg>}
@@ -2076,7 +2151,8 @@ export function PhotoStudio() {
       {editPath&&PATH_SELECT_TOOLS.includes(tool)&&!geometryActive&&<PathEditOverlay width={document.width} height={document.height} zoom={zoom} path={editPath.path} direct={tool==="path.direct"}
         commit={path=>editPath.layer!==undefined?command("shape.edit",{layer:editPath.layer,path}):command("path.set",{name:editPath.name,path})}
         move={(dx,dy)=>editPath.layer!==undefined?command("shape.edit",{layer:editPath.layer,move:[dx,dy]}):command("path.transform",{name:editPath.name,translateX:dx,translateY:dy})}/>}
-      {canvasText&&<CanvasTextEditor key={canvasText.layer?`layer-${canvasText.layer.id}`:canvasText.point.join(",")} target={canvasText} zoom={zoom} resolution={state?.resolution??72} font={textFont} size={textSize} color={typeColor??paintColor} create={{...typeStyleParams(textStyle),...(textAlign!=="left"?{align:textAlign}:{})}} after={{antialias:textAntialias,orientation:textOrientation}} close={work=>{const closing=canvasText;if(!work){setCanvasText(null);return;}void untilShown(work).then(()=>setCanvasText(current=>current===closing?null:current));}}/>}
+      {tool==="paint.gradient"&&liveGradient&&!grayscaleTarget&&currentLayer?.gradientFill&&!geometryActive&&<GradientStopsOverlay width={document.width} height={document.height} zoom={zoom} fill={currentLayer.gradientFill} layer={currentLayer.id} disabled={busy} commit={command}/>}
+      {canvasText&&<CanvasTextEditor key={canvasText.layer?`layer-${canvasText.layer.id}`:canvasText.point.join(",")} target={canvasText} zoom={zoom} resolution={state?.resolution??72} font={textFont} size={textSize} color={typeColor??paintColor} create={{...typeStyleParams(textStyle),...(textAlign!=="left"?{align:textAlign}:{})}} after={{antialias:textAntialias,orientation:textOrientation}} control={canvasTextControl} close={work=>{const closing=canvasText;if(!work){setCanvasText(null);return;}void untilShown(work).then(()=>setCanvasText(current=>current===closing?null:current));}}/>}
       {textWarp&&textLayer&&document&&<PhotoTextGeometryDialog key={`${textLayer.id}/warp`} kind="warp" document={document} layer={textLayer} close={()=>setTextWarp(false)}/>}
       {selectionBox&&!geometryActive&&<CropOverlay label="Selection" shade={false} width={frame!.width} height={frame!.height} zoom={zoom} box={selectionBox.box} change={box=>setSelectionBox(current=>current&&{...current,box})}/>}</div></div></div>
     <ViewAids stage={stage} image={image} docId={document.id} width={document.width} height={document.height} zoom={zoom} resolution={state?.resolution} moveTool={tool==="move"} onRulerMenu={at=>setContextMenu({...at,kind:"ruler"})} onRulerDoubleClick={()=>setPreferencesSection("units")}/>
@@ -2093,7 +2169,7 @@ export function PhotoStudio() {
         {flyout&&<div className="xd-ps-flyout" role="region" aria-label={`${flyout} panel`}><header><strong>{flyout}</strong><span className="xd-ps-spacer"/><MenuButton label={`${flyout} panel options`} icon={Menu} iconOnly align="end" className="xd-ps-panel-menu" items={panelMenu(flyout)}/><button type="button" className="xd-editor-icon-button" aria-label="Collapse panel" title="Collapse to icon" onClick={()=>setFlyout(null)}><ChevronsRight size={13}/></button></header><div className="xd-ps-flyout-body">
           {flyout==="History"&&currentState&&<PhotoHistory state={currentState} disabled={busy} contents={!!smartTrail.length} name={document?.name} preview={document?convertFileSrc(document.previewPath):undefined} source={historySource} chooseSource={setHistorySource} newSnapshot={()=>setImageDialog("snapshot")}/>}
           {flyout==="Navigator"&&<div className="xd-ps-pad"><PhotoNavigator src={viewPreview.active?viewPreview.url??undefined:convertFileSrc(document.previewPath)} width={document.width} height={document.height} view={navigatorView} zoom={zoom} center={centerView} zoomTo={value=>zoomAt(()=>value)}/></div>}
-          {flyout==="Info"&&<div className="xd-ps-pad"><InfoPanel width={document.width} height={document.height} selectionBounds={currentState?.selectionBounds} ruler={tool==="ruler"?displayState?.analysis?.ruler??null:undefined} documentId={document.id} refresh={`${document.version}/${displayState?.viewKey??""}/${sampleSize}`} sample={(x,y)=>projectId?sampleImageColor({projectId,photoId:document.id,version:document.version,viewKey:displayState?.viewKey??null,...sampleBox(x,y)}):Promise.resolve(null)}/></div>}
+          {flyout==="Info"&&<div className="xd-ps-pad"><InfoPanel width={document.width} height={document.height} selectionBounds={currentState?.selectionBounds} ruler={tool==="ruler"?displayState?.analysis?.ruler??null:undefined} documentId={document.id} refresh={`${document.version}/${displayState?.viewKey??""}/${sampleSize}`} sample={(x,y)=>projectId?sampleImageColor({projectId,photoId:document.id,version:document.version,viewKey:displayState?.viewKey??null,...sampleBox(x,y)}):Promise.resolve(null)} ink={projectId&&currentState?.mode.toLowerCase()==="cmyk"?(x,y)=>sampleImageInks({projectId,photoId:document.id,version:document.version,...sampleBox(x,y)}):undefined}/></div>}
           {flyout==="Notes"&&<NotesPanel notes={displayState?.analysis?.notes??[]}/>}
           {flyout==="Brushes"&&state&&<div className="xd-ps-pad"><BrushPanel state={state} changed={changedBrush}/></div>}
           {flyout==="Brush Settings"&&state&&<div className="xd-ps-pad"><BrushSettingsPanel state={state} changed={changedBrush}/></div>}
@@ -2109,7 +2185,7 @@ export function PhotoStudio() {
           {flyout==="Layer Comps"&&displayState?.panels&&<LayerCompsPanel comps={displayState.panels.layerComps}/>}
           {flyout==="Actions"&&<ActionsPanel/>}
           {flyout==="Measurement Log"&&displayState?.panels&&<MeasurementLogPanel log={displayState.panels.measurementLog}/>}
-          {flyout==="Tool Presets"&&state&&<div className="xd-ps-pad"><ToolPresetsPanel state={state} tool={tool} options={{toolOptions:{gradientStyle,gradientReverse,liveGradient,selectionMode,paintOptions:sanitizePaintOptions(tool,toolOptions)},foreground:grayscaleTarget?paintColorRGBA(channelColor):nativeForeground??paintColorRGBA(color),background:nativeBackground??paintColorRGBA(background)}} choose={chooseToolPreset}/></div>}
+          {flyout==="Tool Presets"&&state&&<div className="xd-ps-pad"><ToolPresetsPanel state={state} tool={tool} options={toolPresetOptions} choose={chooseToolPreset}/></div>}
         </div></div>}
         <nav className="xd-ps-strip" aria-label="Collapsed panels">{STRIP_PANELS.map(({name,icon:Icon})=><button key={name} type="button" aria-label={name} title={name} aria-pressed={flyout===name} onClick={()=>setFlyout(current=>current===name?null:name)}><Icon size={16}/></button>)}</nav>
         <div className="xd-ps-groups">
@@ -2119,8 +2195,9 @@ export function PhotoStudio() {
           </section>
           <section className="xd-ps-group xd-ps-group-properties xd-photo-properties" aria-label="Image properties" hidden={!panels.left} data-collapsed={middleCollapsed}>
             <PanelTabs label="Properties panels" tabs={MIDDLE_PANELS} active={middleTab} collapsed={middleCollapsed} inert={geometryActive} menu={panelMenu(middleTab)} select={openPanel} toggle={()=>setCollapsed(c=>({...c,middle:!c.middle}))}/>
-            {!middleCollapsed&&<div ref={propertiesScroll} className="xd-editor-panel-scroll">{perspectiveCrop&&image.current?<PerspectiveCropDialog document={document} box={perspectiveCrop} canvas={{element:image.current,zoom}} options={{size:perspectiveSize,ppi:cropResolution(perspectiveOptions,imagePpi),showGrid:perspectiveOptions.showGrid!==false}} close={()=>setPerspectiveCrop(null)}/>:geometryActive&&image.current?<GeometryDialog kind={specialDialog as GeometryKind} document={document} layer={currentLayer!} canvas={{element:image.current,zoom}} close={()=>setSpecialDialog(null)}/>:<>
+            {!middleCollapsed&&<div ref={propertiesScroll} className="xd-editor-panel-scroll">{perspectiveCrop&&image.current?<PerspectiveCropDialog document={document} box={perspectiveCrop} canvas={{element:image.current,zoom}} options={{size:perspectiveSize,ppi:cropResolution(perspectiveOptions,imagePpi),showGrid:perspectiveOptions.showGrid!==false}} close={()=>setPerspectiveCrop(null)}/>:geometryActive&&image.current?<GeometryDialog kind={specialDialog as GeometryKind} document={document} layer={currentLayer!} canvas={{element:image.current,zoom}} fold={geometryFold} freeTransform={warpToFreeTransform} close={()=>setSpecialDialog(null)}/>:<>
               {toolPreferencesNotice&&<p role="status" className="xd-photo-section-help">{toolPreferencesNotice}</p>}
+              {vectorNotice&&<p role="status" className="xd-photo-section-help">{vectorNotice}</p>}
               {middleTab==="Properties"&&<>{["paint.cloneStamp","paint.healingBrush"].includes(tool)&&cloneSources&&<InspectorSection title="Clone Source" defaultOpen>{cloneSourceControls}</InspectorSection>}
               {(currentLayer?<>
             {currentLayer.adjustmentKind?<AdjustmentProperties layer={currentLayer} document={document} canvas={image.current} untilShown={untilShown}/>:<>
@@ -2148,7 +2225,7 @@ export function PhotoStudio() {
         <PanelResize side="right" panels={panels}/>
       </aside>
     </div>
-    <footer className="xd-photo-footer xd-ps-status"><span role="status" className="xd-ps-status-text">{strokeEnd.current?previewStatus??(polygonDraft.current?PEN_DRAFT_TOOLS.includes(tool)?`${polygonVertices} anchor points · Click the first point to close · Enter or double-click finishes · Backspace removes · Esc cancels`:`${polygonVertices} polygon vertices · Enter or double-click finishes · Backspace removes · Esc cancels`:selectionTool?"Selecting… · Esc cancels the gesture":tool==="crop"||tool==="perspectiveCrop"?"Defining crop… · Esc cancels the gesture":tool==="straighten"?"Drawing reference line… · Esc cancels the gesture":SHAPE_TOOLS.includes(tool)?"Drawing shape… · Esc cancels the gesture":tool==="pen.freeform"?"Drawing path… · Esc cancels the gesture":"Painting… · Esc cancels the gesture"):busy?"Applying image edit…":error??viewPreview.error??previewStatus??(warnings.length?warnings.join("; "):editTarget!=="Layer pixels"?`Editing ${editTarget}`:toolHint||"Edits update every linked placement")}</span>{polygonDraft.current&&<><button aria-label={PEN_DRAFT_TOOLS.includes(tool)?"Finish path":"Finish polygon selection"} onClick={finishPolygon}>{PEN_DRAFT_TOOLS.includes(tool)?"Finish path":"Finish selection"}</button><button aria-label={PEN_DRAFT_TOOLS.includes(tool)?"Cancel path":"Cancel polygon selection"} onClick={()=>resetStroke()}>Cancel</button></>}<button disabled={busy} onClick={fit}>Fit</button><button disabled={busy} onClick={()=>zoomAt(()=>1)}>100%</button><button disabled={busy} title="Zoom out" onClick={()=>zoomAt(z=>z/1.25)}><ZoomOut size={14}/></button><span>{Math.round(zoom*100)}%</span><button disabled={busy} title="Zoom in" onClick={()=>zoomAt(z=>z*1.25)}><ZoomIn size={14}/></button><span className="xd-ps-doc-info">{document.width} px × {document.height} px ({state?.resolution??72} ppi)</span></footer>
+    <footer className="xd-photo-footer xd-ps-status"><span role="status" className="xd-ps-status-text">{strokeEnd.current?previewStatus??(polygonDraft.current?PEN_DRAFT_TOOLS.includes(tool)?`${polygonVertices} anchor points · Click the first point to close · Enter or double-click finishes · Backspace removes · Esc cancels`:`${polygonVertices} polygon vertices · Enter or double-click finishes · Backspace removes · Esc cancels`:selectionTool||patchLasso.current?"Selecting… · Esc cancels the gesture":tool==="crop"||tool==="perspectiveCrop"?"Defining crop… · Esc cancels the gesture":tool==="straighten"?"Drawing reference line… · Esc cancels the gesture":SHAPE_TOOLS.includes(tool)?"Drawing shape… · Esc cancels the gesture":tool==="pen.freeform"?"Drawing path… · Esc cancels the gesture":"Painting… · Esc cancels the gesture"):busy?"Applying image edit…":error??viewPreview.error??previewStatus??(warnings.length?warnings.join("; "):editTarget!=="Layer pixels"?`Editing ${editTarget}`:toolHint||"Edits update every linked placement")}</span>{polygonDraft.current&&<><button aria-label={PEN_DRAFT_TOOLS.includes(tool)?"Finish path":"Finish polygon selection"} onClick={finishPolygon}>{PEN_DRAFT_TOOLS.includes(tool)?"Finish path":"Finish selection"}</button><button aria-label={PEN_DRAFT_TOOLS.includes(tool)?"Cancel path":"Cancel polygon selection"} onClick={()=>resetStroke()}>Cancel</button></>}<button disabled={busy} onClick={fit}>Fit</button><button disabled={busy} onClick={()=>zoomAt(()=>1)}>100%</button><button disabled={busy} title="Zoom out" onClick={()=>zoomAt(z=>z/1.25)}><ZoomOut size={14}/></button><span>{Math.round(zoom*100)}%</span><button disabled={busy} title="Zoom in" onClick={()=>zoomAt(z=>z*1.25)}><ZoomIn size={14}/></button><span className="xd-ps-doc-info">{document.width} px × {document.height} px ({state?.resolution??72} ppi)</span></footer>
     {specialDialog==="develop"&&currentLayer&&<DevelopDialog document={document} layer={currentLayer} close={()=>setSpecialDialog(null)}/>}
     {layerStyle&&<LayerStyleDialog key={layerStyle.layer} layerId={layerStyle.layer} initial={layerStyle.pane} onClose={()=>setLayerStyle(null)} document={document} canvas={image.current} untilShown={untilShown}/>}
     {contextMenu&&<ContextMenu x={contextMenu.x} y={contextMenu.y} label={contextMenu.kind==="picker"?"Layers":contextMenu.kind==="selection"?"Selection":contextMenu.kind==="path"?"Path":contextMenu.kind==="crop"?"Crop":contextMenu.kind==="fx"?"Layer Style":contextMenu.kind==="adjustment"?"New Fill or Adjustment Layer":"Layer"} close={()=>setContextMenu(null)} items={contextItems(contextMenu)}/>}
@@ -2184,8 +2261,8 @@ export function PhotoStudio() {
     {state&&imageDialog==="colorTable"&&<ColorTableDialog close={()=>setImageDialog(null)}/>}
     {state&&imageDialog==="snapshot"&&<NewSnapshotDialog next={state.historySnapshotName??"Snapshot 1"} close={()=>setImageDialog(null)}/>}
     {imageDialog==="text"&&<ImageTextDialog layer={textPoint?undefined:currentLayer?.text?currentLayer:undefined} point={textPoint} close={()=>{setImageDialog(null);setTextPoint(undefined);}}/>}
-    {(imageDialog==="gradient"||imageDialog==="newGradient")&&currentLayer?.gradientFill&&<GradientFillDialog document={document} layer={currentLayer} canvas={image.current} close={()=>setImageDialog(null)} cancel={imageDialog==="newGradient"?()=>{setImageDialog(null);const base=newFillBase.current;if(base===undefined)undo();else void command("history.select",{index:base,discardRedo:true});}:undefined}/>}
-    {commandDialog&&<ImageCommandDialog key={commandDialog.command.id} document={document} canvas={image.current} command={commandDialog.command} initial={commandDialog.initial} close={()=>setCommandDialog(null)}/>}
+    {(imageDialog==="gradient"||imageDialog==="newGradient")&&currentLayer?.gradientFill&&<GradientFillDialog document={document} layer={currentLayer} canvas={image.current} close={()=>setImageDialog(null)} cancel={imageDialog==="newGradient"?()=>{setImageDialog(null);const base=newFillBase.current;if(base===undefined)undo();else void command("history.select",{id:base,discardRedo:true});}:undefined}/>}
+    {commandDialog&&<ImageCommandDialog key={commandDialog.command.id} document={document} canvas={image.current} command={commandDialog.command} initial={commandDialog.initial} layerPixels={!grayscaleTarget} close={()=>setCommandDialog(null)}/>}
     {exportOpen&&<ImageExportDialog key={exportOpen} name={document.name} kind={exportOpen} choose={exportTo} close={()=>setExportOpen(false)}/>}
     {state&&fileDialog==="info"&&<FileInfoDialog close={()=>setFileDialog(null)}/>}
     {state&&fileDialog==="fitImage"&&<FitImageDialog width={state.width} height={state.height} close={()=>setFileDialog(null)}/>}

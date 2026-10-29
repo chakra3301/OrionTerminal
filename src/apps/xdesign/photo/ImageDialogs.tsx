@@ -7,15 +7,18 @@ import { runPhotoCommand, usePhotoWorkspace } from "./runtime";
 import type { PhotoDocument, PhotoLayer, PhotoState } from "./types";
 import { ipc } from "../../../lib/ipc";
 import { usePhotoCommandPreview } from "./commandPreview";
-import { documentUnder } from "./ColorRangeDialog";
+import { documentUnder, EYEDROPPERS, type Eyedropper } from "./ColorRangeDialog";
 import { sampleImageColor } from "./eyedropper";
 import { paintColorHex } from "./imageColors";
-import { selectionDefaults, selectionRequest, selectionSamplePoint } from "./selectionSettings";
+import { MAX_SELECTION_SAMPLES, selectionDefaults, selectionRequest, selectionSamplePoint } from "./selectionSettings";
 import { useDesignDialog } from "../useDesignDialog";
 import { REPLACE_COLOR, type CommandField, type ImageCommand } from "./imageCommands";
 import { useFontFamilies } from "./fontFamilies";
 import { PhotoDialog } from "./photoDialog";
 import { blendOptions } from "./blendOptions";
+import { MatchColorLayer } from "./MatchColorLayer";
+import { ToningCurve } from "./ToningCurve";
+import { isToningCurve } from "./curveTools";
 
 function Dialog({title,children,apply,close,reset,ok,okDisabled,...frame}:{title:string;children:ReactNode;apply:()=>Promise<unknown>;close:()=>void;reset?:()=>void;ok?:string;okDisabled?:boolean}&Pick<ComponentProps<typeof PhotoDialog>,"className"|"beside"|"scrim"|"preview"|"buttons">) {
   const busy=usePhotoWorkspace(s=>s.busy),error=usePhotoWorkspace(s=>s.error);
@@ -36,7 +39,7 @@ function Group({legend,children}:{legend?:string;children:ReactNode}) {
 // Photoshop keeps each command's last values for the session; choices that no longer exist (closed images) fall back.
 const remembered=new Map<string,Record<string,unknown>>();
 const usable=(field:CommandField,value:unknown)=>field.kind==="number"?typeof value==="number"&&value>=field.min&&value<=field.max:
-  field.kind==="enum"?field.choices.some(([choice])=>choice===value):field.kind==="boolean"?typeof value==="boolean":field.kind==="text"?typeof value==="string"&&value.trim()!=="":typeof value==="string";
+  field.kind==="enum"?field.choices.some(([choice])=>choice===value):field.kind==="boolean"?typeof value==="boolean":field.kind==="text"?typeof value==="string"&&value.trim()!=="":field.kind==="curve"?isToningCurve(value):typeof value==="string";
 function openingValues(command:ImageCommand,initial?:Record<string,unknown>) {
   const saved=remembered.get(command.id)??{};
   return {...Object.fromEntries(command.fields.map(field=>[field.key,usable(field,saved[field.key])?saved[field.key]:field.value])),...initial};
@@ -54,16 +57,17 @@ export function replacementFor(hex:string,result:string){const [h,s,l]=rgbHsl(he
 
 const moreShown=new Map<string,boolean>();
 
-export function ImageCommandDialog({command,initial,document,canvas=null,close}:{command:ImageCommand;initial?:Record<string,unknown>;document?:PhotoDocument;canvas?:HTMLElement|null;close:()=>void}) {
+/** `layerPixels` is false while a mask, channel or Quick Mask is the target. */
+export function ImageCommandDialog({command,initial,document,canvas=null,layerPixels=true,close}:{command:ImageCommand;initial?:Record<string,unknown>;document?:PhotoDocument;canvas?:HTMLElement|null;layerPixels?:boolean;close:()=>void}) {
   const [opening]=useState(()=>openingValues(command,initial)),[values,setValues]=useState(opening);
   const [more,setMore]=useState(()=>moreShown.get(command.id)??false),[live,setLive]=useState(true),[localError,setLocalError]=useState("");
-  const [eyedropper,setEyedropper]=useState(true),[overImage,setOverImage]=useState(false),[thumbnail,setThumbnail]=useState<"selection"|"image">("selection");
+  const [eyedropper,setEyedropper]=useState<Eyedropper>("replace"),[overImage,setOverImage]=useState(false),[thumbnail,setThumbnail]=useState<"selection"|"image">("selection");
   const projectId=usePhotoWorkspace(s=>s.projectId),imageState=usePhotoWorkspace(s=>s.state),busy=usePhotoWorkspace(s=>s.busy);
-  const set=(key:string,value:unknown)=>{setValues(current=>({...current,[key]:value}));setLocalError("");};
+  const set=(key:string,value:unknown)=>{setValues(current=>({...current,[key]:value,...(replace&&key==="color"?{colorPoint:null}:{})}));setLocalError("");};
   const radios=(field:CommandField)=>field.kind==="enum"&&!!field.radios;
   const name=(field:CommandField)=>field.group&&command.fields.some(other=>other!==field&&other.label===field.label)?`${field.group} ${field.label}`:field.label;
   const hasSelection=imageState?.hasSelection===true,replace=command.id===REPLACE_COLOR.id,match=command.id==="image.adjustments.matchColor";
-  const off=(field:CommandField)=>field.off?.(values,hasSelection)===true;
+  const off=(field:CommandField)=>field.off?.(values,hasSelection)===true||field.pixels===true&&!layerPixels;
   const control=(field:CommandField)=>field.kind==="number"?<>
     <Field label={field.label} unit={field.unit}><input type="number" aria-label={name(field)} required disabled={off(field)} min={field.min} max={field.max} step={field.step??1} value={Number.isFinite(values[field.key])?values[field.key] as number:""} onChange={e=>set(field.key,e.target.valueAsNumber)}/></Field>
     {command.sliders&&<input type="range" aria-label={`${name(field)} slider`} disabled={off(field)} min={field.min} max={field.max} step={field.step??1} value={Number.isFinite(values[field.key])?values[field.key] as number:field.value} onChange={e=>set(field.key,e.target.valueAsNumber)}/>}
@@ -72,22 +76,32 @@ export function ImageCommandDialog({command,initial,document,canvas=null,close}:
   field.kind==="enum"?<Field label={field.label}><select aria-label={name(field)} disabled={off(field)} value={values[field.key] as string} onChange={e=>set(field.key,e.target.value)}>{field.key==="mode"?blendOptions(field.choices.map(([value])=>value)):field.choices.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></Field>:
   field.kind==="boolean"?<label className="xd-ps-dialog-check"><input type="checkbox" aria-label={name(field)} disabled={off(field)} checked={values[field.key] as boolean} onChange={e=>set(field.key,e.target.checked)}/>{field.label}</label>:
   field.kind==="text"?<Field label={field.label}><input aria-label={name(field)} required maxLength={255} disabled={off(field)} value={values[field.key] as string} onChange={e=>set(field.key,e.target.value)}/></Field>:
+  field.kind==="curve"?<ToningCurve document={document} value={values[field.key]} disabled={busy||off(field)} change={points=>set(field.key,points)}/>:
   <Field label={field.label}><input type="color" aria-label={name(field)} disabled={off(field)} value={values[field.key] as string} onChange={e=>set(field.key,e.target.value)}/></Field>;
   const visible=command.fields.filter(field=>!field.more||more);
-  const sections=visible.reduce<{group?:string;radio:boolean;fields:CommandField[]}[]>((list,field)=>{const last=list.at(-1);if(last&&!last.radio&&!radios(field)&&last.group===field.group)last.fields.push(field);else list.push({group:field.group,radio:radios(field),fields:[field]});return list;},[]);
-  const params=command.params?command.params(values):values;
+  const destination=match?visible.filter(field=>field.group==="Destination Image"):[];
+  const sections=visible.filter(field=>!destination.includes(field)).reduce<{group?:string;radio:boolean;fields:CommandField[]}[]>((list,field)=>{const last=list.at(-1);if(last&&!last.radio&&!radios(field)&&last.group===field.group)last.fields.push(field);else list.push({group:field.group,radio:radios(field),fields:[field]});return list;},[]);
+  const sent=layerPixels?values:{...values,...Object.fromEntries(command.fields.filter(field=>field.pixels).map(field=>[field.key,field.value]))};
+  const params=command.params?command.params(sent):sent;
   const valid=command.fields.every(field=>usable(field,values[field.key]));
   const previewable=!!command.preview&&!!document&&isTauri()&&document.width*document.height<=16_777_216;
   const preview=usePhotoCommandPreview(document??NO_DOCUMENT,projectId,command.id,params,{automatic:live,enabled:previewable&&valid&&!busy,viewKey:imageState?.viewKey,cancelable:imageState?.canCancelPreview===true});
-  const maskRequest=selectionRequest("color",{...selectionDefaults("color",[0,0,0,1]),colors:[values.color],sampleFuzziness:values.fuzziness,mode:"replace"},{width:document?.width??0,height:document?.height??0,hasSelection:false});
+  const maskRequest=selectionRequest("color",{...selectionDefaults("color",[0,0,0,1]),colors:params.color?[params.color]:[],points:params.points??[],subtractPoints:params.subtractPoints??[],localized:params.localized===true,range:params.range??100,sampleFuzziness:values.fuzziness,mode:"replace"},{width:document?.width??0,height:document?.height??0,hasSelection:false});
   const mask=usePhotoCommandPreview(document??NO_DOCUMENT,projectId,maskRequest.command,maskRequest.params,{automatic:true,delay:150,enabled:replace&&previewable&&thumbnail==="selection"&&!maskRequest.problem&&!busy,viewKey:imageState?.viewKey,selectionView:"mask"});
-  const sampleAt=(x:number,y:number,bounds:{left:number;top:number;width:number;height:number})=>{
+  const tool=(event:{altKey:boolean;shiftKey:boolean}):Eyedropper=>!layerPixels?"replace":event.altKey?"subtract":event.shiftKey?"add":eyedropper;
+  // A plain click replaces the samples with the colour under it; + and − add the click itself, which the engine samples.
+  const sampleAt=(x:number,y:number,bounds:{left:number;top:number;width:number;height:number},mode:Eyedropper)=>{
     const point=document&&selectionSamplePoint(x,y,bounds,document.width,document.height);
     if(!point||!projectId||!document)return;
-    void sampleImageColor({projectId,photoId:document.id,version:document.version,viewKey:imageState?.viewKey??null,x:point[0],y:point[1]}).then(hex=>{if(hex)set("color",hex);}).catch(failure=>setLocalError(String(failure)));
+    if(mode!=="replace"){
+      const key=mode==="add"?"points":"subtractPoints",list=(value:unknown)=>Array.isArray(value)?value:[];
+      if(1+list(values.points).length+list(values.subtractPoints).length>=MAX_SELECTION_SAMPLES){setLocalError(`Use at most ${MAX_SELECTION_SAMPLES} color samples.`);return;}
+      setValues(current=>({...current,[key]:[...list(current[key]),point]}));setLocalError("");return;
+    }
+    void sampleImageColor({projectId,photoId:document.id,version:document.version,viewKey:imageState?.viewKey??null,x:point[0],y:point[1]}).then(hex=>{if(hex){setValues(current=>({...current,color:hex,colorPoint:point,points:[],subtractPoints:[]}));setLocalError("");}}).catch(failure=>setLocalError(String(failure)));
   };
-  const scrim=replace&&document?{className:overImage&&eyedropper?"xd-photo-eyedropper-cursor":undefined,
-    onPointerDown:(event:{target:unknown;currentTarget:unknown;clientX:number;clientY:number})=>{const bounds=eyedropper&&!busy&&event.target===event.currentTarget?documentUnder(canvas,event.clientX,event.clientY):null;if(bounds)sampleAt(event.clientX,event.clientY,bounds);},
+  const scrim=replace&&document?{className:overImage?"xd-photo-eyedropper-cursor":undefined,
+    onPointerDown:(event:{target:unknown;currentTarget:unknown;clientX:number;clientY:number;altKey:boolean;shiftKey:boolean})=>{const bounds=!busy&&event.target===event.currentTarget?documentUnder(canvas,event.clientX,event.clientY):null;if(bounds)sampleAt(event.clientX,event.clientY,bounds,tool(event));},
     onPointerMove:(event:{target:unknown;currentTarget:unknown;clientX:number;clientY:number})=>{const over=event.target===event.currentTarget&&!!documentUnder(canvas,event.clientX,event.clientY);if(over!==overImage)setOverImage(over);},
     onWheel:(event:{target:unknown;currentTarget:unknown;deltaX:number;deltaY:number})=>{if(event.target===event.currentTarget)canvas?.closest(".xd-photo-stage")?.scrollBy(event.deltaX,event.deltaY);}}:undefined;
   const portable=()=>Object.fromEntries(command.fields.filter(field=>field.key!=="sourceImage").map(field=>[field.key,values[field.key]]));
@@ -101,18 +115,19 @@ export function ImageCommandDialog({command,initial,document,canvas=null,close}:
     setValues(current=>({...current,...Object.fromEntries(loaded.map(field=>[field.key,data[field.key]]))}));setLocalError("");
     if(loaded.some(field=>field.more&&data[field.key]!==field.value))setMore(true);
   }).catch(failure=>setLocalError(String(failure)));
-  const thumbnailPoint=(event:{clientX:number;clientY:number;currentTarget:Element})=>sampleAt(event.clientX,event.clientY,event.currentTarget.getBoundingClientRect());
+  const thumbnailPoint=(event:{clientX:number;clientY:number;altKey:boolean;shiftKey:boolean;currentTarget:Element})=>{if(!busy)sampleAt(event.clientX,event.clientY,event.currentTarget.getBoundingClientRect(),tool(event));};
   const extras=(group?:string)=>replace&&document&&group==="Selection"?<>
-    <div className="xd-ps-dialog-row"><button type="button" className="xd-ps-dialog-tool" aria-label="Eyedropper Tool" title="Eyedropper Tool" aria-pressed={eyedropper} onClick={()=>setEyedropper(!eyedropper)}><Pipette size={14}/></button></div>
+    <div className="xd-ps-dialog-row"><div className="xd-photo-color-range-tools">{EYEDROPPERS.map(([mode,label,mark])=><button key={mode} type="button" aria-label={label} title={label} aria-pressed={eyedropper===mode} disabled={busy||mode!=="replace"&&!layerPixels} onClick={()=>setEyedropper(mode)}><Pipette size={14}/>{mark&&<b aria-hidden="true">{mark}</b>}</button>)}</div></div>
     <div className="xd-ps-dialog-thumb"><img className="xd-photo-eyedropper-cursor" src={thumbnail==="selection"&&mask.url?mask.url:convertFileSrc(document.previewPath)} alt={thumbnail==="selection"&&mask.url?"Replace Color selection":"Replace Color image"} draggable={false} onPointerDown={thumbnailPoint}/></div>
     <div role="radiogroup" aria-label="Thumbnail" className="xd-ps-dialog-radios">{(["selection","image"] as const).map(value=><label key={value} className="xd-ps-dialog-check"><input type="radio" name="xd-replace-color-thumbnail" aria-label={value==="selection"?"Selection":"Image"} checked={thumbnail===value} onChange={()=>setThumbnail(value)}/>{value==="selection"?"Selection":"Image"}</label>)}</div>
-  </>:replace&&group==="Replacement"?<div className="xd-ps-dialog-row"><Field label="Result"><input type="color" aria-label="Result" value={replacedColor(String(values.color),Number(values.hue)||0,Number(values.saturation)||0,Number(values.lightness)||0)} onChange={e=>{const next=replacementFor(String(values.color),e.target.value);setValues(current=>({...current,...next}));}}/></Field></div>:null;
+  </>:replace&&group==="Replacement"?<div className="xd-ps-dialog-row"><Field label="Result"><input type="color" aria-label="Result" value={replacedColor(String(values.color),Number(values.hue)||0,Number(values.saturation)||0,Number(values.lightness)||0)} onChange={e=>{const next=replacementFor(String(values.color),e.target.value);setValues(current=>({...current,...next}));}}/></Field></div>:
+    match&&group==="Image Statistics"?<div className="xd-ps-dialog-row"><MatchColorLayer projectId={projectId} source={params.sourcePhoto as {id:string;version:string}|undefined} value={values.sourceLayer} disabled={busy} change={layer=>set("sourceLayer",layer)} fail={setLocalError}/></div>:null;
   const layerName=imageState?.layers.find(layer=>layer.id===imageState.activeLayer)?.name;
   return <Dialog title={command.title} close={close} className="is-scroll" beside={previewable||!!scrim} scrim={scrim} okDisabled={!valid} reset={()=>setValues(opening)}
     preview={command.preview?{checked:live&&previewable,disabled:!previewable,busy:live&&preview.loading,change:setLive}:undefined}
     buttons={command.settingsFile?<><button type="button" disabled={busy} onClick={()=>void loadSettings()}>Load…</button><button type="button" disabled={busy} onClick={()=>void saveSettings()}>Save…</button></>:undefined}
     apply={()=>runPhotoCommand(command.id,params).then(()=>{remembered.set(command.id,values);moreShown.set(command.id,more);})}>
-    {match&&imageState&&<fieldset className="xd-ps-dialog-group"><legend>Destination Image</legend><p className="xd-ps-dialog-readout">Target: {imageState.name}{layerName?` (${layerName}, ${imageState.mode.toUpperCase()}/${imageState.depth})`:""}</p></fieldset>}
+    {match&&<fieldset className="xd-ps-dialog-group"><legend>Destination Image</legend>{imageState&&<p className="xd-ps-dialog-readout">Target: {imageState.name}{layerName?` (${layerName}, ${imageState.mode.toUpperCase()}/${imageState.depth})`:""}</p>}{destination.map(field=><Fragment key={field.key}>{control(field)}</Fragment>)}</fieldset>}
     {sections.map((section,index)=>section.radio?<div key={index}>{section.fields.map(field=><Fragment key={field.key}>{control(field)}</Fragment>)}</div>:
       <Fragment key={index}><Group legend={section.group}><div className={`xd-ps-dialog-grid${command.sliders?" has-sliders":""}`}>{section.fields.map(field=><div key={field.key} className="xd-ps-dialog-row">{control(field)}</div>)}{extras(section.group)}</div></Group></Fragment>)}
     {command.moreOptions&&<label className="xd-ps-dialog-check"><input type="checkbox" aria-label="Show More Options" checked={more} onChange={e=>setMore(e.target.checked)}/>Show More Options</label>}

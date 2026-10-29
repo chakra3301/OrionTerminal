@@ -21,7 +21,7 @@ mod healing_coverage;
 mod healing_publish;
 #[path = "xdesign_photo_healing_solve.rs"]
 mod healing_solve;
-use healing_solve::heal_region;
+use healing_solve::{heal_region, heal_region_diffused};
 #[path = "xdesign_photo_healing_sources.rs"]
 mod healing_sources;
 #[path = "xdesign_photo_spot_inpaint.rs"]
@@ -32,6 +32,14 @@ mod float_tiles;
 mod sequential;
 #[path = "xdesign_photo_smudge.rs"]
 mod smudge;
+#[path = "xdesign_photo_healing_options.rs"]
+mod healing_options;
+#[path = "xdesign_photo_patch_options.rs"]
+mod patch_options;
+/// Whether the stroke needs a healing option only the host implements (validating every option).
+pub(super) fn host_only(command:&str,params:&Value)->Result<bool,String>{if command=="paint.patch"{patch_options::host_only(params)}else{healing_options::host_only(command,params).map(|host|host||super::super::clone_document::requested(command,params))}}
+/// Patch with Diffusion or Content-Aware: the patched document, its damage and history label.
+pub(super) fn patch(engine:&Session,params:&Value,ctl:&Interrupt)->Result<(Document,Rect,&'static str),String>{patch_options::patch(engine,params,ctl)}
 pub(super) const TOOLS:[&str;12]=["paint.cloneStamp","paint.healingBrush","paint.spotHealing","paint.dodge","paint.burn","paint.sponge","paint.blur","paint.sharpen","paint.mixerBrush","paint.colorReplacement","paint.smudge","paint.historyBrush"];
 pub(super) enum RetouchStroke { Coverage(CoverageStroke), Sequential(sequential::SequentialStroke), Smudge(smudge::SmudgeStroke) }
 impl RetouchStroke {
@@ -82,7 +90,7 @@ fn retouch_brush(engine:&Session,params:&Value)->BrushSettings{
         BrushSettings { size: number(params, "size", base.size).max(1.0), hardness: pct("hardness", base.hardness * 100.0, 0.0, 100.0), opacity: pct("opacity", 100.0, 1.0, 100.0), flow: pct("flow", 100.0, 1.0, 100.0), spacing: pct("spacing", 25.0, 1.0, 1000.0), erase: false, ..base }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum SampleLayers { Current, CurrentAndBelow, All }
 #[derive(Clone, Copy)]
 enum SpotType { ContentAware, CreateTexture, ProximityMatch }
@@ -121,8 +129,10 @@ pub(super) struct CoverageStroke {
     brush: BrushSettings, renderer: StrokeRenderer, command: String, which: SampleLayers,
     generator:DabGenerator,budget:admission::DabBudget,stable_bounds:Rect,dual_bounds:Rect,
     mapping: Option<Mapping>, mode: BlendMode, spot: SpotType,
+    replace:bool,diffusion:u8,pattern:Option<healing_options::PatternSource>,sample:Arc<Document>,
     history_surface:Option<Surface>,
     clone_sources:Option<photocraft_engine::presets::clone_source::CloneSources>,
+    from:Option<super::super::clone_document::Foreign>,
     tail_keys:sparse::Keys,
     pub document: Arc<Document>, pub damage: Rect,
     #[cfg(test)] pub samples_pushed: usize,
@@ -139,24 +149,28 @@ impl CoverageStroke {
         let (target,layer,restriction)=routing(engine,params,false)?;
         let brush=retouch_brush(engine,params);
         admission::brush(&brush)?;
-        let which = if matches!(command,"paint.spotHealing"|"paint.historyBrush") { SampleLayers::Current } else { match params["sampleLayer"].as_str().unwrap_or("current") {
-            "current" => SampleLayers::Current, "currentAndBelow" => SampleLayers::CurrentAndBelow, "all" => SampleLayers::All, _ => return Err("Unknown retouch sample layer".into())
-        }};
-        let mode = if command == "paint.spotHealing" { BlendMode::Normal } else {
-            params["mode"].as_str().map(photocraft_engine::commands::blend_from_str).unwrap_or(Some(BlendMode::Normal)).ok_or("Unknown retouch blend mode")?
+        let which = if command=="paint.historyBrush" { SampleLayers::Current } else { healing_options::sample_layers(command,params)? };
+        let heal = if matches!(command,"paint.spotHealing"|"paint.healingBrush") { healing_options::heal_mode(command,params)? } else {
+            healing_options::Heal::Blend(params["mode"].as_str().map(photocraft_engine::commands::blend_from_str).unwrap_or(Some(BlendMode::Normal)).ok_or("Unknown retouch blend mode")?)
         };
+        let (mode,replace)=(heal.blend(),heal==healing_options::Heal::Replace);
+        let diffusion=if command=="paint.healingBrush"{healing_options::diffusion(command,params)?}else{5};
+        let ignore=matches!(command,"paint.cloneStamp"|"paint.healingBrush")&&healing_options::ignore_adjustments(command,params)?&&which!=SampleLayers::Current;
         let spot = if command != "paint.spotHealing" { SpotType::ContentAware } else { match params["type"].as_str().unwrap_or("contentAware") {
             "contentAware" => SpotType::ContentAware, "createTexture" => SpotType::CreateTexture, "proximityMatch" => SpotType::ProximityMatch, _ => return Err("Unknown spot healing type".into())
         }};
         let points = samples(params)?;
+        let pattern=if command=="paint.healingBrush"{healing_options::PatternSource::new(engine,command,params,(points[0].x,points[0].y))?}else{None};
         let mut clone_sources=None;
-        let map = if matches!(command,"paint.spotHealing"|"paint.historyBrush") { None } else {
+        let map = if matches!(command,"paint.spotHealing"|"paint.historyBrush")||pattern.is_some() { None } else {
             let mut isolated = Session::new(); isolated.presets = engine.presets.clone();
             let map=mapping(&mut isolated, params, (points[0].x, points[0].y), command).map_err(|error| error.to_string())?;clone_sources=Some(isolated.presets.clone.clone());Some(map)
         };
         let mut validation = (*state.doc).clone();let original=target.surface(&mut validation)?.0.clone();let fmt=original.format();
         let history_surface=if command=="paint.historyBrush"{let selected=history::resolve(engine,params)?;let effective=params.get("target").cloned().unwrap_or_else(||history::effective_target(state));let source=history::surface(&selected.doc,layer,&effective)?;Some(if source.format()==fmt{source}else{source.convert(fmt)})}else{None};
-        Ok(Self { source: state.doc.clone(),original, target, layer, restriction, renderer: StrokeRenderer::new(&brush, None, 1.0),generator:DabGenerator::new(&brush,1.0),budget:admission::DabBudget::new(&brush),stable_bounds:Rect::EMPTY,dual_bounds:Rect::EMPTY, brush, command: command.into(), which, mapping: map, mode, spot,history_surface,clone_sources,tail_keys:Default::default(), document: state.doc.clone(), damage: Rect::EMPTY, #[cfg(test)] samples_pushed: 0,#[cfg(test)]patches_applied:0,#[cfg(test)]coverage_pixels:0,#[cfg(test)]patch_peak_pixels:0,#[cfg(test)]staged_coverage_pixels:0 })
+        let from=super::super::clone_document::foreign(command,params,&state.doc,fmt,pattern.is_some(),which==SampleLayers::Current,ignore.then_some(healing_options::without_adjustments as fn(&Document)->Document))?;
+        let sample=if ignore{Arc::new(healing_options::without_adjustments(&state.doc))}else{state.doc.clone()};
+        Ok(Self { source: state.doc.clone(),replace,diffusion,pattern,sample,original, target, layer, restriction, renderer: StrokeRenderer::new(&brush, None, 1.0),generator:DabGenerator::new(&brush,1.0),budget:admission::DabBudget::new(&brush),stable_bounds:Rect::EMPTY,dual_bounds:Rect::EMPTY, brush, command: command.into(), which, mapping: map, mode, spot,history_surface,clone_sources,from,tail_keys:Default::default(), document: state.doc.clone(), damage: Rect::EMPTY, #[cfg(test)] samples_pushed: 0,#[cfg(test)]patches_applied:0,#[cfg(test)]coverage_pixels:0,#[cfg(test)]patch_peak_pixels:0,#[cfg(test)]staged_coverage_pixels:0 })
     }
     #[cfg(test)] pub fn push(&mut self,params:&Value)->Result<(),String>{self.push_with(params,&Interrupt::NONE)}
     pub fn push_with(&mut self, params: &Value,ctl:&Interrupt) -> Result<(), String> {
@@ -195,15 +209,16 @@ impl CoverageStroke {
         let mut sources=healing_sources::Sources::default();
         let published = match self.command.as_str() {
             "paint.healingBrush" => {
-                let area=bounds.inflate(2);let cov=coverage.dense(area,ctl)?;let fmt=surface.format();
-                let source = sources.clone_sample(&self.source, self.layer, surface, self.which, area, self.mapping.as_ref().ok_or("No clone mapping")?,ctl)?;
-                let destination = if self.which == SampleLayers::Current { sources.read(surface,area,ctl)? } else { sources.compose(&self.source,self.layer,self.which,area,fmt,ctl)? };
+                let area=bounds.inflate(2);let mut cov=coverage.dense(area,ctl)?;let fmt=surface.format();
+                let source = match &self.pattern { Some(pattern)=>pattern.region(area,&fmt), None=>{let (sample,id,read)=self.sampling();sources.clone_sample(sample, id, read, self.which, area, self.mapping.as_ref().ok_or("No clone mapping")?,ctl)?} };
+                let destination = if self.which == SampleLayers::Current { sources.read(surface,area,ctl)? } else { sources.compose(&self.sample,self.layer,self.which,area,fmt,ctl)? };
                 let mask: Vec<_> = cov.iter().map(|value| *value > 0.0).collect();
-                let healed = heal_region(&fmt, &source, &destination, &mask,ctl)?;
+                let healed = heal_region_diffused(&fmt, &source, &destination, &mask,self.diffusion,self.brush.size,ctl)?;
                 drop((source,mask));
+                if self.replace{healing_options::replace_coverage(&mut cov);}
                 healing_publish::apply(surface, area, &cov, area, self.brush.opacity, self.source.selection.as_ref(), locked, &healed, self.mode,ctl)?
             }
-            _ => spot_heal_surface(surface, self.source.bounds(), &mut coverage, self.brush.size, self.brush.opacity, self.spot, self.source.selection.as_ref(), locked,&mut sources,ctl)?
+            _ => spot_heal_surface(surface, self.source.bounds(), &mut coverage, self.brush.size, self.brush.opacity, self.spot, self.source.selection.as_ref(), locked,&mut sources,(&self.source,self.layer,self.which),(self.mode,self.replace),ctl)?
         };
         let damage=published.damage;
         #[cfg(test)]{self.patch_peak_pixels=self.patch_peak_pixels.max(published.peak_pixels);self.patches_applied+=published.patches;}
@@ -215,6 +230,11 @@ impl CoverageStroke {
         }
         admission::check(ctl)?;self.document = Arc::new(document);self.damage=damage;Ok(())
     }
+}
+
+impl CoverageStroke {
+    /// The image, layer and pre-stroke surface a clone samples: this image, or another one the stroke names.
+    fn sampling(&self)->(&Document,Option<LayerId>,&Surface){match &self.from{Some(from)=>from.parts(),None=>(&self.sample,self.layer,&self.original)}}
 }
 
 fn admit_source(rect:Rect,map:&Mapping)->Result<(),String>{
@@ -326,7 +346,8 @@ fn dilate(w: usize, h: usize, m: &[bool], r: usize,ctl:&Interrupt) -> Result<Vec
     Ok(out)
 }
 
-fn spot_heal_surface(surf: &mut Surface, area: Rect, coverage:&mut healing_coverage::Coverage<'_>, size: f32, opacity: f32, kind: SpotType, sel: Option<&Surface>, lock: bool,sources:&mut healing_sources::Sources,ctl:&Interrupt) -> Result<healing_publish::Published,String> {
+#[allow(clippy::too_many_arguments)]
+fn spot_heal_surface(surf: &mut Surface, area: Rect, coverage:&mut healing_coverage::Coverage<'_>, size: f32, opacity: f32, kind: SpotType, sel: Option<&Surface>, lock: bool,sources:&mut healing_sources::Sources,(doc,layer,which):(&Document,Option<LayerId>,SampleLayers),(mode,replace):(BlendMode,bool),ctl:&Interrupt) -> Result<healing_publish::Published,String> {
     admission::check(ctl)?;
     let bounds=coverage.bounds;
     let margin = (size.max(8.0) * 1.0).ceil() as i32 + 8;
@@ -335,9 +356,9 @@ fn spot_heal_surface(surf: &mut Surface, area: Rect, coverage:&mut healing_cover
         return Ok(healing_publish::Published::empty());
     }
     let fmt = surf.format();
-    let img = sources.read(surf,region_rect,ctl)?;
+    let img = if which==SampleLayers::Current { sources.read(surf,region_rect,ctl)? } else { sources.compose(doc,layer,which,region_rect,fmt,ctl)? };
     let (w, h, ch) = (img.width(), img.height(), img.ch);
-    let stroke_cov=coverage.dense(region_rect,ctl)?;
+    let mut stroke_cov=coverage.dense(region_rect,ctl)?;
     let hole: Vec<bool> = stroke_cov.iter().map(|c| *c > 0.0).collect();
     if !hole.iter().any(|h| *h) {
         return Ok(healing_publish::Published::empty());
@@ -381,7 +402,8 @@ fn spot_heal_surface(surf: &mut Surface, area: Rect, coverage:&mut healing_cover
     let healed = heal_region(&fmt, &src, &img, &heal_mask,ctl)?;
     drop((src,heal_mask,domain,hole));
     let dmg = bounds.intersect(&region_rect);
-    healing_publish::apply(surf,dmg,&stroke_cov,region_rect,opacity,sel,lock,&healed,BlendMode::Normal,ctl)
+    if replace{healing_options::replace_coverage(&mut stroke_cov);}
+    healing_publish::apply(surf,dmg,&stroke_cov,region_rect,opacity,sel,lock,&healed,mode,ctl)
 }
 
 #[cfg(test)]

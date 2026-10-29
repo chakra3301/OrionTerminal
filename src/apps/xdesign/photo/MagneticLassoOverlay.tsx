@@ -11,7 +11,8 @@ import { surfaceOffset, surfaceSize } from "./viewTurn";
 
 const empty: MagneticSnapshot = { points: [], anchors: [], pending: false, snapped: false, error: null };
 type Key = {key: string; target: EventTarget | null; preventDefault: () => void; stopPropagation: () => void; isComposing?: boolean; nativeEvent?: {isComposing: boolean}};
-export function MagneticLassoOverlay({ document, projectId, viewKey, options, mode, zoom, ready, changeWidth }: { document: PhotoDocument; projectId: string | null; viewKey?: string; options: PaintOptions; mode: string; zoom: number; ready: boolean; changeWidth: (width: number) => void }) {
+/** With `pen`, the Freeform Pen's Magnetic option: the outline becomes a path instead of a selection. */
+export function MagneticLassoOverlay({ document, projectId, viewKey, options, mode, zoom, ready, changeWidth, pen }: { document: PhotoDocument; projectId: string | null; viewKey?: string; options: PaintOptions; mode: string; zoom: number; ready: boolean; changeWidth: (width: number) => void; pen?: (points: MagneticPoint[], closed: boolean) => Promise<unknown> }) {
   const supported = usePhotoWorkspace(s => s.state?.features?.magneticLasso === true);
   const svg = useRef<SVGSVGElement>(null), draft = useRef<MagneticDraft | null>(null), end = useRef<(() => void) | null>(null);
   const selectedMode = useRef<SelectionMode>("replace"), alive = useRef(true), closing = useRef(false);
@@ -33,7 +34,7 @@ export function MagneticLassoOverlay({ document, projectId, viewKey, options, mo
     const pending = current.fasten(p, points); action.current = pending;
     void pending.finally(() => { if (action.current === pending) action.current = null; });
   };
-  const finish = async () => {
+  const finish = async (closed = true) => {
     if (closing.current || !draft.current || altDrag.current) return;
     closing.current = true; setApplying(true);
     try {
@@ -43,7 +44,7 @@ export function MagneticLassoOverlay({ document, projectId, viewKey, options, mo
       if (!points || !alive.current || current !== draft.current) return;
       const workspace = usePhotoWorkspace.getState();
       if (workspace.documentId !== document.id || workspace.stateVersion !== document.version || workspace.state?.viewKey !== viewKey) throw new Error("The image view changed; cancel this outline and trace the current image.");
-      try { await runPhotoCommand("select.xdesignMagneticLasso", { points, mode: selectedMode.current, feather: options.feather ?? 0, antiAlias: options.antiAlias !== false }); reset(); }
+      try { await (pen ? pen(points, closed) : runPhotoCommand("select.xdesignMagneticLasso", { points, mode: selectedMode.current, feather: options.feather ?? 0, antiAlias: options.antiAlias !== false })); reset(); }
       catch (error) { if (alive.current && draft.current) setSnapshot(s => ({ ...s, error: String(error) })); }
     } catch (error) { if (alive.current) setSnapshot(s => ({ ...s, error: String(error) })); }
     finally { closing.current = false; if (alive.current) setApplying(false); }
@@ -55,7 +56,7 @@ export function MagneticLassoOverlay({ document, projectId, viewKey, options, mo
     event.preventDefault(); event.stopPropagation();
     if (closing.current) return;
     if (event.key === "Escape") { reset(); return; }
-    if (event.key === "Enter") { void finish(); return; }
+    if (event.key === "Enter") { void finish(!pen); return; }
     if (event.key === "Backspace" || event.key === "Delete") { draft.current?.undo(); return; }
     if (event.key === "CapsLock") { if (!draft.current) setShowWidth(v => !v); return; }
     changeWidth(Math.max(1, Math.min(256, Number(options.width ?? 10) + (event.key === "]" ? 1 : -1))));
@@ -106,15 +107,15 @@ export function MagneticLassoOverlay({ document, projectId, viewKey, options, mo
   };
   const path = snapshot.points.map(p => p.join(",")).join(" ");
   return <div className="xd-photo-magnetic-overlay" onKeyDown={key}>
-    <svg ref={svg} role="img" aria-label="Magnetic lasso canvas" tabIndex={0} className={showWidth ? "xd-photo-magnetic-canvas precise" : "xd-photo-magnetic-canvas"} viewBox={`0 0 ${document.width} ${document.height}`} onPointerDown={begin} onPointerMove={move} onPointerUp={event => up(event)} onPointerCancel={event => up(event, true)} onLostPointerCapture={event => { if (altDrag.current?.id === event.pointerId) up(event, true); }} onDoubleClick={event => { event.preventDefault(); event.stopPropagation(); void finish(); }}>
+    <svg ref={svg} role="img" aria-label={pen ? "Magnetic pen canvas" : "Magnetic lasso canvas"} tabIndex={0} className={showWidth ? "xd-photo-magnetic-canvas precise" : "xd-photo-magnetic-canvas"} viewBox={`0 0 ${document.width} ${document.height}`} onPointerDown={begin} onPointerMove={move} onPointerUp={event => up(event)} onPointerCancel={event => up(event, true)} onLostPointerCapture={event => { if (altDrag.current?.id === event.pointerId) up(event, true); }} onDoubleClick={event => { event.preventDefault(); event.stopPropagation(); void finish(); }}>
       <polyline className="xd-photo-magnetic-outline" points={path} fill="none" vectorEffect="non-scaling-stroke" />
       {snapshot.anchors.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={3 / zoom} className="xd-photo-magnetic-anchor" vectorEffect="non-scaling-stroke" />)}
       {cursor && showWidth && <circle cx={cursor[0]} cy={cursor[1]} r={Number(options.width ?? 10) / 2} className="xd-photo-magnetic-width" fill="none" vectorEffect="non-scaling-stroke" />}
     </svg>
     <div className="xd-photo-magnetic-controls" role="toolbar" aria-label="Magnetic lasso draft">
       {!supported || !isTauri() ? <span role="alert">Magnetic lasso requires an updated native engine.</span> : !snapshot.anchors.length ? <span>Click to start. Trace an edge; click to anchor. Alt-drag draws freely.</span> : <>
-        <span role="status">{applying ? "Closing selection…" : snapshot.pending ? "Following edge…" : snapshot.snapped ? "Edge found" : "Trace the outline"} · {snapshot.anchors.length} anchors</span>
-        <button type="button" disabled={applying} onClick={() => draft.current?.undo()}>Remove anchor</button><button type="button" disabled={applying} onClick={reset}>Cancel</button><button type="button" disabled={applying || snapshot.points.length < 3} onClick={() => { void finish(); }}>Close selection</button>
+        <span role="status">{applying ? pen ? "Finishing path…" : "Closing selection…" : snapshot.pending ? "Following edge…" : snapshot.snapped ? "Edge found" : "Trace the outline"} · {snapshot.anchors.length} anchors</span>
+        <button type="button" disabled={applying} onClick={() => draft.current?.undo()}>Remove anchor</button><button type="button" disabled={applying} onClick={reset}>Cancel</button><button type="button" disabled={applying || snapshot.points.length < 3} onClick={() => { void finish(); }}>{pen ? "Close path" : "Close selection"}</button>
       </>}
       {snapshot.error && <span role="alert">{snapshot.error}</span>}
     </div>

@@ -125,11 +125,24 @@ describe("editable image text and live gradients",()=>{
       await act(async()=>editor()!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));expect(editor()).toBeNull();
       await submit();expect(native.run).toHaveBeenLastCalledWith("gradient.fill.set",{layer:1,stops:[[.1,"#000000"],[1,"#ffffff"]],transparency:[[0,20],[1,100]],midpoints:[.3]});
     });
-    it("applies a preset from the arrow beside the swatch",async()=>{
-      usePhotoWorkspace.setState({state:{presets:{gradient:{name:"Custom",stops:[],transparency:[]},styles:[],gradients:[{name:"Basics",presets:[{name:"Red, Green",stops:[[0,"#ff0000"],[.4,"#00ff00"],[1,"#0000ff"]],transparency:[[0,100],[1,50]]}]}]}} as never});
+    it("moves a Classic fill's colour midpoint in the Gradient Editor, and shows none on a baked Method's stops",async()=>{
+      const editor=()=>document.querySelector<HTMLFormElement>('form[aria-label="Gradient Editor"]')!,edit=()=>act(async()=>container.querySelector<HTMLButtonElement>('[aria-label="Edit gradient"]')!.click());
+      await open();await edit();
+      await act(async()=>editor().querySelector<HTMLElement>('[aria-label="Color stop 1"]')!.click());
+      await act(async()=>editor().querySelector<HTMLElement>('[aria-label="Color midpoint 1"]')!.click());
+      const location=editor().querySelector<HTMLInputElement>('[aria-label="Color midpoint location"]')!;expect(location.value).toBe("30");
+      await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(location,"60");location.dispatchEvent(new Event("input",{bubbles:true}));});
+      await act(async()=>editor().dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+      await submit();expect(native.run).toHaveBeenLastCalledWith("gradient.fill.set",{layer:1,stops:[[0,"#000000"],[1,"#ffffff"]],transparency:[[0,20],[1,100]],midpoints:[.6]});
+      native.run.mockClear();await open({...gradient,stops:bakeRemembered([[0,"#ff0000"],[1,"#0000ff"]],"linear")!,midpoints:[]});await edit();
+      await act(async()=>editor().querySelector<HTMLElement>('[aria-label="Color stop 1"]')!.click());
+      expect(editor().querySelector('[aria-label="Color midpoint 1"]')).toBeNull();
+    });
+    it("applies a preset from the arrow beside the swatch, with its saved midpoints",async()=>{
+      usePhotoWorkspace.setState({state:{presets:{gradient:{name:"Custom",stops:[],transparency:[]},styles:[],gradients:[{name:"Basics",presets:[{name:"Red, Green",stops:[[0,"#ff0000"],[.4,"#00ff00"],[1,"#0000ff"]],transparency:[[0,100],[1,50]],midpoints:[.3,.7]}]}]}} as never});
       await open();await act(async()=>container.querySelector<HTMLButtonElement>('[aria-label="Gradient presets"]')!.click());
       await act(async()=>button("Basics",host).click());await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="Red, Green"]')!.click());
-      await submit();expect(native.run).toHaveBeenLastCalledWith("gradient.fill.set",{layer:1,stops:[[0,"#ff0000"],[.4,"#00ff00"],[1,"#0000ff"]],transparency:[[0,100],[1,50]],midpoints:[]});
+      await submit();expect(native.run).toHaveBeenLastCalledWith("gradient.fill.set",{layer:1,stops:[[0,"#ff0000"],[.4,"#00ff00"],[1,"#0000ff"]],transparency:[[0,100],[1,50]],midpoints:[.3,.7]});
     });
     it("bakes the Method into the stops and reopens a baked gradient with its Method",async()=>{
       await open();expect(container.querySelector<HTMLSelectElement>('select[aria-label="Fill gradient method"]')!.value).toBe("classic");

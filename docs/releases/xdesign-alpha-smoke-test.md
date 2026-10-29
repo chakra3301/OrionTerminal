@@ -113,4 +113,5 @@ Text for the "Alpha limits" section of the release notes:
 - A ninth open tab, or a 512 MiB total, evicts the least recently edited image from memory. Switching back to it reloads from disk, taking about as long as opening it. Its History panel snapshots are lost; its undo history isn't.
 - Merge to HDR Pro has no preview, curve or presets. Photomerge and HDR Pro can't take a folder as a source.
 - Large images (about 24 MP) work but need memory: about 1.3–1.6 GB with one open. Adjustments on a single colour channel can still peak near 2 GB.
+- Some tool and adjustment controls are still missing (full list: `docs/research/xdesign-controls-2026-10-28/post-alpha.md`). The most visible: the Mixer Brush always loads solid colours and ignores Paint Symmetry, Paint Symmetry has no on-canvas guide, Gradient Fill layers don't keep their Method, and the Levels and Curves eyedroppers are off on CMYK images.
 - Batch, Droplets, Scripts and Package aren't available. Cloud, generative AI, video, 3D, Libraries and Timeline are out of scope.

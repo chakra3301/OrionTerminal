@@ -9,7 +9,7 @@ type Preferences = { workflows: Partial<Record<SelectionWorkflow, Saved>>; writa
 export function sanitizeSelectionPreferences(kind: SelectionWorkflow, value: unknown): SelectionSettings {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const input = value as SelectionSettings, result: SelectionSettings = {};
-  const fields = kind === "refine" ? [...REFINE_FIELDS, { key: "amount", min: 0, max: 100 }] : kind === "focus" ? FOCUS_FIELDS : [
+  const fields = kind === "refine" ? [...REFINE_FIELDS, { key: "amount", min: 0, max: 100 }, { key: "quickSize", min: 1, max: 5000 }, { key: "brushToolSize", min: 1, max: 5000 }, { key: "brushToolHardness", min: 0, max: 100 }] : kind === "focus" ? FOCUS_FIELDS : [
     { key: "sampleFuzziness", min: 0, max: 200 }, { key: "toneFuzziness", min: 0, max: 100 },
     ...["shadowLevel", "highlightLevel", "midLow", "midHigh"].map(key => ({ key, min: 0, max: 255 })), { key: "range", min: 0, max: 100 },
   ];

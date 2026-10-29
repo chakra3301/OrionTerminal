@@ -1,13 +1,16 @@
 import { BLEND_MODES } from "./controls";
+import { curveSamples, toningCurve } from "./curveTools";
 
-// `more` fields appear only under Show More Options; `off` disables a field from the dialog's state.
-type Field = {key:string;label:string;group?:string;more?:boolean;off?:(values:Record<string,unknown>,hasSelection:boolean)=>boolean};
+// `more` fields appear only under Show More Options; `off` disables a field from the dialog's state; `pixels` fields work on
+// layer pixels only, so on a mask or channel target they are disabled and send their default.
+type Field = {key:string;label:string;group?:string;more?:boolean;pixels?:boolean;off?:(values:Record<string,unknown>,hasSelection:boolean)=>boolean};
 export type CommandField = Field & (
   | {kind:"number";min:number;max:number;step?:number;value:number;unit?:string}
   | {kind:"enum";choices:[string,string][];value:string;radios?:boolean}
   | {kind:"boolean";value:boolean}
   | {kind:"color";value:string}
-  | {kind:"text";value:string});
+  | {kind:"text";value:string}
+  | {kind:"curve";value:[number,number][]});
 export type ImageCommand = {id:string;title:string;fields:CommandField[];sliders?:boolean;preview?:boolean;moreOptions?:boolean;settingsFile?:boolean;params?:(values:Record<string,unknown>)=>Record<string,unknown>};
 
 const n=(key:string,label:string,min:number,max:number,value:number,unit?:string,group?:string,step=1,more=false):CommandField=>({key,label,kind:"number",min,max,value,step,unit,group,...(more?{more}:{})});
@@ -23,7 +26,7 @@ export const SELECTION_MODIFY:ImageCommand[]=[
 // Each option is only sent with the contents that reads it.
 const FILL_OPTIONS:Record<string,string>={color:"color",pattern:"pattern",colorAdaptation:"contentAware"};
 // Photoshop lists Behind and Clear only where a fill paints pixels, after Dissolve.
-const FILL_MODES=[...BLEND_MODES.slice(0,2),"Behind","Clear",...BLEND_MODES.slice(2)];
+export const FILL_MODES=[...BLEND_MODES.slice(0,2),"Behind","Clear",...BLEND_MODES.slice(2)];
 export function fillCommand(patterns:{id:string;name:string}[],current?:string|null,historySource?:string):ImageCommand {
   const unused=(key:string)=>(values:Record<string,unknown>)=>values.contents!==FILL_OPTIONS[key];
   return {id:"edit.fill",title:"Fill",fields:[
@@ -71,28 +74,44 @@ export const SHADOWS_HIGHLIGHTS:ImageCommand={id:"image.adjustments.shadowsHighl
   n("color","Color",-100,100,20,undefined,"Adjustments",1,true),n("midtone","Midtone",-100,100,0,undefined,"Adjustments",1,true),
   n("blackClip","Black Clip",0,50,.01,"%","Adjustments",.01,true),n("whiteClip","White Clip",0,50,.01,"%","Adjustments",.01,true),
 ]};
+// The dialog keeps where the Color was sampled (`colorPoint`): an unplaced colour matches everywhere, so Localized Color
+// Clusters send that click as the first point instead. The new keys travel only when used, keeping the engine's own route.
+const listed=(value:unknown)=>Array.isArray(value)?value:[];
 export const REPLACE_COLOR:ImageCommand={id:"image.adjustments.replaceColor",title:"Replace Color",sliders:true,preview:true,settingsFile:true,fields:[
+  {key:"localized",label:"Localized Color Clusters",kind:"boolean",value:false,group:"Selection",pixels:true},
   {key:"color",label:"Color",kind:"color",value:"#000000",group:"Selection"},n("fuzziness","Fuzziness",0,200,40,undefined,"Selection"),
+  {...n("range","Range",0,100,100,"%","Selection"),off:values=>values.localized!==true,pixels:true},
   n("hue","Hue",-180,180,0,undefined,"Replacement"),n("saturation","Saturation",-100,100,0,undefined,"Replacement"),n("lightness","Lightness",-100,100,0,undefined,"Replacement"),
-]};
+],params:({color,colorPoint,points,subtractPoints,localized,range,...values})=>{
+  const centred=localized===true&&Array.isArray(colorPoint),add=[...(centred?[colorPoint]:[]),...listed(points)],cut=listed(subtractPoints);
+  return {...(centred?{}:{color}),...values,...(add.length?{points:add}:{}),...(cut.length?{subtractPoints:cut}:{}),...(localized===true&&add.length+cut.length?{localized,range}:{})};
+}};
+/** Match Color's Layer choice, kept with the source image it was picked from so another source starts at Merged. */
+export type MatchSourceLayer={photo:string;layer:number};
+export const matchSourceLayer=(value:unknown,photo:unknown):number|undefined=>{const chosen=value as Partial<MatchSourceLayer>|null|undefined;return chosen&&typeof chosen==="object"&&chosen.photo===photo&&typeof chosen.layer==="number"?chosen.layer:undefined;};
 export function matchColorCommand(images:{id:string;version:string;name:string}[]):ImageCommand {
   return {id:"image.adjustments.matchColor",title:"Match Color",sliders:true,preview:true,fields:[
+    {key:"ignoreSelection",label:"Ignore Selection when Applying Adjustment",kind:"boolean",value:false,group:"Destination Image",off:(_,hasSelection)=>!hasSelection,pixels:true},
     n("luminance","Luminance",1,200,100,undefined,"Image Options"),n("intensity","Color Intensity",1,200,100,undefined,"Image Options"),n("fade","Fade",0,100,0,undefined,"Image Options"),
     {key:"neutralize",label:"Neutralize",kind:"boolean",value:false,group:"Image Options"},
     {key:"useSelectionInSource",label:"Use Selection in Source to Calculate Colors",kind:"boolean",value:false,group:"Image Statistics",off:(values)=>!values.sourceImage},
-    {key:"useSelectionInTarget",label:"Use Selection in Target to Calculate Colors",kind:"boolean",value:false,group:"Image Statistics",off:(_,hasSelection)=>!hasSelection},
+    {key:"useSelectionInTarget",label:"Use Selection in Target to Calculate Adjustment",kind:"boolean",value:false,group:"Image Statistics",off:(_,hasSelection)=>!hasSelection},
     {key:"sourceImage",label:"Source",kind:"enum",value:"",group:"Image Statistics",choices:[["","None"],...images.map(image=>[image.id,image.name] as [string,string])]},
-  ],params:({sourceImage,...values})=>{const image=images.find(item=>item.id===sourceImage);return image?{...values,sourcePhoto:{id:image.id,version:image.version}}:values;}};
+  ],params:({sourceImage,sourceLayer,ignoreSelection,...rest})=>{const image=images.find(item=>item.id===sourceImage),layer=matchSourceLayer(sourceLayer,image?.id),values=ignoreSelection===true?{...rest,ignoreSelection}:rest;return image?{...values,sourcePhoto:{id:image.id,version:image.version},...(layer!==undefined?{sourceLayer:layer}:{})}:values;}};
 }
 export const DEFRINGE:ImageCommand={id:"layer.matting.defringe",title:"Defringe",fields:[n("width","Width",1,200,1,"pixels")]};
 export const COLOR_DECONTAMINATE:ImageCommand={id:"layer.matting.colorDecontaminate",title:"Color Decontaminate",fields:[n("amount","Amount",0,100,100,"%"),n("radius","Radius",1,100,4,"pixels")]};
 export const SCALE_EFFECTS:ImageCommand={id:"layer.layerStyle.scaleEffects",title:"Scale Layer Effects",fields:[n("scale","Scale",1,1000,100,"%")]};
 export const GLOBAL_LIGHT:ImageCommand={id:"layer.layerStyle.globalLight",title:"Global Light",fields:[n("angle","Angle",-180,180,120,"°"),n("altitude","Altitude",0,90,30,"°")]};
-export const HDR_TONING:ImageCommand={id:"image.adjustments.hdrToning",title:"HDR Toning",fields:[
-  n("radius","Radius",1,500,30,"px","Edge Glow"),n("strength","Strength",.1,4,.5,undefined,"Edge Glow",.1),
-  n("gamma","Gamma",.1,2,1,undefined,"Tone and Detail",.01),n("exposure","Exposure",-5,5,0,undefined,"Tone and Detail",.1),n("detail","Detail",-100,300,30,"%","Tone and Detail"),
-  n("shadow","Shadow",-100,100,0,"%","Advanced"),n("highlight","Highlight",-100,100,0,"%","Advanced"),n("vibrance","Vibrance",-100,100,0,"%","Advanced"),n("saturation","Saturation",-100,100,20,"%","Advanced"),
-]};
+const local=(field:CommandField):CommandField=>({...field,off:values=>values.method!=="localAdaptation"});
+const tone=(field:CommandField):CommandField=>({...field,off:values=>values.method!=="localAdaptation"&&values.method!=="exposureGamma"});
+export const HDR_TONING:ImageCommand={id:"image.adjustments.hdrToning",title:"HDR Toning",preview:true,fields:[
+  {key:"method",label:"Method",kind:"enum",value:"localAdaptation",choices:[["localAdaptation","Local Adaptation"],["equalizeHistogram","Equalize Histogram"],["exposureGamma","Exposure and Gamma"],["highlightCompression","Highlight Compression"]]},
+  local(n("radius","Radius",1,500,30,"px","Edge Glow")),local(n("strength","Strength",.1,4,.5,undefined,"Edge Glow",.1)),
+  tone(n("gamma","Gamma",.1,2,1,undefined,"Tone and Detail",.01)),tone(n("exposure","Exposure",-5,5,0,undefined,"Tone and Detail",.1)),local(n("detail","Detail",-100,300,30,"%","Tone and Detail")),
+  ...[n("shadow","Shadow",-100,100,0,"%","Advanced"),n("highlight","Highlight",-100,100,0,"%","Advanced"),n("vibrance","Vibrance",-100,100,0,"%","Advanced"),n("saturation","Saturation",-100,100,20,"%","Advanced")].map(local),
+  local({key:"curve",label:"Toning Curve",kind:"curve",value:[[0,0],[255,255]],group:"Toning Curve and Histogram"}),
+],params:({curve,method,...values})=>{const samples=curveSamples(toningCurve(curve));return {...values,...(method!=="localAdaptation"?{method}:{}),...(samples?{curve:samples}:{})};}};
 
 type Values=Record<string,unknown>;
 const choice=(key:string,label:string,value:string,choices:[string,string][],group?:string,off?:Field["off"],radios?:boolean):CommandField=>({key,label,kind:"enum",value,choices,group,...(off?{off}:{}),...(radios?{radios}:{})});

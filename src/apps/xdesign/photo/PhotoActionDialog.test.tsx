@@ -338,8 +338,8 @@ describe("Photoshop 2026 adjustment layout", () => {
   it("clamps Contrast to the legacy range when Use Legacy changes", async () => {
     await render("brightnessContrast"); await input("Adjustment Contrast", "-40"); await toggle("Adjustment Use legacy"); await input("Adjustment Contrast", "-90");
     await toggle("Adjustment Use legacy"); expect(field("Adjustment Contrast").value).toBe("-50");
-    await toggle("Adjustment Use legacy"); await input("Adjustment Contrast", "99"); await toggle("Adjustment Use legacy"); expect(field("Adjustment Contrast").value).toBe("99");
-    await toggle("Adjustment Use legacy"); expect(field("Adjustment Contrast").max).toBe("99");
+    await toggle("Adjustment Use legacy"); await input("Adjustment Contrast", "100"); await toggle("Adjustment Use legacy"); expect(field("Adjustment Contrast").value).toBe("100");
+    await toggle("Adjustment Use legacy"); expect(field("Adjustment Contrast").max).toBe("100");
   });
 
   it("solves Auto for Brightness/Contrast from the luminosity histogram", async () => {
@@ -371,6 +371,29 @@ describe("Photoshop 2026 adjustment layout", () => {
     await act(async () => dropper("Set gray point (Exposure)").click()); await press(50, 50);
     expect(Number(field("Adjustment Exposure").value)).toBeCloseTo(1.71, 1);
     expect(native.invoke.mock.calls.filter(([command]) => command === "xdesign_photo_sample")).toHaveLength(3);
+  });
+
+  it.each([["alpha", { channel: 0 }], ["mask", "mask"], ["quickMask", "quickMask"]] as const)("reads a %s target's own grey pixels for the histogram, Auto and the black and white eyedroppers", async (kind, target) => {
+    native.enabled = true; stage(); native.invoke.mockImplementation(async (command: string) => command === "xdesign_photo_sample" ? [40] : [darkBins]);
+    const state: PhotoState = { name: "Image", width: 100, height: 100, mode: "RGB", depth: 8, resolution: 72, activeLayer: 7, hasSelection: false, selectionBounds: null, layers: [{ ...layer, kind: "Pixel", hasMask: kind === "mask" }], quickMask: kind === "quickMask", layerMaskView: kind === "mask" ? { layer: 7, mode: "gray" } : null, channels: { alpha: [{ index: 0, name: "Alpha", spot: null, visible: true }], target: kind === "alpha" ? { kind: "alpha", index: 0 } : { kind: "composite" } }, canUndo: false, canRedo: false };
+    const tools = () => ["Sample in image to set black point", "Sample in image to set gray point", "Sample in image to set white point"].map(name => container.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`)!.disabled).concat(button("Auto").disabled);
+    usePhotoWorkspace.setState({ state }); await render("levels", false); await act(async () => { await new Promise(resolve => setTimeout(resolve, 250)); });
+    expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_histogram", expect.objectContaining({ target, ...kind === "mask" ? { layer: 7 } : {} }));
+    expect([...container.querySelector<HTMLSelectElement>('select[aria-label="Adjustment Channel"]')!.options].map(option => option.textContent)).toEqual(["Gray"]);
+    expect(tools()).toEqual([false, true, false, false]);
+    await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Sample in image to set black point"]')!.click()); await press(50, 50);
+    const sample = native.invoke.mock.calls.find(([command]) => command === "xdesign_photo_sample")![1];
+    expect(sample).toMatchObject({ target, x: 50, y: 50 }); expect(sample).not.toHaveProperty("space");
+    expect(field("Adjustment Input black").value).toBe("40");
+    await submit(); expect(native.run).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ inBlack: 40 }));
+  });
+
+  it("draws Threshold's histogram from the Quick Mask it edits", async () => {
+    native.enabled = true; native.invoke.mockResolvedValue([darkBins]);
+    usePhotoWorkspace.setState({ state: { name: "Image", width: 100, height: 100, mode: "RGB", depth: 8, resolution: 72, activeLayer: 7, hasSelection: false, selectionBounds: null, layers: [{ ...layer, kind: "Pixel" }], quickMask: true, channels: { alpha: [], target: { kind: "composite" } }, canUndo: false, canRedo: false } });
+    await render("threshold", false); await act(async () => { await new Promise(resolve => setTimeout(resolve, 250)); });
+    expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_histogram", expect.objectContaining({ target: "quickMask" }));
+    expect(container.querySelector(".xd-photo-histogram path")).not.toBeNull();
   });
 
   it("chooses the Channel Mixer output with coloured circles instead of a dropdown", async () => {

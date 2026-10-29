@@ -2,15 +2,16 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { humanBytes, ImageCommandDialog, ImageExportDialog, ImageSizeDialog, ImageTrimDialog, NewSnapshotDialog, replacedColor, replacementFor } from "./ImageDialogs";
-import { contentAwareFillCommand, FADE, fillCommand, matchColorCommand, REPLACE_COLOR, SHADOWS_HIGHLIGHTS, STROKE } from "./imageCommands";
+import { contentAwareFillCommand, FADE, fillCommand, HDR_TONING, matchColorCommand, REPLACE_COLOR, SHADOWS_HIGHLIGHTS, STROKE } from "./imageCommands";
 import { usePhotoWorkspace } from "./runtime";
 import type { PhotoState } from "./types";
 
-const native = vi.hoisted(() => ({ run: vi.fn(), save: vi.fn(), open: vi.fn(), write: vi.fn(), read: vi.fn(), invoke: vi.fn(), tauri: false }));
+const native = vi.hoisted(() => ({ run: vi.fn(), save: vi.fn(), open: vi.fn(), write: vi.fn(), read: vi.fn(), invoke: vi.fn(), sample: vi.fn(), tauri: false }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => native.tauri, invoke: native.invoke, convertFileSrc: (path: string) => path }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save: native.save, open: native.open }));
 vi.mock("../../../lib/ipc", () => ({ ipc: { saveFileAtomic: native.write, readFile: native.read } }));
 vi.mock("./runtime", async original => ({ ...await original<typeof import("./runtime")>(), runPhotoCommand: native.run }));
+vi.mock("./eyedropper", async original => ({ ...await original<typeof import("./eyedropper")>(), sampleImageColor: native.sample }));
 const background = { id: 1, name: "Background", kind: "Raster", visible: true, opacity: 1, fill: 1, blend: "Normal", clipped: false, hasMask: false, locks: { transparency: true, pixels: false, position: true, all: false } };
 const state: PhotoState = { name: "Shot", width: 400, height: 300, mode: "Rgb", depth: 8, resolution: 72, activeLayer: 1, hasSelection: false, selectionBounds: null, layers: [background], canUndo: false, canRedo: false };
 let root: Root, container: HTMLDivElement;
@@ -128,10 +129,22 @@ describe("Photoshop command dialogs", () => {
     expect(native.invoke).toHaveBeenLastCalledWith("xdesign_photo_command_preview", expect.objectContaining({ params: expect.objectContaining({ shadowAmount: 70 }) }));
     await click(previewBox()); expect(container.querySelector("img.xd-photo-canvas-preview")).toBeNull();
   });
+  it("previews HDR Toning live through the same command preview, with its Method", async () => {
+    native.tauri = true; native.invoke.mockImplementation(async (command: string) => command === "xdesign_photo_command_preview" ? { width: 1, height: 1, png: "AAAA" } : null);
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:preview", revokeObjectURL: vi.fn() }));
+    const document_ = { id: "d", version: "v1", name: "Shot", width: 400, height: 300, previewPath: "/p.png" } as never;
+    await act(async () => root.render(<ImageCommandDialog command={HDR_TONING} document={document_} canvas={container} close={vi.fn()}/>));
+    expect(container.querySelector<HTMLInputElement>(".xd-ps-dialog-buttons input[type=checkbox]")!.checked).toBe(true);
+    await act(async () => { await new Promise(done => setTimeout(done, 300)); });
+    expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_command_preview", expect.objectContaining({ command: "image.adjustments.hdrToning", params: expect.objectContaining({ radius: 30, saturation: 20 }) }));
+    expect(container.querySelector("img.xd-photo-canvas-preview")).not.toBeNull();
+    await select("Method", "exposureGamma"); await act(async () => { await new Promise(done => setTimeout(done, 400)); });
+    expect(native.invoke).toHaveBeenLastCalledWith("xdesign_photo_command_preview", expect.objectContaining({ command: "image.adjustments.hdrToning", params: expect.objectContaining({ method: "exposureGamma" }) }));
+  });
   it("lists the Match Color destination and gates the selection statistics", async () => {
     await act(async () => root.render(<ImageCommandDialog command={matchColorCommand([{ id: "a", version: "1", name: "Sunset" }])} close={vi.fn()}/>));
     expect(container.querySelector(".xd-ps-dialog-readout")!.textContent).toBe("Target: Shot (Background, RGB/8)");
-    expect(field("Use Selection in Target to Calculate Colors").disabled).toBe(true); expect(field("Use Selection in Source to Calculate Colors").disabled).toBe(true);
+    expect(field("Use Selection in Target to Calculate Adjustment").disabled).toBe(true); expect(field("Use Selection in Source to Calculate Colors").disabled).toBe(true);
     await select("Source", "a"); expect(field("Use Selection in Source to Calculate Colors").disabled).toBe(false);
     await click(field("Use Selection in Source to Calculate Colors")); expect(field("Use Selection in Source to Calculate Colors").checked).toBe(true);
     await click(field("Use Selection in Source to Calculate Colors"));
@@ -152,6 +165,131 @@ describe("Photoshop command dialogs", () => {
     expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", { luminance: 100, intensity: 100, fade: 0, neutralize: false, useSelectionInSource: false, useSelectionInTarget: false, sourcePhoto: { id: "a", version: "1" } });
     await act(async () => root.render(<ImageCommandDialog key="closed" command={matchColorCommand([])} close={vi.fn()}/>));
     expect(field<HTMLSelectElement>("Source").value).toBe("");
+  });
+  it("lists the source image's layers under Merged, sends the chosen one as sourceLayer and starts another source at Merged", async () => {
+    native.tauri = true;
+    const sky = { ...background, id: 4, name: "Sky", kind: "Group", locks: undefined, children: [{ ...background, id: 5, name: "Cloud", locks: undefined }] };
+    native.invoke.mockImplementation(async (command: string, args: { source: { photoId: string } }) => command === "xdesign_photo_source_inspect" ? { ...state, layers: args.source.photoId === "a" ? [background, sky] : [background] } : null);
+    const layers = () => [...field<HTMLSelectElement>("Layer").options].map(option => option.text);
+    const sent = { luminance: 100, intensity: 100, fade: 0, neutralize: false, useSelectionInSource: false, useSelectionInTarget: false };
+    await act(async () => root.render(<ImageCommandDialog command={matchColorCommand([{ id: "a", version: "1", name: "Sunset" }, { id: "b", version: "3", name: "Beach" }])} close={vi.fn()}/>));
+    await select("Source", ""); expect(layers()).toEqual(["Merged"]); expect(field<HTMLSelectElement>("Layer").disabled).toBe(true);
+    await select("Source", "a");
+    expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_source_inspect", { projectId: "project", source: { photoId: "a", version: "1" } });
+    expect(layers()).toEqual(["Merged", "Background", "Sky", "Sky / Cloud"]); expect(field<HTMLSelectElement>("Layer").disabled).toBe(false);
+    await select("Layer", "5"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", { ...sent, sourcePhoto: { id: "a", version: "1" }, sourceLayer: 5 });
+    await select("Source", "b");
+    expect(field<HTMLSelectElement>("Layer").value).toBe("merged"); expect(layers()).toEqual(["Merged", "Background"]);
+    await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", { ...sent, sourcePhoto: { id: "b", version: "3" } });
+    await select("Source", "a"); expect(field<HTMLSelectElement>("Layer").value).toBe("merged");
+    await select("Layer", "4"); await select("Source", ""); expect(field<HTMLSelectElement>("Layer").disabled).toBe(true);
+    await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", sent);
+    await act(async () => usePhotoWorkspace.setState({ busy: true })); await select("Source", "a"); expect(field<HTMLSelectElement>("Layer").disabled).toBe(true);
+  });
+  it("disables the Match Color Layer menu and says so when the source image can't be read", async () => {
+    native.tauri = true; native.invoke.mockImplementation(async (command: string) => { if (command === "xdesign_photo_source_inspect") throw new Error("That image version is gone"); return null; });
+    await act(async () => root.render(<ImageCommandDialog command={matchColorCommand([{ id: "a", version: "1", name: "Sunset" }])} close={vi.fn()}/>));
+    await select("Source", ""); await select("Source", "a");
+    expect(field<HTMLSelectElement>("Layer").disabled).toBe(true); expect(container.querySelector('[role="alert"]')!.textContent).toContain("That image version is gone");
+  });
+  it("shapes HDR Toning's Toning Curve over the image's luminosity histogram, sends every level of it, remembers it and resets it", async () => {
+    native.tauri = true; const bins = Array.from({ length: 256 }, (_, level) => level % 9 + 1);
+    native.invoke.mockImplementation(async (command: string) => command === "xdesign_photo_histogram" ? [bins] : null);
+    const photo = { id: "d", version: "v1", name: "Shot", width: 400, height: 300, previewPath: "/p.png" } as never, wait = () => act(async () => { await new Promise(done => setTimeout(done, 150)); });
+    const sent = { radius: 30, strength: .5, gamma: 1, exposure: 0, detail: 30, shadow: 0, highlight: 0, vibrance: 0, saturation: 20 };
+    await act(async () => root.render(<ImageCommandDialog command={HDR_TONING} document={photo} close={vi.fn()}/>)); await wait();
+    expect([...container.querySelectorAll("legend")].map(legend => legend.textContent)).toEqual(["Edge Glow", "Tone and Detail", "Advanced", "Toning Curve and Histogram"]);
+    expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_histogram", { projectId: "project", photoId: "d", version: "v1", layer: null, below: false, space: "luminosity" });
+    expect(container.querySelector('[aria-label="Toning Curve"] .xd-photo-curve-histogram')).not.toBeNull(); expect(button("Reset Curve").disabled).toBe(true);
+    await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.hdrToning", sent);
+    await input("Curve output", "40"); expect(button("Reset Curve").disabled).toBe(false);
+    native.run.mockClear(); await submit(); expect(native.run).toHaveBeenCalledOnce();
+    const [command, params] = native.run.mock.calls[0]!, curve = (params as { curve: [number, number][] }).curve;
+    expect(command).toBe("image.adjustments.hdrToning"); expect(params).toEqual({ ...sent, curve });
+    expect(curve).toHaveLength(256); expect([curve[0], curve[128], curve[255]]).toEqual([[0, 40], [128, 147.92], [255, 255]]);
+    await act(async () => root.render(<ImageCommandDialog key="again" command={HDR_TONING} document={photo} close={vi.fn()}/>));
+    expect(field("Curve output").value).toBe("40");
+    await click(button("Reset Curve")); expect(field("Curve output").value).toBe("0");
+    await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.hdrToning", sent);
+    await input("Curve output", "40"); await act(async () => usePhotoWorkspace.setState({ busy: true }));
+    expect(field("Curve output").disabled).toBe(true); expect(button("Reset Curve").disabled).toBe(true); expect(field("Toning Curve black point slider").getAttribute("aria-disabled")).toBe("true");
+  });
+  describe("Photoshop's Replace Color samples, Match Color Ignore Selection and HDR Toning methods", () => {
+    const photo = { id: "d", version: "v1", name: "Shot", width: 400, height: 300, previewPath: "/p.png" } as never;
+    const thumbnail = () => container.querySelector<HTMLImageElement>(".xd-ps-dialog-thumb img")!;
+    const at = (x: number, y: number, init: MouseEventInit = {}) => act(async () => { thumbnail().dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: x, clientY: y, ...init })); });
+    const replace = async (props: { layerPixels?: boolean; key?: string } = {}) => {
+      await act(async () => root.render(<ImageCommandDialog key={props.key} command={REPLACE_COLOR} initial={{ color: "#336699" }} document={photo} layerPixels={props.layerPixels} close={vi.fn()}/>));
+      vi.spyOn(thumbnail(), "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 400, height: 300, right: 400, bottom: 300, x: 0, y: 0 } as DOMRect);
+    };
+    const base = { fuzziness: 40, hue: 0, saturation: 0, lightness: 0 };
+    it("adds and subtracts Replace Color samples with the + and − eyedroppers, Shift and Alt, and centres Localized Color Clusters on every click", async () => {
+      native.sample.mockReset().mockResolvedValue("#ff0000"); await replace();
+      expect(field("Localized Color Clusters").checked).toBe(false); expect(field("Range").disabled).toBe(true); expect(field("Range").value).toBe("100");
+      expect(field("Eyedropper Tool").getAttribute("aria-pressed")).toBe("true");
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, color: "#336699" });
+      await at(10, 20); expect(field("Color").value).toBe("#ff0000");
+      await click(field("Add to Sample")); expect(field("Add to Sample").getAttribute("aria-pressed")).toBe("true"); expect(field("Eyedropper Tool").getAttribute("aria-pressed")).toBe("false");
+      await at(30, 40); await at(50, 60, { altKey: true }); await click(field("Subtract from Sample")); await at(70, 80); await at(90, 100, { shiftKey: true });
+      expect(native.sample).toHaveBeenCalledOnce(); expect(field("Color").value).toBe("#ff0000");
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, color: "#ff0000", points: [[30, 40], [90, 100]], subtractPoints: [[50, 60], [70, 80]] });
+      await click(field("Localized Color Clusters")); expect(field("Range").disabled).toBe(false); await input("Range", "25");
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, points: [[10, 20], [30, 40], [90, 100]], subtractPoints: [[50, 60], [70, 80]], localized: true, range: 25 });
+      await click(field("Eyedropper Tool")); await at(5, 6);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, points: [[5, 6]], localized: true, range: 25 });
+      await input("Color", "#00ff00");
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, color: "#00ff00" });
+      await click(field("Localized Color Clusters")); await at(5, 6);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, color: "#ff0000" });
+      await click(field("Add to Sample")); for (let index = 0; index < 63; index++) await at(index, 1);
+      expect(container.querySelector('[role="alert"]')).toBeNull(); await at(200, 1); expect(container.querySelector('[role="alert"]')!.textContent).toBe("Use at most 64 color samples.");
+      await submit(); expect((native.run.mock.lastCall![1] as { points: unknown[] }).points).toHaveLength(63);
+    });
+    it("previews the Replace Color selection with the added, subtracted and localized samples", async () => {
+      native.tauri = true; native.sample.mockReset().mockResolvedValue("#ff0000"); native.invoke.mockResolvedValue({ width: 1, height: 1, png: "AAAA" });
+      vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:preview", revokeObjectURL: vi.fn() }));
+      await replace({ key: "preview" }); await at(10, 20); await click(field("Add to Sample")); await at(30, 40); await at(50, 60, { altKey: true }); await click(field("Localized Color Clusters")); await input("Range", "30");
+      await act(async () => { await new Promise(done => setTimeout(done, 400)); });
+      expect(native.invoke).toHaveBeenLastCalledWith("xdesign_photo_command_preview", expect.objectContaining({ command: "select.colorRange", params: expect.objectContaining({ points: [[10, 20], [30, 40]], subtractPoints: [[50, 60]], localized: true, range: 30, fuzziness: 40 }) }));
+      expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_command_preview", expect.objectContaining({ command: "image.adjustments.replaceColor", params: { ...base, points: [[10, 20], [30, 40]], subtractPoints: [[50, 60]], localized: true, range: 30 } }));
+    });
+    it("keeps Replace Color to one sample colour on a mask or channel target", async () => {
+      native.sample.mockReset().mockResolvedValue("#ff0000"); await replace({ key: "layer" }); await click(field("Localized Color Clusters")); await submit();
+      await replace({ key: "mask", layerPixels: false });
+      expect(field("Localized Color Clusters").disabled).toBe(true); expect(field("Range").disabled).toBe(true); expect(field("Add to Sample").disabled).toBe(true); expect(field("Subtract from Sample").disabled).toBe(true);
+      await at(10, 20, { shiftKey: true }); await at(30, 40, { altKey: true }); expect(native.sample).toHaveBeenCalledTimes(2);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, color: "#ff0000" });
+      await replace({ key: "layer again" }); expect(field("Localized Color Clusters").checked).toBe(true);
+      await click(field("Localized Color Clusters")); await submit();
+    });
+    it("puts Match Color's Ignore Selection under Destination Image, live only with a selection on layer pixels, and sends it only when on", async () => {
+      const match = (key: string, layerPixels?: boolean) => act(async () => root.render(<ImageCommandDialog key={key} command={matchColorCommand([])} layerPixels={layerPixels} close={vi.fn()}/>));
+      const sent = { luminance: 100, intensity: 100, fade: 0, neutralize: false, useSelectionInSource: false, useSelectionInTarget: false }, ignore = "Ignore Selection when Applying Adjustment";
+      await match("none"); expect(field(ignore).disabled).toBe(true);
+      const destination = [...container.querySelectorAll("fieldset")].find(set => set.querySelector("legend")?.textContent === "Destination Image")!;
+      expect(destination.textContent).toBe("Destination ImageTarget: Shot (Background, RGB/8)Ignore Selection when Applying Adjustment");
+      expect([...container.querySelectorAll("legend")].filter(legend => legend.textContent === "Destination Image")).toHaveLength(1);
+      await act(async () => usePhotoWorkspace.setState({ state: { ...state, hasSelection: true } })); expect(field(ignore).disabled).toBe(false);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", sent);
+      await click(field(ignore)); await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", { ...sent, ignoreSelection: true });
+      await match("mask", false); expect(field(ignore).checked).toBe(true); expect(field(ignore).disabled).toBe(true);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", sent);
+      await match("layer"); await click(field(ignore)); await submit();
+    });
+    it("leads HDR Toning with Photoshop's four Methods and leaves each only the options it uses", async () => {
+      const sent = { radius: 30, strength: .5, gamma: 1, exposure: 0, detail: 30, shadow: 0, highlight: 0, vibrance: 0, saturation: 20 }, labels = ["Radius", "Strength", "Gamma", "Exposure", "Detail", "Shadow", "Highlight", "Vibrance", "Saturation"];
+      const live = () => labels.filter(label => !field(label).disabled);
+      await act(async () => root.render(<ImageCommandDialog command={HDR_TONING} document={photo} close={vi.fn()}/>));
+      expect(container.querySelector("select")!.getAttribute("aria-label")).toBe("Method");
+      expect([...field<HTMLSelectElement>("Method").options].map(option => [option.value, option.text])).toEqual([["localAdaptation", "Local Adaptation"], ["equalizeHistogram", "Equalize Histogram"], ["exposureGamma", "Exposure and Gamma"], ["highlightCompression", "Highlight Compression"]]);
+      expect(live()).toEqual(labels); expect(field("Curve output").disabled).toBe(false);
+      await select("Method", "exposureGamma"); expect(live()).toEqual(["Gamma", "Exposure"]); expect(field("Curve output").disabled).toBe(true);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.hdrToning", { ...sent, method: "exposureGamma" });
+      for (const method of ["equalizeHistogram", "highlightCompression"]) { await select("Method", method); expect(live()).toEqual([]); await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.hdrToning", { ...sent, method }); }
+      await select("Method", "localAdaptation"); expect(live()).toEqual(labels);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.hdrToning", sent);
+    });
   });
 });
 

@@ -34,6 +34,9 @@
 .xd-ge-stop.is-leaving { opacity:.3; }
 .xd-ge-stop:focus-visible { outline:none; }
 .xd-ge-stop:focus-visible path { stroke:var(--xd-accent); }
+.xd-ge-midpoint { position:absolute;top:2px;width:6px;height:6px;margin-left:-3px;box-sizing:border-box;border:1px solid var(--xd-text-2);background:var(--xd-raised);transform:rotate(45deg); }
+.xd-ge-midpoint[aria-pressed=true] { background:var(--xd-text);border-color:var(--xd-text); }
+.xd-ge-midpoint:focus-visible { outline:none;border-color:var(--xd-accent); }
 .xd-ge-row { display:grid;grid-template-columns:52px 56px 12px 72px 56px 12px 28px;gap:6px;align-items:center;margin-bottom:6px; }
 .xd-ge-row:last-child { margin-bottom:0; }
 .xd-ge-row > span:is(:nth-child(1),:nth-child(4)) { text-align:right; }

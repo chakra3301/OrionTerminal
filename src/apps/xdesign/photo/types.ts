@@ -65,7 +65,7 @@ export type PhotoChannels = {
   quickMask?:{visible:boolean;color:number[];opacity:number;indicates:string}|null;
 };
 
-export type GradientPreset={name:string;stops:[number,string][];transparency:[number,number][]};
+export type GradientPreset={name:string;stops:[number,string][];transparency:[number,number][];midpoints?:number[]};
 export type PhotoCloneSource={index:number;source:[number,number]|null;anchor:[number,number]|null;offset:[number,number]|null;layer:number|null;width:number;height:number;rotation:number;flipH:boolean;flipV:boolean};
 export type PhotoCloneSources={active:number;sources:PhotoCloneSource[];overlay:{show:boolean;opacity:number;clipped:boolean;auto_hide:boolean;invert:boolean;blend:string}};
 export type PhotoRulerInfo={x:number;y:number;w:number;h:number;angle:number;l1:number;l2:number|null;length:number;units:string;protractor:boolean};
@@ -88,6 +88,8 @@ export type PhotoPanels={
 };
 export type PhotoRGBA = [number,number,number,number];
 export type PhotoColor = string | PhotoRGBA;
+/** The brush tip's identity: "round", or "sampled:<hash>" with the first preset that carries that exact bitmap. */
+export type PhotoBrushTip={id:string;preset:string|null};
 export type PhotoState = {
   name: string;
   width: number;
@@ -109,7 +111,7 @@ export type PhotoState = {
   colorView?: {profile:string;description:string;kind:string;intent:string;bpc:boolean;simulatePaper:boolean;on:boolean;gamutWarning:boolean;threshold:number;hdr:{highlightCompression:boolean;exposure:number;gamma:number};active:boolean};
   colorSettings?: PhotoColorSettings;
   colorProfile?: {description:string;colorSpace:string;embedded:boolean;bytes:number};
-  brush?: {revision?:number;settings:Record<string,unknown>;sampledTip:boolean;sampledTexture:boolean;presets:{name:string;group:string;builtin:boolean;size:number;hardness:number}[]};
+  brush?: {revision?:number;settings:Record<string,unknown>;sampledTip:boolean;sampledTexture:boolean;presets:{name:string;group:string;builtin:boolean;size:number;hardness:number}[];groups?:string[];tip?:PhotoBrushTip;dualTip?:PhotoBrushTip};
   presets?: {revision?:number;gradient:GradientPreset;gradients:{name:string;presets:GradientPreset[]}[];styles:{name:string;presets:{name:string;effects:string[]}[]}[];
     patterns?:{name:string;presets:{id:string;name:string;width:number;height:number}[]}[];pattern?:string|null;
     shapes?:{name:string;presets:{name:string}[]}[];tools?:{name:string;tool:string}[];cloneSource?:PhotoCloneSources};
@@ -126,6 +128,8 @@ export type PhotoState = {
   historySnapshotName?:string;
   historyOpenThumbnail?:string|null;
   paths?:{saved:string[];work:boolean};
+  /** A preset, or `{type:"Path",path}` with `path` "work", "layer" or a saved name; null when off. */
+  symmetry?:{type:string;path?:string;segments?:number;center?:[number,number];angle?:number;size?:number}|null;
 };
 export type PhotoHistorySnapshot={id:string;name:string;source:string;current:boolean;thumbnail?:string|null};
 export type PhotoHistorySource={id:string;index:number;label:string;current:boolean;available:boolean;reason?:string|null};

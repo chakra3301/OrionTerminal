@@ -14,7 +14,7 @@ import type { PhotoDocument } from "./types";
 const shadow = { type: "DropShadow", enabled: true, colors: {}, settings: { common: { enabled: true, blend: "Multiply", opacity: 0.75 }, color: { mode: "Rgb", c: [0, 0, 0, 0], alpha: 1 }, angle: 120, use_global_light: false, distance: 5, spread: 0, size: 5, noise: 0, anti_alias: false, contour: "Linear", knocks_out: true } };
 const bevel = { type: "BevelEmboss", enabled: true, colors: {}, settings: { enabled: true, style: "InnerBevel", technique: "Smooth", depth: 1, up: true, size: 5, soften: 0, angle: 120, altitude: 30, use_global_light: false, gloss_contour: "Linear", highlight: { blend: "Screen", opacity: 0.75 }, highlight_color: { mode: "Rgb", c: [1, 1, 1, 0], alpha: 1 }, shadow: { blend: "Multiply", opacity: 0.75 }, shadow_color: { mode: "Rgb", c: [0, 0, 0, 0], alpha: 1 } } };
 const layer = (items: unknown[]) => ({ id: 7, name: "L", blend: "Normal", opacity: 1, fill: 1, effects: { items } });
-const withState = (items: unknown[], index = 3) => { store.state = { layers: [layer(items)], historySources: [{ index, current: true }], globalLight: { angle: 120, altitude: 30 }, presets: { styles: [], patterns: [] } }; };
+const withState = (items: unknown[], index = 3) => { store.state = { layers: [layer(items)], historySources: [{ id: `h${index}`, index, current: true }], globalLight: { angle: 120, altitude: 30 }, presets: { styles: [], patterns: [] } }; };
 
 let root: Root, container: HTMLDivElement;
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); run.mockClear(); container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
@@ -217,9 +217,9 @@ describe("LayerStyleDialog", () => {
 
   it("Cancel returns to the opening history step, leaving nothing to redo, and closes", async () => {
     withState([]); const onClose = render();
-    store.state = { ...(store.state as object), historySources: [{ index: 5, current: true }] };
+    store.state = { ...(store.state as object), historySources: [{ id: "h5", index: 5, current: true }] };
     await act(async () => [...container.querySelectorAll("button")].find(b => b.textContent === "Cancel")!.click());
-    expect(run).toHaveBeenCalledWith("history.select", { index: 3, discardRedo: true });
+    expect(run).toHaveBeenCalledWith("history.select", { id: "h3", discardRedo: true });
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -238,21 +238,28 @@ describe("LayerStyleDialog", () => {
 
   it("OK records the dialog's edits as one Layer Style history step", async () => {
     withState([]); const onClose = render();
-    store.state = { ...(store.state as object), historySources: [{ index: 5, current: true }] };
+    store.state = { ...(store.state as object), historySources: [{ id: "h5", index: 5, current: true }] };
     await act(async () => q("button[type=submit]").click());
-    expect(run.mock.calls).toEqual([["history.fold", { from: 3, label: "Layer Style" }]]);
+    expect(run.mock.calls).toEqual([["history.fold", { fromId: "h3", label: "Layer Style" }]]);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("OK still folds the dialog's edits at the History limit, where a new step keeps the current index", async () => {
+    withState([], 50); render();
+    store.state = { ...(store.state as object), historySources: [{ id: "later", index: 50, current: true }] };
+    await act(async () => q("button[type=submit]").click());
+    expect(run.mock.calls).toEqual([["history.fold", { fromId: "h50", label: "Layer Style" }]]);
   });
 
   it("OK with Preview off brings the edits back before folding them", async () => {
     withState([]); render();
-    store.state = { ...(store.state as object), historySources: [{ index: 5, current: true }] };
+    store.state = { ...(store.state as object), historySources: [{ id: "h5", index: 5, current: true }] };
     const box = [...container.querySelectorAll(".xd-ps-dialog-buttons label")].find(label => label.textContent === "Preview")!.querySelector("input")!;
     await act(async () => box.click());
-    store.state = { ...(store.state as object), historySources: [{ index: 3, current: true }] };
-    run.mockImplementation(async (command, params) => { if (command === "history.select") store.state = { ...(store.state as object), historySources: [{ index: params!.index, current: true }] }; return {}; });
+    store.state = { ...(store.state as object), historySources: [{ id: "h3", index: 3, current: true }] };
+    run.mockImplementation(async (command, params) => { if (command === "history.select") store.state = { ...(store.state as object), historySources: [{ id: params!.id, current: true }] }; return {}; });
     await act(async () => q("button[type=submit]").click());
-    expect(run.mock.calls).toEqual([["history.select", { index: 3 }], ["history.select", { index: 5 }], ["history.fold", { from: 3, label: "Layer Style" }]]);
+    expect(run.mock.calls).toEqual([["history.select", { id: "h3" }], ["history.select", { id: "h5" }], ["history.fold", { fromId: "h3", label: "Layer Style" }]]);
     run.mockImplementation(async () => ({}));
   });
 

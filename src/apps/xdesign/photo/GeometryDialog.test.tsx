@@ -419,13 +419,13 @@ describe('precise shared Camera Raw curves',()=>{
     await pointEvent(svg,'pointermove',110,140);await pointEvent(svg,'pointerup',110,140);expect(changed).toHaveBeenLastCalledWith([[0,0],[110,140],[255,255]]);
   });
 
-  it('caps actual RAW curves at sixteen while preserving the shared adjustment default of nineteen',async()=>{
+  it('caps actual RAW curves and the shared adjustment curves at sixteen, as Photoshop does',async()=>{
     await develop();for(let index=0;index<14;index++)await addCurvePoint(8+index*16,120);
     expect(curveData()).toHaveLength(16);const raw=curveData();await addCurvePoint(240,120);expect(curveData()).toEqual(raw);
     await act(async()=>root.render(null));
     const changed=vi.fn();await act(async()=>root.render(<CurveFixture initial={[[0,0],[255,255]]} changed={changed}/>));
     for(let index=0;index<17;index++)await addCurvePoint(8+index*13,120);
-    expect(curveData()).toHaveLength(19);const adjustment=curveData();await addCurvePoint(240,120);expect(curveData()).toEqual(adjustment);
+    expect(curveData()).toHaveLength(16);const adjustment=curveData();await addCurvePoint(240,120);expect(curveData()).toEqual(adjustment);
   });
 
   it.each(['pointerup','pointercancel','lostpointercapture'])('finishes capture after %s and ignores other pointers and late movement',async end=>{
@@ -637,5 +637,36 @@ describe("Photoshop warp anchors, guides, Cylinder and menus",()=>{
     const on=warpMenuItems(session,false,{label:"Warp"}).filter(entry=>entry!=="-");
     expect(on.map(entry=>!!entry.disabled)).toEqual([false,false,false,false,true,false,false]);
     on[1]!.run!();expect(session.split).toHaveBeenCalledWith("Horizontally");
+  });
+});
+
+describe("Photoshop's Free Transform and Warp as one session",()=>{
+  const at=(index:number)=>act(async()=>usePhotoWorkspace.setState({state:{historySources:[{id:`h${index}`,index,current:true}]} as never}));
+  const nudge=()=>act(async()=>container.querySelector('[aria-label="Warp point 1"]')!.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowRight",bubbles:true})));
+  const toggle=()=>container.querySelector<HTMLButtonElement>('[aria-label="Switch between free transform and warp modes"]');
+  afterEach(()=>usePhotoWorkspace.setState({state:null}));
+  it("folds a Warp reached from Free Transform into the transform's step, and Cancel undoes the transform too",async()=>{
+    const close=vi.fn(),fold={fromId:"h4",label:"Free Transform"};await at(5);
+    await act(async()=>root.render(<GeometryDialog kind="warp" document={doc} layer={layer} fold={fold} close={close}/>));
+    await nudge();await act(async()=>container.querySelector("form")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+    expect(native.run.mock.calls.map(call=>call[0])).toEqual(["edit.transform.warp","history.fold"]);expect(native.run).toHaveBeenLastCalledWith("history.fold",fold);expect(close).toHaveBeenCalledOnce();
+    native.run.mockClear();await act(async()=>root.render(<GeometryDialog key="again" kind="warp" document={doc} layer={layer} fold={fold} close={close}/>));
+    await act(async()=>button("Cancel").click());
+    expect(native.run.mock.calls).toEqual([["history.select",{id:"h4",discardRedo:true}]]);expect(close).toHaveBeenCalledTimes(2);
+    native.run.mockClear();await act(async()=>root.render(<GeometryDialog key="plain" kind="warp" document={doc} layer={layer} close={close}/>));
+    await act(async()=>button("Cancel").click());expect(native.run).not.toHaveBeenCalled();
+  });
+  it("switches Warp back to Free Transform: an untouched warp just hands over, an edited one is applied first and joins the session's step",async()=>{
+    const freeTransform=vi.fn();await at(7);
+    await act(async()=>root.render(<GeometryDialog kind="warp" document={doc} layer={layer} close={vi.fn()}/>));expect(toggle()).toBeNull();
+    await act(async()=>root.render(<GeometryDialog key="switch" kind="warp" document={doc} layer={layer} freeTransform={freeTransform} close={vi.fn()}/>));
+    await act(async()=>toggle()!.click());expect(native.run).not.toHaveBeenCalled();expect(freeTransform).toHaveBeenLastCalledWith(null,undefined);
+    await nudge();await act(async()=>toggle()!.click());
+    expect(native.run.mock.calls.map(call=>call[0])).toEqual(["edit.transform.warp"]);expect(freeTransform).toHaveBeenLastCalledWith(expect.any(Promise),{fromId:"h7",label:"Warp"});
+    native.run.mockClear();const fold={fromId:"h4",label:"Free Transform"};
+    await act(async()=>root.render(<GeometryDialog key="session" kind="warp" document={doc} layer={layer} fold={fold} freeTransform={freeTransform} close={vi.fn()}/>));
+    await nudge();await act(async()=>toggle()!.click());
+    expect(native.run.mock.calls.map(call=>call[0])).toEqual(["edit.transform.warp","history.fold"]);expect(freeTransform).toHaveBeenLastCalledWith(expect.any(Promise),fold);
+    await act(async()=>usePhotoWorkspace.setState({busy:true}));expect(toggle()!.disabled).toBe(true);
   });
 });

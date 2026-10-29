@@ -3,6 +3,7 @@ import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Trash2 } from "lucide-react";
 import { EffectSettings } from "./LayerEffects";
+import { BrushTexturePattern, BrushTipGrid } from "./BrushSettingsPickers";
 import { runPhotoCommand, usePhotoWorkspace, controlsLocked } from "./runtime";
 import type { PhotoState } from "./types";
 
@@ -28,10 +29,13 @@ export function BrushSettingsPanel({state,changed}:{state:PhotoState;changed:Cha
   const run=brushRun(changed);
   const patch=(path:string[],value:unknown)=>{let result:unknown=value;for(const key of [...path].reverse())result={[key]:result};attempt(run("tools.setBrush",result as Record<string,unknown>));};
   const settings=Object.fromEntries(Object.entries(brush.settings).filter(([key])=>!["tip","color","background","erase","seed"].includes(key)));
-  if(brush.sampledTexture&&settings.texture&&typeof settings.texture==="object")settings.texture=Object.fromEntries(Object.entries(settings.texture).filter(([key])=>key!=="pattern"));
+  if(settings.texture&&typeof settings.texture==="object")settings.texture=Object.fromEntries(Object.entries(settings.texture).filter(([key])=>key!=="patternId"&&(key!=="pattern"||!brush.sampledTexture)));
   if(settings.dualBrush&&typeof settings.dualBrush==="object")settings.dualBrush=Object.fromEntries(Object.entries(settings.dualBrush).filter(([key])=>key!=="tip"));
   return <div className="xd-photo-brush-panel">
     {brush.sampledTip&&<p className="xd-photo-section-help">Sampled tip retained. Size, spacing and dynamics remain editable.</p>}{brush.sampledTexture&&<p className="xd-photo-section-help">Imported texture retained.</p>}
+    <BrushTipGrid label="Brush Tip Shape" target="tip" brush={brush} disabled={busy} run={run}/>
+    {(brush.settings.dualBrush as {enabled?:unknown}|undefined)?.enabled===true&&<BrushTipGrid label="Dual Brush tip" target="dualBrush" brush={brush} disabled={busy} run={run}/>}
+    {(brush.settings.texture as {enabled?:unknown}|undefined)?.enabled===true&&<BrushTexturePattern state={state} disabled={busy} run={run}/>}
     <EffectSettings value={settings} commit={patch} disabled={busy} effectType="BrushSettings"/>
   </div>;
 }

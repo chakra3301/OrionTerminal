@@ -14,7 +14,7 @@ export const ADJUSTMENTS: PhotoAction[] = [
   {id:"hueSaturation",label:"Hue/Saturation",fields:[n("hue","Hue",-180,180,0),n("saturation","Saturation",-100,100,0),n("lightness","Lightness",-100,100,0)]},
   {id:"blackWhite",label:"Black & White",fields:[n("reds","Reds",-200,300,40),n("yellows","Yellows",-200,300,60),n("greens","Greens",-200,300,40),n("cyans","Cyans",-200,300,60),n("blues","Blues",-200,300,20),n("magentas","Magentas",-200,300,80)]},
   {id:"colorBalance",label:"Color Balance",fields:[n("cyanRed","Cyan / Red",-100,100,0),n("magentaGreen","Magenta / Green",-100,100,0),n("yellowBlue","Yellow / Blue",-100,100,0)]},
-  {id:"photoFilter",label:"Photo Filter",fields:[n("density","Density",0,100,25)]},
+  {id:"photoFilter",label:"Photo Filter",fields:[n("density","Density",1,100,25)]},
   {id:"channelMixer",label:"Channel Mixer",fields:[n("red","Red",-200,200,100),n("green","Green",-200,200,0),n("blue","Blue",-200,200,0),n("constant","Constant",-200,200,0)]},
   {id:"gradientMap",label:"Gradient Map"},
   {id:"selectiveColor",label:"Selective Color",fields:[n("cyan","Cyan",-100,100,0),n("magenta","Magenta",-100,100,0),n("yellow","Yellow",-100,100,0),n("black","Black",-100,100,0)]},

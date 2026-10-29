@@ -1,23 +1,27 @@
-import { AlignCenter, AlignHorizontalDistributeCenter, AlignHorizontalDistributeEnd, AlignHorizontalDistributeStart, AlignHorizontalSpaceAround, AlignLeft, AlignRight, AlignVerticalDistributeCenter, AlignVerticalDistributeEnd, AlignVerticalDistributeStart, AlignVerticalSpaceAround, ArrowDownUp, Brush, Ellipsis, FlipHorizontal2, Gauge, Settings2, SprayCan, Type as TypeIcon, type LucideIcon } from "lucide-react";
+import { AlignCenter, AlignHorizontalDistributeCenter, AlignHorizontalDistributeEnd, AlignHorizontalDistributeStart, AlignHorizontalSpaceAround, AlignLeft, AlignRight, AlignVerticalDistributeCenter, AlignVerticalDistributeEnd, AlignVerticalDistributeStart, AlignVerticalSpaceAround, ArrowDownUp, Ban, Brush, Check, Ellipsis, FlipHorizontal2, Gauge, PanelRight, Settings2, SprayCan, Type as TypeIcon, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MenuButton } from "../EditorMenus";
 import { DeleteCropPresetDialog, NewCropPresetDialog, applyCropPreset, matchingCropPreset, useCropPresets } from "./CropPresets";
 import type { MenuEntry } from "../menuModel";
 import { InfoNote } from "./OptionsBarControls";
+import { PhotoDialog } from "./photoDialog";
+import { controlsLocked, usePhotoWorkspace } from "./runtime";
+import { useDesignDialog } from "../useDesignDialog";
 import { GradientEditorDialog, GradientPick, gradientCss, type EditedGradient } from "./GradientEditorDialog";
+import type { AlignTo } from "./moveAlign";
+import { antialiasEntries, faceStyles, typeAntialias, typeSize, type Face } from "./typeOptions";
+export { typeStyleParams } from "./typeOptions";
 
 export const TYPE_STYLES = ["Regular", "Italic", "Bold", "Bold Italic"] as const;
-export const TYPE_ANTIALIAS = ["none", "sharp", "crisp", "strong", "smooth"] as const;
 export const PATH_OPS = [["new", "New Shape Layer"], ["combine", "Combine Shapes"], ["subtract", "Subtract Front Shape"], ["intersect", "Intersect Shape Areas"], ["exclude", "Exclude Overlapping Shapes"]] as const;
-export type TypeStyle = typeof TYPE_STYLES[number];
+export type TypeStyle = string;
 export type TypeAlign = "left" | "center" | "right";
 export type PathOp = typeof PATH_OPS[number][0];
-export type ShapeStyle = { fill: boolean; stroke: boolean; strokeColor: string; strokeWidth: number };
+export type { ShapeStyle } from "./shapeStyle";
+export { shapeStyleParams } from "./shapeStyle";
+export { ShapeStyleFields } from "./ShapeStyleFields";
 
-// Regular must reset weight/italic when restyling an existing layer, but stay out of type.create's params.
-export const typeStyleParams = (style: TypeStyle, reset = false) => ({ ...(style.includes("Bold") ? { weight: 700 } : reset ? { weight: 400 } : {}), ...(style.includes("Italic") ? { italic: true } : reset ? { italic: false } : {}) });
-export const shapeStyleParams = (style: ShapeStyle, fill: unknown) => ({ fill: style.fill ? fill : null, ...(style.stroke ? { stroke: { color: style.strokeColor, width: style.strokeWidth } } : {}) });
 
 export function IconCluster<T extends string>({ label, value, options, change, disabled }: { label: string; value: T; options: readonly (readonly [T, string, LucideIcon])[]; change: (value: T) => void; disabled?: boolean }) {
   return <div role="group" aria-label={label} className="xd-ps-icon-cluster">{options.map(([key, name, Icon]) => <button key={key} aria-label={name} title={name} aria-pressed={value === key} disabled={disabled} onClick={() => change(key)}><Icon size={16} /></button>)}</div>;
@@ -27,29 +31,26 @@ const ORIENTATIONS = [["horizontal", "Horizontal type", TypeIcon], ["vertical", 
 
 export type TypeBarProps = { font: string; size: number; style: TypeStyle; align: TypeAlign; antialias: string; orientation: string; fonts: { listId: string; list: ReactNode }; warpDisabled: boolean;
   // The swatch edits freely, then `commitColor` applies it (a native colour picker fires input events while dragging).
-  color?: string; changeColor?: (color: string) => void; commitColor?: () => void;
+  color?: string; changeColor?: (color: string) => void; commitColor?: () => void; faces?: Face[];
+  editing?: boolean; finish?: (commit: boolean) => void; panelsOpen?: boolean; togglePanels?: () => void;
   patch: (patch: Partial<{ font: string; size: number; style: TypeStyle; align: TypeAlign; antialias: string; orientation: string }>) => void; warp: () => void };
-export function TypeBar({ font, size, style, align, antialias, orientation, fonts, warpDisabled, color, changeColor, commitColor, patch, warp }: TypeBarProps) {
+// The bar's buttons must not take focus: the canvas editor commits whenever it loses it.
+const keepFocus = (event: { preventDefault: () => void }) => event.preventDefault();
+export function TypeBar({ font, size, style, align, antialias, orientation, fonts, warpDisabled, color, changeColor, commitColor, faces = [], editing, finish, panelsOpen, togglePanels, patch, warp }: TypeBarProps) {
   return <>
     <IconCluster label="Text orientation" value={orientation as "horizontal" | "vertical"} options={ORIENTATIONS} change={value => patch({ orientation: value })} />
     <label>Font<input aria-label="Text font" list={fonts.listId} value={font} onChange={event => patch({ font: event.target.value })} />{fonts.list}</label>
-    <select aria-label="Text font style" value={style} onChange={event => patch({ style: event.target.value as TypeStyle })}>{TYPE_STYLES.map(value => <option key={value}>{value}</option>)}</select>
-    <label>Size<input aria-label="Text size" type="number" min="1" max="10000" value={size} onChange={event => patch({ size: Math.max(1, Math.min(10000, event.target.valueAsNumber || 1)) })} /><span>pt</span></label>
-    <select aria-label="Text anti-aliasing" value={antialias} onChange={event => patch({ antialias: event.target.value })}>{TYPE_ANTIALIAS.map(value => <option key={value} value={value}>{value.charAt(0).toUpperCase() + value.slice(1)}</option>)}</select>
+    <select aria-label="Text font style" value={style} onChange={event => patch({ style: event.target.value })}>{faceStyles(faces, style).map(value => <option key={value}>{value}</option>)}</select>
+    <label>Size<input aria-label="Text size" type="number" min="0.01" max="1296" step="any" value={size} onChange={event => { const next = typeSize(event.target.valueAsNumber); if (next !== null) patch({ size: next }); }} /><span>pt</span></label>
+    <select aria-label="Text anti-aliasing" value={typeAntialias(antialias)} onChange={event => patch({ antialias: event.target.value })}>{antialiasEntries().map(([value, label, supported]) => <option key={value} value={value} disabled={!supported} title={supported ? undefined : "Not supported by the image engine"}>{label}</option>)}</select>
     <IconCluster label="Text alignment" value={align} options={ALIGNS} change={value => patch({ align: value })} />
     {color !== undefined && changeColor && <input type="color" aria-label="Type tool color" title="Text color" value={color} onChange={event => changeColor(event.target.value)} onBlur={commitColor} />}
     <button aria-label="Create warped text" title="Create warped text" disabled={warpDisabled} onClick={warp}>Warp Text…</button>
+    {togglePanels && <span className="xd-ps-icon-cluster"><button aria-label="Toggle the Character and Paragraph panels" title="Toggle the Character and Paragraph panels" aria-pressed={!!panelsOpen} onMouseDown={keepFocus} onClick={togglePanels}><PanelRight size={16} /></button></span>}
+    {editing && finish && <span className="xd-ps-icon-cluster"><button aria-label="Cancel any current edits" title="Cancel any current edits (Esc)" onMouseDown={keepFocus} onClick={() => finish(false)}><Ban size={16} /></button><button aria-label="Commit any current edits" title="Commit any current edits" onMouseDown={keepFocus} onClick={() => finish(true)}><Check size={16} /></button></span>}
   </>;
 }
 
-export function ShapeStyleFields({ style, change }: { style: ShapeStyle; change: (patch: Partial<ShapeStyle>) => void }) {
-  return <>
-    <label><input type="checkbox" aria-label="Shape fill" checked={style.fill} onChange={event => change({ fill: event.target.checked })} />Fill</label>
-    <label><input type="checkbox" aria-label="Shape stroke" checked={style.stroke} onChange={event => change({ stroke: event.target.checked })} />Stroke</label>
-    <input type="color" aria-label="Stroke color" disabled={!style.stroke} value={style.strokeColor} onChange={event => change({ strokeColor: event.target.value })} />
-    <label>Width<input aria-label="Stroke width" className="xd-ps-number" type="number" min="0" max="1000" disabled={!style.stroke} value={style.strokeWidth} onChange={event => change({ strokeWidth: Math.max(0, Math.min(1000, event.target.valueAsNumber || 0)) })} /><span>px</span></label>
-  </>;
-}
 export function PathOpSelect({ value, change, merge }: { value: PathOp; change: (value: PathOp) => void; merge?: () => void }) {
   return <select aria-label="Path operation" title="Path operations" value={value} onChange={event => { if (event.target.value === "merge") { event.target.value = value; merge?.(); } else change(event.target.value as PathOp); }}>
     {PATH_OPS.map(([key, name]) => <option key={key} value={key}>{name}</option>)}
@@ -178,25 +179,26 @@ export function CropFillField({ value, deleteCroppedPixels, disabled, change }: 
 
 const DISTRIBUTE = [["topEdges", "Distribute top edges", AlignVerticalDistributeStart], ["verticalCenters", "Distribute vertical centers", AlignVerticalDistributeCenter], ["bottomEdges", "Distribute bottom edges", AlignVerticalDistributeEnd], ["vertically", "Distribute vertically", AlignVerticalSpaceAround],
   ["leftEdges", "Distribute left edges", AlignHorizontalDistributeStart], ["horizontalCenters", "Distribute horizontal centers", AlignHorizontalDistributeCenter], ["rightEdges", "Distribute right edges", AlignHorizontalDistributeEnd], ["horizontally", "Distribute horizontally", AlignHorizontalSpaceAround]] as const;
-// Photoshop folds Distribute behind the Move bar's "..." button.
-export function DistributeMenu({ disabled, run }: { disabled: boolean; run: (command: string) => void }) {
+// Photoshop folds Distribute and Align To behind the Move bar's "..." button.
+export function DistributeMenu({ disabled, run, alignTo = "selection", changeAlignTo }: { disabled: boolean; run: (command: string) => void; alignTo?: AlignTo; changeAlignTo?: (to: AlignTo) => void }) {
   const [open, setOpen] = useState(false);
   return <><button aria-label="More alignment and distribute options" title="Distribute" aria-expanded={open} className="xd-ps-more" disabled={disabled} onClick={() => setOpen(value => !value)}><Ellipsis size={16} /></button>
-    {open && <div role="group" aria-label="Distribute" className="xd-ps-icon-cluster">{DISTRIBUTE.map(([edge, name, Icon]) => <button key={edge} aria-label={name} title={name} disabled={disabled} onClick={() => run(`layer.distribute.${edge}`)}><Icon size={16} /></button>)}</div>}</>;
+    {open && <div role="group" aria-label="Distribute" className="xd-ps-icon-cluster">{DISTRIBUTE.map(([edge, name, Icon]) => <button key={edge} aria-label={name} title={name} disabled={disabled} onClick={() => run(`layer.distribute.${edge}`)}><Icon size={16} /></button>)}</div>}
+    {open && changeAlignTo && <label>Align To:<select aria-label="Align layers to" disabled={disabled} value={alignTo} onChange={event => changeAlignTo(event.target.value as AlignTo)}><option value="selection">Selection</option><option value="canvas">Canvas</option></select></label>}</>;
 }
 
-type Gradient = { name: string; stops: [number, string][]; transparency: [number, number][] };
+type Gradient = { name: string; stops: [number, string][]; transparency: [number, number][]; midpoints?: number[] };
 /** The Gradient tool's swatch. Classic gradient edits it in the Gradient Editor (the swatch previews each edit, OK keeps it); the live Gradient tool picks presets from it, as in Photoshop. */
 export function GradientToolPick({ current, live, foreground, background, disabled, select }: { current: Gradient; live: boolean; foreground: string; background: string; disabled: boolean; select: (params: Record<string, unknown>) => void }) {
   const [editing, setEditing] = useState<{ root: Element; draft: EditedGradient<string> | null } | null>(null);
   const hex = (color: string) => color === "foreground" ? foreground : color === "background" ? background : color;
-  const gradient = { stops: current.stops, opacity: current.transparency.map(([at, alpha]): [number, number] => [at, alpha / 100]) }, shown = editing?.draft ?? gradient;
+  const gradient = { stops: current.stops, opacity: current.transparency.map(([at, alpha]): [number, number] => [at, alpha / 100]), midpoints: current.midpoints ?? [] }, shown = editing?.draft ?? gradient;
   // A classic gradient paints pixels, so it leaves a selected Gradient Fill layer alone.
   const target = live ? {} : { applyToLayer: false };
   return <>
     <GradientPick css={gradientCss(shown.stops, shown.opacity, hex)} disabled={disabled} edit={live ? undefined : event => setEditing({ root: event.currentTarget.closest(".xd-photo") ?? document.body, draft: null })} choose={(_, preset, group) => select({ preset, group, ...target })}/>
     {editing && createPortal(<GradientEditorDialog<string> gradient={gradient} name={current.name} hex={hex} color={value => value} preview={draft => setEditing(open => open && { ...open, draft })}
-      choose={(next, name) => { setEditing(null); select({ name, stops: next.stops, transparency: next.opacity.map(([at, alpha]) => [at, Math.round(alpha * 100)]), ...target }); }} close={() => setEditing(null)}/>, editing.root)}
+      choose={(next, name) => { setEditing(null); select({ name, stops: next.stops, transparency: next.opacity.map(([at, alpha]) => [at, Math.round(alpha * 100)]), ...next.midpoints?.length ? { midpoints: next.midpoints } : {}, ...target }); }} close={() => setEditing(null)}/>, editing.root)}
   </>;
 }
 
@@ -213,7 +215,19 @@ export const BRUSH_BAR_ITEMS: Record<string, readonly BrushBarItem[]> = {
   "paint.healingBrush": ["pressureSize"], "paint.spotHealing": ["pressureSize"],
 };
 export type BrushBarSettings = Partial<{ angle: number; buildUp: boolean; pressureOpacity: boolean; pressureSize: boolean }>;
-export type SymmetryChoice = { current: string; saved: string[]; hasWorkPath: boolean; choose: (name: string | null) => void };
+export const SYMMETRY_PRESETS = ["Vertical", "Horizontal", "Dual Axis", "Diagonal", "Wavy", "Circle", "Spiral", "Parallel Lines", "Radial", "Mandala"] as const;
+const SYMMETRY_SEGMENTS: Record<string, readonly [number, number]> = { Radial: [2, 12], Mandala: [3, 10] };
+export type SymmetryChoice = { current: string; segments?: number; saved: string[]; hasWorkPath: boolean; choose: (name: string | null) => void; preset: (type: string, segments?: number) => void };
+
+// Photoshop asks for the segment count each time Radial or Mandala is chosen.
+function SymmetrySegmentsDialog({ type, range: [min, max], initial, close, submit }: { type: string; range: readonly [number, number]; initial: number; close: () => void; submit: (segments: number) => void }) {
+  const [value, setValue] = useState(String(initial)), dialog = useDesignDialog<HTMLFormElement>(close), busy = usePhotoWorkspace(controlsLocked);
+  const segments = Number(value), valid = value.trim() !== "" && Number.isInteger(segments) && segments >= min && segments <= max;
+  return <PhotoDialog dialog={dialog} title={`${type} Symmetry`} noValidate busy={busy} okDisabled={!valid} close={close} onSubmit={event => { event.preventDefault(); if (valid) { submit(segments); close(); } }}>
+    <div className="xd-ps-dialog-grid"><label className="xd-ps-dialog-field"><span>Segment Count:</span><input aria-label="Segment count" className="xd-ps-number" type="number" min={min} max={max} step="1" value={value} onFocus={event => event.currentTarget.select()} onChange={event => setValue(event.target.value)}/></label></div>
+    {!valid && <p role="alert">{`Enter a whole number from ${min} to ${max}.`}</p>}
+  </PhotoDialog>;
+}
 
 export function BrushSettingsToggle({ open, toggle }: { open: boolean; toggle: () => void }) {
   return <button type="button" className="xd-ps-toggle" aria-label="Brush Settings panel" title="Toggle the Brush Settings panel" aria-pressed={open} onClick={toggle}><Settings2 size={16} /></button>;
@@ -221,13 +235,15 @@ export function BrushSettingsToggle({ open, toggle }: { open: boolean; toggle: (
 
 export function BrushBarItems({ tool, settings, patch, symmetry }: { tool: string; settings: BrushBarSettings; patch: (patch: BrushBarSettings) => void; symmetry?: SymmetryChoice }) {
   const items = BRUSH_BAR_ITEMS[tool];
-  const [angle, setAngle] = useState(String(settings.angle ?? 0));
+  const [angle, setAngle] = useState(String(settings.angle ?? 0)), [asking, setAsking] = useState<{ type: string; range: readonly [number, number] } | null>(null), anchor = useRef<HTMLSpanElement>(null);
   useEffect(() => setAngle(String(Math.round(settings.angle ?? 0))), [settings.angle]);
   if (!items) return null;
   const toggle = (key: "buildUp" | "pressureOpacity" | "pressureSize", label: string, Icon: LucideIcon) =>
     <button key={key} type="button" className="xd-ps-toggle" aria-label={label} title={label} aria-pressed={!!settings[key]} onClick={() => patch({ [key]: !settings[key] })}><Icon size={16} /></button>;
   const symmetryItems: MenuEntry[] = symmetry ? [
     { label: "Off", radio: true, checked: symmetry.current === "", run: () => symmetry.choose(null) },
+    "-",
+    ...SYMMETRY_PRESETS.map((type): MenuEntry => ({ label: type, radio: true, checked: symmetry.current === type, run: () => { const range = SYMMETRY_SEGMENTS[type]; if (range) setAsking({ type, range }); else symmetry.preset(type); } })),
     "-",
     { label: "Work Path", radio: true, checked: symmetry.current === "work", disabled: !symmetry.hasWorkPath, run: () => symmetry.choose("work") },
     { label: "Selected Shape Layer Path", radio: true, checked: symmetry.current === "layer", run: () => symmetry.choose("layer") },
@@ -238,6 +254,7 @@ export function BrushBarItems({ tool, settings, patch, symmetry }: { tool: strin
     {items.includes("angle") && <label>Angle<input aria-label="Brush angle" className="xd-ps-number" type="number" min="-180" max="180" value={angle} onChange={event => { setAngle(event.target.value); const value = event.target.valueAsNumber; if (Number.isFinite(value)) patch({ angle: Math.max(-180, Math.min(180, value)) }); }} /><span>°</span></label>}
     {items.includes("pressureOpacity") && toggle("pressureOpacity", "Always use pressure for opacity", Gauge)}
     {items.includes("pressureSize") && toggle("pressureSize", "Always use pressure for size", Brush)}
-    {items.includes("symmetry") && symmetry && <MenuButton label="Painting symmetry" icon={FlipHorizontal2} iconOnly items={symmetryItems} />}
+    {items.includes("symmetry") && symmetry && <span ref={anchor} className="xd-ps-symmetry"><MenuButton label="Painting symmetry" icon={FlipHorizontal2} iconOnly items={symmetryItems} /></span>}
+    {asking && symmetry && createPortal(<SymmetrySegmentsDialog {...asking} initial={symmetry.current === asking.type && symmetry.segments ? symmetry.segments : 5} close={() => setAsking(null)} submit={segments => symmetry.preset(asking.type, segments)} />, anchor.current?.closest(".xd-photo") ?? document.body)}
   </>;
 }

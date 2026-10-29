@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { identityTransform, perspectiveQuad, resizeTransform, rotateQuad, scaleQuad, skewQuad, transformHandle, transformMatrix, type Quad, type TransformSettings } from "./transformMath";
+import { identityTransform, perspectiveQuad, pivotTransform, resizeTransform, rotateQuad, scaleQuad, skewQuad, transformHandle, transformMatrix, type Quad, type TransformSettings } from "./transformMath";
 
 const bounds: [number, number, number, number] = [20, 30, 100, 60];
 const initial: TransformSettings = identityTransform(bounds);
@@ -59,5 +59,13 @@ describe("quad transform modes", () => {
   it("rotates a quad about a centre", () => {
     const turned = rotateQuad(box, [0, 0], Math.PI / 2);
     expect(turned[1]!.map(Math.round)).toEqual([0, 100]);
+  });
+  it("scales, rotates and skews about the reference point, which stays put; the centre reference changes nothing", () => {
+    for (const change of [{ width: 200 }, { angle: 90, height: 50 }, { skewX: 30, flipY: true }]) {
+      const pivoted = pivotTransform(bounds, initial, { ...initial, ...change }, [-1, -1]);
+      expect(transformHandle(bounds, pivoted, -1, -1).map(value => Math.round(value * 1000) / 1000)).toEqual([20, 30]);
+      expect(pivotTransform(bounds, initial, { ...initial, ...change }, [0, 0])).toEqual({ ...initial, ...change });
+    }
+    expect(pivotTransform(bounds, initial, { ...initial, width: 200 }, [1, 0])).toMatchObject({ x: 20, y: 60 });
   });
 });

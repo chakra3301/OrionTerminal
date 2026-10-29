@@ -142,7 +142,7 @@ pub(super) const ADJUSTMENTS: [&str; 16] = [
 ];
 
 /// Pixel adjustments with their own engine parameters; they preview but do not use the shared adjustment-layer path.
-const PIXEL_ADJUSTMENTS: [&str; 3] = ["shadowsHighlights", "replaceColor", "matchColor"];
+const PIXEL_ADJUSTMENTS: [&str; 4] = ["shadowsHighlights", "replaceColor", "matchColor", "hdrToning"];
 
 /// Images above this render each preview frame too slowly to follow a drag.
 const FULL_PREVIEW_PIXELS: u64 = 16_777_216;

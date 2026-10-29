@@ -18,7 +18,7 @@ export function findTextLayer(layers:PhotoLayer[],x:number,y:number):PhotoLayer|
 }
 
 // Point text is anchored at its baseline; existing layers open over their bounds.
-export function CanvasTextEditor({target,zoom,resolution,font,size,color,create,after,close}:{target:CanvasText;zoom:number;resolution:number;font:string;size:number;color:string;create?:Record<string,unknown>;after?:{antialias:string;orientation:string};close:(work?:Promise<unknown>)=>void}) {
+export function CanvasTextEditor({target,zoom,resolution,font,size,color,create,after,control,close}:{target:CanvasText;zoom:number;resolution:number;font:string;size:number;color:string;create?:Record<string,unknown>;after?:{antialias:string;orientation:string};control?:{current:((commit:boolean)=>void)|null};close:(work?:Promise<unknown>)=>void}) {
   const original=target.layer?.text?.text??"",[text,setText]=useState(original),[committing,setCommitting]=useState(false),field=useRef<HTMLTextAreaElement>(null),done=useRef(false);
   const pointSize=target.layer?.text?.sizePt??size,pixels=pointSize*resolution/72*zoom,lines=text.split("\n");
   const left=(target.layer?.bounds?.[0]??target.point![0])*zoom,top=target.layer?.bounds?(target.layer.bounds[1]*zoom):(target.point![1]*zoom-pixels*.8);
@@ -33,6 +33,8 @@ export function CanvasTextEditor({target,zoom,resolution,font,size,color,create,
     if(!work){close();return;}
     void work.catch(()=>{});setCommitting(true);close(work);
   };
+  // The Type bar's Cancel and Commit reach the open editor through `control`.
+  useEffect(()=>{if(!control)return;control.current=finish;return()=>{if(control.current===finish)control.current=null;};});
   return <textarea ref={field} className="xd-photo-canvas-text" aria-label="Text on canvas" spellCheck={false} value={text} readOnly={committing}
     style={{left,top,fontFamily:target.layer?.text?.font??font,fontSize:pixels,lineHeight:1.2,...(target.layer?{}:{color}),width:Math.max(4,...lines.map(line=>line.length))*pixels*.62+16,height:lines.length*pixels*1.2+8}}
     onChange={event=>setText(event.target.value)} onBlur={()=>finish(true)}

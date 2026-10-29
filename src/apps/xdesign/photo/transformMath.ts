@@ -27,6 +27,12 @@ export function transformHandle(bounds: Bounds, settings: TransformSettings, hx:
   const matrix = transformMatrix(bounds, settings), px = bounds[0] + (hx + 1) * bounds[2] / 2, py = bounds[1] + (hy + 1) * bounds[3] / 2;
   return [matrix[0] * px + matrix[2] * py + matrix[4], matrix[1] * px + matrix[3] * py + matrix[5]];
 }
+/** `to`, moved so the reference point (a box point in -1..1) stays where `from` put it. */
+export function pivotTransform(bounds: Bounds, from: TransformSettings, to: TransformSettings, reference: XY): TransformSettings {
+  if (!reference[0] && !reference[1]) return to;
+  const before = transformHandle(bounds, from, reference[0], reference[1]), after = transformHandle(bounds, to, reference[0], reference[1]);
+  return { ...to, x: to.x + before[0] - after[0], y: to.y + before[1] - after[1] };
+}
 /** Resize around the opposite handle (or the centre when `centered`) in the rotated, skewed axes, preserving flips. */
 export function resizeTransform(bounds: Bounds, initial: TransformSettings, hx: number, hy: number, point: XY, linked: boolean, centered = false): TransformSettings {
   const anchor = centered ? [initial.x, initial.y] : transformHandle(bounds, initial, -hx, -hy), [m00, m01, m10, m11] = basis(initial);

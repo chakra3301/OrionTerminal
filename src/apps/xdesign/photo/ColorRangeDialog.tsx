@@ -14,8 +14,8 @@ import { surfaceFraction, surfaceSize, turnedSurface } from "./viewTurn";
 
 const PRESETS: Record<string, string> = { sampledColors: "Sampled Colors", reds: "Reds", yellows: "Yellows", greens: "Greens", cyans: "Cyans", blues: "Blues", magentas: "Magentas", highlights: "Highlights", midtones: "Midtones", shadows: "Shadows", outOfGamut: "Out Of Gamut" };
 const PREVIEWS: Record<string, string> = { none: "None", mask: "Grayscale", black: "Black Matte", white: "White Matte", overlay: "Quick Mask" };
-type Eyedropper = "replace" | "add" | "subtract";
-const EYEDROPPERS: [Eyedropper, string, string][] = [["replace", "Eyedropper Tool", ""], ["add", "Add to Sample", "+"], ["subtract", "Subtract from Sample", "−"]];
+export type Eyedropper = "replace" | "add" | "subtract";
+export const EYEDROPPERS: [Eyedropper, string, string][] = [["replace", "Eyedropper Tool", ""], ["add", "Add to Sample", "+"], ["subtract", "Subtract from Sample", "−"]];
 const LIVE_PIXELS = 16_777_216;
 
 // The document is partly hidden under the panels when zoomed in, so only its visible part of the stage takes samples.

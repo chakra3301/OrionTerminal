@@ -65,11 +65,12 @@ export function selectionGestureCommand(tool: string, points: readonly XY[], opt
     const rect = canvas ? lineSelection(tool, last, canvas) : null;
     return rect && { id: "select.rect", params: { ...rect, mode, ellipse: false, feather: edge.feather, antiAlias: false } };
   }
+  if (tool === "select.object" && options.objectMode === "lasso") return points.length < 3 ? null : { id: tool, params: { points: points.map(point => point.slice(0, 2)), mode, sampleAllLayers: options.sampleAllLayers === true, hardEdge: options.hardEdge === true } };
   if (RECTANGLE_TOOLS.includes(tool)) {
-    const rect = gestureRectangle(first, last, options, start, current);
+    const rect = gestureRectangle(first, last, tool === "select.object" ? {} : options, start, current);
     if (!rect) return null;
     if (tool === "crop") return rect.width * rect.height <= 256_000_000 ? { id: "image.crop", params: { ...rect, deleteCroppedPixels: options.deleteCroppedPixels === true } } : null;
-    if (tool === "select.object") return { id: tool, params: { rect: [rect.x, rect.y, rect.width, rect.height], mode, sampleAllLayers: options.sampleAllLayers === true } };
+    if (tool === "select.object") return { id: tool, params: { rect: [rect.x, rect.y, rect.width, rect.height], mode, sampleAllLayers: options.sampleAllLayers === true, hardEdge: options.hardEdge === true } };
     return { id: "select.rect", params: { ...rect, mode, ellipse: tool === "ellipseSelection", ...edge } };
   }
   if (tool === "select.lasso" || tool === "polygonLasso") {
@@ -77,6 +78,6 @@ export function selectionGestureCommand(tool: string, points: readonly XY[], opt
     return { id: "select.lasso", params: { points: points.map(point => point.slice(0, 2)), mode, ...edge } };
   }
   if (tool === "select.quick") return { id: tool, params: { points: points.map(point => point.slice(0, 2)), size: options.size ?? 30, mode: mode === "intersect" ? "subtract" : mode, sampleAllLayers: options.sampleAllLayers === true, enhanceEdge: options.enhanceEdge === true } };
-  if (tool === "select.magicWand") return { id: tool, params: { x: first[0], y: first[1], mode, tolerance: options.tolerance ?? 32, contiguous: options.contiguous !== false, antiAlias: options.antiAlias !== false, sampleAllLayers: options.sampleAllLayers === true } };
+  if (tool === "select.magicWand") return { id: tool, params: { x: first[0], y: first[1], mode, tolerance: options.tolerance ?? 32, contiguous: options.contiguous !== false, antiAlias: options.antiAlias !== false, sampleAllLayers: options.sampleAllLayers === true, sampleSize: options.sampleSize ?? 1 } };
   return null;
 }

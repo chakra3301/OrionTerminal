@@ -100,6 +100,35 @@ pub(super) fn commit_feedback(engine:&mut Session,identity:&str,command:&str,par
     Some(super::prepared::commit(engine,command,params.clone(),prepared,move|engine|entry.touched.elapsed()<Duration::from_secs(30)&&entry.live.matches(engine)))
 }
 
+/// Commits a Brush/Pencil Behind or Clear stroke (see `paint_modes`), or one under a multi-copy symmetry preset
+/// (see `symmetry`), through the draft its live feedback shows.
+pub(super) fn host_paint_mode(engine:&mut Session,command:&str,params:&Value)->Option<Result<Value,String>>{
+    if !super::paint_modes::applies(command,params)&&!super::symmetry::applies(engine,command){return None;}
+    let live=match BrushDraft::begin(engine,command,params){Ok(live)=>live,Err(error)=>return Some(Err(error))};
+    let prepared=live.prepared();
+    Some(super::prepared::commit(engine,command,params.clone(),prepared,move|engine|live.matches(engine)))
+}
+
+/// Commits a retouch stroke whose options the native command would ignore (see
+/// `continuous_retouch::host_only`) through the same coverage solve as its live feedback.
+pub(super) fn host_retouch(engine:&mut Session,command:&str,params:&Value)->Option<Result<Value,String>>{
+    match continuous_retouch::host_only(command,params){Ok(false)=>return None,Err(error)=>return Some(Err(error)),Ok(true)=>{}}
+    if command=="paint.patch"{return Some((||{
+        let source=engine.active().ok_or("No image document")?.doc.clone();
+        let (document,damage,label)=continuous_retouch::patch(engine,params,&photocraft_raster::Interrupt::NONE)?;
+        let result=serde_json::json!({"damage":[damage.x0,damage.y0,damage.width(),damage.height()],"offset":params["offset"].clone()});
+        let prepared=super::prepared::Prepared{document:Arc::new(document),damage,label,result,clone_sources:None,mixer:None};
+        super::prepared::commit(engine,command,params.clone(),prepared,move|engine|engine.active().is_some_and(|state|Arc::ptr_eq(&state.doc,&source)))
+    })());}
+    Some((||{
+        let mut live=continuous_retouch::RetouchStroke::begin(engine,command,params)?;
+        live.push_with(params,&photocraft_raster::Interrupt::NONE)?;
+        let source=engine.active().ok_or("No retouch image")?.doc.clone();
+        let prepared=live.prepared(command,params)?;
+        super::prepared::commit(engine,command,params.clone(),prepared,move|engine|engine.active().is_some_and(|state|Arc::ptr_eq(&state.doc,&source)))
+    })())
+}
+
 fn continuous_retouch_document(engine:&Session,identity:&str,command:&str,params:&Value)->Result<(std::sync::Arc<photocraft_engine::doc::Document>,Rect),String> {
     let key=stroke_key(identity,command,params)?;
     let points=params["points"].as_array().ok_or("Missing retouch points")?;
@@ -161,6 +190,11 @@ fn retouch_document(engine:&Session,identity:Option<&str>,command:&str,params:&V
     // Identity-less callers have no retained context. Final commits stay native
     // for journaling, Fade, scripts and tool state.
     let state=engine.active().ok_or("No retouch preview")?;
+    if continuous_retouch::host_only(command,params)?{
+        let mut live=continuous_retouch::RetouchStroke::begin(engine,command,params)?;
+        live.push_with(params,&photocraft_raster::Interrupt::NONE)?;
+        return Ok((live.document(),live.damage()));
+    }
     let mut draft=Session::new();draft.add_document((*state.doc).clone(),None);
     let mut source=state.clone();if command!="paint.historyBrush"{source.history=Default::default();}*draft.active_mut().ok_or("No retouch preview")?=source;
     draft.tools=engine.tools.clone();draft.presets=engine.presets.clone();draft.patterns=engine.patterns.clone();
@@ -206,15 +240,20 @@ pub(super) fn render(
     render_with_identity(engine,None,command,params,x,y,width,height,scale)
 }
 
+/// Patch feedback: the host solve for Diffusion and Content-Aware, else the native coarse preview.
+fn patch_preview(engine:&Session,params:&Value,max_cells:u64,step:u32)->Result<(photocraft_engine::doc::Document,Rect),String>{
+    if continuous_retouch::host_only("paint.patch",params)?{let (doc,damage,_)=continuous_retouch::patch(engine,params,&photocraft_raster::Interrupt::NONE)?;return Ok((doc,damage));}
+    photocraft_engine::retouch_cmds::patch_preview(engine,params,max_cells,step).map_err(|error|error.to_string())
+}
 fn patch_preview_tiles(engine:&Session,params:&Value,x:u32,y:u32,width:u32,height:u32,scale:u32)->Result<Vec<PhotoTile>,String>{
     if !params.is_object()||params.to_string().len()>1024*1024{return Err("Invalid Patch preview parameters".into());}
     tiles::validate_dimensions(1,1,scale)?;
     let state=engine.active().ok_or("No Patch preview image")?;
     if width==0||height==0||x>=state.doc.size.width||y>=state.doc.size.height{
-        let _=photocraft_engine::retouch_cmds::patch_preview(engine,params,262_144,scale).map_err(|error|error.to_string())?;
+        let _=patch_preview(engine,params,262_144,scale)?;
         return Ok(Vec::new());
     }
-    let (doc,damage)=photocraft_engine::retouch_cmds::patch_preview(engine,params,262_144,scale).map_err(|error|error.to_string())?;
+    let (doc,damage)=patch_preview(engine,params,262_144,scale)?;
     let viewport=Rect::from_xywh(x as i32,y as i32,width.min(doc.size.width-x),height.min(doc.size.height-y));
     let visible=viewport.intersect(&damage);
     if visible.is_empty(){return Ok(Vec::new());}
@@ -439,7 +478,7 @@ struct PixelDraft{doc:std::sync::Arc<photocraft_engine::doc::Document>,damage:Re
 /// visible brush request redraw the whole stroke. `patch_step` floors Patch's solve coarseness.
 fn pixel_draft(engine:&Session,identity:&str,command:&str,params:&Value,view:Option<[u32;5]>,patch_step:u32)->Result<PixelDraft,String>{
     if !params.is_object()||params.to_string().len()>1024*1024{return Err("Invalid native stroke preview parameters".into());}
-    if command=="paint.patch"{let (doc,damage)=photocraft_engine::retouch_cmds::patch_preview(engine,params,262_144,patch_step).map_err(|error|error.to_string())?;return Ok(PixelDraft{doc:Arc::new(doc),damage,replace:true});}
+    if command=="paint.patch"{let (doc,damage)=patch_preview(engine,params,262_144,patch_step)?;return Ok(PixelDraft{doc:Arc::new(doc),damage,replace:true});}
     if matches!(command,"paint.magicEraser"|"paint.backgroundEraser"){eraser_limits(engine,command,params)?;let (doc,damage)=isolated_eraser_result(engine,command,params)?;return Ok(PixelDraft{doc,damage,replace:true});}
     if command==super::pattern_stamp::COMMAND{
         let points=params["points"].as_array().filter(|points|!points.is_empty()&&points.len()<=8192).ok_or("Native feedback supports up to 8192 stroke samples; finish the stroke to render all samples")?;

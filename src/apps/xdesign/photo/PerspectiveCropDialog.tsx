@@ -63,11 +63,11 @@ export function PerspectiveCropDialog({ document, close, canvas, box, options }:
   };
   // A set Resolution is applied after the crop, and both fold into Photoshop's single Perspective Crop step; a failed step undoes the crop.
   const apply = async () => {
-    const workspace = usePhotoWorkspace.getState().state, base = workspace?.historySources?.find(source => source.current)?.index;
+    const workspace = usePhotoWorkspace.getState().state, base = workspace?.historySources?.find(source => source.current)?.id;
     await runPhotoCommand(PERSPECTIVE_CROP_COMMAND, params);
     if (!options || options.ppi === (workspace?.resolution || 72)) return;
-    try { await runPhotoCommand("image.imageSize", { resolution: options.ppi, resample: "none" }); if (base !== undefined) await runPhotoCommand("history.fold", { from: base, label: "Perspective Crop" }); }
-    catch (error) { if (base !== undefined) await runPhotoCommand("history.select", { index: base, discardRedo: true }).catch(() => {}); throw error; }
+    try { await runPhotoCommand("image.imageSize", { resolution: options.ppi, resample: "none" }); if (base !== undefined) await runPhotoCommand("history.fold", { fromId: base, label: "Perspective Crop" }); }
+    catch (error) { if (base !== undefined) await runPhotoCommand("history.select", { id: base, discardRedo: true }).catch(() => {}); throw error; }
   };
   const surface = <svg ref={stage} className={`xd-photo-geometry-stage${canvas ? " xd-photo-main-geometry" : ""}`} aria-label="Perspective crop canvas" viewBox={`0 0 ${document.width} ${document.height}`} onPointerMove={move} onPointerUp={event => { if (gesture.current?.id === event.pointerId) { move(event); finish(false); } }} onPointerCancel={event => { if (gesture.current?.id === event.pointerId) finish(true); }} onLostPointerCapture={event => { if (gesture.current?.id === event.pointerId) finish(true); }} onKeyDownCapture={event => { if (event.key === "Escape" && gesture.current) { event.preventDefault(); event.stopPropagation(); finish(true); } }}>
     {!canvas && <image href={convertFileSrc(document.previewPath)} width={document.width} height={document.height} />}

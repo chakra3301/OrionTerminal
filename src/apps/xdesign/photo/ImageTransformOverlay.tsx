@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent } from "react";
 import type { PhotoDocument, PhotoLayer } from "./types";
-import { identityTransform, layerFrame, CORNERS, distortCorners, perspectiveQuad, quadCentre, quadHandle, resizeTransform, rotateQuad, scaleQuad, skewQuad, transformHandle, transformMatrix, type TransformSettings } from "./transformMath";
-import { beginFreeTransform, cancelFreeTransform, commitFreeTransform, freeTransformChanged, freeTransformParams, patchFreeTransform, useFreeTransform, type Quad } from "./freeTransform";
+import { identityTransform, layerFrame, CORNERS, distortCorners, perspectiveQuad, pivotTransform, quadCentre, quadHandle, resizeTransform, rotateQuad, scaleQuad, skewQuad, transformHandle, transformMatrix, type TransformSettings } from "./transformMath";
+import { beginFreeTransform, cancelFreeTransform, commitFreeTransform, discardFreeTransform, freeTransformChanged, freeTransformParams, patchFreeTransform, referencePoint, useFreeTransform, type Quad } from "./freeTransform";
 import { controlsLocked, runPhotoCommand, usePhotoWorkspace } from "./runtime";
 import { usePhotoCommandPreview } from "./commandPreview";
 import { surfaceFraction } from "./viewTurn";
@@ -13,7 +13,7 @@ const QUAD_KINDS:Drag["kind"][]=["distort","skew","perspective"];
 const editable=(target:EventTarget|null)=>target instanceof HTMLElement&&!!target.closest("input,select,textarea,[contenteditable]");
 export function ImageTransformOverlay({document,layer,zoom,untilShown,autoSelect=false}:{document:PhotoDocument;layer:PhotoLayer;zoom:number;autoSelect?:boolean;untilShown:(work:Promise<unknown>)=>Promise<void>}) {
   const projectId=usePhotoWorkspace(workspace=>workspace.projectId),busy=usePhotoWorkspace(controlsLocked),viewKey=usePhotoWorkspace(workspace=>workspace.state?.viewKey);
-  const active=useFreeTransform(store=>store.session),held=useFreeTransform(store=>store.held),session=active&&active.documentId===document.id&&active.layerId===layer.id?active:null;
+  const active=useFreeTransform(store=>store.session),held=useFreeTransform(store=>store.held),showReference=useFreeTransform(store=>store.showReference),session=active&&active.documentId===document.id&&active.layerId===layer.id?active:null;
   // `layer` still has its old bounds until the committed image is shown.
   const shape=session??(held&&held.documentId===document.id&&held.layerId===layer.id?held:null);
   const raw=layer.transformBounds??layer.bounds,bounds=shape?.bounds??(raw&&raw[2]>0&&raw[3]>0?layerFrame(document,layer):null);
@@ -26,7 +26,7 @@ export function ImageTransformOverlay({document,layer,zoom,untilShown,autoSelect
     const key=(event:KeyboardEvent)=>{
       setCmd(event.metaKey||event.ctrlKey);
       const open=useFreeTransform.getState().session;if(!open||event.defaultPrevented)return;
-      if(event.key==="Escape"){event.preventDefault();event.stopPropagation();drag.current=null;cancelFreeTransform();}
+      if(event.key==="Escape"){event.preventDefault();event.stopPropagation();drag.current=null;discardFreeTransform();}
       else if(event.key==="Enter"&&!editable(event.target)&&!(event.target instanceof HTMLButtonElement)){event.preventDefault();event.stopPropagation();drag.current=null;commitFreeTransform(shownRef.current)?.catch(()=>{});}
     };
     const up=(event:KeyboardEvent)=>setCmd(event.metaKey||event.ctrlKey);
@@ -69,7 +69,7 @@ export function ImageTransformOverlay({document,layer,zoom,untilShown,autoSelect
     let value:TransformSettings;
     if(current.kind==="resize")value=resizeTransform(open.bounds,initial,current.hx,current.hy,p,open.linked!==event.shiftKey,event.altKey);
     else if(current.kind==="move")value={...initial,x:initial.x+p[0]-current.start[0],y:initial.y+p[1]-current.start[1]};
-    else {let angle=initial.angle+(Math.atan2(p[1]-initial.y,p[0]-initial.x)-Math.atan2(current.start[1]-initial.y,current.start[0]-initial.x))*180/Math.PI;if(event.shiftKey)angle=Math.round(angle/15)*15;value={...initial,angle};}
+    else {const reference=referencePoint(open,useFreeTransform.getState().showReference),[px,py]=transformHandle(open.bounds,initial,...reference);let angle=initial.angle+(Math.atan2(p[1]-py,p[0]-px)-Math.atan2(current.start[1]-py,current.start[0]-px))*180/Math.PI;if(event.shiftKey)angle=Math.round(angle/15)*15;value=pivotTransform(open.bounds,initial,{...initial,angle},reference);}
     if(![value.x,value.y,value.width,value.height,value.angle].every(Number.isFinite)||Math.abs(value.x)>1_000_000||Math.abs(value.y)>1_000_000)return;
     patchFreeTransform({settings:value});
   };
@@ -116,6 +116,6 @@ export function ImageTransformOverlay({document,layer,zoom,untilShown,autoSelect
       {!quad&&(mode==="free"||mode==="rotate")&&CORNERS.map(([hx,hy])=>{const p=transformHandle(bounds,visible,hx,hy),length=Math.hypot(p[0]-visible.x,p[1]-visible.y)||1,outward=11/zoom;
         return <circle key={`${hx}${hy}`} className="xd-photo-rotate-zone" cx={p[0]+(p[0]-visible.x)/length*outward} cy={p[1]+(p[1]-visible.y)/length*outward} r={13/zoom} aria-label={`Rotate image layer ${hy<0?"top":"bottom"} ${hx<0?"left":"right"}`} onPointerDown={event=>begin(event,"rotate")}/>;})}
       {HANDLES.map(([hx,hy,name])=>{const p=handlePoint(hx,hy);return <circle role="button" tabIndex={0} aria-disabled={busy} key={name} cx={p[0]} cy={p[1]} r={5/zoom} vectorEffect="non-scaling-stroke" style={{cursor:resizeCursor(p)}} aria-label={`Resize image layer ${name}`} onPointerDown={event=>begin(event,"resize",hx,hy)} onKeyDown={event=>keyTransform(event,"resize",hx,hy)}/>;})}
-      {session&&!quad&&<circle data-pivot="" cx={visible.x} cy={visible.y} r={4/zoom} vectorEffect="non-scaling-stroke"/>}
+      {session&&!quad&&showReference&&(()=>{const [cx,cy]=transformHandle(bounds,visible,...session.reference);return <circle data-pivot="" cx={cx} cy={cy} r={4/zoom} vectorEffect="non-scaling-stroke"/>;})()}
     </svg></>;
 }

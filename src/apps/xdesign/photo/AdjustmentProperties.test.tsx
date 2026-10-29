@@ -6,15 +6,15 @@ import { ADJUSTMENTS } from "./controls";
 import { usePhotoWorkspace } from "./runtime";
 import type { PhotoDocument, PhotoLayer } from "./types";
 
-const native = vi.hoisted(() => ({ run: vi.fn(), invoke: vi.fn() }));
-vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => false, invoke: native.invoke, convertFileSrc: (path: string) => path }));
+const native = vi.hoisted(() => ({ run: vi.fn(), invoke: vi.fn(), tauri: false }));
+vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => native.tauri, invoke: native.invoke, convertFileSrc: (path: string) => path }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 vi.mock("./runtime", async original => ({ ...await original<typeof import("./runtime")>(), runPhotoCommand: native.run }));
 const photo: PhotoDocument = { id: "photo", version: "v1", name: "Image", width: 100, height: 100, previewWidth: 100, previewHeight: 100, bundlePath: "", previewPath: "original.png", originalPath: null };
 const make = (kind: string, params: Record<string, unknown> = {}, extra: Partial<PhotoLayer> = {}): PhotoLayer => ({ id: 7, name: "Adjustment 1", kind: "Adjustment", visible: true, opacity: 1, fill: 1, blend: "Normal", clipped: false, hasMask: false, adjustment: {}, adjustmentKind: kind, adjustmentParams: params, ...extra } as PhotoLayer);
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
-  vi.useFakeTimers(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); native.run.mockReset().mockResolvedValue({}); native.invoke.mockReset();
+  vi.useFakeTimers(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); native.run.mockReset().mockResolvedValue({}); native.invoke.mockReset(); native.tauri = false;
   usePhotoWorkspace.setState({ projectId: "project", busy: false, quiet: false, error: null, state: null });
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
 });
@@ -56,6 +56,28 @@ describe("adjustment layer properties", () => {
     await settle();
     expect(native.run).toHaveBeenCalledTimes(1);
     expect(native.run).toHaveBeenCalledWith("layer.setAdjustment", expect.objectContaining({ layer: 7, brightness: 30, contrast: 0 }));
+  });
+
+  it("solves Auto Brightness/Contrast in Properties as one history step, and disables it while busy", async () => {
+    const dark = Array.from({ length: 256 }, (_, level) => level >= 20 && level <= 100 ? 10 : 0);
+    native.tauri = true; native.invoke.mockImplementation(async (command: string) => command === "xdesign_photo_histogram" ? [dark] : null);
+    await render(make("brightnessContrast", { brightness: 0, contrast: 0, legacy: false })); await settle();
+    const auto = [...container.querySelectorAll("button")].find(button => button.textContent === "Auto")!;
+    expect(auto.disabled).toBe(false);
+    await act(async () => auto.click()); await settle();
+    expect(native.run).toHaveBeenCalledTimes(1);
+    const params = native.run.mock.calls[0]![1] as { brightness: number; contrast: number };
+    expect(native.run.mock.calls[0]![0]).toBe("layer.setAdjustment"); expect(params.brightness).toBeGreaterThan(20); expect(params.contrast).toBeGreaterThan(20);
+    await act(async () => usePhotoWorkspace.setState({ busy: true, quiet: false }));
+    expect(auto.disabled).toBe(true);
+  });
+
+  it("colorizes from the foreground in one history step", async () => {
+    usePhotoWorkspace.setState({ state: { mode: "RGB", tools: { foreground: [1, 0, 0, 1], background: [1, 1, 1, 1] } } as never });
+    await render(make("hueSaturation", { colorize: false, hue: 0, saturation: 0, lightness: 10 }));
+    await act(async () => (by("Adjustment Colorize") as HTMLInputElement).click()); await settle();
+    expect(native.run).toHaveBeenCalledTimes(1);
+    expect(native.run).toHaveBeenCalledWith("layer.setAdjustment", expect.objectContaining({ layer: 7, colorize: true, hue: 0, saturation: 25, lightness: 10 }));
   });
 
   it("waits for the pointer to be released before committing a drag", async () => {

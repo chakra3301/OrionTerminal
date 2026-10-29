@@ -31,10 +31,12 @@
 .xd-ps-brush-presets > button { display: grid; justify-items: center; gap: 2px; padding: 3px; border: 1px solid transparent; border-radius: var(--r-sm); background: var(--xd-raised); color: var(--xd-text); font: inherit; cursor: default; }
 .xd-ps-brush-presets > button:hover { background: var(--xd-hover); }
 .xd-ps-brush-presets > button:focus-visible { border-color: var(--xd-accent); outline: none; }
+.xd-ps-brush-presets > button[aria-pressed="true"] { border-color: var(--xd-accent); }
 .xd-ps-brush-presets small { font-size: 9px; color: var(--xd-text-2); }
 
 .xd-ps-label { font-size: 11px; color: var(--xd-text-2); margin-right: 3px; }
 .xd-ps-segmented { gap: 1px; }
+.xd-ps-symmetry { display: contents; }
 .xd-ps-segmented > button { width: auto; padding: 0 7px; font-size: 11px; }
 .xd-ps-options .xd-ge-pick { flex: none; }
 .xd-photo .xd-ps-options .xd-ge-pick > button.xd-ge-pick-swatch { width: 72px; min-width: 0; }
@@ -45,3 +47,17 @@
 .xd-ps-toggle[aria-pressed="true"] { background: var(--bg-3); color: var(--xd-text); }
 
 .xd-photo-sampling-ring { position: fixed; z-index: 70; width: 76px; height: 76px; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; background: linear-gradient(to bottom, var(--ring-new) 50%, var(--ring-old) 50%); -webkit-mask: radial-gradient(circle, transparent 28px, #000 29px); mask: radial-gradient(circle, transparent 28px, #000 29px); box-shadow: 0 0 0 1px rgba(0, 0, 0, .6); }
+
+.xd-ps-brush-folders { display: grid; gap: 2px; max-height: 240px; overflow-y: auto; }
+.xd-ps-brush-folders .xd-ps-brush-presets { max-height: none; overflow: visible; }
+.xd-ps-brush-folder { display: flex; align-items: center; gap: 4px; width: 100%; padding: 2px 3px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; color: var(--xd-text); font: inherit; text-align: left; cursor: default; }
+.xd-ps-brush-folder:hover { background: var(--xd-hover); }
+.xd-ps-brush-folder:focus-visible { border-color: var(--xd-accent); outline: none; }
+.xd-ps-brush-folder > svg { flex: none; color: var(--xd-text-2); }
+
+.xd-ps-tool-preset { position: relative; }
+.xd-ps-tool-preset > button { display: inline-flex; align-items: center; gap: 1px; height: 24px; padding: 0 2px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; color: inherit; font: inherit; cursor: default; }
+.xd-ps-tool-preset > button:hover:not(:disabled), .xd-ps-tool-preset > button[aria-expanded="true"] { background: var(--xd-hover); }
+.xd-ps-tool-preset > button > span { display: inline-flex; }
+.xd-ps-tool-preset > button > span > svg:last-child { color: inherit; }
+.xd-ps-tool-preset-popover { width: 240px; white-space: normal; }

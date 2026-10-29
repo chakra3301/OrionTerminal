@@ -99,6 +99,7 @@ describe("Photoshop colour adjustment controls", () => {
     expect(radios().map(radio => radio.checked)).toEqual([true, false]);
     expect(by<HTMLSelectElement>("Adjustment Filter").selectedOptions[0]!.textContent).toBe("Warming Filter (85)");
     expect(by<HTMLInputElement>("Adjustment Filter color").disabled).toBe(true);
+    expect(by<HTMLInputElement>("Adjustment Density").min).toBe("1");
     await input("Adjustment Filter", "Cooling 80"); expect(changed).toHaveBeenLastCalledWith("color", "#006dff");
     await act(async () => radios()[1]!.click());
     expect(by<HTMLSelectElement>("Adjustment Filter").disabled).toBe(true);

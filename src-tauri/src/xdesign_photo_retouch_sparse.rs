@@ -118,7 +118,7 @@ impl CoverageStroke {
                 let mut cov=Vec::with_capacity(visible.width() as usize*visible.height() as usize);
                 for y in visible.y0..visible.y1{admission::check(ctl)?;for x in visible.x0..visible.x1{cov.push(renderer.coverage_at(x,y));}}
                 let paint=if self.command=="paint.historyBrush"{Region::read(self.history_surface.as_ref().ok_or("No History Brush source")?,visible)}else{
-                    clone_sample(&self.source,self.layer,&self.original,self.which,visible,self.mapping.as_ref().ok_or("No clone mapping")?)
+                    {let (sample,id,read)=self.sampling();clone_sample(sample,id,read,self.which,visible,self.mapping.as_ref().ok_or("No clone mapping")?)}
                 };
                 apply_coverage(surface,visible,&cov,self.brush.opacity,self.source.selection.as_ref(),locked,&paint,self.mode);
                 #[cfg(test)]{self.coverage_pixels+=cov.len();self.patch_peak_pixels=self.patch_peak_pixels.max(cov.len());}

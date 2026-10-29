@@ -49,6 +49,7 @@
 .xd-photo .xd-ps-dialog .xd-ps-dialog-unit { color:var(--xd-text-2); }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-grid input[type=range] { grid-column:1/-1;margin:0 0 6px; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-row > .xd-ps-dialog-check { grid-column:1/-1; }
+.xd-photo .xd-ps-dialog .xd-ps-dialog-row > .xd-photo-curves { grid-column:1/-1;justify-self:stretch; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-row > button { grid-column:2/-1;justify-self:start; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-row > .xd-ps-dialog-check.xd-ps-dialog-indent { grid-column:2/-1; }
 .xd-photo .xd-ps-dialog .xd-ps-dialog-row > .xd-ps-dialog-check.is-label { grid-column:1;justify-self:end; }

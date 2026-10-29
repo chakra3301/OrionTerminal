@@ -10,6 +10,8 @@ import { PhotoStudio } from "./PhotoStudio";
 import { IMAGE_SWATCHES_KEY } from "./PhotoSwatches";
 import { PAINT_TOOL_PREFERENCES_KEY } from "./paintToolPreferences";
 import { CROP_PRESETS_KEY, saveCropPreset } from "./CropPresets";
+import { MOVE_ALIGN_TO_KEY } from "./moveAlign";
+import { VECTOR_TOOL_PREFERENCES_KEY } from "./vectorToolPreferences";
 import { polygonRect } from "./polygonShape";
 import { DEFAULT_PREFERENCES, usePreferences } from "./preferences";
 import type { PhotoAnalysis, PhotoDocument, PhotoSlice, PhotoState } from "./types";
@@ -26,6 +28,7 @@ vi.mock("@tauri-apps/plugin-dialog",()=>({save:savePath}));
 vi.mock("./PhotoTiles",async original=>({...await original<typeof import("./PhotoTiles")>(),PhotoTiles:()=><div data-testid="detail-tiles"/>}));
 vi.mock("./eyedropper",async original=>({...await original<typeof import("./eyedropper")>(),sampleImageColor:sample}));
 let root:Root,container:HTMLDivElement;
+const opening=()=>usePhotoWorkspace.getState().state!.historySources!.find(source=>source.current)!.id;
 const editor=()=>container.querySelector<HTMLElement>('[aria-label="Image editor"]')!;
 const canvas=()=>container.querySelector<HTMLCanvasElement>('[aria-label="Paint and select image"]')!;
 const stage=()=>container.querySelector<HTMLDivElement>(".xd-photo-stage")!;
@@ -41,7 +44,7 @@ beforeEach(async()=>{
   useViewAids.setState(state=>({flags:{...state.flags,snap:false}}));
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);
   vi.stubGlobal("ResizeObserver",class{observe(){}disconnect(){}});
-  native.enabled=false;native.invoke.mockReset();localStorage.removeItem(IMAGE_SWATCHES_KEY);localStorage.removeItem(PAINT_TOOL_PREFERENCES_KEY);localStorage.removeItem(CROP_PRESETS_KEY);command.mockClear();colors.mockClear();sample.mockClear();useXDesign.getState().hydrate(null);
+  native.enabled=false;native.invoke.mockReset();localStorage.removeItem(IMAGE_SWATCHES_KEY);localStorage.removeItem(PAINT_TOOL_PREFERENCES_KEY);localStorage.removeItem(CROP_PRESETS_KEY);localStorage.removeItem(MOVE_ALIGN_TO_KEY);localStorage.removeItem(VECTOR_TOOL_PREFERENCES_KEY);command.mockClear();colors.mockClear();sample.mockClear();useXDesign.getState().hydrate(null);
   const id=ulid(),version=ulid();
   const doc:PhotoDocument={id,version,name:"Portrait",width:800,height:600,previewWidth:800,previewHeight:600,bundlePath:`/assets/${version}.pcraft`,previewPath:`/assets/${version}.png`,originalPath:null};
   const placement=useXDesign.getState().applyPhotoDocument(doc);
@@ -110,6 +113,15 @@ describe("Image workspace Photoshop tools",()=>{
     await act(async()=>root.render(<PhotoStudio/>));
     expect(document.activeElement).toBe(field);field.remove();
   });
+  it("shows empty brush groups in the picker and creates one with Create new group, as Photoshop does",async()=>{
+    await setState({brush:{revision:1,settings:{size:30},sampledTip:false,sampledTexture:false,groups:["General Brushes","Mine"],presets:[{name:"Hard Round",group:"General Brushes",builtin:true,size:30,hardness:1}]}});
+    await key("b");await click("Brush preset picker");
+    expect(container.querySelector('[role=group][aria-label="Mine"]')).toBeTruthy();
+    await click("Create new group");const name=container.querySelector<HTMLInputElement>('input[aria-label="Group Name"]')!;expect(name.value).toBe("Group 3");
+    await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(name,"Inks");name.dispatchEvent(new Event("input",{bubbles:true}));});
+    await act(async()=>name.form!.requestSubmit());
+    expect(command).toHaveBeenLastCalledWith("brush.presets.newGroup",{group:"Inks"});expect(container.querySelector('input[aria-label="Group Name"]')).toBeNull();
+  });
   it("steps brush size and hardness with brackets, sets opacity and flow with number keys and hides panels with Tab",async()=>{
     await key("b");const size=()=>button("Brush preset picker").textContent;
     for(const [bracket,expected] of [["]","30"],["]","40"],["[","30"],["[","20"],["[","10"],["[","9"]] as const){await key(bracket);expect(size()).toBe(expected);}
@@ -147,6 +159,16 @@ describe("Image workspace Photoshop tools",()=>{
     expect(command.mock.calls).toEqual([["layer.pickAt",{x:100,y:50,target:"group"}],["layer.translate",{dx:30,dy:20}]]);
     await click("Align top edges");expect(command).toHaveBeenLastCalledWith("layer.align.topEdges",{});
     await click("Align right edges");expect(command).toHaveBeenLastCalledWith("layer.align.rightEdges",{});
+  });
+  it("aligns to the pixel selection or the canvas from the Move bar's ... popover and keeps the choice after a relaunch",async()=>{
+    await key("v");await setState({hasSelection:true,selectionBounds:[10,10,50,50]});
+    await click("Align top edges");expect(command).toHaveBeenLastCalledWith("layer.align.topEdges",{to:"selection"});
+    await click("More alignment and distribute options");
+    await act(async()=>{const select=container.querySelector<HTMLSelectElement>('[aria-label="Align layers to"]')!;select.value="canvas";select.dispatchEvent(new Event("change",{bubbles:true}));});
+    await click("Align left edges");expect(command).toHaveBeenLastCalledWith("layer.align.leftEdges",{to:"canvas"});
+    await act(async()=>root.unmount());root=createRoot(container);await act(async()=>root.render(<PhotoStudio/>));await key("v");
+    await click("Align bottom edges");expect(command).toHaveBeenLastCalledWith("layer.align.bottomEdges",{to:"canvas"});
+    await act(async()=>usePhotoWorkspace.setState({busy:true}));expect(button("Align bottom edges").disabled).toBe(true);expect(button("More alignment and distribute options").disabled).toBe(true);
   });
   it("runs selection and layer shortcuts, clears selected pixels on Delete and keeps the editor open on Escape",async()=>{
     await key("a",{metaKey:true});expect(command).toHaveBeenLastCalledWith("select.all",{});
@@ -377,25 +399,25 @@ describe("Image workspace Photoshop tools",()=>{
     expect(field("Name").value).toBe("Layer 1");expect(field("Mode").value).toBe("Normal");expect([...field("Mode").querySelectorAll("hr")].map(hr=>hr.nextElementSibling!.textContent)).toEqual(["Darken","Lighten","Overlay","Difference","Hue"]);expect(field("Opacity").value).toBe("100");expect(field("Fill with neutral color").disabled).toBe(true);expect(field("Color").value).toBe("none");
     await type("Name","Sky");await choose("Color","red");await choose("Mode","Multiply");await type("Opacity","50");await act(async()=>field("Use previous layer to create clipping mask").click());
     await click("OK");expect(dialog()).toBeNull();
-    expect(command.mock.calls).toEqual([["layer.new.layer",{name:"Sky"}],["layer.setProps",{clipped:true,blend:"Multiply",opacity:.5}],["layer.setColor",{color:"red"}],["history.fold",{from:1,label:"New Layer"}]]);
+    expect(command.mock.calls).toEqual([["layer.new.layer",{name:"Sky"}],["layer.setProps",{clipped:true,blend:"Multiply",opacity:.5}],["layer.setColor",{color:"red"}],["history.fold",{fromId:opening(),label:"New Layer"}]]);
     command.mockClear();await key("n",{metaKey:true,shiftKey:true});expect(field("Name").value).toBe("Layer 1");await click("OK");
     expect(command.mock.calls).toEqual([["layer.new.layer",{name:"Layer 1"}]]);
     // Overlay's neutral colour is 50% gray, and Photoshop fills the whole layer with it whatever is selected.
     command.mockClear();await setState({hasSelection:true,selectionBounds:[10,10,40,40]});await menu("Layer","New","Layer…");await choose("Mode","Overlay");await act(async()=>field("Fill with neutral color").click());await click("OK");
-    expect(command.mock.calls).toEqual([["layer.newFillLayer.solidColor",{color:"#808080"}],["layer.rasterize.fillContent",{}],["layer.setProps",{name:"Layer 1",blend:"Overlay"}],["history.fold",{from:1,label:"New Layer"}]]);
+    expect(command.mock.calls).toEqual([["layer.newFillLayer.solidColor",{color:"#808080"}],["layer.rasterize.fillContent",{}],["layer.setProps",{name:"Layer 1",blend:"Overlay"}],["history.fold",{fromId:opening(),label:"New Layer"}]]);
     command.mockClear();await click("Create a new layer");expect(dialog()).toBeNull();
     await click("Create a new layer",{altKey:true});expect(field("Name").value).toBe("Layer 1");await click("Cancel");expect(command.mock.calls).toEqual([["layer.new.layer",{}]]);
     command.mockClear();await menu("Layer","New","Group…");
     expect(field("Name","New Group").value).toBe("Group 1");expect(field("Mode","New Group").value).toBe("Pass Through");expect([...field("Mode","New Group").querySelectorAll("hr")].map(hr=>hr.nextElementSibling!.textContent)).toEqual(["Darken","Lighten","Overlay","Difference","Hue"]);expect(dialog("New Group")!.querySelector('input[type="checkbox"]')).toBeNull();
     await choose("Mode","Normal","New Group");await click("OK");
-    expect(command.mock.calls).toEqual([["layer.new.group",{name:"Group 1"}],["layer.setProps",{blend:"Normal"}],["history.fold",{from:1,label:"New Group"}]]);
+    expect(command.mock.calls).toEqual([["layer.new.group",{name:"Group 1"}],["layer.setProps",{blend:"Normal"}],["history.fold",{fromId:opening(),label:"New Group"}]]);
     command.mockClear();await menu("Layer","New Adjustment Layer","Curves…");expect(field("Name").value).toBe("Curves 1");expect(dialog()!.querySelector('[aria-label="Fill with neutral color"]')).toBeNull();
     await type("Name","Tone");await click("OK");
-    expect(command.mock.calls).toEqual([["layer.newAdjustmentLayer.curves",{}],["layer.setProps",{name:"Tone"}],["history.fold",{from:1,label:"New Curves Layer"}]]);
+    expect(command.mock.calls).toEqual([["layer.newAdjustmentLayer.curves",{}],["layer.setProps",{name:"Tone"}],["history.fold",{fromId:opening(),label:"New Curves Layer"}]]);
     expect(button("Properties").getAttribute("aria-selected")).toBe("true");
     command.mockClear();await menu("Layer","New Fill Layer","Solid Color…");expect(field("Name").value).toBe("Color Fill 1");await type("Name","Tint");await click("OK");
     expect(command).not.toHaveBeenCalled();await click("OK");
-    expect(command.mock.calls).toEqual([["layer.newFillLayer.solidColor",{color:expect.any(String)}],["layer.setProps",{name:"Tint"}],["history.fold",{from:1,label:"New Color Fill Layer"}]]);
+    expect(command.mock.calls).toEqual([["layer.newFillLayer.solidColor",{color:expect.any(String)}],["layer.setProps",{name:"Tint"}],["history.fold",{fromId:opening(),label:"New Color Fill Layer"}]]);
   });
   it("duplicates through Photoshop's Duplicate Layer dialog and names the copy as Photoshop does",async()=>{
     const dialog=(label="Duplicate Layer")=>container.querySelector<HTMLFormElement>(`[role="dialog"][aria-label="${label}"]`);
@@ -407,11 +429,11 @@ describe("Image workspace Photoshop tools",()=>{
     expect(field("Document").value).toBe("Portrait");expect(field("Artboard").value).toBe("Canvas");expect(field("Artboard").disabled).toBe(true);expect(field("Name").disabled).toBe(true);
     await click("OK");expect(dialog()).toBeNull();expect(command.mock.calls).toEqual([["layer.duplicate",{}]]);
     command.mockClear();await menu("Layer","Duplicate Layer…");await type("As","Sky");await click("OK");
-    expect(command.mock.calls).toEqual([["layer.duplicate",{}],["layer.setProps",{name:"Sky"}],["history.fold",{from:1,label:"Duplicate Layer"}]]);
+    expect(command.mock.calls).toEqual([["layer.duplicate",{}],["layer.setProps",{name:"Sky"}],["history.fold",{fromId:opening(),label:"Duplicate Layer"}]]);
     command.mockClear();await setState({layers:[{...layer,id:2,name:"Portrait layer copy"},layer]});
     await menu("Layer","Duplicate Layer…");expect(field("As").value).toBe("Portrait layer copy 2");await click("Cancel");
     await setState({activeLayer:2});await menu("Layer","Duplicate Layer…");expect(field("As").value).toBe("Portrait layer copy 2");await click("OK");
-    expect(command.mock.calls).toEqual([["layer.duplicate",{}],["layer.setProps",{name:"Portrait layer copy 2"}],["history.fold",{from:1,label:"Duplicate Layer"}]]);
+    expect(command.mock.calls).toEqual([["layer.duplicate",{}],["layer.setProps",{name:"Portrait layer copy 2"}],["history.fold",{fromId:opening(),label:"Duplicate Layer"}]]);
     command.mockClear();await setState({selectedLayers:[1,2]});await menu("Layer","Duplicate Layers…");
     expect(dialog("Duplicate Layers")!.textContent).toContain("Duplicate:As:");expect(field("As","Duplicate Layers").value).toBe("");expect(field("As","Duplicate Layers").disabled).toBe(true);
     await click("OK");expect(command.mock.calls).toEqual([["layer.duplicate",{}]]);
@@ -473,6 +495,13 @@ describe("Image workspace Photoshop tools",()=>{
     await pointer("pointermove",{clientX:10,clientY:20});
     await vi.waitFor(()=>expect(sample).toHaveBeenCalledWith(expect.objectContaining({x:10,y:20})));
   });
+  it("reads a CMYK image's inks in the Info panel from the host's CMYK sample",async()=>{
+    native.invoke.mockImplementation(async(id:string)=>id==="xdesign_photo_sample"?[12,34,56,78]:null);
+    await setState({mode:"Cmyk"});await click("Info");await pointer("pointermove",{clientX:10,clientY:20});
+    await vi.waitFor(()=>expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_sample",expect.objectContaining({layer:null,below:false,x:10,y:20,space:"cmyk"})));
+    await vi.waitFor(()=>expect(container.querySelector('[aria-label="Info C"] output')!.textContent).toBe("12%"));
+    expect(container.querySelector('[aria-label="Info R"]')).toBeNull();
+  });
   it("keeps an adjustable crop box until it is applied or cancelled",async()=>{
     await key("c");await pointer("pointerdown",{clientX:100,clientY:50});await pointer("pointermove",{clientX:300,clientY:250});await pointer("pointerup",{clientX:300,clientY:250});
     expect(command).not.toHaveBeenCalled();expect(container.textContent).toContain("200 × 200 px");
@@ -527,6 +556,16 @@ describe("Image workspace Photoshop tools",()=>{
     await drag([400,300],[400,300]);expect(box()).not.toBeNull();expect(container.textContent).toContain("800 × 600 px");
     await key("b");expect(box()).toBeNull();await key("c");expect(box()).not.toBeNull();
     await click("Straighten crop");await drag([100,100],[400,130]);expect(container.textContent).toContain("709 × 532 px");
+  });
+  it("takes any Crop Shield Opacity from 0 to 100 in a field instead of four menu steps",async()=>{
+    const field=()=>container.querySelector<HTMLInputElement>('[aria-label="Crop shield opacity"]')!,shade=()=>container.querySelector<SVGPathElement>(".xd-photo-crop-shade")!;
+    const type=async(value:string)=>{await act(async()=>{const input=field();input.focus();Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,value);input.dispatchEvent(new Event("input",{bubbles:true}));});await act(async()=>field().blur());};
+    await key("c");expect(field().value).toBe("75");expect(shade().style.fill).toBe("rgba(0,0,0,0.75)");
+    await click("Crop options");expect([...container.querySelectorAll("[role=menu] > button")].map(element=>element.textContent).join("|")).not.toContain("Shield Opacity");await key("Escape",{},button("Crop options"));
+    await type("33");expect(field().value).toBe("33");expect(shade().style.fill).toBe("rgba(0,0,0,0.33)");
+    await type("0");expect(shade().style.fill).toBe("rgba(0,0,0,0)");await type("150");expect(field().value).toBe("100");
+    await key("/");expect(field().disabled).toBe(true);await key("/");expect(field().disabled).toBe(false);
+    expect(button("Crop options").compareDocumentPosition(field())&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();expect(command).not.toHaveBeenCalled();
   });
   it("transforms the selection with a box, navigates the view and opens Content-Aware Scale",async()=>{
     await setState({hasSelection:true,selectionBounds:[10,10,40,40]});
@@ -594,10 +633,10 @@ describe("Image workspace Photoshop tools",()=>{
     expect(container.querySelector<HTMLSelectElement>('[aria-label="Crop ratio"]')!.value).toBe("1024 x 768 px 92 ppi");expect(fields()).toEqual(["1024 px","768 px","92"]);
     expect(container.textContent).toContain("800 × 600 px");await rightClick();expect(row("Clear W x H x Resolution").disabled).toBe(false);expect(row("1024 x 768 px 92 ppi").getAttribute("aria-checked")).toBe("true");await act(async()=>row("Reset Crop").click());
     await key("Enter");await act(async()=>{});
-    expect(command.mock.calls).toEqual([["image.crop",{x:0,y:0,width:800,height:600,deleteCroppedPixels:false}],["image.imageSize",{width:1024,height:768,resolution:92,resample:"preserveDetails"}],["history.fold",{from:1,label:"Crop"}]]);
+    expect(command.mock.calls).toEqual([["image.crop",{x:0,y:0,width:800,height:600,deleteCroppedPixels:false}],["image.imageSize",{width:1024,height:768,resolution:92,resample:"preserveDetails"}],["history.fold",{fromId:opening(),label:"Crop"}]]);
     command.mockClear();await rightClick();await act(async()=>row("4 x 5 in 300 ppi").click());expect(container.textContent).toContain("480 × 600 px");expect(fields()).toEqual(["4 in","5 in","300"]);
     await key("Enter");await act(async()=>{});
-    expect(command.mock.calls).toEqual([["image.crop",{x:160,y:0,width:480,height:600,deleteCroppedPixels:false}],["image.imageSize",{width:1200,height:1500,resolution:300,resample:"preserveDetails"}],["history.fold",{from:1,label:"Crop"}]]);
+    expect(command.mock.calls).toEqual([["image.crop",{x:160,y:0,width:480,height:600,deleteCroppedPixels:false}],["image.imageSize",{width:1200,height:1500,resolution:300,resample:"preserveDetails"}],["history.fold",{fromId:opening(),label:"Crop"}]]);
     command.mockClear();await rightClick();await act(async()=>row("Use Front Image Size & Resolution").click());
     expect(fields()).toEqual(["800 px","600 px","72"]);expect(container.querySelector<HTMLSelectElement>('[aria-label="Crop ratio"]')!.selectedOptions[0]!.textContent).toBe("W x H x Resolution");
     await key("Enter");expect(command).not.toHaveBeenCalled();
@@ -752,7 +791,7 @@ describe("Image workspace Photoshop tools",()=>{
     };
     const image=[["select.lasso",{points:[[-50,20],[750,20],[750,620],[-50,620]]}],["select.inverse",{}]];
     await key("c");await choose(container.querySelector<HTMLSelectElement>('[aria-label="Crop fill"]')!,"contentAware");
-    await expand();expect(command.mock.calls).toEqual([["image.crop",{x:50,y:-20,width:600,height:600,deleteCroppedPixels:false}],...image,["edit.fill",{contents:"contentAware"}],["select.deselect",{}],["history.fold",{from:1,label:"Crop"}]]);
+    await expand();expect(command.mock.calls).toEqual([["image.crop",{x:50,y:-20,width:600,height:600,deleteCroppedPixels:false}],...image,["edit.fill",{contents:"contentAware"}],["select.deselect",{}],["history.fold",{fromId:opening(),label:"Crop"}]]);
     command.mockClear();await key("b");await key("c");
     await pointer("pointerdown",{clientX:100,clientY:50});await pointer("pointermove",{clientX:300,clientY:250});await pointer("pointerup",{clientX:300,clientY:250});await key("Enter");await settle();
     expect(command.mock.calls).toEqual([["image.crop",{x:100,y:50,width:200,height:200,deleteCroppedPixels:false}]]);
@@ -760,11 +799,11 @@ describe("Image workspace Photoshop tools",()=>{
     command.mockClear();await choose(container.querySelector<HTMLSelectElement>('[aria-label="Crop fill"]')!,"background");await expand();
     expect(command.mock.calls).toEqual([["image.crop",{x:50,y:-20,width:600,height:600,deleteCroppedPixels:false}]]);
     command.mockClear();await act(async()=>container.querySelector<HTMLInputElement>('[aria-label="Tool Delete Cropped Pixels"]')!.click());await expand();
-    expect(command.mock.calls).toEqual([["image.crop",{x:50,y:-20,width:600,height:600,deleteCroppedPixels:true}],...image,["edit.fill",{contents:"background",layer:1}],["select.deselect",{}],["history.fold",{from:1,label:"Crop"}]]);
+    expect(command.mock.calls).toEqual([["image.crop",{x:50,y:-20,width:600,height:600,deleteCroppedPixels:true}],...image,["edit.fill",{contents:"background",layer:1}],["select.deselect",{}],["history.fold",{fromId:opening(),label:"Crop"}]]);
     command.mockClear();await choose(container.querySelector<HTMLSelectElement>('[aria-label="Crop fill"]')!,"contentAware");
     command.mockImplementation(async id=>{if(id==="edit.fill")throw new Error("Content-Aware fill needs a pixel layer");});
     try{await expand();}finally{command.mockImplementation(async()=>undefined);}
-    expect(command.mock.calls.at(-1)).toEqual(["history.select",{index:1,discardRedo:true}]);expect(command.mock.calls.some(([id])=>id==="history.fold")).toBe(false);
+    expect(command.mock.calls.at(-1)).toEqual(["history.select",{id:opening(),discardRedo:true}]);expect(command.mock.calls.some(([id])=>id==="history.fold")).toBe(false);
   });
   it("paints Shift-click lines from the last stroke, locks Shift-drags to 45° steps and snaps Shift gradients",async()=>{
     const points=()=>(command.mock.lastCall![1]!.points as number[][]).map(([x,y])=>[Math.round(x!),Math.round(y!)]);
@@ -856,12 +895,17 @@ describe("Image workspace Photoshop tools",()=>{
     expect(container.querySelector('[aria-label="Swap foreground and background colors"]')).not.toBeNull();expect(button("Document")).toBeUndefined();
     await setState({activeLayer:null});expect(button("Profile information…")).toBeDefined();
   });
-  it("matches color to another image in the project",async()=>{
-    const id=ulid(),version=ulid();
+  it("matches color to another image in the project, or to this one",async()=>{
+    const id=ulid(),version=ulid(),sent={luminance:100,intensity:100,fade:0,neutralize:false,useSelectionInSource:false,useSelectionInTarget:false};
     await act(async()=>{useXDesign.getState().applyPhotoDocument({id,version,name:"Sunset",width:400,height:300,previewWidth:400,previewHeight:300,bundlePath:"",previewPath:"",originalPath:null});});
-    await menu("Image","Adjustments","Match Color…");
-    await act(async()=>{const select=container.querySelector<HTMLSelectElement>('[role="dialog"] select')!;expect([...select.options].map(option=>option.text)).toEqual(["None","Sunset"]);select.value=id;select.dispatchEvent(new Event("change",{bubbles:true}));});
-    await click("OK");expect(command).toHaveBeenLastCalledWith("image.adjustments.matchColor",{luminance:100,intensity:100,fade:0,neutralize:false,useSelectionInSource:false,useSelectionInTarget:false,sourcePhoto:{id,version}});
+    const choose=async(name:string)=>{await menu("Image","Adjustments","Match Color…");let chosen="";await act(async()=>{const select=container.querySelector<HTMLSelectElement>('[role="dialog"] select')!;expect([...select.options].map(option=>option.text)).toEqual(["None","Portrait","Sunset"]);chosen=[...select.options].find(option=>option.text===name)!.value;select.value=chosen;select.dispatchEvent(new Event("change",{bubbles:true}));});await click("OK");return chosen;};
+    await choose("Sunset");expect(command).toHaveBeenLastCalledWith("image.adjustments.matchColor",{...sent,sourcePhoto:{id,version}});
+    const self=await choose("Portrait");expect(command).toHaveBeenLastCalledWith("image.adjustments.matchColor",{...sent,sourcePhoto:{id:self,version:expect.any(String)}});expect(self).not.toBe(id);
+  });
+  it("keeps the command dialogs' layer-pixel options off while Quick Mask is the target",async()=>{
+    const ignore=()=>container.querySelector<HTMLInputElement>('[aria-label="Ignore Selection when Applying Adjustment"]')!;
+    await setState({hasSelection:true});await menu("Image","Adjustments","Match Color…");expect(ignore().disabled).toBe(false);await click("Cancel");
+    await setState({hasSelection:true,quickMask:true});await menu("Image","Adjustments","Match Color…");expect(ignore().disabled).toBe(true);
   });
   it("shows native layer thumbnails while the Layers panel is open",async()=>{
     native.enabled=true;native.invoke.mockImplementation(async(name:string)=>name==="xdesign_photo_layer_thumbnails"?[{layer:1,png:"AAAA"}]:[]);
@@ -890,6 +934,24 @@ describe("Image workspace Photoshop tools",()=>{
     await act(async()=>field()!.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,key:"Enter",metaKey:true})));
     expect(command).toHaveBeenLastCalledWith("type.create",{text:"Hi",font:"Arial",size:48,color:"#ff3ea5",x:100,y:200,weight:700,italic:true,align:"center"});
   });
+  it("lists the family's own faces on the Type bar, commits or cancels canvas text from it and toggles the Character and Paragraph panels",async()=>{
+    command.mockImplementation(async(id:string)=>id==="type.fonts"?{faces:[300,400,900].map(weight=>({family:"Arial",weight,italic:weight===900,axes:[]}))}:undefined);
+    const field=()=>container.querySelector<HTMLTextAreaElement>('[aria-label="Text on canvas"]'),style=()=>container.querySelector<HTMLSelectElement>('[aria-label="Text font style"]')!;
+    const type=async(value:string)=>{await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(field(),value);field()!.dispatchEvent(new Event("input",{bubbles:true}));});};
+    await key("t");expect(command).toHaveBeenCalledWith("type.fonts",{family:"Arial"});
+    expect([...style().options].map(option=>option.value)).toEqual(["Light","Regular","Black Italic"]);
+    await act(async()=>{style().value="Black Italic";style().dispatchEvent(new Event("change",{bubbles:true}));});
+    expect(button("Commit any current edits")).toBeUndefined();
+    await pointer("pointerdown",{clientX:100,clientY:200});await type("Hi");
+    expect(button("Commit any current edits").dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true}))).toBe(false);
+    await click("Commit any current edits");expect(field()).toBeNull();
+    expect(command).toHaveBeenLastCalledWith("type.create",{text:"Hi",font:"Arial",size:48,color:"#ff3ea5",x:100,y:200,weight:900,italic:true});
+    command.mockClear();await pointer("pointerdown",{clientX:300,clientY:300});await type("No");await click("Cancel any current edits");
+    expect(field()).toBeNull();expect(command).not.toHaveBeenCalledWith("type.create",expect.anything());
+    const panel=()=>container.querySelector('.xd-type-panel[aria-label="Character"]');
+    await click("Toggle the Character and Paragraph panels");expect(panel()).not.toBeNull();expect(button("Toggle the Character and Paragraph panels").getAttribute("aria-pressed")).toBe("true");
+    await click("Toggle the Character and Paragraph panels");expect(panel()).toBeNull();
+  });
   it("types new text and edits existing text directly on the canvas",async()=>{
     const field=()=>container.querySelector<HTMLTextAreaElement>('[aria-label="Text on canvas"]');
     const type=async(value:string)=>{await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(field(),value);field()!.dispatchEvent(new Event("input",{bubbles:true}));});};
@@ -898,7 +960,7 @@ describe("Image workspace Photoshop tools",()=>{
     expect(command).toHaveBeenLastCalledWith("type.create",{text:"Hello",font:"Arial",size:48,color:"#ff3ea5",x:100,y:200});expect(field()).toBeNull();
     await setState({layers:[...usePhotoWorkspace.getState().state!.layers,{id:2,name:"Title",kind:"Text",visible:true,opacity:1,fill:1,blend:"Normal",clipped:false,hasMask:false,bounds:[300,300,100,40],text:{text:"Old",font:"Inter",sizePt:24}}]});
     await pointer("pointerdown",{clientX:320,clientY:310});expect(field()!.value).toBe("Old");
-    await type("Gone");await act(async()=>field()!.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,key:"Escape"})));expect(field()).toBeNull();expect(command).toHaveBeenCalledTimes(1);
+    await type("Gone");await act(async()=>field()!.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,key:"Escape"})));expect(field()).toBeNull();expect(command.mock.calls.filter(([id])=>id!=="type.fonts")).toHaveLength(1);
     expect(usePhotoWorkspace.getState().shapeId).not.toBeNull();
     await pointer("pointerdown",{clientX:320,clientY:310});await type("Olde");await act(async()=>field()!.blur());
     expect(command).toHaveBeenLastCalledWith("type.edit",{layer:2,replace:{start:3,end:3,text:"e"}});

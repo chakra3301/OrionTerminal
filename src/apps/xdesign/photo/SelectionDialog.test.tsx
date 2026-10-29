@@ -24,6 +24,13 @@ const altReset = async () => {
   await act(async () => { window.dispatchEvent(new KeyboardEvent("keyup", { key: "Alt" })); });
 };
 const toggle = (name: string) => act(async () => container.querySelector<HTMLInputElement>(`[aria-label="${name}"]`)!.click());
+const image = () => { const img = container.querySelector<HTMLImageElement>(".xd-photo-selection-image img")!; vi.spyOn(img, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 200, height: 200 } as DOMRect); return img; };
+const stroke = async (extra: MouseEventInit = {}) => { const img = image(); for (const [type, clientX, clientY] of [["pointerdown", 50, 75], ["pointermove", 100, 100], ["pointerup", 150, 125]] as const) await act(async () => img.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, clientX, clientY, ...extra }))); };
+const value = (name: string) => container.querySelector<HTMLInputElement>(`[aria-label="${name}"]`)!;
+const historyAt = (index: number) => act(async () => usePhotoWorkspace.setState(workspace => ({ state: { ...workspace.state!, historySources: [{ id: "open", index, label: "Open", current: true, available: true }] } })));
+// What the host's reply does: a new image version and history step (and the parent re-rendering with it) before the command settles.
+const advance = () => { const version = ulid(); doc = { ...doc, version }; usePhotoWorkspace.setState(workspace => ({ stateVersion: version, busy: false, quiet: false, state: { ...workspace.state!, hasSelection: true, historySources: [{ id: version, index: (workspace.state!.historySources?.find(source => source.current)?.index ?? 0) + 1, label: "Edit", current: true, available: true }] } })); root.render(<SelectionDialog kind="refine" document={doc} close={close}/>); };
+const editing = () => command.mockImplementation(async (id: string) => { if (["select.quick", "select.subject", "select.inverse"].includes(id)) advance(); return undefined; });
 beforeEach(() => {
   localStorage.removeItem(SELECTION_PREFERENCES_KEY);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); command.mockReset(); command.mockResolvedValue(undefined); native.invoke.mockReset(); native.invoke.mockResolvedValue({ width: 64, height: 48, png: "AA==" }); native.enabled = false;
@@ -36,9 +43,7 @@ afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimer
 describe("native selection workspaces", () => {
   it("requires advertised native edge support and keeps global refinement usable with older binaries", async () => {
     await act(async () => usePhotoWorkspace.setState(workspace => ({ state: { ...workspace.state!, features: undefined } }))); await mount("refine");
-    expect(container.textContent).toContain("requires the updated XDesign image engine"); expect(button("Brush at coordinate").disabled).toBe(true);
-    const image = container.querySelector<HTMLImageElement>(".xd-photo-selection-image img")!; vi.spyOn(image, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 200, height: 200 } as DOMRect);
-    await act(async () => image.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 50, clientY: 75 }))); expect(button("OK").disabled).toBe(false);
+    expect(container.textContent).toContain("requires the updated XDesign image engine"); expect(button("Brush at coordinate").disabled).toBe(true); expect(button("Refine Edge Brush Tool").disabled).toBe(true); expect(button("OK").disabled).toBe(false);
     await click("OK"); expect(command.mock.lastCall![1]).not.toHaveProperty("edgeBrushes");
   });
   it("previews and applies local refine/erase strokes with draft undo and keyboard coordinates", async () => {
@@ -49,7 +54,7 @@ describe("native selection workspaces", () => {
     await click("Clear edge strokes"); await click("OK"); expect(command.mock.lastCall![1]).not.toHaveProperty("edgeBrushes");
   });
   it("captures reference-image strokes, cancels drafts and keeps remembered strokes image-local", async () => {
-    await mount("refine"); const image = container.querySelector<HTMLImageElement>(".xd-photo-selection-image img")!; vi.spyOn(image, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 200, height: 200 } as DOMRect);
+    await mount("refine"); await click("Refine Edge Brush Tool"); const image = container.querySelector<HTMLImageElement>(".xd-photo-selection-image img")!; vi.spyOn(image, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 200, height: 200 } as DOMRect);
     const pointer = async (type: string, extra: MouseEventInit = {}) => act(async () => image.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, clientX: 50, clientY: 75, ...extra })));
     await pointer("pointerdown"); expect(button("OK").disabled).toBe(true); await pointer("pointermove", { clientX: 100, clientY: 100 }); await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))); expect(close).not.toHaveBeenCalled(); expect(button("OK").disabled).toBe(false);
     await pointer("pointerdown"); await pointer("pointercancel"); await click("OK"); expect(command.mock.lastCall![1]).not.toHaveProperty("edgeBrushes");
@@ -76,6 +81,52 @@ describe("native selection workspaces", () => {
   });
   it("retains values/errors after failure and prevents edits/cancel while busy", async () => {
     await mount("refine"); await number("Selection Feather (px)", 3); command.mockRejectedValueOnce(new Error("Native selection failed")); await click("OK"); expect(close).not.toHaveBeenCalled(); expect(container.textContent).toContain("Native selection failed"); await act(async () => usePhotoWorkspace.setState({ busy: true })); expect(button("Cancel").disabled).toBe(true); await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))); expect(close).not.toHaveBeenCalled(); await act(async () => usePhotoWorkspace.setState({ busy: false })); await altReset(); expect(container.querySelector<HTMLInputElement>('[aria-label="Selection Feather (px)"]')!.value).toBe("0"); await click("Cancel"); expect(close).toHaveBeenCalledOnce();
+  });
+  it("paints Quick Selection strokes that add or subtract (Alt flips the mode), remembers the size and is inert while busy", async () => {
+    await mount("refine"); expect(button("Quick Selection Tool").getAttribute("aria-pressed")).toBe("true"); expect(button("Add to selection").getAttribute("aria-pressed")).toBe("true");
+    expect(value("Selection quick selection size").value).toBe("30");
+    await number("Selection quick selection size", 12); await stroke(); expect(command).toHaveBeenLastCalledWith("select.quick", { points: [[16, 16], [32, 24], [48, 32]], size: 12, mode: "add", sampleAllLayers: false });
+    await stroke({ altKey: true }); expect(command.mock.lastCall).toEqual(["select.quick", expect.objectContaining({ mode: "subtract" })]);
+    await click("Subtract from selection"); await toggle("Selection Sample all layers"); await stroke(); expect(command.mock.lastCall).toEqual(["select.quick", expect.objectContaining({ mode: "subtract", sampleAllLayers: true })]);
+    await stroke({ altKey: true }); expect(command.mock.lastCall).toEqual(["select.quick", expect.objectContaining({ mode: "add" })]); expect(container.textContent).toContain("0 edge strokes"); expect(close).not.toHaveBeenCalled();
+    await toggle("Remember selection settings"); await click("OK"); await act(async () => root.render(null)); await mount("refine"); expect(value("Selection quick selection size").value).toBe("12");
+    await act(async () => usePhotoWorkspace.setState({ busy: true })); command.mockClear(); await stroke(); expect(command).not.toHaveBeenCalled();
+    for (const name of ["Quick Selection Tool", "Refine Edge Brush Tool", "Add to selection", "Subtract from selection", "Select Subject", "Invert"]) expect(button(name).disabled).toBe(true);
+    expect(value("Selection quick selection size").disabled).toBe(true);
+  });
+  it("paints the selection with the Brush Tool, one select.brush step per stroke at its own size and hardness, Alt flipping the mode and no layers sampled", async () => {
+    await mount("refine"); await click("Brush Tool"); expect(button("Brush Tool").getAttribute("aria-pressed")).toBe("true"); expect(button("Brush Tool").disabled).toBe(false);
+    expect(value("Selection quick selection size")).toBeNull(); expect(value("Selection brush tool size").value).toBe("30"); expect(value("Selection brush tool hardness").value).toBe("100");
+    await number("Selection brush tool size", 20); await number("Selection brush tool hardness", 50); await stroke();
+    expect(command.mock.calls).toEqual([["select.brush", { points: [[16, 16], [32, 24], [48, 32]], size: 20, hardness: 50, mode: "add" }]]);
+    await stroke({ altKey: true }); expect(command.mock.lastCall).toEqual(["select.brush", expect.objectContaining({ mode: "subtract" })]);
+    await click("Subtract from selection"); await toggle("Selection Sample all layers"); await stroke(); expect(command.mock.lastCall).toEqual(["select.brush", expect.objectContaining({ mode: "subtract" })]); expect(command.mock.lastCall![1]).not.toHaveProperty("sampleAllLayers");
+    expect(container.textContent).toContain("0 edge strokes"); await click("Quick Selection Tool"); expect(value("Selection quick selection size").value).toBe("30"); await click("Brush Tool");
+    await number("Selection brush tool hardness", 101); command.mockClear(); await stroke(); expect(command).not.toHaveBeenCalled(); await number("Selection brush tool hardness", 50);
+    await toggle("Remember selection settings"); await click("OK"); await act(async () => root.render(null)); await mount("refine"); await click("Brush Tool");
+    expect(value("Selection brush tool size").value).toBe("20"); expect(value("Selection brush tool hardness").value).toBe("50");
+    await act(async () => usePhotoWorkspace.setState({ busy: true })); command.mockClear(); await stroke(); expect(command).not.toHaveBeenCalled();
+    expect(button("Brush Tool").disabled).toBe(true); expect(value("Selection brush tool size").disabled).toBe(true); expect(value("Selection brush tool hardness").disabled).toBe(true);
+  });
+  it("inverts and selects the subject in place, staying open across its own edits even when the image settles first", async () => {
+    await mount("refine"); let settle!: () => void;
+    command.mockImplementationOnce(() => { usePhotoWorkspace.setState({ busy: true, quiet: true }); return new Promise<undefined>(resolve => { settle = () => resolve(undefined); }); });
+    await click("Invert"); expect(command).toHaveBeenLastCalledWith("select.inverse", {}); await act(async () => advance()); expect(close).not.toHaveBeenCalled();
+    await act(async () => settle()); expect(close).not.toHaveBeenCalled(); expect(button("OK").disabled).toBe(false);
+    editing(); await toggle("Selection Sample all layers"); await click("Select Subject"); expect(command).toHaveBeenLastCalledWith("select.subject", { sampleAllLayers: true }); expect(close).not.toHaveBeenCalled();
+    await act(async () => usePhotoWorkspace.setState({ stateVersion: ulid() })); expect(close).toHaveBeenCalled();
+  });
+  it("folds its edits and the refinement into one Select and Mask step on OK and rolls them back on Cancel, leaving untouched sessions alone", async () => {
+    await historyAt(4); editing(); await mount("refine"); await click("Invert"); await stroke(); await click("OK");
+    expect(command.mock.calls.map(call => call[0])).toEqual(["select.inverse", "select.quick", "select.refineEdge", "history.fold"]); expect(command).toHaveBeenLastCalledWith("history.fold", { fromId: "open", label: "Select and Mask" }); expect(close).toHaveBeenCalledOnce();
+    await act(async () => root.render(null)); command.mockClear(); close.mockClear(); await historyAt(4); await mount("refine"); await click("Select Subject"); await click("Cancel");
+    expect(command).toHaveBeenLastCalledWith("history.select", { id: "open", discardRedo: true }); expect(close).toHaveBeenCalledOnce();
+    await act(async () => root.render(null)); command.mockClear(); await historyAt(4); await mount("refine"); await click("OK"); await mount("refine"); await click("Cancel"); expect(command.mock.calls.map(call => call[0])).toEqual(["select.refineEdge"]);
+  });
+  it("opens without a selection, where Invert and OK wait for the one its tools make", async () => {
+    await act(async () => usePhotoWorkspace.setState(workspace => ({ state: { ...workspace.state!, hasSelection: false } }))); editing(); await mount("refine");
+    expect(button("OK").disabled).toBe(true); expect(button("Invert").disabled).toBe(true); expect(button("Select Subject").disabled).toBe(false); expect(container.textContent).toContain("Make a selection to refine.");
+    await stroke(); expect(command).toHaveBeenLastCalledWith("select.quick", expect.objectContaining({ mode: "add" })); expect(button("OK").disabled).toBe(false); expect(button("Invert").disabled).toBe(false); expect(close).not.toHaveBeenCalled();
   });
   it.each(["version", "project", "view", "document"])("closes stale %s selection workspaces without applying", async boundary => {
     await mount("focus"); await act(async () => usePhotoWorkspace.setState(state => boundary === "version" ? { stateVersion: ulid() } : boundary === "project" ? { projectId: ulid() } : boundary === "document" ? { documentId: ulid() } : { state: { ...state.state!, viewKey: "alpha" } })); expect(close).toHaveBeenCalled(); expect(command).not.toHaveBeenCalled();

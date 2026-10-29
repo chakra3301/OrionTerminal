@@ -7,13 +7,17 @@ import { ColorPickerDialog } from "./ColorPickerDialog";
 import { importPreset } from "./PresetPanels";
 import { paintColorHex } from "./imageColors";
 import { runPhotoCommand, usePhotoWorkspace } from "./runtime";
+import { MidpointDiamonds } from "./GradientEditorMidpoints";
+import { addedMidpoints, movedMidpoints, removedMidpoints, withMidpoint } from "./gradientStops";
 import type { GradientPreset } from "./types";
 import "./gradientEditor.css";
 
-/** Colour stops in the caller's colour type, opacity stops as 0..1 fractions; no opacity stops means opaque, as in the engine. */
-export type EditedGradient<C> = { stops: [number, C][]; opacity: [number, number][] };
-type Draft<C> = { stops: [number, C][]; opacity: [number, number][] };
+/** Colour stops in the caller's colour type, opacity stops as 0..1 fractions; no opacity stops means opaque, as in the engine. `midpoints` (one per colour segment, none when all at 50%) only where the gradient keeps them: without it the editor shows no diamonds. */
+export type EditedGradient<C> = { stops: [number, C][]; opacity: [number, number][]; midpoints?: number[] };
+type Draft<C> = EditedGradient<C>;
 type Kind = "color" | "opacity";
+// A selected midpoint keeps the colour stop whose diamonds were showing.
+type Picked = { kind: Kind; index: number } | { kind: "midpoint"; index: number; around: number | null };
 type View = "text" | "small" | "large" | "smallList" | "largeList";
 const VIEWS: [View, string][] = [["text", "Text Only"], ["small", "Small Thumbnail"], ["large", "Large Thumbnail"], ["smallList", "Small List"], ["largeList", "Large List"]];
 // Photoshop keeps the presets view for the session.
@@ -55,7 +59,7 @@ function StopField({ label, value, step, disabled, set }: { label: string; value
 /** A preset's stops as hex colours (foreground and background resolved) and 0..1 opacity stops, empty when opaque. */
 export function presetGradient(preset: GradientPreset, foreground: string, background: string): EditedGradient<string> {
   const opacity = preset.transparency.map(([t, a]): [number, number] => [t, a / 100]);
-  return { stops: preset.stops.map(([t, c]): [number, string] => [t, c === "foreground" ? foreground : c === "background" ? background : c]), opacity: opacity.every(([, a]) => a >= 1) ? [] : opacity };
+  return { stops: preset.stops.map(([t, c]): [number, string] => [t, c === "foreground" ? foreground : c === "background" ? background : c]), opacity: opacity.every(([, a]) => a >= 1) ? [] : opacity, ...preset.midpoints && { midpoints: preset.midpoints } };
 }
 
 /** The gradient preset folders: closed until opened, as in Photoshop. */
@@ -106,8 +110,8 @@ export function GradientEditorDialog<C>({ gradient, name: named = "Custom", hex,
 }) {
   const dialog = useDesignDialog<HTMLFormElement>(close);
   const opacityOf = (stops: [number, number][]) => transparency && stops.length ? stops : OPAQUE;
-  const [draft, setDraft] = useState<Draft<C>>(() => ({ stops: gradient.stops, opacity: opacityOf(gradient.opacity) }));
-  const [name, setName] = useState(named), [picked, setPicked] = useState<{ kind: Kind; index: number } | null>(null);
+  const [draft, setDraft] = useState<Draft<C>>(() => ({ stops: gradient.stops, opacity: opacityOf(gradient.opacity), ...gradient.midpoints && { midpoints: gradient.midpoints } }));
+  const [name, setName] = useState(named), [picked, setPicked] = useState<Picked | null>(null);
   const [picking, setPicking] = useState<{ before: Draft<C>; name: string } | null>(null), [menu, setMenu] = useState(false), [view, setView] = useState(presetView), [error, setError] = useState("");
   const [leaving, setLeaving] = useState<{ kind: Kind; index: number } | null>(null);
   const latest = useRef(draft); latest.current = draft;
@@ -116,28 +120,37 @@ export function GradientEditorDialog<C>({ gradient, name: named = "Custom", hex,
   const refocus = useRef<{ kind: Kind; index: number } | null>(null), bar = useRef<HTMLDivElement>(null);
   useEffect(() => { const to = refocus.current; refocus.current = null; if (to) bar.current?.querySelector<HTMLElement>(`.is-${to.kind} [data-stop="${to.index}"]`)?.focus(); });
 
-  const out = (next: Draft<C>): EditedGradient<C> => ({ stops: next.stops, opacity: next.opacity.every(([, a]) => a >= 1) ? [] : next.opacity });
+  const out = (next: Draft<C>): EditedGradient<C> => ({ stops: next.stops, opacity: next.opacity.every(([, a]) => a >= 1) ? [] : next.opacity, ...next.midpoints && { midpoints: next.midpoints } });
   const update = (next: Draft<C>, label = "Custom") => { latest.current = next; setDraft(next); setName(label); preview(out(next)); };
   const attempt = (work: Promise<unknown>) => void work.then(() => setError(""), failure => setError(failure instanceof Error ? failure.message : String(failure)));
   const list = (kind: Kind): [number, unknown][] => kind === "color" ? latest.current.stops : latest.current.opacity;
-  const put = (kind: Kind, next: [number, unknown][]) => update(kind === "color" ? { ...latest.current, stops: next as [number, C][] } : { ...latest.current, opacity: next as [number, number][] });
+  // Colour stop edits carry the midpoints along, as the engine pairs each with the stop before its segment.
+  const carried = (kind: Kind, change: (locations: number[], midpoints: number[]) => number[]) => { const mids = latest.current.midpoints; return kind === "color" && mids ? change(latest.current.stops.map(([t]) => t), mids) : mids; };
+  const put = (kind: Kind, next: [number, unknown][], midpoints = latest.current.midpoints) => update(kind === "color" ? { ...latest.current, stops: next as [number, C][], ...midpoints && { midpoints } } : { ...latest.current, opacity: next as [number, number][] });
   const place = (kind: Kind, index: number, t: number) => {
     const stops = list(kind), stop = stops[index];
     if (!stop || !Number.isFinite(t)) return index;
     const moved: [number, unknown] = [round(clamp(t)), stop[1]];
     if (moved[0] === stop[0]) return index;
     const next = stops.map((s, i) => i === index ? moved : s).sort((a, b) => a[0] - b[0]), at = next.indexOf(moved);
-    put(kind, next); setPicked({ kind, index: at });
+    put(kind, next, carried(kind, (locations, mids) => movedMidpoints(locations, mids, index, moved[0]))); setPicked({ kind, index: at });
     return at;
   };
   const add = (kind: Kind, t: number) => {
     const stops = list(kind), at = round(t);
     const value = kind === "color" ? color(toHex(sample(latest.current.stops.map(([p, c]): [number, number[]] => [p, rgb(hex(c))]), at, mixRgb))) : round(sample(latest.current.opacity, at, mixNumber));
     const added: [number, unknown] = [at, value], next = [...stops, added].sort((a, b) => a[0] - b[0]), index = next.indexOf(added);
-    put(kind, next); setPicked({ kind, index });
+    put(kind, next, carried(kind, (locations, mids) => addedMidpoints(locations, mids, at))); setPicked({ kind, index });
     return index;
   };
-  const remove = (kind: Kind, index: number) => { const stops = list(kind); if (stops.length <= 2) return false; put(kind, stops.filter((_, i) => i !== index)); setPicked({ kind, index: Math.max(0, index - 1) }); return true; };
+  const remove = (kind: Kind, index: number) => { const stops = list(kind); if (stops.length <= 2) return false; put(kind, stops.filter((_, i) => i !== index), carried(kind, (locations, mids) => removedMidpoints(locations.length, mids, index))); setPicked({ kind, index: Math.max(0, index - 1) }); return true; };
+  const setMidpoint = (segment: number, value: number) => {
+    const mids = latest.current.midpoints;
+    if (!mids) return;
+    const next = withMidpoint(latest.current.stops.length, mids, segment, value);
+    if (next.join() !== mids.join()) update({ ...latest.current, midpoints: next });
+  };
+  const pickMidpoint = (segment: number) => setPicked(current => ({ kind: "midpoint", index: segment, around: current?.kind === "color" ? current.index : current?.kind === "midpoint" ? current.around : null }));
   const recolor = (index: number, value: string, from: C) => put("color", latest.current.stops.map((stop, i) => i === index ? [stop[0], color(value, from)] : stop));
 
   const strip = (kind: Kind) => {
@@ -182,11 +195,13 @@ export function GradientEditorDialog<C>({ gradient, name: named = "Custom", hex,
         <svg viewBox="0 0 11 14" aria-hidden="true">{kind === "color" ? <><path d="M5.5 .5L10.5 5V13.5H.5V5Z"/><rect x="2.5" y="6.5" width="6" height="5" fill={fill}/></> : <><path d="M.5 .5H10.5V9L5.5 13.5L.5 9Z"/><rect x="2.5" y="2.5" width="6" height="5" fill={fill}/></>}</svg>
       </span>;
     })}
+    {kind === "color" && draft.midpoints && <MidpointDiamonds locations={draft.stops.map(([t]) => t)} midpoints={draft.midpoints} around={picked?.kind === "color" ? picked.index : picked?.kind === "midpoint" ? picked.around : null} selected={midpoint} select={pickMidpoint} set={setMidpoint}/>}
   </div>;
 
   const colorStop = picked?.kind === "color" ? draft.stops[picked.index] : undefined, opacityStop = picked?.kind === "opacity" ? draft.opacity[picked.index] : undefined;
+  const midpoint = picked?.kind === "midpoint" && draft.midpoints && picked.index < draft.stops.length - 1 ? picked.index : null;
   const location = (stop: [number, unknown] | undefined) => stop ? Math.round(stop[0] * 1000) / 10 : "";
-  const save = () => attempt(runPhotoCommand("gradient.presets.new", { name: name.trim() || "Custom", stops: draft.stops.map(([t, c]) => [t, hex(c)]), transparency: draft.opacity.map(([t, a]) => [t, Math.round(a * 100)]) }));
+  const save = () => attempt(runPhotoCommand("gradient.presets.new", { name: name.trim() || "Custom", stops: draft.stops.map(([t, c]) => [t, hex(c)]), transparency: draft.opacity.map(([t, a]) => [t, Math.round(a * 100)]), ...draft.midpoints?.length ? { midpoints: draft.midpoints } : {} }));
   return <>
     <PhotoDialog dialog={dialog} title="Gradient Editor" className="xd-ge-dialog" close={close} onSubmit={event => { event.preventDefault(); choose(out(latest.current), name.trim() || "Custom"); }}
       buttons={<><button type="button" onClick={() => attempt(importPreset("grd", "gradient.presets.importGrd"))}>Import…</button><button type="button" disabled title="Gradients export as .grd from Photoshop only">Export…</button></>}>
@@ -202,7 +217,7 @@ export function GradientEditorDialog<C>({ gradient, name: named = "Custom", hex,
             </div>}
           </span>
         </div>
-        <GradientPresets view={view} choose={(preset, label) => { setPicked(null); update({ stops: preset.stops.map(([t, c]) => [t, color(c)]), opacity: opacityOf(preset.opacity) }, label); }}/>
+        <GradientPresets view={view} choose={(preset, label) => { setPicked(null); update({ stops: preset.stops.map(([t, c]) => [t, color(c)]), opacity: opacityOf(preset.opacity), ...latest.current.midpoints && { midpoints: preset.midpoints ?? [] } }, label); }}/>
       </div>
       <div className="xd-ge-line"><span>Name:</span><input type="text" aria-label="Gradient name" maxLength={255} value={name} onChange={event => setName(event.target.value)}/><button type="button" onClick={save}>New</button></div>
       <div className="xd-ge-line"><span>Type:</span><select aria-label="Gradient Type" defaultValue="Solid"><option>Solid</option><option disabled>Noise</option></select></div>
@@ -220,7 +235,8 @@ export function GradientEditorDialog<C>({ gradient, name: named = "Custom", hex,
         </div>
         <div className="xd-ge-row">
           <span>Color:</span><button type="button" className="xd-ge-swatch" aria-label="Stop color" disabled={!colorStop} style={{ background: colorStop ? hex(colorStop[1]) : undefined }} onClick={() => setPicking({ before: latest.current, name })}/><span/>
-          <span>Location:</span><StopField label="Color stop location" step="any" disabled={!colorStop} value={location(colorStop)} set={value => { if (picked) place("color", picked.index, value / 100); }}/><span>%</span>
+          <span>Location:</span>{midpoint === null ? <StopField label="Color stop location" step="any" disabled={!colorStop} value={location(colorStop)} set={value => { if (picked) place("color", picked.index, value / 100); }}/>
+            : <StopField key="midpoint" label="Color midpoint location" step="any" disabled={false} value={Math.round((draft.midpoints![midpoint] ?? .5) * 1000) / 10} set={value => setMidpoint(midpoint, value / 100)}/>}<span>%</span>
           <button type="button" aria-label="Delete color stop" title="Delete" disabled={!colorStop || draft.stops.length <= 2} onClick={() => picked && remove("color", picked.index)}><Trash2 size={13}/></button>
         </div>
       </fieldset>

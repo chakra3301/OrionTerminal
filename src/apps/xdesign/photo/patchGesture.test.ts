@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { patchOffset, patchOffsetFitsCanvas, patchPreviewScale, patchTarget } from "./patchGesture";
+import { patchOffset, patchOffsetFitsCanvas, patchOptions, patchPress, patchPreviewScale, patchTarget } from "./patchGesture";
 
 describe("Patch gesture", () => {
+  it("draws its own selection on a modified press, with no selection or outside it, and patches on a plain press inside", () => {
+    const plain = { shiftKey: false, altKey: false }, bounds = [100, 120, 220, 180] as const;
+    expect(patchPress([150, 150], bounds, plain)).toBe("patch");
+    expect(patchPress([100, 120], bounds, plain)).toBe("patch");
+    expect(patchPress([20, 25], bounds, plain)).toBe("replace");
+    expect(patchPress([320, 150], bounds, plain)).toBe("replace");
+    expect(patchPress([150, 150], null, plain)).toBe("replace");
+    expect(patchPress([150, 150], bounds, { shiftKey: true, altKey: false })).toBe("add");
+    expect(patchPress([150, 150], bounds, { shiftKey: false, altKey: true })).toBe("subtract");
+    expect(patchPress([20, 25], bounds, { shiftKey: true, altKey: true })).toBe("intersect");
+    expect(patchPress([Number.NaN, 150], bounds, plain)).toBe("replace");
+  });
+
   it("rounds image-coordinate deltas and ignores a zero-offset drag", () => {
     expect(patchOffset([10.25, 8.5], [3.75, 20.49])).toEqual([-7, 12]);
     expect(patchOffset([0,0],[0.5,-0.5])).toEqual([1,-1]);
@@ -34,5 +47,13 @@ describe("Patch gesture", () => {
     expect(patchTarget({ layer: 7, mask: true, quickMask: false })).toEqual({ layer: 7, target: "mask" });
     expect(patchTarget({ layer: 7, mask: false, quickMask: true })).toEqual({ target: "quickMask" });
     expect(patchTarget({ layer: 7, mask: false, quickMask: false, channel: { kind: "alpha", index: 2 } })).toEqual({ target: { channel: 2 } });
+  });
+
+  it("adds Diffusion or Content-Aware only off the native patch and only for layer pixels", () => {
+    const pixels = { layer: 7, target: "pixels" }, options = { type: "normal", mode: "source", diffusion: 5, structure: 4, colorAdaptation: 0, sampleAllLayers: false };
+    expect(patchOptions(options, pixels)).toEqual({});
+    expect(patchOptions({ ...options, diffusion: 2 }, pixels)).toEqual({ type: "normal", diffusion: 2 });
+    expect(patchOptions({ ...options, type: "contentAware", structure: 7, sampleAllLayers: true }, pixels)).toEqual({ type: "contentAware", structure: 7, colorAdaptation: 0, sampleAllLayers: true });
+    for (const target of [{ layer: 7, target: "mask" }, { target: "quickMask" }, { target: { channel: 2 } }]) expect(patchOptions({ ...options, type: "contentAware" }, target)).toEqual({});
   });
 });

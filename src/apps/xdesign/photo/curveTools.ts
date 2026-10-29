@@ -39,8 +39,11 @@ export function curveLut(points: CurvePoint[]): number[] {
 
 const level = (value: number) => Math.max(0, Math.min(255, Math.round(value)));
 
-/** The engine keeps 2–19 curve points, so a drawn curve is refitted: each new point goes where the spline strays furthest. */
-export function fitCurve(target: number[], maxPoints = 19, tolerance = 1): CurvePoint[] {
+/** Photoshop's Curves holds 16 points; the engine accepts 19, so .acv files with more still load. */
+export const CURVE_POINTS = 16;
+
+/** A drawn curve is refitted to a few points: each new point goes where the spline strays furthest. */
+export function fitCurve(target: number[], maxPoints = CURVE_POINTS, tolerance = 1): CurvePoint[] {
   const points: CurvePoint[] = [[0, target[0]!], [255, target[255]!]];
   while (points.length < maxPoints) {
     const lut = curveLut(points);
@@ -63,4 +66,18 @@ export function drawCurve(values: number[], from: CurvePoint | null, to: CurvePo
 export function smoothCurve(points: CurvePoint[], radius = 6): CurvePoint[] {
   const values = curveLut(points);
   return fitCurve(values.map((_, x) => { let sum = 0; for (let at = x - radius; at <= x + radius; at++) sum += values[Math.max(0, Math.min(255, at))]!; return sum / (radius * 2 + 1); }));
+}
+
+const DIAGONAL: CurvePoint[] = [[0, 0], [255, 255]];
+const inRange = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 255;
+/** Whether a value is a curve CurveEditor could have made: 2 to 16 points within 0–255, rising left to right. */
+export const isToningCurve = (value: unknown): value is CurvePoint[] => Array.isArray(value) && value.length >= 2 && value.length <= CURVE_POINTS
+  && value.every((point, i) => Array.isArray(point) && point.length === 2 && inRange(point[0]) && inRange(point[1]) && (i === 0 || point[0] > value[i - 1][0]));
+/** HDR Toning's Toning Curve as the dialog keeps it, or the diagonal for anything else. */
+export const toningCurve = (value: unknown): CurvePoint[] => (isToningCurve(value) ? value : DIAGONAL).map(([x, y]) => [x, y]);
+
+/** The engine joins HDR Toning's curve points with straight lines, so the spline the dialog draws is sent level by level. */
+export function curveSamples(points: CurvePoint[]): CurvePoint[] | undefined {
+  const lut = curveLut(points);
+  return lut.every((y, x) => Math.abs(y - x) < .005) ? undefined : lut.map((y, x) => [x, Math.round(y * 100) / 100]);
 }

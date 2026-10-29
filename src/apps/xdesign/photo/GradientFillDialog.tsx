@@ -70,7 +70,7 @@ export function GradientFillDialog({document,layer,canvas,close,cancel=close}:{d
   // The engine blends stops linearly, so Methods other than Classic go as baked stops.
   const colors=(stops:Stops,as:GradientMethod)=>stops.every(([,color])=>/^#[\da-f]{6}$/i.test(color))&&bakeRemembered(stops,as)||stops;
   const transparency=(opacity:[number,number][]):[number,number][]=>opacity.length?opacity.map(([at,alpha])=>[at,Math.round(alpha*100)]):[[0,100],[1,100]];
-  const edited=(next:EditedGradient<string>)=>change({stops:colors(next.stops,method),transparency:transparency(next.opacity),midpoints:method==="classic"&&next.stops.length===gradient.stops.length?gradient.midpoints:[]});
+  const edited=(next:EditedGradient<string>)=>change({stops:colors(next.stops,method),transparency:transparency(next.opacity),midpoints:next.midpoints??[]});
   const drag=(event:{target:unknown;currentTarget:unknown;button:number;clientX:number;clientY:number})=>{
     const image=event.button===0&&!busy&&event.target===event.currentTarget?documentUnder(canvas??null,event.clientX,event.clientY):null;
     if(!image)return;
@@ -88,7 +88,7 @@ export function GradientFillDialog({document,layer,canvas,close,cancel=close}:{d
   return <PhotoDialog dialog={dialog} title="Gradient Fill" label="Edit gradient fill" className="xd-gf-dialog" beside busy={busy} close={cancel} reset={()=>setPatch({})} scrim={{onPointerDown:drag}} onSubmit={event=>{event.preventDefault();void runPhotoCommand("gradient.fill.set",{layer:layer.id,...patch}).then(close).catch(()=>{});}}>
     <div className="xd-ps-dialog-grid">
       <span className="xd-ps-dialog-label">Gradient:</span><span className="xd-gf-field"><GradientPick css={gradientCss(gradient.stops,gradient.transparency.map(([at,alpha]):[number,number]=>[at,alpha/100]),hex)} disabled={busy}
-        edit={event=>setEditing({before:patch,root:event.currentTarget.closest(".xd-photo")??window.document.body})} choose={next=>change({stops:colors(next.stops,method),transparency:transparency(next.opacity),midpoints:[]})}/></span>
+        edit={event=>setEditing({before:patch,root:event.currentTarget.closest(".xd-photo")??window.document.body})} choose={next=>change({stops:colors(next.stops,method),transparency:transparency(next.opacity),midpoints:method==="classic"?next.midpoints??[]:[]})}/></span>
       <label className="xd-ps-dialog-field"><span>Style:</span><select aria-label="Fill gradient style" value={gradient.style} disabled={busy} onChange={event=>reshape({style:event.target.value})}>{STYLES.map(style=><option key={style} value={style}>{style[0]!.toUpperCase()+style.slice(1)}</option>)}</select></label>
       <span className="xd-ps-dialog-label">Angle:</span><span className="xd-gf-field"><AngleDial label="Fill gradient angle" value={gradient.angle} disabled={busy} change={angle=>reshape({angle})}/><NumberField label="Fill gradient angle" value={gradient.angle} min={-360} max={360} disabled={busy} set={angle=>reshape({angle})}/><span className="xd-ps-dialog-unit">°</span></span>
       <span className="xd-ps-dialog-label">Scale:</span><span className="xd-gf-field"><PopupSlider label="Scale" ariaLabel="Fill gradient scale" unit="%" min={10} max={150} value={Math.round(gradient.scale*shown)} disabled={busy} change={scale=>change({scale:stored(scale/shown)})} commit={()=>{}}
@@ -102,7 +102,7 @@ export function GradientFillDialog({document,layer,canvas,close,cancel=close}:{d
     {canvas&&preview.url&&createPortal(<img className="xd-photo-canvas-preview" src={preview.url} alt="" draggable={false}/>,canvas)}
     {/* Events bubble out of a portal through the React tree, so without this the editor's OK would submit this dialog. */}
     {editing&&createPortal(<div className="xd-ge-portal" onSubmit={stop} onKeyDown={stop} onFocus={stop} onBlur={stop}>
-      <GradientEditorDialog<string> gradient={{stops:plain,opacity:gradient.transparency.every(([,alpha])=>alpha>=100)?[]:gradient.transparency.map(([at,alpha])=>[at,alpha/100])}} hex={hex} color={(value,from)=>from?.length===9?value+from.slice(7):value}
+      <GradientEditorDialog<string> gradient={{stops:plain,opacity:gradient.transparency.every(([,alpha])=>alpha>=100)?[]:gradient.transparency.map(([at,alpha])=>[at,alpha/100]),...method==="classic"&&{midpoints:gradient.midpoints}}} hex={hex} color={(value,from)=>from?.length===9?value+from.slice(7):value}
         preview={edited} choose={next=>{edited(next);setEditing(null);}} close={()=>{setPatch(editing.before);setEditing(null);}}/>
     </div>,editing.root)}
   </PhotoDialog>;

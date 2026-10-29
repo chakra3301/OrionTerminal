@@ -33,6 +33,7 @@
 .xd-photo .xd-photo-curve-aside-row { display:flex;align-items:center;gap:4px; }
 .xd-photo .xd-photo-curve-aside-row > .xd-photo-tone-eyedroppers { flex-direction:row;gap:4px; }
 .xd-photo .xd-photo-curve-aside > .xd-ps-dialog-check { margin:0; }
+.xd-photo .xd-photo-tone > .xd-ps-dialog-check { display:flex;align-items:center;gap:6px;font-size:11px; }
 .xd-photo .xd-photo-clipping { z-index:6; }
 .xd-photo .xd-photo-curve-display { width:100%;font-size:11px; }
 .xd-photo .xd-photo-curve-display > summary { padding:4px 0;cursor:default; }

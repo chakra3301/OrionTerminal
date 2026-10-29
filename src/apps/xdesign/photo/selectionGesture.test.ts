@@ -49,11 +49,21 @@ describe("Image selection geometry and native requests", () => {
   });
   it("sends only supported native geometry/edge/combination fields", () => {
     expect(selectionGestureCommand("ellipseSelection", [[20, 25, .7], [40, 45, .5]], { ...paintToolDefaults("ellipseSelection", null), feather: 2.5, antiAlias: false }, "intersect", none, none)).toEqual({ id: "select.rect", params: { x: 20, y: 25, width: 20, height: 20, ellipse: true, feather: 2.5, antiAlias: false, mode: "intersect" } });
-    expect(selectionGestureCommand("select.object", [[40, 45], [20, 25]], { sampleAllLayers: true }, "add", none, none)).toEqual({ id: "select.object", params: { rect: [20, 25, 20, 20], mode: "add", sampleAllLayers: true } });
+    expect(selectionGestureCommand("select.object", [[40, 45], [20, 25]], { sampleAllLayers: true }, "add", none, none)).toEqual({ id: "select.object", params: { rect: [20, 25, 20, 20], mode: "add", sampleAllLayers: true, hardEdge: false } });
+    // Object Selection has no marquee Style or Draw from center, so stale marquee options never reshape its box.
+    expect(selectionGestureCommand("select.object", [[20, 25], [40, 45]], { objectMode: "rectangle", style: "fixedRatio", ratioWidth: 2, ratioHeight: 1, fromCenter: true }, "replace", none, none)).toEqual({ id: "select.object", params: { rect: [20, 25, 20, 20], mode: "replace", sampleAllLayers: false, hardEdge: false } });
     expect(selectionGestureCommand("crop", [[20, 25], [40, 45]], { deleteCroppedPixels: true }, "replace", none, none)).toEqual({ id: "image.crop", params: { x: 20, y: 25, width: 20, height: 20, deleteCroppedPixels: true } });
     expect(selectionGestureCommand("select.quick", [[20, 25, .7, 0], [40, 45, .5, 0]], { size: 18, enhanceEdge: true, sampleAllLayers: true }, "subtract", none, none)).toEqual({ id: "select.quick", params: { points: [[20, 25], [40, 45]], size: 18, mode: "subtract", enhanceEdge: true, sampleAllLayers: true } });
     expect(selectionGestureCommand("polygonLasso", [[10, 10], [40, 10], [40, 40]], { feather: 3 }, "add", none, none)).toEqual({ id: "select.lasso", params: { points: [[10, 10], [40, 10], [40, 40]], feather: 3, antiAlias: true, mode: "add" } });
     expect(selectionGestureCommand("polygonLasso", [[10, 10], [40, 10]], {}, "replace", none, none)).toBeNull();
+  });
+  it("sends Magic Wand's Sample Size and Object Selection's Hard Edge and Lasso outline", () => {
+    expect(selectionGestureCommand("select.magicWand", [[12.5, 8]], {}, "replace", none, none)?.params).toEqual({ x: 12.5, y: 8, mode: "replace", tolerance: 32, contiguous: true, antiAlias: true, sampleAllLayers: false, sampleSize: 1 });
+    expect(selectionGestureCommand("select.magicWand", [[12.5, 8]], { sampleSize: 11 }, "add", none, none)?.params.sampleSize).toBe(11);
+    expect(selectionGestureCommand("select.object", [[20, 25], [40, 45]], { hardEdge: true }, "replace", none, none)?.params.hardEdge).toBe(true);
+    const outline = [[10, 10, .5], [40, 10, .6], [40, 40, .7]];
+    expect(selectionGestureCommand("select.object", outline, { objectMode: "lasso", hardEdge: true, sampleAllLayers: true }, "subtract", none, none)).toEqual({ id: "select.object", params: { points: [[10, 10], [40, 10], [40, 40]], mode: "subtract", sampleAllLayers: true, hardEdge: true } });
+    expect(selectionGestureCommand("select.object", outline.slice(0, 2), { objectMode: "lasso" }, "replace", none, none)).toBeNull();
   });
   it("snaps polygon segments to 45 degrees without altering unsnapped input", () => {
     expect(polygonPoint([10, 10], [30, 14], false)).toEqual([30, 14]);

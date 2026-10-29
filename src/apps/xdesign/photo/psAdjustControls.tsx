@@ -44,10 +44,11 @@ export function OnImageButton({ title, armed, disabled, toggle }: { title: strin
   return <button type="button" className="xd-photo-on-image" aria-label="On-image adjustment" title={title} aria-pressed={armed} disabled={disabled} onClick={toggle}><Pointer size={14}/></button>;
 }
 
-/** Brightness/Contrast's Auto, solved from the luminosity histogram. */
-export function AutoBrightnessContrast({ slot, source, legacy, locked, setValues }: { slot?: HTMLElement | null; source?: HistogramSource; legacy: boolean; locked: boolean; setValues: Dispatch<SetStateAction<Settings>> }) {
+/** Brightness/Contrast's Auto, solved from the luminosity histogram: in a dialog's button column through `slot`, or `inline` above the Properties sliders. */
+export function AutoBrightnessContrast({ slot, inline = false, source, legacy, locked, setValues }: { slot?: HTMLElement | null; inline?: boolean; source?: HistogramSource; legacy: boolean; locked: boolean; setValues: Dispatch<SetStateAction<Settings>> }) {
   const bins = useHistogram(source, "luminosity")?.[0], patch = bins ? autoBrightnessContrast(bins, legacy) : null;
-  return slot ? createPortal(<button type="button" disabled={locked || !patch} onClick={() => { if (patch) setValues(current => ({ ...current, ...patch })); }}>Auto</button>, slot) : null;
+  const button = <button type="button" disabled={locked || !patch} onClick={() => { if (patch) setValues(current => ({ ...current, ...patch })); }}>Auto</button>;
+  return slot ? createPortal(button, slot) : inline ? <div className="xd-photo-tone-head">{button}</div> : null;
 }
 
 const stop = (event: SyntheticEvent) => event.stopPropagation();

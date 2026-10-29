@@ -9,11 +9,11 @@ import { startRowDrag } from "./rowDrag";
 
 type Kind = "gradient" | "style" | "shape" | "pattern";
 type Preset = { name: string; id?: string };
-type Prompt = { title: string; initial?: string; message?: string; submit: (name: string) => Promise<unknown> };
+export type Prompt = { title: string; initial?: string; message?: string; submit: (name: string) => Promise<unknown> };
 const NOUNS: Record<Kind, string> = { gradient: "Gradient", style: "Style", shape: "Shape", pattern: "Pattern" };
 const key = (preset: Preset) => preset.id ?? preset.name;
 
-function PresetPrompt({ prompt, close }: { prompt: Prompt; close: () => void }) {
+export function PresetPrompt({ prompt, close }: { prompt: Prompt; close: () => void }) {
   const busy = usePhotoWorkspace(controlsLocked), [name, setName] = useState(prompt.initial ?? "");
   const dialog = useDesignDialog<HTMLFormElement>(close, busy);
   return <div className="xd-photo-dialog-scrim"><form ref={dialog} role="dialog" aria-modal="true" aria-label={prompt.title} className="xd-photo-dialog" onSubmit={event => {

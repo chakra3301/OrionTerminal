@@ -44,7 +44,7 @@ const norm = (text: string) => text.toLowerCase().replace("(add)", "").replace(/
 export const blendLabel = (variant: string) => variant === "LinearDodge" ? "Linear Dodge (Add)" : variant === "PassThrough" ? "Pass Through" : variant.replace(/([a-z])([A-Z])/g, "$1 $2");
 const at = (value: unknown, path: string[]) => path.reduce<unknown>((current, key) => (current as Record<string, unknown> | undefined)?.[key], value);
 const find = (layers: PhotoLayer[], id: number): PhotoLayer | undefined => { for (const layer of layers) { if (layer.id === id) return layer; const inner = layer.children && find(layer.children, id); if (inner) return inner; } };
-const historyIndex = (state: PhotoState | null | undefined) => state?.historySources?.find(source => source.current)?.index ?? null;
+const historyId = (state: PhotoState | null | undefined) => state?.historySources?.find(source => source.current)?.id ?? null;
 const hexOf = (color: unknown) => { const c = (color as { c?: number[] } | undefined)?.c ?? [0, 0, 0]; return `#${c.slice(0, 3).map(v => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0")).join("")}`; };
 const cssOf = (color: unknown, opacity = 1) => { const c = (color as { c?: number[]; alpha?: number } | undefined) ?? {}, [r, g, b] = (c.c ?? [0, 0, 0]).map(v => Math.round(Math.max(0, Math.min(1, v)) * 255)); return `rgba(${r},${g},${b},${(c.alpha ?? 1) * opacity})`; };
 const rgbColor = (hex: string, alpha: number) => ({ mode: "Rgb", c: [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).concat(0), alpha });
@@ -431,7 +431,7 @@ export function LayerStyleDialog({ layerId, initial = "blending", onClose, docum
   const state = usePhotoWorkspace(s => s.state), layer = state ? find(state.layers, layerId) : undefined;
   const [sel, setSel] = useState<Sel>({ pane: initial, nth: 0 }), [preview, setPreview] = useState(true), [menu, setMenu] = useState(false), [naming, setNaming] = useState(false), [error, setError] = useState("");
   const [picking, setPicking] = useState<{ path: string[]; title: string } | null>(null), [gradientAt, setGradientAt] = useState<string[] | null>(null), [live, setLive] = useState<CanvasDraft | null>(null);
-  const opened = useRef({ base: historyIndex(state), reset: historyIndex(state), top: null as number | null, started: false });
+  const opened = useRef({ base: historyId(state), reset: historyId(state), top: null as string | null, started: false });
   const pending = useRef<Promise<unknown>>(Promise.resolve());
   const items = layer?.effects?.items ?? [];
   const current = () => { const next = usePhotoWorkspace.getState().state; return next ? find(next.layers, layerId) : undefined; };
@@ -476,7 +476,7 @@ export function LayerStyleDialog({ layerId, initial = "blending", onClose, docum
   useEffect(() => {
     if (opened.current.started || !layer) return; opened.current.started = true;
     const def = FX.find(entry => entry.key === initial);
-    if (def && !instances(def.type).length) void addEffect(def).then(() => { opened.current.reset = historyIndex(usePhotoWorkspace.getState().state); });
+    if (def && !instances(def.type).length) void addEffect(def).then(() => { opened.current.reset = historyId(usePhotoWorkspace.getState().state); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!layer) onClose(); }, [layer]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -577,24 +577,24 @@ export function LayerStyleDialog({ layerId, initial = "blending", onClose, docum
   }, [canvas, document, preview, moving]);
 
   // Host commands refuse to overlap, so these wait for an edit still committing (a field's blur when OK is clicked).
-  const revert = (to: number | null, discardRedo = false) => pending.current.then(() => {
-    const now = historyIndex(usePhotoWorkspace.getState().state);
-    if (to !== null && now !== to) return runPhotoCommand("history.select", discardRedo ? { index: to, discardRedo } : { index: to });
+  const revert = (to: string | null, discardRedo = false) => pending.current.then(() => {
+    const now = historyId(usePhotoWorkspace.getState().state);
+    if (to !== null && now !== to) return runPhotoCommand("history.select", discardRedo ? { id: to, discardRedo } : { id: to });
   }).catch(() => {});
   const cancel = () => { void revert(opened.current.base, true); onClose(); };
   const form = useDesignDialog<HTMLFormElement>(cancel);
   const ok = () => {
     const { base, top } = opened.current;
     void (preview ? pending.current : revert(top)).then(() => {
-      const now = historyIndex(usePhotoWorkspace.getState().state);
-      if (base !== null && now !== null && now > base) return runPhotoCommand("history.fold", { from: base, label: "Layer Style" });
+      const now = historyId(usePhotoWorkspace.getState().state);
+      if (base !== null && now !== null && now !== base) return runPhotoCommand("history.fold", { fromId: base, label: "Layer Style" });
     }).catch(() => {});
     onClose();
   };
   const reset = () => { void revert(opened.current.reset); setError(""); setPreview(true); };
   const togglePreview = (on: boolean) => {
     setPreview(on);
-    if (!on) { opened.current.top = historyIndex(usePhotoWorkspace.getState().state); void revert(opened.current.base); }
+    if (!on) { opened.current.top = historyId(usePhotoWorkspace.getState().state); void revert(opened.current.base); }
     else void revert(opened.current.top);
   };
   const create = (name: string, includeEffects: boolean, includeBlending: boolean) => { setNaming(false); void run("style.presets.new", { name, includeEffects, includeBlending }); };
