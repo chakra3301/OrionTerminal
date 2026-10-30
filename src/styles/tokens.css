@@ -242,17 +242,10 @@ summary:focus-visible,
   font-size: 11px;
   text-transform: uppercase;
 }
-.ot-menubar-logo .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--neon-green);
-  box-shadow: 0 0 8px var(--neon-green);
-  animation: ot-pulse 2s ease-in-out infinite;
-}
-@keyframes ot-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+.ot-menubar-mark {
+  height: 10px;
+  width: auto;
+  flex-shrink: 0;
 }
 
 .ot-menubar-sep {

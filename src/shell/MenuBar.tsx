@@ -9,6 +9,7 @@ import { buildMenu, appMenu } from "@/shell/menus";
 import { NotificationCenter } from "@/shell/NotificationCenter";
 import { SpotifyWidget } from "@/shell/SpotifyWidget";
 import { ThemeBorder } from "@/components/effects/ThemeBorder";
+import { BrandMark } from "@/components/BrandMark";
 
 // Twelve bars driven by CSS animations. Heights/delays are pseudo-random
 // (hand-picked) so each bar moves on its own beat — gives the impression of
@@ -145,7 +146,7 @@ export function MenuBar() {
     <div className="ot-menubar">
       <ThemeBorder />
       <div className="ot-menubar-logo">
-        <span className="dot" />
+        <BrandMark decorative className="ot-menubar-mark" />
         <span>ORION TERMINAL</span>
       </div>
       <div className="ot-menubar-sep" />
