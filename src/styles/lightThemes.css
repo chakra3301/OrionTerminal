@@ -41,13 +41,12 @@
   background: var(--bg-1);
   border-bottom-color: var(--work-line);
 }
-:root[data-color-mode="light"] body :is(.ot-window, .cp-surface, .ot-dock, .ot-spotlight, .ot-prompt-card) {
+:root[data-color-mode="light"] body :is(.ot-window, .cp-surface, .ot-spotlight, .ot-prompt-card) {
   border-color: var(--glass-border);
   box-shadow: var(--shadow-window);
 }
 /* A selected shader finish owns the outer rim; never stack decorative trims. */
-:root[data-color-mode="light"] body :is(.ot-window, .cp-surface, .ot-dock, .ot-spotlight, .ot-prompt-card):has(> .ot-themed-border) { border-color: transparent; }
-:root[data-color-mode="light"] body .ot-dock { background: var(--bg-2); }
+:root[data-color-mode="light"] body :is(.ot-window, .cp-surface, .ot-spotlight, .ot-prompt-card):has(> .ot-themed-border) { border-color: transparent; }
 :root[data-color-mode="light"] body .ot-welcome-card { background: var(--bg-1); border-color: var(--glass-border); box-shadow: var(--shadow-window); }
 :root[data-color-mode="light"] body :is(.or-home, .xd-root-home, .ar-today) { background: var(--bg-1); }
 :root[data-color-mode="light"] body :is(.ot-window-body, .ot-panel, .ar-main, .note-page, .or-preview-empty, .or-preview-md, .cp-main-body, .learn-body, .rl-view) { background: var(--bg-1); color: var(--t-primary); }
@@ -119,7 +118,6 @@
 :root[data-color-mode="light"] body .cp-surface .ot-theme-card.active { border-color: color-mix(in srgb, var(--light-detail) 38%, transparent); }
 :root[data-color-mode="light"] body :is(.ot-model-select, .cp-input) option { background: var(--bg-2); color: var(--t-primary); }
 :root[data-color-mode="light"] body :is(.cp-input, .ot-prompt-input, .ot-claude-input textarea, .ot-rosie-input textarea)::placeholder { color: var(--t-tertiary); opacity: 1; }
-:root[data-color-mode="light"] body .ot-dock-item .icon-bed { box-shadow: none; }
 :root[data-color-mode="light"] body .ot-welcome-card :is(button, a):focus-visible { outline: 2px solid var(--light-detail); outline-offset: 3px; }
 
 /* Keep opaque palette tokens for native editors, artwork and no-blur fallback.
@@ -143,7 +141,7 @@
       --light-glass-edge: inset 0 1px 0 #ffffff4d;
     }
     :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
-      .ot-window, .cp-surface, .ot-menubar, .ot-dock, .ot-spotlight,
+      .ot-window, .cp-surface, .ot-menubar, .ot-spotlight,
       .ot-prompt-card, .ot-rosie-panel, .ot-welcome-card, .ot-companion-bubble
     ) {
       background: var(--light-glass-surface);
@@ -151,7 +149,7 @@
       -webkit-backdrop-filter: var(--light-glass-backdrop);
     }
     :root[data-color-mode="light"]:not(.ot-reduce-glass) body :is(
-      .ot-window, .cp-surface, .ot-dock, .ot-spotlight, .ot-prompt-card,
+      .ot-window, .cp-surface, .ot-spotlight, .ot-prompt-card,
       .ot-welcome-card, .ot-rosie-panel, .ot-companion-bubble
     ):not(:has(> .ot-themed-border)) {
       border-color: var(--light-glass-rim);

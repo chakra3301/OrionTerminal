@@ -313,52 +313,92 @@ summary:focus-visible,
    ============================================================ */
 
 .ot-dock-wrap {
+  --dock-green: #39ff88;
+  --dock-cyan: #00e0ff;
+  --dock-yellow: #e6ff3a;
+  --dock-magenta: #ff3ea5;
+  --dock-violet: #b14cff;
+  --dock-utility: #cdd6de;
+  --dock-orb-core: #9ff6ff;
+  --dock-radius: 13.6px;
+  --dock-backdrop: blur(26px) saturate(1.25);
+  --dock-smoked-fill: linear-gradient(180deg, rgba(40,48,56,.42), rgba(14,18,22,.5));
+  --dock-milky-fill: linear-gradient(180deg, rgba(225,232,238,.2), rgba(200,210,218,.11));
+  --dock-smoked-border: rgba(255,255,255,.14);
+  --dock-milky-border: rgba(255,255,255,.24);
+  --dock-shadow: 0 34px 60px -22px rgba(0,0,0,.85), 0 12px 26px -14px rgba(0,0,0,.7);
+  --dock-smoked-edge: inset 0 1px 0 rgba(255,255,255,.18);
+  --dock-milky-edge: inset 0 1px 0 rgba(255,255,255,.34), inset 0 -1px 0 rgba(255,255,255,.06);
+  --dock-sheen: linear-gradient(118deg, rgba(255,255,255,.16) 0%, transparent 38%, transparent 62%, rgba(255,255,255,.06) 100%);
+  --dock-divider: rgba(255,255,255,.16);
+  --dock-reduced-fill: rgba(8,14,18,.88);
   position: fixed;
-  bottom: 14px;
+  bottom: 30px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
 }
 
 .ot-dock {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  border-radius: var(--r-xl);
-  background: rgba(8, 14, 18, 0.88);
-  border: 1px solid var(--glass-border-bright);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.08),
-    0 20px 50px -10px rgba(0,0,0,0.7),
-    0 0 40px -10px rgba(var(--neon-cyan-rgb), 0.15);
+  border-radius: var(--dock-radius);
+  background: var(--dock-smoked-fill);
+  border: 1px solid var(--dock-smoked-border);
+  box-shadow: var(--dock-smoked-edge), var(--dock-shadow);
+  backdrop-filter: var(--dock-backdrop);
+  -webkit-backdrop-filter: var(--dock-backdrop);
+}
+.ot-dock::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--dock-sheen);
+}
+:root[data-color-mode="light"] body .ot-dock {
+  background: var(--dock-milky-fill);
+  border-color: var(--dock-milky-border);
+  box-shadow: var(--dock-milky-edge), var(--dock-shadow);
+}
+:root body .ot-dock:has(> .ot-themed-border) { border-color: transparent; }
+:root.ot-reduce-glass body .ot-dock {
+  background: var(--dock-reduced-fill);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root.ot-reduce-glass[data-color-mode="light"] body .ot-dock { background: var(--bg-2); }
+:root.ot-reduce-glass body .ot-dock::before { display: none; }
+@media (prefers-reduced-transparency: reduce) {
+  :root body .ot-dock {
+    background: var(--dock-reduced-fill);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  :root[data-color-mode="light"] body .ot-dock { background: var(--bg-2); }
+  :root body .ot-dock::before { display: none; }
 }
 
 .ot-dock-item {
   position: relative;
+  flex: 0 0 auto;
   width: 48px;
   height: 48px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  border-radius: var(--dock-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
   cursor: pointer;
   color: inherit;
   font: inherit;
   padding: 0;
-}
-.ot-dock-item:hover {
-  /* magnify handles the transform — keep only the border treat here so the
-     two don't fight. */
-  border-color: var(--glass-border-bright);
-}
-@media (prefers-reduced-motion: reduce) {
-  /* Fallback: bring back the simple hover lift when motion is reduced (JS
-     magnify auto-disables itself by setting transition: 0.25s ease, which
-     still works at any reduce-motion level). */
-  .ot-dock-item { transition: transform 0.2s ease; }
+  transform-origin: 50% 100%;
 }
 .ot-dock-item.active::after {
   content: "";
@@ -369,24 +409,53 @@ summary:focus-visible,
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--neon-green);
-  box-shadow: 0 0 6px var(--neon-green);
+  background: var(--dock-green);
+  box-shadow: 0 0 6px var(--dock-green);
+  transition: opacity .12s ease;
 }
-
-.ot-dock-item .icon-bed {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
+.ot-dock-item.active.labeled::after { opacity: 0; }
+.ot-dock-icon {
+  display: block;
+  flex: 0 0 auto;
+  width: 76px;
+  height: 76px;
+  margin: -14px;
+  pointer-events: none;
+  will-change: transform;
 }
-
+.ot-dock-mask-source, .ot-dock-icon[hidden] { display: none; }
+.ot-dock-icon-fallback { opacity: .55; pointer-events: none; }
+.ot-dock-orb-slot { width: 64px; margin: 0 4px; }
+.ot-dock-orb {
+  display: block;
+  position: absolute;
+  width: 96px;
+  height: 96px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, calc(-50% - 14px));
+  pointer-events: none;
+}
 .ot-dock-divider {
   width: 1px;
   height: 28px;
-  background: rgba(255,255,255,0.08);
+  background: var(--dock-divider);
   margin: 0 4px;
 }
+.ot-dock-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  white-space: pre;
+  opacity: 0;
+  transition: opacity .12s ease;
+  font: 500 8px/1 "JetBrains Mono", ui-monospace, monospace;
+  letter-spacing: .06em;
+  color: var(--dock-color);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--dock-color) 45%, transparent);
+}
+.ot-dock-label.on { opacity: 1; }
 
 /* ============================================================
    Window frame

@@ -24,6 +24,7 @@ import { useHtmlArtifact } from "@/apps/xdesign/htmlArtifactStore";
 import { useXDesignSaveState } from "@/apps/xdesign/saveState";
 import { setAppState } from "@/lib/db";
 import { allTabs, useWorkspace } from "@/components/workspace/workspaceStore";
+import { dockApps } from "@/shell/dock/logic";
 
 vi.mock("@/lib/log", () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -48,6 +49,14 @@ beforeEach(reset);
 afterEach(reset);
 
 describe("built-in app plugins", () => {
+  it("hides Command Center and Hermes only from the dock", () => {
+    ensureBuiltinAppPlugins();
+    expect(dockApps(appRegistry.list()).map((app) => app.id)).toEqual(["archives", "orion", "xdesign", "incubator"]);
+    expect(registry.has("app.openCommandCenter")).toBe(true);
+    expect(registry.has("app.openHermes")).toBe(true);
+    expect(appRegistry.has("command")).toBe(true);
+    expect(appRegistry.has("hermes")).toBe(true);
+  });
   it("autosaves webpage-only edits through the project queue without a canvas mutation", async () => {
     vi.useFakeTimers();
     const id = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";

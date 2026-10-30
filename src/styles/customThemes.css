@@ -1,4 +1,4 @@
-:root[data-custom-surface] body :is(.ot-window, .cp-surface, .ot-menubar, .ot-dock, .ot-spotlight, .ot-prompt-card, .ot-welcome-card, .ot-rosie-panel, .ot-companion-bubble) {
+:root[data-custom-surface] body :is(.ot-window, .cp-surface, .ot-menubar, .ot-spotlight, .ot-prompt-card, .ot-welcome-card, .ot-rosie-panel, .ot-companion-bubble) {
   background: var(--bg-1);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -23,7 +23,7 @@
     --custom-glass-body: transparent;
     --custom-glass-backdrop: blur(12px);
   }
-  :root[data-custom-surface="glass"][data-color-mode="dark"]:not(.ot-reduce-glass) body :is(.ot-window, .cp-surface, .ot-menubar, .ot-dock, .ot-spotlight, .ot-prompt-card, .ot-welcome-card, .ot-rosie-panel, .ot-companion-bubble) {
+  :root[data-custom-surface="glass"][data-color-mode="dark"]:not(.ot-reduce-glass) body :is(.ot-window, .cp-surface, .ot-menubar, .ot-spotlight, .ot-prompt-card, .ot-welcome-card, .ot-rosie-panel, .ot-companion-bubble) {
     background: var(--custom-glass-fill);
     backdrop-filter: var(--custom-glass-backdrop);
     -webkit-backdrop-filter: var(--custom-glass-backdrop);

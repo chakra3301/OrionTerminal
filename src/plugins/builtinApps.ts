@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Archive, Code2, FlaskConical, Palette, Radar, Workflow } from "lucide-react";
+import { Archive, Atom, Code2, Palette, Radar, Workflow } from "lucide-react";
 import { registry, type Command } from "@/commands/registry";
 import { useShell } from "@/shell/store/useShell";
 import { appRegistry, type AppDescriptor } from "@/plugins/appRegistry";
@@ -30,7 +30,7 @@ export const BUILTIN_APP_DESCRIPTORS: readonly AppDescriptor[] = [
     },
     window: { title: "INCUBATOR", subtitle: "bring something in", defaultSize: { w: 1020, h: 780 } },
     dock: {
-      Icon: FlaskConical,
+      Icon: Atom,
       background: "linear-gradient(135deg, rgba(177,76,255,0.4), rgba(177,76,255,0.05))",
       glow: "0 0 14px -2px rgba(177,76,255,0.4)",
       foreground: "#180825",
@@ -152,6 +152,7 @@ export const BUILTIN_APP_DESCRIPTORS: readonly AppDescriptor[] = [
     },
     dock: {
       Icon: Radar,
+      hidden: true,
       background: "linear-gradient(135deg, rgba(255,194,75,0.42), rgba(255,194,75,0.05))",
       glow: "0 0 14px -2px rgba(255,194,75,0.45)",
       foreground: "#1c1303",
@@ -182,6 +183,7 @@ export const BUILTIN_APP_DESCRIPTORS: readonly AppDescriptor[] = [
     },
     dock: {
       Icon: Workflow,
+      hidden: true,
       background: "linear-gradient(135deg, rgba(255,138,61,0.42), rgba(255,138,61,0.05))",
       glow: "0 0 14px -2px rgba(255,138,61,0.45)",
       foreground: "#1c0e03",

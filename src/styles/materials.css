@@ -93,20 +93,20 @@
 
 /* These are chrome adapters, not class-name patterns or descendant injections. */
 :root:is([data-theme="liquid"], [data-color-mode="light"], [data-custom-surface]) body :is(
-  .ot-window, .ot-menubar, .ot-dock, .cp-surface, .ot-welcome-card, .ot-rosie-panel
+  .ot-window, .ot-menubar, .cp-surface, .ot-welcome-card, .ot-rosie-panel
 ) {
   background: var(--material-shell);
   backdrop-filter: var(--material-backdrop);
   -webkit-backdrop-filter: var(--material-backdrop);
 }
 :root:is([data-theme="liquid"], [data-color-mode="light"], [data-custom-surface]) body :is(
-  .ot-window, .ot-dock, .cp-surface, .ot-welcome-card, .ot-rosie-panel,
+  .ot-window, .cp-surface, .ot-welcome-card, .ot-rosie-panel,
   .ot-spotlight, .ot-prompt-card
 ):not(:has(> .ot-themed-border)) {
   border-color: var(--material-rim);
   box-shadow: var(--material-edge), var(--shadow-window);
 }
-:root body :is(.ot-window, .ot-dock, .cp-surface, .ot-spotlight, .ot-prompt-card):has(> .ot-themed-border) {
+:root body :is(.ot-window, .cp-surface, .ot-spotlight, .ot-prompt-card):has(> .ot-themed-border) {
   border-color: transparent;
   box-shadow: var(--shadow-window);
 }

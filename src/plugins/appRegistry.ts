@@ -27,6 +27,7 @@ export type AppDescriptor = {
   };
   dock: {
     Icon: LucideIcon;
+    hidden?: boolean;
     background: string;
     glow: string;
     foreground: string;
