@@ -1,12 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openPath } from "@tauri-apps/plugin-opener";
+import { ArchivesMediaPlayer } from "./MediaPlayer";
 import {
   X,
   ExternalLink,
   Trash2,
   FileText,
-  Music,
   Film as FilmIcon,
   FileQuestion,
 } from "lucide-react";
@@ -28,15 +28,29 @@ export function AssetPreviewModal() {
   const assets = useAssetsStore((s) => s.assets);
   const removeAsset = useAssetsStore((s) => s.remove);
   const asset = previewingId ? assets.get(previewingId) ?? null : null;
+  const modal = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!asset) return;
+    const previous = document.activeElement;
+    const node = modal.current;
+    node?.querySelector<HTMLButtonElement>('[aria-label="Close preview"]')?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (document.querySelector('dialog[open]')) return;
+      if (e.key === "Escape") { e.preventDefault(); close(); }
+      if (e.key === "Tab" && node) {
+        const targets = [...node.querySelectorAll<HTMLElement>('button:not(:disabled),video,audio,[href],input,select,[tabindex="0"]')];
+        const first = targets[0], last = targets.at(-1);
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [asset]);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+    };
+  }, [asset?.id]);
 
   if (!asset) return null;
 
@@ -45,8 +59,7 @@ export function AssetPreviewModal() {
   const handleOpenExternal = async () => {
     if (!asset.filePath) return;
     try {
-      // openUrl handles file:// paths on all platforms via the OS handler.
-      await openUrl(`file://${asset.filePath}`);
+      await openPath(asset.filePath);
     } catch (e) {
       log.warn("open external failed", e);
     }
@@ -57,9 +70,9 @@ export function AssetPreviewModal() {
       `Delete "${asset.title}"? This removes the file from your Archives.`,
       { title: "Delete asset", kind: "warning" },
     );
-    if (!ok) return;
+    if (!ok || useArchives.getState().previewingAssetId !== asset.id) return;
     await removeAsset(asset.id);
-    close();
+    if (useArchives.getState().previewingAssetId === asset.id) close();
   };
 
   return (
@@ -69,7 +82,7 @@ export function AssetPreviewModal() {
         if (e.target === e.currentTarget) close();
       }}
     >
-      <div className="ar-asset-preview-modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div ref={modal} className="ar-asset-preview-modal" role="dialog" aria-modal="true" aria-label={asset.title} onMouseDown={(e) => e.stopPropagation()}>
         <header className="ar-asset-preview-header">
           <div className="title">
             <span>{asset.title}</span>
@@ -92,6 +105,7 @@ export function AssetPreviewModal() {
             className="icon-btn"
             onClick={() => void handleOpenExternal()}
             title="Open in default app"
+            aria-label="Open in default app"
           >
             <ExternalLink size={13} />
           </button>
@@ -100,6 +114,7 @@ export function AssetPreviewModal() {
             className="icon-btn ar-notes-danger"
             onClick={() => void handleDelete()}
             title="Delete"
+            aria-label="Delete asset"
           >
             <Trash2 size={13} />
           </button>
@@ -108,55 +123,29 @@ export function AssetPreviewModal() {
             className="icon-btn"
             onClick={close}
             title="Close (Esc)"
+            aria-label="Close preview"
           >
             <X size={14} />
           </button>
         </header>
 
         <div className={`ar-asset-preview-body kind-${asset.kind}`}>
-          <AssetPreviewSurface asset={asset} src={src} />
+          <AssetPreviewSurface key={asset.id} asset={asset} src={src} onOpenExternal={() => void handleOpenExternal()} />
         </div>
       </div>
     </div>
   );
 }
 
-function AssetPreviewSurface({ asset, src }: { asset: Asset; src: string }) {
+function AssetPreviewSurface({ asset, src, onOpenExternal }: { asset: Asset; src: string; onOpenExternal: () => void }) {
   if (!src) return <NoSourceState />;
 
   if (asset.kind === "image") {
     return <img src={src} alt={asset.title} className="ar-asset-preview-image" />;
   }
 
-  if (asset.kind === "video") {
-    return (
-      <video
-        key={asset.id}
-        src={src}
-        controls
-        autoPlay
-        playsInline
-        className="ar-asset-preview-video"
-      />
-    );
-  }
-
-  if (asset.kind === "audio") {
-    return (
-      <div className="ar-asset-preview-audio">
-        <div className="ar-asset-preview-audio-icon">
-          <Music size={36} color="var(--neon-green)" />
-        </div>
-        <div className="ar-asset-preview-audio-name">{asset.title}</div>
-        <audio
-          key={asset.id}
-          src={src}
-          controls
-          autoPlay
-          className="ar-asset-preview-audio-player"
-        />
-      </div>
-    );
+  if (asset.kind === "video" || asset.kind === "audio") {
+    return <ArchivesMediaPlayer asset={asset} src={src} onOpenExternal={onOpenExternal} />;
   }
 
   return <GenericFileState asset={asset} />;

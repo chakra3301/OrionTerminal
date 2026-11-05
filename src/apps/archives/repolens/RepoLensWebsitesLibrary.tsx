@@ -10,10 +10,12 @@ import { RepoLensWebsiteProgress } from "./RepoLensWebsiteProgress";
 import { RepoLensDesignMDs } from "./RepoLensDesignMDs";
 import { phaseLabel } from "./websiteRip";
 import type { WebsiteRipRow, WebsiteStatus } from "./repolensWebsitesDb";
+import { archivesHost } from "@/apps/archives/host";
 
 export function RepoLensWebsitesLibrary() {
-  const { rips, loaded, load, remove, continueRip, openInOrion, extractDesign } =
+  const { rips, loaded, load, remove, continueRip, openClone, extractDesign } =
     useRepoLensWebsites();
+  const canOpenClone = archivesHost().openWebsiteClone !== null;
   const extractingSet = useRepoLensWebsites((s) => s.extracting);
   const selectedModel = useRepoLens((s) => s.model.default_model);
   const providers = useProvidersStore((s) => s.providers);
@@ -74,16 +76,18 @@ export function RepoLensWebsitesLibrary() {
             r={r}
             extracting={extractingSet.has(r.id)}
             onOpen={() => {
-              if (r.status === "done") void openInOrion(r.id);
+              if (r.status === "done" && canOpenClone) void openClone(r.id);
             }}
             onExtract={() => void extractDesign(r.id, model)}
             onMenu={(e) =>
               openAt(e, [
-                {
-                  label: "Open in Orion",
-                  onClick: () => void openInOrion(r.id),
-                  disabled: r.status !== "done",
-                },
+                ...(canOpenClone
+                  ? [{
+                      label: "Open in Orion",
+                      onClick: () => void openClone(r.id),
+                      disabled: r.status !== "done",
+                    }]
+                  : []),
                 {
                   label: r.design_json ? "Re-extract MD" : "Extract MD",
                   onClick: () => void extractDesign(r.id, model),

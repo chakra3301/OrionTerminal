@@ -18,3 +18,16 @@ export function sendToArchivesChat(text: string): boolean {
   sender(text);
   return true;
 }
+
+/** Panel toggles ArchivesApp exposes to its host (the standalone app's View menu). */
+export type ArchivesPanelToggles = { toggleSidebar: () => void; toggleChat: () => void };
+
+let toggles: ArchivesPanelToggles | null = null;
+
+export function setArchivesPanelToggles(t: ArchivesPanelToggles | null): void {
+  toggles = t;
+}
+
+export function archivesPanelToggles(): ArchivesPanelToggles | null {
+  return toggles;
+}

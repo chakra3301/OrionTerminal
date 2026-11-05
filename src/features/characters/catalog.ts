@@ -1,19 +1,17 @@
-// Built-in characters live in public/characters/<slug>.glb (Meshy "merged
-// animations" exports: one skinned mesh + a few clips). Idle/select clip names
-// differ per model, so playback resolves clips by name at runtime (see
-// resolveClips) rather than hard-coding them here.
-
-export type CharacterAccent = "cyan" | "green" | "magenta" | "violet" | "yellow";
+import manifest from "../../../public/characters/manifest.json";
+import type { CompanionId } from "./companionProfiles";
 
 export type BuiltinCharacter = {
-  id: string;
+  id: CompanionId;
+  /** Display name, spelled exactly as on the card art. */
   name: string;
+  code: string;
   blurb: string;
-  accent: CharacterAccent;
-  /** Wireframe energy-core color (each character distinct). */
   color: string;
   /** URL served from /public. */
   url: string;
+  /** Card art from the site (orion-site /companions/cards). */
+  card: { art: string; clean: string; spec: string };
 };
 
 export type CustomCharacter = {
@@ -25,96 +23,41 @@ export type CustomCharacter = {
   color?: string;
 };
 
-/** Energy-core color for any character (custom defaults to cyan). */
-export function colorOf(c: Character): string {
-  return c.color ?? "#00e0ff";
-}
-
 export type Character =
   | (BuiltinCharacter & { custom?: false })
   | CustomCharacter;
 
-// The original R.O.S.I.E companion. Kept first + default so the desktop
-// companion is unchanged out of the box; selecting another character swaps the
-// companion model ("your version of R.O.S.I.E").
-export const ROSIE_ID = "rosie";
+export function colorOf(c: Character): string {
+  return c.color ?? "#00e0ff";
+}
 
+export const DEFAULT_CHARACTER_ID: CompanionId = "rosie";
+
+export function versionedCharacterUrl(url: string) {
+  const asset = manifest.characters.find((character) => character.model === url);
+  return asset ? `${url}?v=${asset.sha256.slice(0, 12)}` : url;
+}
+
+const card = (id: CompanionId) => ({
+  art: `/companions/cards/${id}.webp`,
+  clean: `/companions/cards/${id}-clean.webp`,
+  spec: `/companions/cards/${id}.json`,
+});
+
+// Order and colours follow the cards: OT-01 R.O.S.I.E cyan, OT-02 M.X.S.H.Y
+// pink, OT-03 A.N.G.3.L silver, OT-04 S.U.K.I red.
 export const BUILTIN_CHARACTERS: BuiltinCharacter[] = [
-  {
-    id: ROSIE_ID,
-    name: "R.O.S.I.E",
-    blurb: "The original. Your default companion.",
-    accent: "cyan",
-    color: "#00e0ff",
-    url: "/companion/companion.glb",
-  },
-  {
-    id: "azure-halo-knight",
-    name: "Azure Halo Knight",
-    blurb: "Haloed sentinel in azure plate.",
-    accent: "cyan",
-    color: "#4cc2ff",
-    url: "/characters/azure-halo-knight.glb",
-  },
-  {
-    id: "azure-horizon-runner",
-    name: "Azure Horizon Runner",
-    blurb: "Built for speed. Comes with a power spin.",
-    accent: "cyan",
-    color: "#39ff88",
-    url: "/characters/azure-horizon-runner.glb",
-  },
-  {
-    id: "azure-rebellion",
-    name: "Azure Rebellion",
-    blurb: "Defiant edge, electric blue.",
-    accent: "violet",
-    color: "#b14cff",
-    url: "/characters/azure-rebellion.glb",
-  },
-  {
-    id: "haloed-blue-demon",
-    name: "Haloed Blue Demon",
-    blurb: "Angelic halo, demonic intent.",
-    accent: "magenta",
-    color: "#ff3ea5",
-    url: "/characters/haloed-blue-demon.glb",
-  },
-  {
-    id: "horned-shadow-knight",
-    name: "Horned Shadow Knight",
-    blurb: "Dark armor, sharper horns.",
-    accent: "violet",
-    color: "#ff6a3a",
-    url: "/characters/horned-shadow-knight.glb",
-  },
-  {
-    id: "pink-hatted-alien",
-    name: "Pink Hatted Alien",
-    blurb: "Friendly visitor, questionable hat.",
-    accent: "magenta",
-    color: "#e6ff3a",
-    url: "/characters/pink-hatted-alien.glb",
-  },
-  {
-    id: "winged-guardian",
-    name: "Winged Guardian",
-    blurb: "Watches over the terminal. Has wings.",
-    accent: "green",
-    color: "#00ffd0",
-    url: "/characters/winged-guardian.glb",
-  },
+  { id: "rosie", name: "R.O.S.I.E", code: "OT-01", blurb: "The original. Your default companion.", color: "#00e0ff", url: "/characters/rosie.glb", card: card("rosie") },
+  { id: "mxshy", name: "M.X.S.H.Y", code: "OT-02", blurb: "Your companion. A little otherworldly.", color: "#ff5fa8", url: "/characters/mxshy.glb", card: card("mxshy") },
+  { id: "ang3l", name: "A.N.G.3.L", code: "OT-03", blurb: "Cybernetic visor, mechanical wings.", color: "#e8edf2", url: "/characters/ang3l.glb", card: card("ang3l") },
+  { id: "suki", name: "S.U.K.I", code: "OT-04", blurb: "Cream helmet, ruby eyes. System online.", color: "#ff3b46", url: "/characters/suki.glb", card: card("suki") },
 ];
 
-export const ACCENT_VAR: Record<CharacterAccent, string> = {
-  cyan: "var(--neon-cyan)",
-  green: "var(--neon-green)",
-  magenta: "var(--neon-magenta)",
-  violet: "var(--neon-violet)",
-  yellow: "var(--neon-yellow)",
-};
+export function builtinCharacter(id: string): BuiltinCharacter | undefined {
+  return BUILTIN_CHARACTERS.find((c) => c.id === id);
+}
 
-/** Pick idle + a one-shot "select" clip from whatever the GLB ships with. */
+/** Clip roles for uploaded models (Mixamo-style libraries). Built-ins use the sleeve gestures. */
 export function resolveClips(names: string[]): {
   idle: string | null;
   select: string | null;
@@ -125,12 +68,17 @@ export function resolveClips(names: string[]): {
     return i >= 0 ? names[i] : null;
   };
   const idle =
+    find((n) => n === "idle") ??
+    find((n) => n === "texting while standing") ??
+    find((n) => n === "sad idle") ??
     find((n) => n.includes("idle")) ??
     find((n) => n.includes("swim")) ??
     find((n) => n.includes("walk")) ??
     names[0] ??
     null;
   const select =
+    find((n) => n === "greeting") ??
+    find((n) => n === "standing greeting") ??
     find((n) => n.includes("spin") || n.includes("jump") || n.includes("power")) ??
     find((n) => n.includes("run")) ??
     find((n) => n.includes("walk")) ??

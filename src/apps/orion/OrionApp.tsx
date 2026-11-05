@@ -1,5 +1,10 @@
-import { File as FileIcon, FolderTree, Sparkles, Terminal as TerminalIcon, Eye, StickyNote, Bot, Image as ImageIcon, Film, Music, FileText, AlertCircle, Search, GitPullRequestArrow, FileDiff } from "lucide-react";
+import { FolderTree, Sparkles, Terminal as TerminalIcon, Eye, StickyNote, Bot, AlertCircle, Search, GitPullRequestArrow, FileDiff, Columns2 } from "lucide-react";
+import { useEffect } from "react";
+import { confirmAction } from "@/components/ConfirmModal";
+import { registry as commands } from "@/commands/registry";
+import { OrionSidebar } from "@/apps/orion/OrionSidebar";
 import { mediaTypeForPath } from "@/lib/mediaTypes";
+import { FileTypeIcon } from "@/lib/fileIcon";
 import { OrionMediaViewer } from "@/apps/orion/MediaViewer";
 import { useProjectStore } from "@/store/projectStore";
 import { useTabsStore, isFileTabDirty } from "@/store/tabsStore";
@@ -15,7 +20,6 @@ import type {
   Tab,
   TabDescriptor,
 } from "@/components/workspace/types";
-import { OrionFileTree } from "@/apps/orion/FileTree";
 import { OrionEditor } from "@/apps/orion/Editor";
 import { OrionPreview } from "@/apps/orion/Preview";
 import { OrionTerminalPanel } from "@/apps/orion/Terminal";
@@ -35,7 +39,7 @@ const orionRegistry: ContentRegistry = {
   render: (tab: Tab) => {
     switch (tab.descriptor.kind) {
       case "files-tree":
-        return <OrionFileTree />;
+        return <OrionSidebar />;
       case "preview":
         return <OrionPreview />;
       case "terminal":
@@ -48,7 +52,13 @@ const orionRegistry: ContentRegistry = {
       case "claude":
         return <OrionClaudeRail />;
       case "claude-code":
-        return <OrionClaudeCodePanel agent={tab.descriptor.agent ?? "claude"} />;
+        return (
+          <OrionClaudeCodePanel
+            agent={tab.descriptor.agent ?? "claude"}
+            tabId={tab.id}
+            initialView={tab.descriptor.view}
+          />
+        );
       case "problems":
         return <OrionProblemsPanel />;
       case "search":
@@ -70,47 +80,32 @@ const orionRegistry: ContentRegistry = {
     }
   },
   icon: (tab: Tab) => {
-    switch (tab.descriptor.kind) {
+    // Quiet monochrome glyphs; the active tab lifts them to ink in CSS.
+    const d = tab.descriptor;
+    switch (d.kind) {
       case "files-tree":
-        return <FolderTree size={11} color="var(--t-tertiary)" />;
+        return <FolderTree size={14} />;
       case "preview":
-        return <Eye size={11} color="var(--neon-cyan)" />;
+        return <Eye size={14} />;
       case "terminal":
-        return <TerminalIcon size={11} color="var(--neon-green)" />;
+        return <TerminalIcon size={14} />;
       case "claude":
-        return <Sparkles size={11} color="var(--neon-cyan)" />;
-      case "claude-code": {
-        const a = tab.descriptor.agent ?? "claude";
-        const color =
-          a === "hermes"
-            ? "var(--neon-cyan)"
-            : a === "pi"
-              ? "var(--neon-green)"
-              : "var(--neon-violet)";
-        return <Bot size={11} color={color} />;
-      }
+        return <Sparkles size={14} />;
+      case "claude-code":
+        return <Bot size={14} />;
       case "problems":
-        return <AlertCircle size={11} color="var(--neon-magenta)" />;
+        return <AlertCircle size={14} />;
       case "search":
-        return <Search size={11} color="var(--t-secondary)" />;
+        return <Search size={14} />;
       case "changes":
-        return <GitPullRequestArrow size={11} color="var(--neon-yellow)" />;
+        return <GitPullRequestArrow size={14} />;
       case "diff-review":
-        return <FileDiff size={11} color="var(--neon-cyan)" />;
+        return <FileDiff size={14} />;
       case "file": {
-        const m = mediaTypeForPath(tab.descriptor.path);
-        if (m?.kind === "image")
-          return <ImageIcon size={11} color="var(--neon-cyan)" />;
-        if (m?.kind === "video")
-          return <Film size={11} color="var(--neon-cyan)" />;
-        if (m?.kind === "audio")
-          return <Music size={11} color="var(--neon-cyan)" />;
-        if (m?.kind === "pdf")
-          return <FileText size={11} color="var(--neon-cyan)" />;
-        return <FileIcon size={11} color="var(--t-tertiary)" />;
+        return <FileTypeIcon path={d.path} />;
       }
       case "note":
-        return <StickyNote size={11} color="var(--neon-green)" />;
+        return <StickyNote size={14} />;
       default:
         return null;
     }
@@ -131,6 +126,35 @@ const orionRegistry: ContentRegistry = {
     }
     return false;
   },
+  confirmClose: async (tab: Tab) => {
+    if (tab.descriptor.kind !== "file" || !isFileTabDirty(tab, useTabsStore.getState().fileBuffers)) return true;
+    return confirmAction({
+      title: `Close ${tab.label}?`,
+      body: "Your changes will be lost if you don't save them.",
+      confirmLabel: "Close without saving",
+      danger: true,
+    });
+  },
+  tabActions: (panel: LayoutPanel) => {
+    if (panel.role === "explorer" || panel.role === "claude" || panel.role === "terminal") return null;
+    const active = panel.tabs.find((t) => t.id === panel.activeTabId);
+    if (active?.descriptor.kind !== "file") return null;
+    return (
+      <button
+        type="button"
+        className="ot-panel-tab-add"
+        title="Split Editor Right (⌘\\)"
+        aria-label="Split Editor Right"
+        onClick={() => {
+          useWorkspace.getState().focusPanel(panel.id);
+          useWorkspace.getState().splitFocusedPanel();
+        }}
+      >
+        <Columns2 size={14} />
+      </button>
+    );
+  },
+  emptyEditor: () => <OrionEmptyEditor />,
   persistent: (tab: Tab) =>
     tab.descriptor.kind === "claude-code" ||
     tab.descriptor.kind === "terminal",
@@ -146,28 +170,35 @@ const orionRegistry: ContentRegistry = {
     const ai: AddMenuItem[] = [
       {
         id: "claude",
-        label: "Orix47 — AI rail",
-        icon: <Sparkles size={13} color="var(--neon-cyan)" />,
+        label: "Orix47",
+        icon: <Sparkles size={13} />,
         onSelect: () => open({ kind: "claude" }),
       },
       {
         id: "claude-code",
         label: "Claude Code",
-        icon: <Bot size={13} color="var(--neon-violet)" />,
+        icon: <Bot size={13} />,
         onSelect: () =>
           open({ kind: "claude-code", id: ulid(), agent: "claude" }),
       },
       {
+        id: "codex-code",
+        label: "Codex",
+        icon: <Bot size={13} />,
+        onSelect: () =>
+          open({ kind: "claude-code", id: ulid(), agent: "codex" }),
+      },
+      {
         id: "hermes-code",
         label: "Hermes",
-        icon: <Bot size={13} color="var(--neon-cyan)" />,
+        icon: <Bot size={13} />,
         onSelect: () =>
           open({ kind: "claude-code", id: ulid(), agent: "hermes" }),
       },
       {
         id: "pi-code",
         label: "Pi",
-        icon: <Bot size={13} color="var(--neon-green)" />,
+        icon: <Bot size={13} />,
         onSelect: () => open({ kind: "claude-code", id: ulid(), agent: "pi" }),
       },
     ];
@@ -186,27 +217,53 @@ const orionRegistry: ContentRegistry = {
       {
         id: "terminal",
         label: "Terminal",
-        icon: <TerminalIcon size={13} color="var(--neon-green)" />,
+        icon: <TerminalIcon size={13} />,
         onSelect: () => open({ kind: "terminal", id: ulid() }),
       },
       {
         id: "preview",
         label: "Preview",
-        icon: <Eye size={13} color="var(--neon-cyan)" />,
+        icon: <Eye size={13} />,
         onSelect: () => open({ kind: "preview" }),
-      },
-      {
-        id: "files-tree",
-        label: "Explorer",
-        icon: <FolderTree size={13} color="var(--t-tertiary)" />,
-        onSelect: () => open({ kind: "files-tree" }),
       },
     ];
   },
 };
 
+const EMPTY_SHORTCUTS: { label: string; keys: string[]; command: string }[] = [
+  { label: "Go to File", keys: ["⌘", "P"], command: "file.openFile" },
+  { label: "Search in Files", keys: ["⇧", "⌘", "F"], command: "search.inFiles" },
+  { label: "Toggle Terminal", keys: ["⌘", "`"], command: "terminal.toggle" },
+  { label: "Toggle Agent", keys: ["⌘", "J"], command: "panel.toggleRightRail" },
+  { label: "Spotlight", keys: ["⌘", "K"], command: "palette.open" },
+];
+
+/** The editor area with nothing open: Cursor's quiet shortcut sheet. */
+function OrionEmptyEditor() {
+  return (
+    <div className="or-empty-editor">
+      <div className="or-empty-editor-list">
+        {EMPTY_SHORTCUTS.map((s) => (
+          <button key={s.command} type="button" className="or-empty-editor-row" onClick={() => void commands.run(s.command)}>
+            <span className="l">{s.label}</span>
+            <span className="k">{s.keys.map((k) => <kbd key={k}>{k}</kbd>)}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function OrionApp() {
   const project = useProjectStore((s) => s.active);
+
+  // Editing a preview tab keeps it, as in Cursor.
+  useEffect(() => useTabsStore.subscribe((state, prev) => {
+    for (const path of Object.keys(state.fileBuffers)) {
+      const now = state.fileBuffers[path], before = prev.fileBuffers[path];
+      if (now && before?.loaded && now.loaded && now.contents !== before.contents) useWorkspace.getState().pinFile(path);
+    }
+  }), []);
 
   if (!project) {
     return <OrionHome />;

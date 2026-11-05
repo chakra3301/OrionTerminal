@@ -1,3 +1,4 @@
+import { runPencilCommands } from "./pencil/legacyCommands";
 // Canvas command DSL — how XDesign's Claude rail manipulates the document.
 //
 // Claude embeds JSON commands in <canvas-command>…</canvas-command> tags in
@@ -143,6 +144,7 @@ export type SendToBackCmd = { action: "sendToBack"; ids: string[] };
 export type DuplicateCmd = { action: "duplicate"; ids: string[] };
 
 export type CanvasCommand =
+  | { action: "designTool"; name: string; input: Record<string,unknown> }
   | AddRectCmd
   | AddEllipseCmd
   | AddTextCmd
@@ -253,6 +255,7 @@ export type CanvasRunOutcome = {
 export function runCanvasCommands(cmds: CanvasCommand[]): CanvasRunOutcome {
   if (cmds.length === 0) return { applied: 0, newIds: [], results: [] };
   const store = useXDesign.getState();
+  if(store.pencilDocument) return runPencilCommands(cmds);
   // Individual store actions (addShape/deleteShapes/…) each push their OWN
   // history entry, so a naive batch becomes N undo steps. Snapshot the
   // pre-batch state up front, let the ops run normally, then rewrite history

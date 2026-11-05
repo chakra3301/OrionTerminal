@@ -23,7 +23,7 @@ export function licenseFiles(dir) {
     .map(entry => ({ name: entry.name, text: fs.readFileSync(path.join(dir, entry.name), 'utf8') }));
 }
 
-export function frontendLicenses(graph, root = process.cwd()) {
+export function frontendLicenses(graph, root = process.cwd(), extraModules = () => []) {
   let sourceManifest;
   return {
     name: `orion-license-inventory-${graph}`,
@@ -31,6 +31,10 @@ export function frontendLicenses(graph, root = process.cwd()) {
     buildStart() { sourceManifest = checkDistributionLicenses(root); },
     generateBundle(_options, bundle) {
       const packages = new Map();
+      for (const id of extraModules()) {
+        const pkg = packageForModule(id);
+        if (pkg) packages.set(`${pkg.name}@${pkg.version}`, pkg);
+      }
       for (const chunk of Object.values(bundle)) {
         if (chunk.type !== 'chunk') continue;
         for (const id of chunk.moduleIds) {
@@ -52,11 +56,13 @@ export function frontendLicenses(graph, root = process.cwd()) {
             files.push({ name: path.basename(file), text: data.toString('utf8'), origin: entry.origin ?? override.reason });
           }
         }
-        return { name: pkg.name, version: pkg.version, license: pkg.license, files };
+        const selectedLicense = override?.selectedLicense;
+        if (selectedLicense && !((pkg.license === '(MPL-2.0 OR Apache-2.0)' && selectedLicense === 'Apache-2.0' && files.some(file => file.text.includes('Apache License') && file.text.includes('Version 2.0'))) || (pkg.license === 'MIT OR SEE LICENSE IN FEEL-FREE.md' && selectedLicense === 'MIT' && files.some(file => file.text.includes('Permission is hereby granted, free of charge'))))) throw new Error('Unsupported license alternative selection');
+        return { name: pkg.name, version: pkg.version, license: pkg.license, ...(selectedLicense ? { selectedLicense, review: override.reason } : {}), files };
       });
-      const supported = new Set(['MIT', 'MPL-2.0', 'MIT OR Apache-2.0', 'Apache-2.0 OR MIT', 'ISC', 'Apache-2.0', 'OFL-1.1', 'BSD-3-Clause', 'BSD-2-Clause', '(MIT OR GPL-3.0-or-later)', 'Unlicense', '0BSD']);
+      const supported = new Set(['MIT', 'MPL-2.0', 'MIT OR Apache-2.0', 'Apache-2.0 OR MIT', '(MIT AND Zlib)', 'ISC', 'Apache-2.0', 'OFL-1.1', 'BSD-3-Clause', 'BSD-2-Clause', '(MIT OR GPL-3.0-or-later)', 'Unlicense', '0BSD']);
       for (const pkg of records) {
-        if (pkg.license && !supported.has(pkg.license)) throw new Error(`Unreviewed frontend license: ${pkg.name} (${pkg.license})`);
+        if (pkg.license && !supported.has(pkg.license) && !pkg.selectedLicense) throw new Error(`Unreviewed frontend license: ${pkg.name} (${pkg.license})`);
         if (pkg.license === 'MPL-2.0' && !sourceManifest?.sources.some(source => source.name === pkg.name && source.version === pkg.version)) throw new Error(`Matching MPL source is missing: ${pkg.name}@${pkg.version}`);
       }
       const missing = records.filter(pkg => !pkg.license || !pkg.files.length);

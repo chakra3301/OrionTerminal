@@ -3,7 +3,7 @@ import { create } from "zustand";
 /**
  * Clip-test mode: steps the companion through every animation clip (by name) so
  * the user can eyeball each one and decide the event mapping. Toggled via the
- * `companion.clipTest` command; the names list is registered by RosieModel on load.
+ * `companion.clipTest` command; the current character registers its clips on load.
  */
 type CompanionDebugState = {
   testMode: boolean;
@@ -19,7 +19,7 @@ export const useCompanionDebug = create<CompanionDebugState>((set) => ({
   testMode: false,
   index: 0,
   names: [],
-  setNames: (names) => set({ names }),
+  setNames: (names) => set({ names, index: 0 }),
   toggle: () => set((s) => ({ testMode: !s.testMode })),
   next: () =>
     set((s) => ({

@@ -40,7 +40,7 @@ fn now_millis() -> i64 {
 
 fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    Ok(dir.join("orion.db"))
+    Ok(dir.join(crate::app_profile::db_file()))
 }
 
 static ACTIVITY_SEQ: AtomicU64 = AtomicU64::new(0);

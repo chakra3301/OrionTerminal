@@ -79,3 +79,17 @@ test('checked-in distribution material is complete and configured for app bundli
   for (const item of ['../THIRD_PARTY_LICENSES', '../THIRD_PARTY_SOURCES', '../resources/distribution-license-manifest.json', '../dist/licenses']) assert.ok(config.bundle.resources.includes(item));
   assert.ok(fs.readFileSync('src/apps/xdesign/fx/fxModel.ts', 'utf8').includes('${noiseLicense}'));
 });
+
+
+test('includes embedded worker modules in the main inventory and applies its license checks', () => fixture(({ root, put }) => {
+  put('node_modules/embedded/package.json', '{"name":"embedded","version":"1","license":"MIT"}');
+  put('node_modules/embedded/LICENSE', 'Embedded license');
+  const id=put('node_modules/embedded/index.js', 'export {}');
+  const plugin=frontendLicenses('main',root,()=>new Set([id])); const assets=[];
+  plugin.buildStart();
+  plugin.generateBundle.call({emitFile:asset=>assets.push(asset)}, {}, {chunk:{type:'chunk',moduleIds:[id]}});
+  const records=JSON.parse(assets.find(asset=>asset.fileName.endsWith('.json')).source);
+  assert.equal(records.length,1);assert.equal(records[0].name,'embedded');assert.equal(records[0].files[0].text,'Embedded license');
+  put('node_modules/embedded/package.json', '{"name":"embedded","version":"1","license":"GPL-3.0-only"}');
+  assert.throws(()=>plugin.generateBundle.call({emitFile(){}},{},{}),/Unreviewed frontend license/);
+}));

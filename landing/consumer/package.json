@@ -1,0 +1,10 @@
+{
+  "name": "orion-terminal-marketing",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check site.js && node --check motion.js && node --test site.test.mjs motion.test.mjs",
+    "build": "node scripts/build.mjs"
+  }
+}

@@ -23,6 +23,7 @@ import {
   type SelectionAction,
 } from "@/features/notes/noteInlineAi";
 import { log } from "@/lib/log";
+import { OrionOrb } from "@/components/effects/OrionOrb";
 
 // BlockNote's editor is heavily generic; we only call a handful of methods.
 type Editor = BlockNoteEditor<any, any, any>;
@@ -73,7 +74,7 @@ function AiToolbarButton({ editor }: { editor: Editor }) {
         title={busy ? "Working…" : "AI actions"}
         onClick={onClick}
       >
-        <Sparkles size={15} />
+        {busy ? <OrionOrb size={20} state="thinking" accent="var(--neon-green)" /> : <Sparkles size={15} />}
         <span>AI</span>
       </button>
       {menu}

@@ -20,7 +20,8 @@ tauri-plugin-dialog = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# Imported vector control points must survive native history JSON exactly.
+serde_json = { version = "1", features = ["float_roundtrip"] }
 walkdir = "2"
 keyring = "3"
 base64 = "0.22"
@@ -52,3 +53,24 @@ notify-debouncer-mini = "0.4"
 # CPU/memory stats for the desktop monitor widget. (Temp/GPU on Apple Silicon
 # need sudo/powermetrics, so the widget sticks to what sysinfo can read freely.)
 sysinfo = "0.33"
+photocraft-engine = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-io = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-format = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-compose = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-raster = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-algo = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-vector = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-codecs = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a", features = ["heif", "avif"] }
+photocraft-psd = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+fontique = { version = "=0.11.1", default-features = false, features = ["std"] }
+
+# `tauri dev` builds unoptimised; the photocraft image engine then renders a 512px tile in
+# ~51ms instead of ~3ms, which makes photo editing unusable. Optimise dependencies only:
+# they compile once, and Orion's own crate keeps fast incremental dev builds.
+[profile.dev.package."*"]
+opt-level = 3
+
+# photocraft-format with batched tile flushes (vendor/photocraft/ORION_CHANGES.md). Remove once
+# the pinned revision above saves new objects without two F_FULLFSYNCs each.
+[patch."https://github.com/storytold/photocraft"]
+photocraft-format = { path = "vendor/photocraft/crates/format" }

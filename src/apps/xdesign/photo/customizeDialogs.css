@@ -1,0 +1,26 @@
+.xd-photo .xd-customize-dialog .xd-ps-dialog-main { display:flex;flex-direction:column;gap:8px;width:560px;max-width:70vw; }
+.xd-customize-tabs { display:flex;gap:2px;border-bottom:1px solid var(--xd-border); }
+/* Prefixed to outrank the dialog's shared button chrome. */
+.xd-photo .xd-customize-dialog .xd-customize-tabs [role=tab] { padding:4px 10px;border:0;border-radius:0;background:none;color:var(--xd-text-2); }
+.xd-photo .xd-customize-dialog .xd-customize-tabs [role=tab][aria-selected=true] { color:var(--xd-text);box-shadow:inset 0 -2px 0 var(--xd-accent); }
+.xd-customize-head { display:flex;gap:16px; }
+.xd-customize-head label { display:flex;align-items:center;gap:6px;color:var(--xd-text-2); }
+.xd-customize-table { height:320px;overflow:auto;border:1px solid var(--xd-border);background:var(--xd-bg); }
+.xd-customize-row { display:grid;grid-template-columns:1fr 140px;align-items:center;min-height:22px;padding:0 6px;color:var(--xd-text); }
+.xd-customize-table.is-menus .xd-customize-row { grid-template-columns:1fr 70px 110px; }
+.xd-customize-row.is-head { position:sticky;top:0;z-index:1;background:var(--xd-raised);color:var(--xd-text-2); }
+.xd-customize-row[aria-selected=true] { background:var(--xd-hover); }
+.xd-customize-row[data-depth="0"] { font-weight:600; }
+.xd-photo .xd-customize-dialog :is(.xd-customize-disclosure,.xd-customize-shortcut,.xd-customize-eye) { display:flex;align-items:center;justify-content:flex-start;gap:4px;width:100%;min-height:20px;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left; }
+.xd-photo .xd-customize-dialog :is(.xd-customize-tabs,.xd-customize-row) button:hover:not(:disabled) { background:none; }
+.xd-customize-row input { width:100%; }
+.xd-customize-actions,.xd-customize-conflict { display:flex;flex-wrap:wrap;align-items:center;gap:6px; }
+.xd-customize-conflict p,.xd-customize-problem { flex-basis:100%;margin:0;color:var(--xd-text); }
+.xd-customize-toolbar { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+.xd-customize-toolbar section { height:340px;overflow:auto;border:1px solid var(--xd-border);background:var(--xd-bg);padding:4px; }
+.xd-customize-toolbar h4 { margin:0 0 4px;color:var(--xd-text-2);font-size:11px;font-weight:600; }
+.xd-customize-toolbar ul { margin:0 0 4px;padding:0 0 4px;list-style:none;border-bottom:1px solid var(--xd-border); }
+.xd-customize-toolbar li { display:flex;align-items:center;gap:6px;min-height:22px;color:var(--xd-text); }
+.xd-customize-toolbar li span { flex:1; }
+.xd-customize-toolbar kbd { color:var(--xd-text-3);font:inherit; }
+.xd-customize-toolbar li button { display:grid;place-items:center;width:20px;height:20px;padding:0; }

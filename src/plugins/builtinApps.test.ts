@@ -24,6 +24,7 @@ import { useHtmlArtifact } from "@/apps/xdesign/htmlArtifactStore";
 import { useXDesignSaveState } from "@/apps/xdesign/saveState";
 import { setAppState } from "@/lib/db";
 import { allTabs, useWorkspace } from "@/components/workspace/workspaceStore";
+import { dockApps } from "@/shell/dock/logic";
 
 vi.mock("@/lib/log", () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -48,6 +49,14 @@ beforeEach(reset);
 afterEach(reset);
 
 describe("built-in app plugins", () => {
+  it("hides Command Center and Hermes only from the dock", () => {
+    ensureBuiltinAppPlugins();
+    expect(dockApps(appRegistry.list()).map((app) => app.id)).toEqual(["archives", "orion", "xdesign", "incubator"]);
+    expect(registry.has("app.openCommandCenter")).toBe(true);
+    expect(registry.has("app.openHermes")).toBe(true);
+    expect(appRegistry.has("command")).toBe(true);
+    expect(appRegistry.has("hermes")).toBe(true);
+  });
   it("autosaves webpage-only edits through the project queue without a canvas mutation", async () => {
     vi.useFakeTimers();
     const id = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
@@ -97,6 +106,7 @@ describe("built-in app plugins", () => {
       "xdesign",
       "command",
       "hermes",
+      "incubator",
     ]);
     expect(appRegistry.ownerOf("hermes")).toBe(BUILTIN_APP_PLUGIN_IDS.hermes);
     expect(registry.ownerOf("app.openHermes")).toBe(BUILTIN_APP_PLUGIN_IDS.hermes);
@@ -203,6 +213,17 @@ describe("built-in app plugins", () => {
       event: { kind: "assistant", text: "after disable" },
     });
     expect(useCommand.getState().activeRun?.text).toBe("before disable");
+  });
+
+  it("Incubator owns its Dock/Spotlight descriptor, command and disposable window", () => {
+    ensureBuiltinAppPlugins();
+    expect(appRegistry.ownerOf("incubator")).toBe(BUILTIN_APP_PLUGIN_IDS.incubator);
+    expect(registry.ownerOf("app.openIncubator")).toBe(BUILTIN_APP_PLUGIN_IDS.incubator);
+    useShell.getState().openApp("incubator");
+    expect(deactivateBuiltinAppPlugin(BUILTIN_APP_PLUGIN_IDS.incubator)).toEqual([]);
+    expect(appRegistry.has("incubator")).toBe(false);
+    expect(registry.has("app.openIncubator")).toBe(false);
+    expect(useShell.getState().windows.some((w) => w.app === "incubator")).toBe(false);
   });
 
   it("deactivating Hermes removes its app, command, and open window", () => {

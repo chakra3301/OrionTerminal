@@ -83,7 +83,7 @@ fn pi_detail(installed: bool, logged_in: bool) -> String {
 async fn probe_version(bin: &str) -> Option<String> {
     let out = TokioCommand::new(bin)
         .arg("--version")
-        .env("PATH", crate::claude_cli::augmented_path())
+        .env("PATH", crate::agent_cli::agent_path())
         .stdin(Stdio::null())
         .output()
         .await
@@ -96,7 +96,7 @@ async fn probe_version(bin: &str) -> Option<String> {
 
 #[tauri::command]
 pub async fn pi_status() -> PiStatus {
-    let version = probe_version("pi").await;
+    let version = probe_version(&crate::agent_cli::program("pi")).await;
     let installed = version.is_some();
     let logged_in = installed
         && std::env::var("HOME")
@@ -143,10 +143,10 @@ pub async fn pi_send(
     let cwd = resolve_vault(&app, &wiki_root)?;
     let args = pi_args(&model, &session_id, &system_append, &prompt);
 
-    let mut cmd = TokioCommand::new("pi");
+    let mut cmd = TokioCommand::new(crate::agent_cli::program("pi"));
     cmd.args(&args);
     cmd.current_dir(&cwd);
-    cmd.env("PATH", crate::claude_cli::augmented_path());
+    cmd.env("PATH", crate::agent_cli::agent_path());
     // Route this profile's llm-wiki to its OWN vault (<workspace>/.llm-wiki),
     // not the global ~/.llm-wiki — each division grows a separate brain.
     cmd.env("WIKI_HOME", &cwd);
@@ -233,10 +233,10 @@ pub async fn pi_oneshot(
     // No --session-id: one-shots are stateless w.r.t. the profile's chat session.
     let args = pi_args(&model, "", &system_append, &prompt);
 
-    let mut cmd = TokioCommand::new("pi");
+    let mut cmd = TokioCommand::new(crate::agent_cli::program("pi"));
     cmd.args(&args);
     cmd.current_dir(&cwd);
-    cmd.env("PATH", crate::claude_cli::augmented_path());
+    cmd.env("PATH", crate::agent_cli::agent_path());
     cmd.env("WIKI_HOME", &cwd);
     cmd.stdin(Stdio::null());
     cmd.stdout(Stdio::piped());

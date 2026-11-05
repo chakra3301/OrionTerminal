@@ -138,8 +138,8 @@ function MoodBoardList() {
 
       {boards.length === 0 && !creating ? (
         <div className="ar-empty-state ar-mood-empty">
-          <ImageIcon size={20} color="var(--neon-magenta)" />
-          <div className="title">No mood boards yet.</div>
+          <ImageIcon size={20} />
+          <div className="title">No mood boards yet</div>
           <div className="hint">
             Make one per project, dream, or vibe. Drop any kind of asset onto
             it.
@@ -446,8 +446,8 @@ function MoodBoardDetail({ board }: { board: MoodBoard }) {
       <div className="ar-mood-detail-body scroll">
         {items.length === 0 ? (
           <div className="ar-empty-state ar-mood-empty">
-            <ImageIcon size={20} color="var(--neon-magenta)" />
-            <div className="title">Empty board.</div>
+            <ImageIcon size={20} />
+            <div className="title">This board is empty</div>
             <div className="hint">
               Drag assets in, paste, or click "Add asset" to pick from your
               library.
@@ -694,7 +694,7 @@ function AddAssetPicker({
         <div className="ar-mood-picker-body scroll">
           {candidates.length === 0 ? (
             <div className="ar-empty-state">
-              <div className="title">No assets to add.</div>
+              <div className="title">No assets to add</div>
               <div className="hint">
                 Drop or paste files into Archives to capture them, then come
                 back here.

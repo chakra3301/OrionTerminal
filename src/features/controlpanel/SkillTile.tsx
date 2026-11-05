@@ -10,11 +10,13 @@ export function SkillTile({
   equipped = false,
   onClick,
   title,
+  disabled = false,
 }: {
   skill: Skill;
   equipped?: boolean;
   onClick?: () => void;
   title?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -22,11 +24,14 @@ export function SkillTile({
       className={`cp-skill${equipped ? " on" : ""}`}
       style={{ "--acc-rgb": hexToRgb(skill.accent) } as CSSProperties}
       onClick={onClick}
+      disabled={disabled}
       title={title}
     >
       <SkillEmblem skill={skill} equipped={equipped} size={64} />
       <span className="cp-skill-name">{skill.name}</span>
-      {equipped ? (
+      {skill.imported ? (
+        <span className="cp-skill-tag dim">{skill.imported.enabled ? (equipped ? "imported · equipped" : "imported") : "disabled"}</span>
+      ) : equipped ? (
         <span className="cp-skill-tag">equipped</span>
       ) : skill.builtin ? (
         <span className="cp-skill-tag dim">core</span>

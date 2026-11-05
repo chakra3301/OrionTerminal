@@ -1,11 +1,16 @@
 import { useEffect } from "react";
+import { observeProviderUsage } from "@/store/providerUsageStore";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { ContentBlock } from "@/store/chatStore";
 import {
-  useAppChat,
-  appForStream,
-  forgetStream,
-} from "@/store/appChatStore";
+  handleAppChatClaudeEvent,
+  handleAppChatClaudeExit,
+  handleAppChatDelta,
+  handleAppChatDone,
+  handleAppChatError,
+  type ClaudeEnvelope,
+  type UserContentBlock,
+} from "@/app/appChatEvents";
 import { useShell, type AppId } from "@/shell/store/useShell";
 import { ipc } from "@/lib/ipc";
 import {
@@ -67,7 +72,7 @@ async function handleUiAction(action: UiAction & UiActionLifetime): Promise<unkn
   const assertLifetime = uiActionGuard(action);
   const assertActive = () => {
     assertLifetime();
-    if (["xdesign_", "model_", "fx_"].some((prefix) => action.kind.startsWith(prefix)) &&
+    if (["xdesign_", "fx_"].some((prefix) => action.kind.startsWith(prefix)) &&
       !usePluginManager.getState().isEnabled(BUILTIN_APP_PLUGIN_IDS.xdesign)) {
       throw new Error("XDesign plugin is disabled");
     }
@@ -108,30 +113,6 @@ async function handleUiAction(action: UiAction & UiActionLifetime): Promise<unkn
       return result;
     });
   }
-  // img2model (`orion_model_*` MCP tools — see mcp_server.rs::tool_model_bridge).
-  // One generic bridge for all ~19 tools: the real implementation lives in
-  // `executeModelTool`, which never throws (its own `ok:false` JSON is the
-  // error channel), so we just parse and hand its result straight back.
-  if (action.kind.startsWith("model_")) {
-    const { useXDProjects, projectKind } = await import("@/apps/xdesign/projectsStore");
-    assertActive();
-    useShell.getState().openApp("xdesign");
-    const proj = useXDProjects.getState();
-    const activeKind = projectKind(proj.registry.find((m) => m.id === proj.activeId));
-    if (activeKind !== "model") {
-      await useXDProjects.getState().newProject(undefined, "model");
-    }
-    return runXDesignUiAction(assertActive, async () => {
-      const { executeModelTool } = await import("@/apps/xdesign/model3d/modelAssistTools");
-      assertActive();
-      const result = await executeModelTool(action.kind, (action.payload ?? {}) as Record<string, unknown>);
-      try {
-        return JSON.parse(result.text);
-      } catch {
-        return { ok: false, error: "model tool returned non-JSON text" };
-      }
-    });
-  }
   log.warn("ui:action unknown kind:", action.kind);
 }
 
@@ -162,82 +143,6 @@ function scheduleHermesRefresh() {
     hermesRefreshTimer = null;
     void useHermes.getState().refresh();
   }, 250);
-}
-
-type ClaudeEnvelope = {
-  chatId: string;
-  event: ClaudeEvent;
-};
-
-type ClaudeEvent =
-  | { type: "system"; subtype?: string; session_id?: string }
-  | { type: "assistant"; message?: { content?: ContentBlock[] } }
-  | { type: "user"; message?: { content?: Array<UserContentBlock> } }
-  | {
-      type: "result";
-      total_cost_usd?: number;
-      session_id?: string;
-      is_error?: boolean;
-    }
-  | { type: "stderr"; text?: string }
-  | { type: string; [k: string]: unknown };
-
-type UserContentBlock =
-  | {
-      type: "tool_result";
-      tool_use_id: string;
-      content: unknown;
-      is_error?: boolean;
-    }
-  | { type: string; [k: string]: unknown };
-
-function extractAssistantText(content: ContentBlock[]): string {
-  return content
-    .filter((b): b is { type: "text"; text: string } => b.type === "text")
-    .map((b) => b.text)
-    .join("");
-}
-
-function handleAppChatClaudeEvent(env: ClaudeEnvelope): boolean {
-  const app = appForStream(env.chatId);
-  if (!app) return false;
-  const ev = env.event;
-  const t = ev.type;
-  const store = useAppChat.getState();
-
-  if (t === "system") {
-    const subtype = (ev as { subtype?: string }).subtype;
-    if (subtype === "init") {
-      const sid = (ev as { session_id?: string }).session_id;
-      if (sid) store.setSessionId(app, sid);
-    }
-    return true;
-  }
-  if (t === "assistant") {
-    const msg = (ev as { message?: { content?: ContentBlock[] } }).message;
-    if (msg && Array.isArray(msg.content)) {
-      const text = extractAssistantText(msg.content);
-      if (text) store.setAssistantContent(app, text);
-    }
-    return true;
-  }
-  if (t === "result") {
-    const cost = (ev as { total_cost_usd?: number }).total_cost_usd;
-    const isError = (ev as { is_error?: boolean }).is_error;
-    const errors = (ev as { errors?: string[] }).errors;
-    if (isError && errors?.length) {
-      store.setError(app, errors.join("\n"));
-    }
-    store.finishAssistant(app, typeof cost === "number" ? cost : null);
-    forgetStream(env.chatId);
-    return true;
-  }
-  if (t === "stderr") {
-    const text = (ev as { text?: string }).text;
-    if (text) log.warn("[claude stderr]", text);
-    return true;
-  }
-  return true; // we handled (or ignored) the event for this app
 }
 
 function trackOrionToolSideEffects(env: ClaudeEnvelope) {
@@ -289,6 +194,7 @@ function trackOrionToolSideEffects(env: ClaudeEnvelope) {
 }
 
 function handleClaude(env: ClaudeEnvelope) {
+  observeProviderUsage(env.event);
   if (env.event.type === "system" && env.event.subtype === "init" && typeof env.event.session_id === "string") {
     recordDispatchedSession(env.chatId, env.event.session_id);
   }
@@ -412,49 +318,24 @@ export function EventBridge() {
         forgetDispatch(e.payload.chatId);
         clearToolActivitiesForChat(e.payload.chatId);
         // App-chat (Archives/XDesign over CLI)?
-        const app = appForStream(e.payload.chatId);
-        if (app) {
-          const store = useAppChat.getState();
-          if (e.payload.error) {
-            store.setError(app, e.payload.error);
-          } else {
-            // Normal exit without a `result` event → still flip running off.
-            const t = store.threads[app];
-            if (t.running) store.finishAssistant(app, null);
-          }
-          forgetStream(e.payload.chatId);
-          return;
-        }
+        if (handleAppChatClaudeExit(e.payload)) return;
         internalEventRegistry.dispatch("orion.claude.exit", e.payload);
       },
     ).then((u) => unlisteners.push(u));
 
     // Messages-API chat stream (Archives + XDesign rails).
-    listen<{ chatId: string; text: string }>("chat:delta", (e) => {
-      const app = appForStream(e.payload.chatId);
-      if (!app) return;
-      useAppChat.getState().appendDelta(app, e.payload.text);
-    }).then((u) => unlisteners.push(u));
+    listen<{ chatId: string; text: string }>("chat:delta", (e) => handleAppChatDelta(e.payload)).then(
+      (u) => unlisteners.push(u),
+    );
 
     listen<{ chatId: string; totalCostUsd: number | null }>(
       "chat:done",
-      (e) => {
-        const app = appForStream(e.payload.chatId);
-        if (!app) return;
-        useAppChat.getState().finishAssistant(app, e.payload.totalCostUsd);
-        forgetStream(e.payload.chatId);
-      },
+      (e) => handleAppChatDone(e.payload),
     ).then((u) => unlisteners.push(u));
 
-    listen<{ chatId: string; message: string }>("chat:error", (e) => {
-      const app = appForStream(e.payload.chatId);
-      if (!app) {
-        log.warn("[chat error]", e.payload.message);
-        return;
-      }
-      useAppChat.getState().setError(app, e.payload.message);
-      forgetStream(e.payload.chatId);
-    }).then((u) => unlisteners.push(u));
+    listen<{ chatId: string; message: string }>("chat:error", (e) => handleAppChatError(e.payload)).then(
+      (u) => unlisteners.push(u),
+    );
 
     return () => {
       for (const u of unlisteners) u();

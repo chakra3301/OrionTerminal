@@ -1,0 +1,11 @@
+.xd-photo .xd-photo-adjustment-editor { display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+.xd-photo .xd-photo-adjustment-header { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--xd-text); }
+.xd-photo .xd-photo-adjustment-header span { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--xd-text-3); }
+.xd-photo .xd-photo-adjustment-preset { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--xd-text-2); }
+.xd-photo .xd-photo-adjustment-preset label { display: flex; flex: 1; align-items: center; gap: 6px; min-width: 0; }
+.xd-photo .xd-photo-adjustment-preset select { flex: 1; min-width: 0; }
+.xd-photo .xd-photo-adjustment-footer { display: flex; justify-content: flex-end; gap: 2px; padding-top: 6px; border-top: 1px solid var(--xd-border); }
+.xd-photo .xd-photo-adjustment-footer button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 24px; padding: 0; color: var(--xd-text-2); background: transparent; border: 1px solid transparent; border-radius: var(--r-sm); }
+.xd-photo .xd-photo-adjustment-footer button:hover:not(:disabled) { background: var(--xd-hover); color: var(--xd-text); }
+.xd-photo .xd-photo-adjustment-footer button[aria-pressed="true"] { color: var(--xd-accent); }
+.xd-photo .xd-photo-adjustment-footer button:disabled { opacity: .4; }

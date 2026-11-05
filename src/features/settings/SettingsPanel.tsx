@@ -17,9 +17,6 @@ import {
   Info,
   Check,
   Trash2,
-  Eye,
-  EyeOff,
-  ExternalLink,
   Image as ImageIcon,
   Plug,
   Plus,
@@ -33,12 +30,20 @@ const CharacterPicker = lazy(() =>
 );
 import { useSettingsStore } from "@/store/settingsStore";
 import { PluginManagerPanel } from "@/features/controlpanel/PluginManagerPanel";
-import { useThemeStore, THEMES } from "@/store/themeStore";
+import { useThemeStore, THEMES, isLightTheme } from "@/store/themeStore";
+import { ThemeExtrasSection } from "./ThemeExtrasSection";
+import { CustomThemeSection } from "./CustomThemeSection";
+import { SettingsSlider } from "./SettingsSlider";
+import { ThemeSphere } from "./ThemeSphere";
+import { OverlayPreview } from "./OverlayPreview";
 import { STOCK_WALLPAPER_URL, useWallpaperStore } from "@/store/wallpaperStore";
 import { useMcpServers } from "@/store/mcpServersStore";
 import { registry, type Command } from "@/commands/registry";
-import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
+import { version as APP_VERSION } from "../../../package.json";
+import { APIKeySection } from "./ApiKeySection";
+
+export { APIKeySection };
 
 type Section =
   | "plugins"
@@ -138,259 +143,6 @@ export function SettingsPanel() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// API key
-// ─────────────────────────────────────────────────────────────
-
-export function APIKeySection() {
-  const [hasKey, setHasKey] = useState<boolean | null>(null);
-  const [draft, setDraft] = useState("");
-  const [reveal, setReveal] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  useEffect(() => {
-    setMsg(null);
-    ipc
-      .apiKeyStatus()
-      .then(setHasKey)
-      .catch((e) => {
-        setHasKey(false);
-        setMsg(String(e));
-      });
-  }, []);
-
-  const save = async () => {
-    if (!draft.trim()) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      await ipc.apiKeySet(draft.trim());
-      setHasKey(true);
-      setDraft("");
-      setMsg("Saved to keychain.");
-    } catch (e) {
-      log.error("api key save failed", e);
-      setMsg(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const clear = async () => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      await ipc.apiKeyClear();
-      setHasKey(false);
-      setMsg("Cleared.");
-    } catch (e) {
-      setMsg(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <>
-      <h2 className="ot-settings-h2">Anthropic API key</h2>
-      <p className="ot-settings-p">
-        Stored in your OS keychain. Used by the inline-edit DiffEditor (⌘K with
-        a selection), Tab completion, and direct Messages-API flows. Chats,
-        Learn, and FX use the AI selected in Control Panel → Providers or
-        their model picker; subscription connectors do not use this key.
-      </p>
-      <div className="ot-settings-status">
-        <span
-          className={`ot-settings-dot${hasKey ? " on" : ""}`}
-          aria-hidden
-        />
-        <span>
-          {hasKey === null
-            ? "checking…"
-            : hasKey
-              ? "key configured"
-              : "no key set"}
-        </span>
-      </div>
-
-      <div className="ot-settings-input-row">
-        <div className="ot-settings-input">
-          <input
-            type={reveal ? "text" : "password"}
-            placeholder={hasKey ? "•••••••• (key set)" : "sk-ant-…"}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            spellCheck={false}
-            autoComplete="off"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void save();
-            }}
-          />
-          <button
-            type="button"
-            className="icon-btn-sm"
-            onClick={() => setReveal((r) => !r)}
-            title={reveal ? "Hide" : "Show"}
-          >
-            {reveal ? <EyeOff size={12} /> : <Eye size={12} />}
-          </button>
-        </div>
-        <button
-          type="button"
-          className="ot-settings-btn primary"
-          disabled={busy || !draft.trim()}
-          onClick={() => void save()}
-        >
-          <Check size={12} /> Save
-        </button>
-        {hasKey && (
-          <button
-            type="button"
-            className="ot-settings-btn danger"
-            disabled={busy}
-            onClick={() => void clear()}
-          >
-            <Trash2 size={12} /> Clear
-          </button>
-        )}
-      </div>
-      {msg && <div className="ot-settings-msg">{msg}</div>}
-
-      <p className="ot-settings-help">
-        Get a key from{" "}
-        <a
-          href="https://console.anthropic.com/settings/keys"
-          target="_blank"
-          rel="noreferrer"
-        >
-          console.anthropic.com <ExternalLink size={10} />
-        </a>
-        . The key never leaves your machine — Tauri's `keyring` v3 plugin uses
-        the platform keychain (Keychain Access on macOS).
-      </p>
-
-      <GithubTokenField />
-    </>
-  );
-}
-
-function GithubTokenField() {
-  const [hasToken, setHasToken] = useState<boolean | null>(null);
-  const [draft, setDraft] = useState("");
-  const [reveal, setReveal] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  useEffect(() => {
-    ipc
-      .githubTokenStatus()
-      .then(setHasToken)
-      .catch(() => setHasToken(false));
-  }, []);
-
-  const save = async () => {
-    if (!draft.trim()) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      await ipc.githubTokenSet(draft.trim());
-      setHasToken(true);
-      setDraft("");
-      setMsg("Saved to keychain.");
-    } catch (e) {
-      log.error("github token save failed", e);
-      setMsg(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const clear = async () => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      await ipc.githubTokenClear();
-      setHasToken(false);
-      setMsg("Cleared.");
-    } catch (e) {
-      setMsg(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <>
-      <h2 className="ot-settings-h2" style={{ marginTop: 28 }}>
-        GitHub token (RepoLens)
-      </h2>
-      <p className="ot-settings-p">
-        Optional. RepoLens scans GitHub's public API unauthenticated (60
-        requests/hour). A token raises that to 5000/hour — useful when scanning
-        many repos. Read-only / no-scope is enough.
-      </p>
-      <div className="ot-settings-status">
-        <span className={`ot-settings-dot${hasToken ? " on" : ""}`} aria-hidden />
-        <span>
-          {hasToken === null ? "checking…" : hasToken ? "token configured" : "no token set"}
-        </span>
-      </div>
-
-      <div className="ot-settings-input-row">
-        <div className="ot-settings-input">
-          <input
-            type={reveal ? "text" : "password"}
-            placeholder={hasToken ? "•••••••• (token set)" : "ghp_…"}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            spellCheck={false}
-            autoComplete="off"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void save();
-            }}
-          />
-          <button
-            type="button"
-            className="icon-btn-sm"
-            onClick={() => setReveal((r) => !r)}
-            title={reveal ? "Hide" : "Show"}
-          >
-            {reveal ? <EyeOff size={12} /> : <Eye size={12} />}
-          </button>
-        </div>
-        <button
-          type="button"
-          className="ot-settings-btn primary"
-          disabled={busy || !draft.trim()}
-          onClick={() => void save()}
-        >
-          <Check size={12} /> Save
-        </button>
-        {hasToken && (
-          <button
-            type="button"
-            className="ot-settings-btn danger"
-            disabled={busy}
-            onClick={() => void clear()}
-          >
-            <Trash2 size={12} /> Clear
-          </button>
-        )}
-      </div>
-      {msg && <div className="ot-settings-msg">{msg}</div>}
-
-      <p className="ot-settings-help">
-        Create one at{" "}
-        <a href="https://github.com/settings/tokens" target="_blank" rel="noreferrer">
-          github.com/settings/tokens <ExternalLink size={10} />
-        </a>
-        . Stored in the same OS keychain as the API key above.
-      </p>
-    </>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
 // Theme
 // ─────────────────────────────────────────────────────────────
 
@@ -402,26 +154,32 @@ export function ThemeSection() {
 
   return (
     <>
-      <h2 className="ot-settings-h2">Appearance</h2>
-      <p className="ot-settings-p">
-        Pick a visual theme. Each restyles the whole workstation; switches are
-        instant. All themes are dark-base for now (⇧⌘ via the “Cycle Theme”
-        command also rotates through them).
-      </p>
+      <div className="cp-appearance-intro"><h2 className="ot-settings-h2">Your workspace, your way.</h2>
+        <p className="ot-settings-p">Choose a theme, then adjust its surface finish. Your documents and artwork keep their own colors.</p>
+      </div>
+      {reduceGlass && (isLightTheme(theme) || theme === "liquid") && (
+        <div className="ot-settings-glass-notice" role="status">
+          <span>Glass is off because Reduce transparency is enabled.</span>
+          <button type="button" className="ot-settings-btn" onClick={() => setReduceGlass(false)}>
+            Enable glass
+          </button>
+        </div>
+      )}
+      <div className="cp-appearance-grid"><section className="cp-theme-section" aria-label="Visual theme">
+      <div className="cp-setting-heading"><h3>Theme</h3><span>{THEMES.filter(t => isLightTheme(t.id)).length} light · {THEMES.filter(t => !isLightTheme(t.id)).length} dark</span></div>
+      {([true, false] as const).map(light => <div className="ot-theme-group" key={String(light)}>
+      <h4 className="ot-theme-group-title">{light ? "Light" : "Dark"}</h4>
       <div className="ot-theme-picker">
-        {THEMES.map((t) => (
+        {THEMES.filter(t => isLightTheme(t.id) === light).map((t) => (
           <button
             key={t.id}
             type="button"
             className={`ot-theme-card${theme === t.id ? " active" : ""}`}
             data-theme-swatch={t.id}
+            aria-pressed={theme === t.id}
             onClick={() => setTheme(t.id)}
           >
-            <span className="ot-theme-swatch" aria-hidden="true">
-              <i className="s-green" />
-              <i className="s-cyan" />
-              <i className="s-magenta" />
-            </span>
+            <ThemeSphere theme={t.id} />
             <span className="ot-theme-meta">
               <span className="ot-theme-name">{t.label}</span>
               <span className="ot-theme-blurb">{t.blurb}</span>
@@ -433,16 +191,18 @@ export function ThemeSection() {
                 </span>
               )}
             </span>
+            <span className="ot-theme-selected" aria-hidden="true">
+              {theme === t.id && <Check size={14} />}
+            </span>
           </button>
         ))}
       </div>
+      </div>)}
       <div className="ot-settings-toggle">
         <div className="ot-settings-toggle-meta">
           <div className="ot-settings-toggle-name">Reduce transparency</div>
           <div className="ot-settings-toggle-blurb">
-            Turns off the glass blur behind panels. Noticeably lighter on the
-            GPU — try this if dragging or scrolling ever stutters with several
-            windows open.
+            Turns off light-theme glass and reduces blur. Also lighter on the GPU with several windows open.
           </div>
         </div>
         <button
@@ -454,6 +214,8 @@ export function ThemeSection() {
           onClick={() => setReduceGlass(!reduceGlass)}
         />
       </div>
+      </section><ThemeExtrasSection /></div>
+      <CustomThemeSection />
     </>
   );
 }
@@ -580,7 +342,7 @@ export function WallpaperSection() {
               aria-pressed={overlay === opt.key}
               onClick={() => setOverlay(opt.key)}
             >
-              <div className={`ot-wp-overlay-thumb ${opt.key}`} aria-hidden />
+              <OverlayPreview kind={opt.key} />
               <div className="ot-wp-overlay-name">{opt.label}</div>
               <div className="ot-wp-overlay-hint">{opt.hint}</div>
             </button>
@@ -590,12 +352,6 @@ export function WallpaperSection() {
 
       {overlay === "matrix" && (
       <div className="ot-wp-slider-row">
-        <label className="ot-wp-slider-label">
-          Matrix color
-          <span className="mono" style={{ color: glow }}>
-            {matrixHue}°
-          </span>
-        </label>
         <div
           className="ot-wp-color-preview"
           style={{ "--mx-glow": glow } as CSSProperties}
@@ -609,18 +365,8 @@ export function WallpaperSection() {
             タ 0 1 <span style={{ color: trail, textShadow: "none" }}>ワ</span> カ
           </span>
         </div>
-        <input
-          type="range"
-          min={0}
-          max={360}
-          step={1}
-          value={matrixHue}
-          onChange={(e) => setMatrixHue(parseInt(e.target.value, 10))}
-          style={{
-            background:
-              "linear-gradient(to right, hsl(0,100%,60%), hsl(60,100%,60%), hsl(120,100%,60%), hsl(180,100%,60%), hsl(240,100%,60%), hsl(300,100%,60%), hsl(360,100%,60%))",
-          }}
-        />
+        <SettingsSlider label="Matrix color" value={matrixHue} min={0} max={360} step={1} valueText={`${matrixHue}°`} onChange={setMatrixHue}
+          gradient="linear-gradient(to right, #fa7272, #edda72, #77e49a, #6fdde7, #8a91ef, #df83de, #fa7272)" />
         <div className="ot-wp-slider-hint">
           Sets the glyph color of the Matrix rain.
         </div>
@@ -629,15 +375,6 @@ export function WallpaperSection() {
 
       {overlay === "core" && (
       <div className="ot-wp-slider-row">
-        <label className="ot-wp-slider-label">
-          Core color
-          <span
-            className="mono"
-            style={{ color: `hsl(${coreHue}, 100%, 60%)` }}
-          >
-            {coreHue}°
-          </span>
-        </label>
         <div
           className="ot-wp-color-preview"
           style={{ "--mx-glow": `hsl(${coreHue}, 100%, 60%)` } as CSSProperties}
@@ -658,42 +395,16 @@ export function WallpaperSection() {
             reactor core
           </span>
         </div>
-        <input
-          type="range"
-          min={0}
-          max={360}
-          step={1}
-          value={coreHue}
-          onChange={(e) => setCoreHue(parseInt(e.target.value, 10))}
-          style={{
-            background:
-              "linear-gradient(to right, hsl(0,100%,60%), hsl(60,100%,60%), hsl(120,100%,60%), hsl(180,100%,60%), hsl(240,100%,60%), hsl(300,100%,60%), hsl(360,100%,60%))",
-          }}
-        />
+        <SettingsSlider label="Core color" value={coreHue} min={0} max={360} step={1} valueText={`${coreHue}°`} onChange={setCoreHue}
+          gradient="linear-gradient(to right, #fa7272, #edda72, #77e49a, #6fdde7, #8a91ef, #df83de, #fa7272)" />
         <div className="ot-wp-slider-hint">
           Sets the energy color of the reactor core.
         </div>
       </div>
       )}
 
-      {overlay !== "none" && <div className="ot-wp-slider-row">
-        <label className="ot-wp-slider-label">
-          Overlay intensity
-          <span className="mono">{Math.round(overlayIntensity * 100)}%</span>
-        </label>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={overlayIntensity}
-          aria-label="Overlay intensity"
-          onChange={(e) => setOverlayIntensity(parseFloat(e.target.value))}
-        />
-        <div className="ot-wp-slider-hint">
-          Adjusts the animation over your wallpaper.
-        </div>
-      </div>}
+      {overlay !== "none" && <SettingsSlider label="Overlay intensity" value={overlayIntensity}
+        valueText={`${Math.round(overlayIntensity * 100)}%`} onChange={setOverlayIntensity} hint="Adjusts the animation over your wallpaper." />}
 
       {msg && <div className="ot-settings-msg">{msg}</div>}
     </>
@@ -761,11 +472,10 @@ export function McpSection() {
     <>
       <h2 className="ot-settings-h2">MCP servers</h2>
       <p className="ot-settings-p">
-        Extra Model Context Protocol servers R.O.S.I.E can call — Linear,
-        GitHub, Sentry, anything MCP-compatible. These merge with Orion's
-        built-in tools and your globally-configured claude servers, and apply
-        across R.O.S.I.E, the per-app rails, and the Claude Code tab. Changes
-        take effect on the next R.O.S.I.E turn (a fresh subprocess).
+        Extra Model Context Protocol servers your companion and app assistants
+        can call: Linear, GitHub, Sentry or anything MCP-compatible. They join
+        Orion's built-in tools and your global Claude servers. Changes apply
+        from the next message.
       </p>
 
       <div className="ot-mcp-list">
@@ -952,9 +662,8 @@ export function ShortcutsSection() {
     <>
       <h2 className="ot-settings-h2">Keyboard shortcuts</h2>
       <p className="ot-settings-p">
-        Generated live from the command registry. Read-only for now — rebinding
-        UI lands later. Press <span className="kbd">⌘K</span> for full
-        Spotlight.
+        Every command with a shortcut. Press <span className="kbd">⌘K</span>{" "}
+        to search all commands in Spotlight.
       </p>
       <div className="ot-settings-shortcuts">
         {grouped.map(([group, cmds]) => (
@@ -1001,13 +710,14 @@ function formatHotkey(hk: string): string {
 export function AboutSection() {
   return (
     <>
-      <h2 className="ot-settings-h2">About</h2>
+      <h2 className="ot-settings-h2">Orion Terminal</h2>
       <p className="ot-settings-p">
-        Orion Terminal — personal workstation. Tauri 2 + React 19 + Vite +
-        SQLite. Three apps share one shell: Orion (code), Archives 47
-        (knowledge), XDesign (design).
+        A personal workstation: Orion for code, Archives 47 for knowledge and
+        XDesign for visuals, with an AI collaborator inside each.
       </p>
       <dl className="ot-settings-meta">
+        <dt>Version</dt>
+        <dd>{APP_VERSION} · Alpha test</dd>
         <dt>Bundle</dt>
         <dd>com.lucaorion.orion-terminal</dd>
         <dt>Data dir</dt>
@@ -1018,13 +728,12 @@ export function AboutSection() {
         <dd className="mono">↳ /orion.db</dd>
       </dl>
       <p className="ot-settings-help">
-        Stack is locked per the master brief: Tauri 2, React 19, Monaco,
-        BlockNote, xterm.js, Zustand. Migrations are append-only — never edit
-        a prior one.
+        This is an alpha test build. Expect rough edges, and keep backups of
+        anything important.
       </p>
       <p className="ot-settings-help">
-        Website Ripper scaffold © JCodesMore (MIT) —
-        github.com/JCodesMore/ai-website-cloner-template
+        Includes the Website Ripper scaffold © JCodesMore, MIT license
+        (github.com/JCodesMore/ai-website-cloner-template).
       </p>
     </>
   );

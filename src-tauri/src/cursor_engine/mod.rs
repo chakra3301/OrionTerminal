@@ -307,7 +307,10 @@ pub async fn cursor_send(
                 line = lines.next_line() => {
                     match line {
                         Ok(Some(text)) => {
-                            for ev in transcode::cursor_line_to_events(&text, &mut cursor_state) {
+                            for mut ev in transcode::cursor_line_to_events(&text, &mut cursor_state) {
+                                if ev.get("usage").is_some_and(|usage| usage.is_object()) {
+                                    ev["usage_run_id"] = json!(ui_run_id);
+                                }
                                 let _ = app_loop.emit("claude:event", EventPayload {
                                     chat_id: chat_loop.clone(),
                                     event: ev,

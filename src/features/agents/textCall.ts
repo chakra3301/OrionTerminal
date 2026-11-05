@@ -6,15 +6,13 @@ import { dispatchResolved, forgetDispatch, routeFor, type Route } from "@/featur
 import { ipc } from "@/lib/ipc";
 import { useProvidersStore } from "@/store/providersStore";
 import { resolveSendFromStores } from "@/features/agents/resolveSend";
-import { parseModelValue } from "@/features/agents/modelSelection";
+import { owningProvider, parseModelValue } from "@/features/agents/modelSelection";
+import { providerSessionIdentity } from "./dispatchSend";
 import { useModelPrefs, type ModelSurface } from "@/store/modelPrefsStore";
+import { ANALYSIS_SYSTEM_PROMPT } from "@/features/repoAnalysis/sourceText";
 
 const TIMEOUT_MS = 180_000;
-const SYSTEM = [
-  "You are running a text analysis call.",
-  "Do not call tools, run commands, browse, or modify files.",
-  "Analyze only the material in the user prompt and return exactly the requested output.",
-].join(" ");
+const SYSTEM = ANALYSIS_SYSTEM_PROMPT;
 
 type ModelEvent = {
   chatId: string;
@@ -42,7 +40,7 @@ async function cancelRoute(route: Route, chatId: string): Promise<void> {
   }
 }
 
-export type AnalysisOptions = { signal?: AbortSignal; imagePath?: string };
+export type AnalysisOptions = { signal?: AbortSignal; imagePath?: string; beforeSend?: () => void; responseByteLimit?: number; reviewedProviderIdentity?: string };
 
 async function runStreamedModel(prompt: string, model: string, route: Route, options: AnalysisOptions = {}): Promise<string> {
   const chatId = `text-${ulid()}`;
@@ -87,10 +85,10 @@ async function runStreamedModel(prompt: string, model: string, route: Route, opt
   const projectRoot = await ipc.analysisWorkDir();
   if (settled) return;
   const eventListener = await listen<ModelEvent>("claude:event", ({ payload }) => {
-    if (payload.chatId !== chatId) return;
+    if (settled || payload.chatId !== chatId) return;
     try { output = textStream.accept(payload.event) ?? output; }
     catch (error) { finish(String(error), true); return; }
-    if (output.length > 128_000) { finish("Analysis exceeded the response limit.", true); return; }
+    if (options.responseByteLimit ? new TextEncoder().encode(output).length > options.responseByteLimit : output.length > 128_000) { finish("Analysis exceeded the response limit.", true); return; }
     if (payload.event.type === "stderr" && payload.event.text) {
       stderr = `${stderr}\n${payload.event.text}`.trim().slice(-4096);
     }
@@ -112,11 +110,23 @@ async function runStreamedModel(prompt: string, model: string, route: Route, opt
     { model, actionModel: null, systemAppend: SYSTEM, allowedTools: [] },
     prompt,
     [{ role: "user", content: prompt }],
-    { projectRoot, imagePath: options.imagePath },
+    { projectRoot, imagePath: options.imagePath, ...(options.beforeSend ? { onReady: options.beforeSend } : {}), ...(options.reviewedProviderIdentity === undefined ? {} : { reviewedProviderIdentity: options.reviewedProviderIdentity }) },
   );
   })().catch((error) => finish(error instanceof Error ? error.message : String(error)));
 
   return result;
+}
+
+export async function runExplicitModelAnalysis(prompt: string, model: string, expectedProvider: string, options: Pick<AnalysisOptions, "signal" | "beforeSend"> = {}): Promise<string> {
+  const check = () => {
+    if (options.signal?.aborted) throw new Error("Analysis cancelled.");
+    if (!parseModelValue(model).providerId || model.startsWith("agent:")) throw new Error("Choose an explicit provider-qualified model, not an agent.");
+    const owner = owningProvider(useProvidersStore.getState().providers, model);
+    if (!owner || providerSessionIdentity(owner) !== expectedProvider) throw new Error("Analysis provider changed or is unavailable. Review the upload again.");
+    options.beforeSend?.();
+  };
+  check();
+  return runStreamedModel(prompt, model, routeFor(useProvidersStore.getState().providers, model), { ...options, beforeSend: check, responseByteLimit: 32_768, reviewedProviderIdentity: expectedProvider });
 }
 
 export async function runSurfaceAnalysis(prompt: string, surface: ModelSurface, options: AnalysisOptions = {}): Promise<string> {

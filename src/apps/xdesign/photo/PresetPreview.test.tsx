@@ -1,0 +1,21 @@
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { afterEach, expect, it, vi } from 'vitest';
+import { PresetPreview } from './PresetPreview';
+const native = vi.hoisted(() => ({ invoke: vi.fn() }));
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true, invoke: native.invoke }));
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+it('loads visible preset cards only and drops results after a card leaves the viewport', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let notify!: IntersectionObserverCallback, resolve!: (value: unknown) => void;
+  const disconnect = vi.fn();
+  vi.stubGlobal('IntersectionObserver', class { constructor(callback: IntersectionObserverCallback) { notify = callback; } observe() {} disconnect = disconnect; });
+  native.invoke.mockReset().mockImplementation(() => new Promise(value => { resolve = value; }));
+  const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
+  await act(async () => root.render(<PresetPreview kind="shape" preset="Visible shape" group="Basics" revision={1}/>)); expect(native.invoke).not.toHaveBeenCalled();
+  await act(async () => notify([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver));
+  expect(native.invoke).toHaveBeenCalledWith('xdesign_photo_preset_preview', { kind: 'shape', preset: 'Visible shape', group: 'Basics', revision: 1 });
+  await act(async () => notify([{ isIntersecting: false } as IntersectionObserverEntry], {} as IntersectionObserver));
+  await act(async () => resolve({ width: 96, height: 64, png: 'bad' })); expect(container.querySelector('img')).toBeNull();
+  await act(async () => root.unmount()); expect(disconnect).toHaveBeenCalledOnce(); container.remove();
+});

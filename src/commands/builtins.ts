@@ -52,6 +52,7 @@ const ORION_COMMAND_IDS = new Set([
   "view.openTerminal",
   "view.openClaude",
   "view.openClaudeCode",
+  "view.openCodex",
   "view.openHermes",
   "view.openPi",
   "editor.toggleTabAutocomplete",
@@ -283,7 +284,8 @@ export function installBuiltinCommands() {
     keywords: ["changes", "diff", "review", "ai", "accept", "reject"],
     group: "View",
     run: () => {
-      useWorkspace.getState().openTab({ kind: "changes" });
+      // Source Control (git + AI edits) lives in Orion's sidebar, as in Cursor.
+      void import("@/apps/orion/store/sidebarStore").then((m) => m.useOrionSidebar.getState().setView("scm"));
     },
   });
 
@@ -294,7 +296,8 @@ export function installBuiltinCommands() {
     keywords: ["search", "grep", "find", "files", "content"],
     group: "View",
     run: () => {
-      useWorkspace.getState().openTab({ kind: "search" });
+      // Search lives in Orion's sidebar, as in Cursor; reveal it and focus the field.
+      void import("@/apps/orion/store/sidebarStore").then((m) => m.useOrionSidebar.getState().showSearch());
     },
   });
 
@@ -351,7 +354,8 @@ export function installBuiltinCommands() {
 
   registry.register({
     id: "view.toggleTheme",
-    label: "Cycle Theme (Neon / Minimal / Modern)",
+    label: "Next Theme",
+    keywords: ["theme", "appearance", "liquid", "minimal", "bmw", "ivory", "cycle"],
     group: "View",
     run: () => useThemeStore.getState().toggle(),
   });
@@ -422,6 +426,16 @@ export function installBuiltinCommands() {
     group: "View",
     run: () => {
       useWorkspace.getState().openTab({ kind: "claude-code", agent: "claude" });
+    },
+  });
+
+  registry.register({
+    id: "view.openCodex",
+    label: "View: Open Codex",
+    keywords: ["codex", "openai", "gpt", "cli", "interactive", "agent", "code"],
+    group: "View",
+    run: () => {
+      useWorkspace.getState().openTab({ kind: "claude-code", agent: "codex" });
     },
   });
 
@@ -602,7 +616,7 @@ export function installBuiltinCommands() {
 
   registry.register({
     id: "companion.clipTest",
-    label: "Companion: Test Animation Clips",
+    label: "Companion: Preview Gestures",
     hotkey: "alt+shift+r",
     keywords: ["companion", "clip", "animation", "test", "cycle", "rosie"],
     group: "Claude",
@@ -737,8 +751,28 @@ export function installBuiltinCommands() {
   // item stays clickable; it only stops the global ⌘B/⌘J hotkey from mutating
   // Orion's layout while another app is focused.
   registry.register({
+    id: "view.explorer",
+    label: "Show Explorer",
+    hotkey: "mod+shift+e",
+    group: "View",
+    run: () => {
+      if (!orionFocused()) return;
+      void import("@/apps/orion/store/sidebarStore").then((m) => m.useOrionSidebar.getState().setView("explorer"));
+    },
+  });
+  registry.register({
+    id: "view.sourceControl",
+    label: "Show Source Control",
+    hotkey: "ctrl+shift+g",
+    group: "View",
+    run: () => {
+      if (!orionFocused()) return;
+      void import("@/apps/orion/store/sidebarStore").then((m) => m.useOrionSidebar.getState().setView("scm"));
+    },
+  });
+  registry.register({
     id: "panel.toggleSidebar",
-    label: "Toggle Sidebar",
+    label: "Focus Explorer",
     hotkey: "mod+b",
     group: "View",
     run: () => {
@@ -748,7 +782,7 @@ export function installBuiltinCommands() {
   });
   registry.register({
     id: "panel.toggleRightRail",
-    label: "Toggle Right Rail",
+    label: "Toggle Agent Pane",
     hotkey: "mod+j",
     group: "View",
     run: () => {

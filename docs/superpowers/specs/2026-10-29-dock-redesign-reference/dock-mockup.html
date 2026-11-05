@@ -1,0 +1,383 @@
+<style>
+  @font-face { font-family: "JetBrains Mono"; font-weight: 500; src: url("./jbm-500.woff2") format("woff2"); }
+  /* The real stock wallpaper, cropped to its bottom edge where the dock sits, so the frost has something to blur. */
+  .scene { position: relative; height: 240px; border-radius: 14px; overflow: hidden; margin-top: 12px;
+    background: #05080a url("./wp-stock.jpg") center bottom / 100% auto no-repeat; border: 1px solid rgba(255,255,255,.06); }
+  .dock2 { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-radius: 13.6px; backdrop-filter: blur(26px) saturate(1.25); -webkit-backdrop-filter: blur(26px) saturate(1.25); }
+  .dock2::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background: linear-gradient(118deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 38%, rgba(255,255,255,0) 62%, rgba(255,255,255,.06) 100%); }
+  .dock2.smoked { background: linear-gradient(180deg, rgba(40,48,56,.42), rgba(14,18,22,.5)); border: 1px solid rgba(255,255,255,.14);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 34px 60px -22px rgba(0,0,0,.85), 0 12px 26px -14px rgba(0,0,0,.7); }
+  .it { position: relative; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; transform-origin: 50% 100%; }
+  .it canvas { display: block; pointer-events: none; will-change: transform; }
+  .it.active::after { content: ""; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: #39ff88; box-shadow: 0 0 6px #39ff88; }
+  .it.orb { width: 64px; margin: 0 4px; }
+  .it.orb canvas { position: absolute; left: 50%; top: 50%; transform: translate(-50%, calc(-50% - 14px)); }
+  .sep { width: 1px; height: 28px; background: rgba(255,255,255,.16); margin: 0 4px; }
+  .tag { position: absolute; left: 0; top: 0; pointer-events: none; white-space: pre; opacity: 0; transition: opacity .12s ease;
+    font: 500 8px/1 "JetBrains Mono", ui-monospace, monospace; letter-spacing: .06em; color: var(--c); text-shadow: 0 0 6px var(--c-glow); }
+  .tag.on { opacity: 1; }
+  .tag .dim { color: #6f7b88; text-shadow: none; }
+  .it.active.labeled::after { opacity: 0; }
+  .it.active::after { transition: opacity .12s ease; }
+</style>
+
+<h2>Icons embossed in the glass</h2>
+<p class="subtitle">Smoked glass. At rest the icons have no colour, just relief in the glass. Hover one and it lights up in its colour as it lifts and its name decodes. Rosie stays lit. "Embossed" could mean two things, so here are both:</p>
+
+<div class="options">
+  <div class="option" data-choice="raised" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Raised</h3>
+      <p>The icons stand up out of the glass: lit along the top edge, with a soft shadow underneath.</p>
+      <div class="scene"><div class="dock2 smoked" data-style="decode" data-emboss="raised"></div></div>
+    </div>
+  </div>
+  <div class="option" data-choice="pressed" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Pressed in</h3>
+      <p>The icons are stamped into the glass: a dark recess, shadowed at the top, with light catching the bottom lip.</p>
+      <div class="scene"><div class="dock2 smoked" data-style="decode" data-emboss="pressed"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(async () => {
+  const ITEMS = {
+    archives: { color: "#39ff88", png: "./glyph-archives.png" },
+    orion: { color: "#00e0ff", png: "./glyph-orion.png" },
+    xdesign: { color: "#ff3ea5", png: "./glyph-xdesign.png" },
+    // Today's dock uses lucide Search and SlidersHorizontal; these are their 24px paths.
+    search: { color: "#cdd6de", path: "M11 3a8 8 0 1 0 0 16a8 8 0 1 0 0-16ZM21 21l-4.3-4.3" },
+    control: { color: "#cdd6de", path: "M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4" },
+  };
+  // Names and shortcuts are the ones the real dock uses (builtinApps.ts and Dock.tsx titles). [text, dim?] segments.
+  const LABELS = {
+    archives: { color: "#39ff88", typed: [["Archives 47"]], command: [["> ", 1], ["archives_47"]] },
+    orion: { color: "#00e0ff", typed: [["Orion"]], command: [["> ", 1], ["orion"]] },
+    xdesign: { color: "#ff3ea5", typed: [["XDesign"]], command: [["> ", 1], ["xdesign"]] },
+    rosie: { color: "#00e0ff", typed: [["R.O.S.I.E"]], command: [["> ", 1], ["rosie"]] },
+    search: { color: "#cdd6de", typed: [["Spotlight"]], command: [["> ", 1], ["spotlight"]] },
+    control: { color: "#cdd6de", typed: [["Control Panel"]], command: [["> ", 1], ["control_panel"]] },
+  };
+  const ORB = "#00e0ff", ORB_CORE = "#9ff6ff";
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const mk = (w) => { const c = document.createElement("canvas"); c.width = c.height = w; return c; };
+  const rgba = (h, a) => `rgba(${[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(",")},${a})`;
+  const clamp01 = (v) => Math.min(1, Math.max(0, v));
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  const masks = {};
+  await Promise.all(Object.entries(ITEMS).map(async ([key, it]) => {
+    const c = mk(512), x = c.getContext("2d");
+    if (it.png) { const im = new Image(); im.src = it.png; await im.decode(); x.drawImage(im, 0, 0, 512, 512); }
+    else { x.scale(512 / 24, 512 / 24); x.strokeStyle = "#fff"; x.lineWidth = 2; x.lineCap = x.lineJoin = "round"; x.stroke(new Path2D(it.path)); x.setTransform(1, 0, 0, 1, 0, 0); }
+    const d = x.getImageData(0, 0, 512, 512).data; let x0 = 512, y0 = 512, x1 = -1, y1 = -1;
+    for (let y = 0; y < 512; y++) for (let i = 0; i < 512; i++) if (d[(y * 512 + i) * 4 + 3] > 8) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    masks[key] = { img: c, box: { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 } };
+  }));
+
+  function glyph(g, P, s, frac, grow = 1) {
+    const c = mk(P), x = c.getContext("2d"), b = g.box, k = (frac * s * grow) / Math.max(b.w, b.h);
+    x.imageSmoothingQuality = "high";
+    x.drawImage(g.img, b.x, b.y, b.w, b.h, P / 2 - (b.w * k) / 2, P / 2 - (b.h * k) / 2, b.w * k, b.h * k);
+    return c;
+  }
+  function tint(src, color) { const c = mk(src.width), x = c.getContext("2d"); x.drawImage(src, 0, 0); x.globalCompositeOperation = "source-in"; x.fillStyle = color; x.fillRect(0, 0, c.width, c.width); return c; }
+  // Canvas shadows are the only blur every browser supports on a 2D canvas; drawing the source off-canvas leaves just its shadow.
+  function glow(src, color, r) { const c = mk(src.width), x = c.getContext("2d"), off = c.width * 2; x.shadowColor = color; x.shadowBlur = r; x.shadowOffsetX = off; x.drawImage(src, -off, 0); return c; }
+  function innerRing(src, w) {
+    const e = mk(src.width), ex = e.getContext("2d"); ex.drawImage(src, 0, 0); ex.globalCompositeOperation = "destination-in";
+    for (let k = 0; k < 16; k++) { const a = (k / 16) * Math.PI * 2; ex.drawImage(src, Math.cos(a) * w, Math.sin(a) * w); }
+    const c = mk(src.width), x = c.getContext("2d"); x.drawImage(src, 0, 0); x.globalCompositeOperation = "destination-out"; x.drawImage(e, 0, 0); return c;
+  }
+  const noise = mk(96);
+  { const x = noise.getContext("2d"), im = x.createImageData(96, 96); for (let i = 0; i < im.data.length; i += 4) { const v = Math.random() * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } x.putImageData(im, 0, 0); }
+
+  function prep(ic) {
+    const { P, s, q, color } = ic, m = glyph(ic.g, P, s, ic.frac), span = ic.frac * s, top = P / 2 - span / 2;
+    const body = mk(P), bx = body.getContext("2d");
+    bx.drawImage(m, 0, 0); bx.globalCompositeOperation = "source-in";
+    const v = bx.createLinearGradient(0, top, 0, top + span); v.addColorStop(0, "rgba(255,255,255,.72)"); v.addColorStop(1, "rgba(255,255,255,.3)");
+    bx.fillStyle = v; bx.fillRect(0, 0, P, P);
+    bx.globalCompositeOperation = "source-atop";
+    bx.globalAlpha = 0.64; bx.fillStyle = color; bx.fillRect(0, 0, P, P);
+    bx.globalAlpha = 0.12; bx.fillStyle = bx.createPattern(noise, "repeat"); bx.fillRect(0, 0, P, P);
+    const rim = tint(innerRing(m, q), "#fff"), rx = rim.getContext("2d"), rg = rx.createLinearGradient(0, top, 0, top + span);
+    rg.addColorStop(0, "#000"); rg.addColorStop(1, "rgba(0,0,0,.2)");
+    rx.globalCompositeOperation = "destination-in"; rx.fillStyle = rg; rx.fillRect(0, 0, P, P);
+    bx.globalAlpha = 0.9; bx.drawImage(rim, 0, 0);
+    return { m, body, emb: emboss(ic, m), drop: glow(m, "#000", s * 0.05), bloom: glow(glyph(ic.g, P, s, ic.frac, 1.15), color, s * 0.2) };
+  }
+  // Inner rim: the edge of m facing away from the shift. Outer rim: the band just outside m on the shift side.
+  function rim(m, dx, dy, outer) {
+    const c = mk(m.width), x = c.getContext("2d");
+    x.drawImage(m, outer ? dx : 0, outer ? dy : 0); x.globalCompositeOperation = "destination-out"; x.drawImage(m, outer ? 0 : dx, outer ? 0 : dy);
+    return c;
+  }
+  // Light comes from above, like the dock's bright top edge. Line icons get a thinner rim or the whole stroke turns to edge.
+  function emboss(ic, m) {
+    const { P, q } = ic, d = (ic.frac < 0.6 ? 0.6 : 1.1) * q, c = mk(P), x = c.getContext("2d");
+    const layer = (src, color, a, dy = 0) => { x.globalAlpha = a; x.drawImage(tint(src, color), 0, dy); };
+    if (ic.emboss === "raised") {
+      x.globalAlpha = 0.45; x.drawImage(glow(m, "#000", ic.s * 0.04), 0, d * 1.5);
+      x.globalAlpha = 1; x.globalCompositeOperation = "destination-out"; x.drawImage(m, 0, 0); x.globalCompositeOperation = "source-over";
+      layer(m, "#fff", 0.07);
+      layer(rim(m, 0, d), "#fff", 0.55);
+      layer(rim(m, 0, -d), "#000", 0.45);
+    } else {
+      layer(m, "#000", 0.32);
+      layer(rim(m, 0, d * 1.6), "#000", 0.6);
+      layer(rim(m, 0, -d), "#fff", 0.24);
+      layer(rim(m, 0, d, true), "#fff", 0.16);
+    }
+    x.globalAlpha = 1;
+    return c;
+  }
+  function draw(ic, x, L) {
+    const { s, h, px, py, P, o, r } = ic;
+    if (r < 0.99) { x.globalAlpha = 1 - r; x.drawImage(L.emb, 0, 0); }
+    if (r < 0.01) { x.globalAlpha = 1; return; }
+    x.globalAlpha = 0.55 * r; x.drawImage(L.drop, 0, s * 0.035);
+    x.globalCompositeOperation = "lighter"; x.globalAlpha = (0.68 + 0.3 * h) * r; x.drawImage(L.bloom, px * s * 0.06, py * s * 0.06);
+    x.globalCompositeOperation = "source-over"; x.globalAlpha = r; x.drawImage(L.body, 0, 0);
+    if (h > 0.01) {
+      const k = ic.scratch.getContext("2d");
+      k.globalCompositeOperation = "source-over"; k.clearRect(0, 0, P, P); k.drawImage(L.m, 0, 0); k.globalCompositeOperation = "source-in";
+      const c = 0.5 + px * 0.35, g = k.createLinearGradient(o, o, o + s, o + s);
+      g.addColorStop(clamp01(c - 0.16), "rgba(255,255,255,0)"); g.addColorStop(clamp01(c), `rgba(255,255,255,${0.6 * h * r})`); g.addColorStop(clamp01(c + 0.16), "rgba(255,255,255,0)");
+      k.fillStyle = g; k.fillRect(0, 0, P, P);
+      x.drawImage(ic.scratch, 0, 0);
+    }
+    x.globalAlpha = 1;
+  }
+  const icons = [];
+  function addIcon(host, key, S, frac, q) {
+    const it = ITEMS[key], pad = Math.round(S * 0.3), P = Math.round((S + 2 * pad) * q), cv = mk(P);
+    cv.style.width = cv.style.height = `${S + 2 * pad}px`; cv.style.margin = `${-pad}px`;
+    host.appendChild(cv);
+    const ic = { cv, x: cv.getContext("2d"), host, emboss: host.closest(".dock2").dataset.emboss, S, q, s: S * q, o: pad * q, P, g: masks[key], color: it.color, frac, h: 0, ht: 0, r: 0, rt: 0, px: 0, py: 0, gx: 0, gy: 0, dirty: true, scratch: mk(P) };
+    ic.L = prep(ic);
+    host.addEventListener("pointermove", (e) => {
+      const r = host.getBoundingClientRect();
+      ic.gx = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1)); ic.gy = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1)); ic.ht = 1;
+    });
+    host.addEventListener("pointerleave", () => { ic.ht = 0; ic.gx = ic.gy = 0; });
+    icons.push(ic);
+  }
+
+  function orbModel() {
+    let seed = 47; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const unit = () => { const z = rnd() * 2 - 1, a = rnd() * Math.PI * 2, r = Math.sqrt(1 - z * z); return [r * Math.cos(a), z, r * Math.sin(a)]; };
+    // Every dot gets its own phase, sensitivity and spring so no two react to the cursor the same way.
+    const group = (pts) => ({
+      pts,
+      ph: Float32Array.from(pts, () => rnd() * Math.PI * 2),
+      fr: Float32Array.from(pts, () => 0.6 + rnd() * 1.6),
+      sens: Float32Array.from(pts, () => 0.3 + rnd() * 1.4),
+      k: Float32Array.from(pts, () => 0.025 + rnd() * 0.06),
+    });
+    const centres = Array.from({ length: 18 }, unit), shell = [], N = 2600, ga = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < N; i++) {
+      const y = 1 - ((i + 0.5) / N) * 2, r = Math.sqrt(1 - y * y), p = [r * Math.cos(i * ga), y, r * Math.sin(i * ga)];
+      const f = Math.max(...centres.map((c) => c[0] * p[0] + c[1] * p[1] + c[2] * p[2]));
+      if (f > 0.94 || rnd() < 0.05) shell.push(p);
+    }
+    const nodes = Array.from({ length: 70 }, unit), links = [];
+    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j]; if (a[0] * b[0] + a[1] * b[1] + a[2] * b[2] > 0.85) links.push([i, j]);
+    }
+    const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
+    const core = Array.from({ length: 320 }, () => [gauss() * 0.45, gauss() * 0.45, gauss() * 0.45]);
+    return { shell: group(shell), nodes: group(nodes), links, spikes: group(Array.from({ length: 46 }, unit)), core: group(core) };
+  }
+  const MODEL = orbModel(), orbs = [];
+  const physics = (G) => { const n = G.pts.length; return { ox: new Float32Array(n), oy: new Float32Array(n), vx: new Float32Array(n), vy: new Float32Array(n) }; };
+  function addOrb(cv, css, R, q, reach) {
+    const P = Math.round(css * q); cv.width = cv.height = P; cv.style.width = cv.style.height = `${css}px`;
+    orbs.push({
+      cv, x: cv.getContext("2d"), P, R: R * q, q, reach, m: null, last: null,
+      st: { shell: physics(MODEL.shell), nodes: physics(MODEL.nodes), spikes: physics(MODEL.spikes), core: physics(MODEL.core) },
+      nodeXY: new Float32Array(MODEL.nodes.pts.length * 3),
+    });
+  }
+  window.addEventListener("pointermove", (e) => {
+    for (const o of orbs) {
+      const r = o.cv.getBoundingClientRect(), inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      o.m = inside ? { x: ((e.clientX - r.left) * o.P) / r.width, y: ((e.clientY - r.top) * o.P) / r.height } : null;
+    }
+  });
+  document.documentElement.addEventListener("mouseleave", () => orbs.forEach((o) => (o.m = null)));
+
+  function drawOrb(o, t) {
+    const { x, P, R, q, st } = o, cx = P / 2, cy = P / 2, M = MODEL;
+    const a = t * 0.3, ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(0.38), sb = Math.sin(0.38);
+    let X = 0, Y = 0, Z = 0;
+    const proj = (p, k) => {
+      const X0 = p[0] * ca + p[2] * sa, Z0 = -p[0] * sa + p[2] * ca, Y0 = p[1] * cb - Z0 * sb, f = R * k;
+      Z = p[1] * sb + Z0 * cb; X = cx + X0 * f * (1 + Z * 0.12); Y = cy + Y0 * f * (1 + Z * 0.12);
+    };
+    const m = o.m, mv = m && o.last ? { x: m.x - o.last.x, y: m.y - o.last.y } : { x: 0, y: 0 };
+    o.last = m && { ...m };
+    const cap = R * 0.15; mv.x = Math.max(-cap, Math.min(cap, mv.x)); mv.y = Math.max(-cap, Math.min(cap, mv.y));
+    const RR = R * o.reach, RR2 = RR * RR, PUSH = R * 0.03;
+    let near = 0;
+    // Pushes one dot away from the cursor (plus a drag along the stroke) and springs it home; moves X/Y to where it now sits.
+    const move = (S, G, i) => {
+      let ox = S.ox[i], oy = S.oy[i], vx = S.vx[i], vy = S.vy[i]; near = 0;
+      if (m) {
+        const dx = X + ox - m.x, dy = Y + oy - m.y, d2 = dx * dx + dy * dy;
+        if (d2 < RR2) {
+          const d = Math.sqrt(d2) + 1e-3, fall = 1 - d / RR, f = fall * fall * G.sens[i] * (0.55 + 0.45 * (0.5 + 0.5 * Z));
+          vx += ((dx / d) * PUSH + mv.x * 0.3) * f; vy += ((dy / d) * PUSH + mv.y * 0.3) * f; near = fall;
+        }
+      }
+      const k = G.k[i]; vx = (vx - ox * k) * 0.88; vy = (vy - oy * k) * 0.88; ox += vx; oy += vy;
+      S.ox[i] = ox; S.oy[i] = oy; S.vx[i] = vx; S.vy[i] = vy; X += ox; Y += oy;
+    };
+
+    x.clearRect(0, 0, P, P); x.globalCompositeOperation = "lighter";
+    const breath = 0.5 - 0.5 * Math.cos(t * 1.1), spread = 0.16 + 0.5 * breath;
+    const bg = x.createRadialGradient(cx, cy, 0, cx, cy, R * 1.3);
+    bg.addColorStop(0, rgba(ORB, 0.1)); bg.addColorStop(0.7, rgba(ORB, 0.04)); bg.addColorStop(1, rgba(ORB, 0));
+    x.globalAlpha = 1; x.fillStyle = bg; x.fillRect(0, 0, P, P);
+    const ds = Math.max(q * 0.75, R * 0.016);
+
+    x.fillStyle = ORB;
+    const SH = M.shell;
+    for (let i = 0; i < SH.pts.length; i++) {
+      const w = t * SH.fr[i] + SH.ph[i];
+      proj(SH.pts[i], 1 + 0.014 * Math.sin(w)); move(st.shell, SH, i);
+      x.globalAlpha = Math.min(1, (0.16 + 0.6 * (0.5 + 0.5 * Z)) * (0.7 + 0.3 * Math.sin(w * 1.7)) + 0.45 * near);
+      x.fillRect(X - ds / 2, Y - ds / 2, ds, ds);
+    }
+    const ND = M.nodes, xy = o.nodeXY;
+    for (let i = 0; i < ND.pts.length; i++) { proj(ND.pts[i], 1.005 + 0.012 * Math.sin(t * ND.fr[i] + ND.ph[i])); move(st.nodes, ND, i); xy[i * 3] = X; xy[i * 3 + 1] = Y; xy[i * 3 + 2] = Z; }
+    x.strokeStyle = ORB; x.lineWidth = Math.max(q * 0.5, R * 0.007);
+    for (const [i, j] of M.links) {
+      x.globalAlpha = 0.08 + 0.42 * (1 + (xy[i * 3 + 2] + xy[j * 3 + 2]) / 2) / 2;
+      x.beginPath(); x.moveTo(xy[i * 3], xy[i * 3 + 1]); x.lineTo(xy[j * 3], xy[j * 3 + 1]); x.stroke();
+    }
+    for (let i = 0; i < ND.pts.length; i++) { x.globalAlpha = 0.2 + 0.7 * (0.5 + 0.5 * xy[i * 3 + 2]); x.fillRect(xy[i * 3] - ds, xy[i * 3 + 1] - ds, ds * 2, ds * 2); }
+    const SP = M.spikes;
+    for (let i = 0; i < SP.pts.length; i++) {
+      const p = SP.pts[i], len = 1.08 + 0.04 * Math.sin(t * SP.fr[i] + SP.ph[i]);
+      proj(p, len); const bx = X, by = Y; proj(p, 1.04); const ax = X, ay = Y, az = Z;
+      move(st.spikes, SP, i); const ox = X - ax, oy = Y - ay;
+      x.globalAlpha = 0.1 + 0.6 * (1 - Math.abs(az)); x.beginPath(); x.moveTo(ax + ox, ay + oy); x.lineTo(bx + ox, by + oy); x.stroke();
+    }
+    const cg = x.createRadialGradient(cx, cy, 0, cx, cy, R * (spread + 0.12));
+    cg.addColorStop(0, rgba(ORB_CORE, 0.55 * (1 - breath) + 0.12)); cg.addColorStop(1, rgba(ORB, 0));
+    x.globalAlpha = 1; x.fillStyle = cg; x.fillRect(0, 0, P, P);
+    x.fillStyle = ORB_CORE;
+    const CO = M.core;
+    for (let i = 0; i < CO.pts.length; i++) {
+      proj(CO.pts[i], spread * (1 + 0.14 * Math.sin(t * CO.fr[i] + CO.ph[i]))); move(st.core, CO, i);
+      x.globalAlpha = Math.min(1, 0.95 - 0.55 * breath + 0.3 * near); x.fillRect(X - ds / 2, Y - ds / 2, ds, ds);
+    }
+    x.globalCompositeOperation = "source-over"; x.globalAlpha = 1;
+  }
+
+  // ---- Labels: [text, dim?] segments revealed n characters at a time ----
+  const CODE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&*+=/<>{}[]_";
+  const SPEED = { typed: 38, command: 26, decode: 30 };
+  function labelHTML(style, segs, ms) {
+    const total = segs.reduce((n, [s]) => n + s.length, 0);
+    let out = "", i = 0, done;
+    if (style === "decode") {
+      // Every slot flickers from the start so the label is full width at once; slot i settles after i steps.
+      const settled = Math.floor((ms - 90) / SPEED.decode);
+      for (const [s, dim] of segs) {
+        let part = "";
+        for (const ch of s) { part += ch === " " || i < settled ? ch : CODE[(Math.random() * CODE.length) | 0]; i++; }
+        out += dim ? `<span class="dim">${esc(part)}</span>` : esc(part);
+      }
+      done = settled >= total;
+    } else {
+      const n = Math.floor(ms / SPEED[style]);
+      for (const [s, dim] of segs) {
+        const part = s.slice(0, Math.max(0, n - i)); i += s.length;
+        if (part) out += dim ? `<span class="dim">${esc(part)}</span>` : esc(part);
+      }
+      done = n >= total;
+    }
+    return { html: out, done };
+  }
+
+  const docks = [];
+  document.querySelectorAll(".dock2").forEach((dock) => {
+    const style = dock.dataset.style, scene = dock.parentElement;
+    const add = (cls, mag, key) => { const el = document.createElement("div"); el.className = `it ${cls}`; el.dataset.mag = mag; el.dataset.key = key; dock.appendChild(el); return el; };
+    for (const key of ["archives", "orion", "xdesign"]) addIcon(add(key === "orion" ? "active" : "", 1.55, key), key, 48, 0.8, dpr * 1.6);
+    const orb = add("orb", 1.2, "rosie"), oc = document.createElement("canvas"); orb.appendChild(oc);
+    // At dock size a 0.45 reach only parts a few dots, so the cursor reaches further.
+    addOrb(oc, 96, 25, dpr * 1.25, 0.7);
+    dock.appendChild(Object.assign(document.createElement("div"), { className: "sep" }));
+    for (const key of ["search", "control"]) addIcon(add("", 1.55, key), key, 48, 0.44, dpr * 1.6);
+    const tag = Object.assign(document.createElement("div"), { className: "tag" }); scene.appendChild(tag);
+    const state = { style, scene, tag, item: null, since: 0, html: "" };
+    docks.push(state);
+
+    // Same magnify curve as src/shell/Dock.tsx (110px reach, cosine falloff, lift 12).
+    const items = [...dock.querySelectorAll("[data-mag]")];
+    const apply = (cx) => {
+      let lifted = null, best = Infinity;
+      items.forEach((el) => {
+        const r = el.getBoundingClientRect(), d = cx == null ? Infinity : Math.abs(cx - (r.left + r.width / 2));
+        const sc = d >= 110 ? 1 : 1 + (+el.dataset.mag - 1) * ((1 - Math.cos((1 - d / 110) * Math.PI)) / 2), lift = sc > 1 ? 12 * (sc - 1) * 1.6 : 0;
+        el.style.transition = cx == null ? "transform .25s ease" : "none";
+        el.style.transform = `translateY(${-lift}px) scale(${sc.toFixed(3)})`;
+        if (d < best && d < r.width / 2 + 5) { best = d; lifted = el; }
+      });
+      if (lifted !== state.item) {
+        state.item?.classList.remove("labeled"); lifted?.classList.add("labeled");
+        state.item = lifted; state.since = performance.now(); state.html = "";
+        if (lifted) {
+          const L = LABELS[lifted.dataset.key];
+          tag.style.setProperty("--c", L.color); tag.style.setProperty("--c-line", rgba(L.color, 0.28)); tag.style.setProperty("--c-glow", rgba(L.color, 0.45));
+        }
+      }
+    };
+    scene.addEventListener("mousemove", (e) => {
+      const r = dock.getBoundingClientRect(), inside = e.clientY >= r.top - 24 && e.clientY <= r.bottom + 24 && e.clientX >= r.left - 24 && e.clientX <= r.right + 24;
+      apply(inside ? e.clientX : null);
+    });
+    scene.addEventListener("mouseleave", () => apply(null));
+  });
+
+  function placeTag(d, now) {
+    const { tag, item, scene } = d;
+    tag.classList.toggle("on", !!item);
+    if (!item) return;
+    const L = LABELS[item.dataset.key], { html } = labelHTML(d.style, d.style === "command" ? L.command : L.typed, now - d.since);
+    if (html !== d.html) { tag.innerHTML = html; d.html = html; }
+    const r = item.getBoundingClientRect(), s = scene.getBoundingClientRect(), dk = item.parentElement.getBoundingClientRect(), w = tag.offsetWidth;
+    // The orb is drawn 14px above its slot and reaches ~29px below its centre, so it leaves room higher up than an icon does.
+    const top = item.dataset.key === "rosie" ? r.top + r.height / 2 + 15 * (r.width / 64) + 2 : r.bottom + 1;
+    const left = Math.min(Math.max(r.left + r.width / 2 - w / 2, dk.left + 10), dk.right - 10 - w);
+    tag.style.transform = `translate(${left - s.left}px, ${top - s.top}px)`;
+  }
+
+  const t0 = performance.now();
+  function frame(now) {
+    const t = (now - t0) / 1000;
+    for (const ic of icons) {
+      // Colour follows the lifted item (the one whose name shows), not raw pointer hover.
+      ic.rt = docks.some((d) => d.item === ic.host) ? 1 : 0;
+      const moving = Math.abs(ic.ht - ic.h) > 0.002 || Math.abs(ic.rt - ic.r) > 0.002 || Math.abs(ic.gx - ic.px) > 0.002 || Math.abs(ic.gy - ic.py) > 0.002;
+      if (!moving && !ic.dirty && ic.h < 0.01) continue;
+      ic.h += (ic.ht - ic.h) * 0.14; ic.r += (ic.rt - ic.r) * 0.16; ic.px += (ic.gx - ic.px) * 0.14; ic.py += (ic.gy - ic.py) * 0.14;
+      ic.cv.style.transform = `perspective(${ic.S * 5}px) rotateX(${-ic.py * 7 * ic.h}deg) rotateY(${ic.px * 7 * ic.h}deg)`;
+      ic.x.clearRect(0, 0, ic.P, ic.P); draw(ic, ic.x, ic.L); ic.dirty = false;
+    }
+    for (const o of orbs) drawOrb(o, t);
+    for (const d of docks) placeTag(d, now);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>

@@ -12,7 +12,7 @@ pub(super) struct RuntimeConfig {
 }
 
 pub(super) fn load(app: &AppHandle, provider_id: &str, model: &str) -> Result<RuntimeConfig, String> {
-    let path = app.path().app_config_dir().map_err(|e| e.to_string())?.join("orion.db");
+    let path = app.path().app_config_dir().map_err(|e| e.to_string())?.join(crate::app_profile::db_file());
     let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
         .map_err(|_| "Cannot read the saved provider configuration")?;
     conn.busy_timeout(std::time::Duration::from_secs(1)).map_err(|e| e.to_string())?;
@@ -65,6 +65,16 @@ fn endpoint(kind: &str, base: &str, model: &str) -> Result<String, String> {
     Ok(super::provider::make_provider(kind).endpoint(url.as_str(), model))
 }
 
+pub(super) fn verify_reviewed_identity(config: &RuntimeConfig, provider_id: &str, model: &str, identity: &str, allowed_tools: &[String]) -> Result<(), String> {
+    if !allowed_tools.is_empty() { return Err("Reviewed analysis does not permit tools".into()); }
+    let error = "Provider changed since upload review. Prepare and approve a new review.";
+    if identity.len() > 8192 { return Err(error.into()); }
+    let [id, kind, base, key_ref]: [String; 4] = serde_json::from_str(identity).map_err(|_| error)?;
+    let expected = RuntimeConfig { endpoint: endpoint(&kind, &base, model).map_err(|_| error)?, kind, key_ref };
+    if id != provider_id || expected != *config { return Err(error.into()); }
+    Ok(())
+}
+
 pub(super) fn dispatch_authorized(
     call: &ToolCall,
     granted: &[ToolDef],
@@ -99,6 +109,23 @@ mod tests {
         assert!(resolve(&db, "account", "unknown").is_err());
         db.execute("UPDATE providers SET enabled=0 WHERE id='account'", []).unwrap();
         assert!(resolve(&db, "account", "model").is_err());
+    }
+    #[test]
+    fn reviewed_upload_binds_native_recipient_before_authentication() {
+        let db = fixture();
+        let identity = r#"["account","openai","https://api.openai.com/v1","owned-key"]"#;
+        let initial = resolve(&db, "account", "model").unwrap();
+        assert!(verify_reviewed_identity(&initial, "account", "model", identity, &[]).is_ok());
+        assert!(verify_reviewed_identity(&initial, "other", "model", identity, &[]).is_err());
+        assert!(verify_reviewed_identity(&initial, "account", "model", identity, &["shell".into()]).is_err());
+        for update in ["UPDATE providers SET base_url='https://different.example/v1' WHERE id='account'", "UPDATE providers SET key_ref='different' WHERE id='account'", "UPDATE providers SET kind='custom' WHERE id='account'"] {
+            let db = fixture();
+            db.execute(update, []).unwrap();
+            assert!(verify_reviewed_identity(&resolve(&db, "account", "model").unwrap(), "account", "model", identity, &[]).is_err());
+        }
+        for invalid in ["{}", "[]", r#"["account","openai","https://api.openai.com/v1","owned-key","extra"]"#, r#"["account","openai","http://remote.example","owned-key"]"#] {
+            assert!(verify_reviewed_identity(&initial, "account", "model", invalid, &[]).is_err());
+        }
     }
     #[test]
     fn configuration_change_invalidates_a_running_snapshot() {

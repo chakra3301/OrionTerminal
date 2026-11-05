@@ -9,9 +9,11 @@
     "@blocknote/core": "^0.39.1",
     "@blocknote/mantine": "^0.39.1",
     "@blocknote/react": "^0.39.1",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react": "~19.2.5",
+    "react-dom": "~19.2.5"
   },
+  "overrides": { "@blocknote/core": { "uuid": "11.1.1" } },
+  "engines": { "node": ">=22.13.0" },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^7.0.4",

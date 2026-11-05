@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Archive, Code2, Palette, Radar, Workflow } from "lucide-react";
+import { Archive, Atom, Code2, Palette, Radar, Workflow } from "lucide-react";
 import { registry, type Command } from "@/commands/registry";
 import { useShell } from "@/shell/store/useShell";
 import { appRegistry, type AppDescriptor } from "@/plugins/appRegistry";
@@ -7,6 +7,7 @@ import { internalPluginHost } from "@/plugins/host";
 import type { InternalPlugin } from "@/plugins/contracts";
 import { registerCommandCenterEventContributions } from "@/apps/command/pluginContributions";
 import { registerArchivesContributions } from "@/apps/archives/pluginContributions";
+import { installOrionArchivesHost } from "@/apps/archives/orionArchivesHost";
 import { registerXDesignContributions } from "@/apps/xdesign/pluginContributions";
 import { registerOrionContributions } from "@/apps/orion/pluginContributions";
 
@@ -16,9 +17,30 @@ export const BUILTIN_APP_PLUGIN_IDS = {
   xdesign: "@orion/xdesign",
   command: "@orion/command-center",
   hermes: "@orion/hermes",
+  incubator: "@orion/incubator",
 } as const;
 
 export const BUILTIN_APP_DESCRIPTORS: readonly AppDescriptor[] = [
+  {
+    id: "incubator",
+    name: "Incubator",
+    order: 60,
+    renderer: {
+      kind: "trusted-react",
+      component: lazy(() => import("@/apps/incubator/IncubatorApp").then((module) => ({ default: module.IncubatorApp }))),
+    },
+    window: { title: "INCUBATOR", subtitle: "bring something in", defaultSize: { w: 1020, h: 780 } },
+    dock: {
+      Icon: Atom,
+      background: "linear-gradient(135deg, rgba(177,76,255,0.4), rgba(177,76,255,0.05))",
+      glow: "0 0 14px -2px rgba(177,76,255,0.4)",
+      foreground: "#180825",
+    },
+    spotlight: { description: "bring repositories and skills into Orion Terminal" },
+    accent: "var(--neon-violet)",
+    menuNames: ["File", "Edit", "View", "Window"],
+    openCommand: { id: "app.openIncubator", label: "Open Incubator", keywords: ["incubator", "intake", "import", "repository", "skills", "plugins"] },
+  },
   {
     id: "archives",
     name: "Archives 47",
@@ -93,7 +115,7 @@ export const BUILTIN_APP_DESCRIPTORS: readonly AppDescriptor[] = [
     },
     window: {
       title: "XDESIGN",
-      subtitle: "untitled frame",
+      subtitle: "studio",
       defaultSize: { w: 1180, h: 760 },
     },
     dock: {
@@ -131,6 +153,7 @@ export const BUILTIN_APP_DESCRIPTORS: readonly AppDescriptor[] = [
     },
     dock: {
       Icon: Radar,
+      hidden: true,
       background: "linear-gradient(135deg, rgba(255,194,75,0.42), rgba(255,194,75,0.05))",
       glow: "0 0 14px -2px rgba(255,194,75,0.45)",
       foreground: "#1c1303",
@@ -161,6 +184,7 @@ export const BUILTIN_APP_DESCRIPTORS: readonly AppDescriptor[] = [
     },
     dock: {
       Icon: Workflow,
+      hidden: true,
       background: "linear-gradient(135deg, rgba(255,138,61,0.42), rgba(255,138,61,0.05))",
       glow: "0 0 14px -2px rgba(255,138,61,0.45)",
       foreground: "#1c0e03",
@@ -187,6 +211,14 @@ export type BuiltinAppPluginInfo = {
 
 export const BUILTIN_APP_PLUGIN_CATALOG: readonly BuiltinAppPluginInfo[] = [
   {
+    pluginId: BUILTIN_APP_PLUGIN_IDS.incubator,
+    appId: "incubator",
+    version: "1.0.0",
+    description: "A home for what you bring into Orion Terminal. Inspect repositories and stage skills for review; no automatic execution or installation.",
+    capabilities: ["Intake", "Repository inspection", "Skill staging"],
+    disableable: true,
+  },
+  {
     pluginId: BUILTIN_APP_PLUGIN_IDS.archives,
     appId: "archives",
     version: "1.0.0",
@@ -206,7 +238,7 @@ export const BUILTIN_APP_PLUGIN_CATALOG: readonly BuiltinAppPluginInfo[] = [
     pluginId: BUILTIN_APP_PLUGIN_IDS.xdesign,
     appId: "xdesign",
     version: "1.0.0",
-    description: "Design canvas, webpages, decks, motion FX, images, and procedural 3D models.",
+    description: "Design canvas, webpages, decks, motion FX, and images.",
     capabilities: ["Design", "Media", "Generation"],
     disableable: true,
   },
@@ -247,6 +279,8 @@ function pluginFor(descriptor: AppDescriptor): InternalPlugin {
       };
       subscriptions.add(registry.register(command, ownerId));
       if (descriptor.id === "archives") {
+        // Added first so it is disposed last: contributions close note tabs through it.
+        subscriptions.add(installOrionArchivesHost());
         registerArchivesContributions(ownerId, subscriptions);
       } else if (descriptor.id === "orion") {
         registerOrionContributions(ownerId, subscriptions);

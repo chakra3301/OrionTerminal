@@ -1,0 +1,288 @@
+{
+  "version": 1,
+  "id": "2048-classic-v1",
+  "primaryRepository": "gabrielecirulli/2048",
+  "primaryCommit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+  "enginePaths": [
+    "js/bind_polyfill.js",
+    "js/classlist_polyfill.js",
+    "js/animframe_polyfill.js",
+    "js/html_actuator.js",
+    "js/grid.js",
+    "js/tile.js",
+    "js/game_manager.js"
+  ],
+  "files": [
+    {
+      "repository": "at-import/Sassy-math",
+      "commit": "60d130108bcd20c5cd5aa50b52505afab9a40519",
+      "path": "readme.md",
+      "bytes": 4412,
+      "sha256": "31927fad0cc6f0320db5d2b9e2626931776db981023f8739b97b90699c701620",
+      "gitBlobSha": "5d9fe0330465f25fb21d9643d08c257a461a8145",
+      "kind": "text",
+      "packagePath": "notices/sassy-readme.md"
+    },
+    {
+      "repository": "at-import/Sassy-math",
+      "commit": "60d130108bcd20c5cd5aa50b52505afab9a40519",
+      "path": "sass/math.scss",
+      "bytes": 7080,
+      "sha256": "293dad4d4be6240e3f62c554324db9f6a7922046480fbd63b91fca005c2f8c53",
+      "gitBlobSha": "9682c65f64985569792ee921cc7d97f376b69db2",
+      "kind": "text",
+      "packagePath": "notices/sassy-math.scss"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "LICENSE.txt",
+      "bytes": 1083,
+      "sha256": "57e12c39a6ad9d98b2e451065bfdfbd15fc9e0c2ed3bf4dc1d09acab41ff02fc",
+      "gitBlobSha": "b0dbfa4d7526587bcc21a4883222b20805d5c065",
+      "kind": "text",
+      "packagePath": "original/LICENSE.txt",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "README.md",
+      "bytes": 2350,
+      "sha256": "3b624490f45eb6315b00bcaac65cefa713678401c42971b0e65cad8d8ff0ccfc",
+      "gitBlobSha": "c947a03d4c63822e2ae79fd26de00fc4565e1292",
+      "kind": "text",
+      "packagePath": "original/README.md",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "index.html",
+      "bytes": 3988,
+      "sha256": "7a76f74c23aeb8ee6af73ff796343834b82f75271a610b7174a8ea6707cc8c77",
+      "gitBlobSha": "0da0ee0e1b142d886c9752fe9477058d3b4b5e83",
+      "kind": "text",
+      "packagePath": "original/index.html",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "js/animframe_polyfill.js",
+      "bytes": 890,
+      "sha256": "b97db8f8973c6c883d415e376f15ba657971e5704c8ecfd62e62a9adfec2792e",
+      "gitBlobSha": "c524a994a92103b6b5dc51af82ca8041884b6eea",
+      "kind": "text",
+      "packagePath": "original/js/animframe_polyfill.js",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "js/application.js",
+      "bytes": 197,
+      "sha256": "5fc43863225b371c458615ef431fac73003546f437aa32026641de48817bd27a",
+      "gitBlobSha": "2c1108e757a0e49af7b9ee48dcc45bd8e61cb806",
+      "kind": "text",
+      "packagePath": "original/js/application.js",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "js/bind_polyfill.js",
+      "bytes": 220,
+      "sha256": "90e671a58a24122ffac4fc28b9a967a3769398c906c348568bf731118d7fdf52",
+      "gitBlobSha": "8d9c4a4886dd1b0b9ae857ab0cf947c697b125b5",
+      "kind": "text",
+      "packagePath": "original/js/bind_polyfill.js",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "js/classlist_polyfill.js",
+      "bytes": 1794,
+      "sha256": "6abb09a37567fb3735e95d7096d30a01190a8eee016c781d51ae6b8b037261cd",
+      "gitBlobSha": "1789ae788939fa86560a96f376400b7069f4d093",
+      "kind": "text",
+      "packagePath": "original/js/classlist_polyfill.js",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "js/game_manager.js",
+      "bytes": 7627,
+      "sha256": "b02baa6b75f8c8cad8606e680b6f73b7c843c61e3a643ee48410022499a649f0",
+      "gitBlobSha": "1c13d15bd667afe06f95316942324885c45d8e6d",
+      "kind": "text",
+      "packagePath": "original/js/game_manager.js",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "js/grid.js",
+      "bytes": 2526,
+      "sha256": "169428f5ff7f726c38112fcf1c918028cbca3a1d9f9239838fbc7eb4396b9f9a",
+      "gitBlobSha": "29f0821e505b0440db8ba23c6ae88f4b5f44180a",
+      "kind": "text",
+      "packagePath": "original/js/grid.js",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "js/html_actuator.js",
+      "bytes": 4040,
+      "sha256": "67b796d4f640b927e517b2281f8230c4f65c08b07558001e2c0dc9ea2e2145cf",
+      "gitBlobSha": "6b31f2d10785a7149e1b2aa3123b06adc1d166c7",
+      "kind": "text",
+      "packagePath": "original/js/html_actuator.js",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "js/keyboard_input_manager.js",
+      "bytes": 4005,
+      "sha256": "7d579ab5b67dddf339cf28a7d06e4e24eca08b0187204ce352d67c49ae1e48de",
+      "gitBlobSha": "ca01b3ce8995a5a20ac50219712d1ef95297ed99",
+      "kind": "text",
+      "packagePath": "original/js/keyboard_input_manager.js",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "js/local_storage_manager.js",
+      "bytes": 1588,
+      "sha256": "8e12c6a9aa34097c0b634b1f6690da091b1b4ac158ff914097a8ac83c86b5bc6",
+      "gitBlobSha": "2ca9cc3006eb0f24c4921725eba34a99a3457dee",
+      "kind": "text",
+      "packagePath": "original/js/local_storage_manager.js",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "js/tile.js",
+      "bytes": 594,
+      "sha256": "13699e51d62179a6d36874108831a29901a98d6e11329918e64cfb5ee82d58e3",
+      "gitBlobSha": "92a670a5a60507bae99f333f0d3a9e23706f629f",
+      "kind": "text",
+      "packagePath": "original/js/tile.js",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "style/fonts/ClearSans-Bold-webfont.woff",
+      "bytes": 27120,
+      "sha256": "b16e36cc53aa72023c67ab31c38290de77905dd2285f331189b2236100b8f849",
+      "gitBlobSha": "184a945da400fdcae4bc6445ede163079087d18a",
+      "kind": "font",
+      "packagePath": "notices/ClearSans-Bold-webfont.woff"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "style/fonts/ClearSans-Light-webfont.woff",
+      "bytes": 28700,
+      "sha256": "465697ff07395574f9771970ca020bf64019dfbd96c2c64ba419c5d074336d90",
+      "gitBlobSha": "44555e04e957649116504d8169f37e8c0936c92a",
+      "kind": "font",
+      "packagePath": "notices/ClearSans-Light-webfont.woff"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "style/fonts/ClearSans-Regular-webfont.woff",
+      "bytes": 26764,
+      "sha256": "8c94cd2fdc93f5a86f1761c0ce14bb695f20e16dc1a585ccad7f0289bd3dbc76",
+      "gitBlobSha": "9d58858d809454e026cdebc3e766154ee8727582",
+      "kind": "font",
+      "packagePath": "notices/ClearSans-Regular-webfont.woff"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "style/fonts/clear-sans.css",
+      "bytes": 1078,
+      "sha256": "ada5fc5f508d57bf4f8d32ac354f1ebfc25b75c991948aa920f9d25defea5307",
+      "gitBlobSha": "de2811db8b5ef12fe4f243fab6c4809363562c29",
+      "kind": "text",
+      "packagePath": "original/style/fonts/clear-sans.css",
+      "sourceMode": "100755"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "style/helpers.scss",
+      "bytes": 1679,
+      "sha256": "4ff6b7bd784c8c914f3a62be3c492e276b36ad4bf47170d74247234e6920bdc5",
+      "gitBlobSha": "72693ee20df55383cc4fcd4a707b6ce07817ba91",
+      "kind": "text",
+      "packagePath": "original/style/helpers.scss",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "style/main.css",
+      "bytes": 20647,
+      "sha256": "2e0fd51d6950afe1cb0af861f92b9d01111e56b825aa46de9475e8afa1a13f1b",
+      "gitBlobSha": "ea3cb19fcaf62b95379376216f643fe5e297c4b7",
+      "kind": "text",
+      "packagePath": "original/style/main.css",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "path": "style/main.scss",
+      "bytes": 10404,
+      "sha256": "197c634a51c1b8063515d18e628e22c85d6a6f75c78f8e63f911c6234d6aabe6",
+      "gitBlobSha": "b0ec8da9ccb38dd9214361fe041ccb5d76fac49c",
+      "kind": "text",
+      "packagePath": "original/style/main.scss",
+      "sourceMode": "100644"
+    },
+    {
+      "repository": "intel/clear-sans",
+      "commit": "1993725b24a36af21e7ebaa8977103983b608572",
+      "path": "LICENSE.txt",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "gitBlobSha": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "kind": "text",
+      "packagePath": "notices/intel-LICENSE.txt"
+    },
+    {
+      "repository": "intel/clear-sans",
+      "commit": "1993725b24a36af21e7ebaa8977103983b608572",
+      "path": "README.md",
+      "bytes": 1933,
+      "sha256": "8175921c7c91ac4f3db2c658b1e09b80d82b0716c50908eebe49539d469a997d",
+      "gitBlobSha": "d66594c2cb7c9c5ccd74cafbd3290a0b8cdad6cb",
+      "kind": "text",
+      "packagePath": "notices/intel-README.md"
+    }
+  ],
+  "excluded": [
+    "Rakefile",
+    "SVG/EOT font variants",
+    "favicon and mobile icons",
+    "unknown repositories/revisions/build systems"
+  ],
+  "limitations": [
+    "Pinned hashes identify bytes, not publisher authentication or security/licensing clearance.",
+    "Clear Sans conversion/metadata identity and the original copied Sassy Math revision are not certified.",
+    "No generic repository converter, build, AI, network, process or background runtime.",
+    "Preparing is not approval to install or enable; Plugin Manager owns lifecycle.",
+    "Pending unacknowledged saves can be lost on close/disable/quit/crash; SDK RPCs have no reply deadline.",
+    "Custom/narrow/tile/overlay/input coverage is not established by a generated artifact."
+  ]
+}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { productShortName } from "@/lib/productName";
 import { RefreshCw, CheckCircle2, LogIn, LogOut, Download, ImageIcon } from "lucide-react";
 import { ipc } from "@/lib/ipc";
 import { confirmAction } from "@/components/ConfirmModal";
@@ -82,12 +83,12 @@ export function CliEngineStatus({ engine }: { engine: Engine }) {
   return <div className="cp-cli-status">
     <span className={`cp-badge ${ready ? "live" : "wait"}`}><Icon size={12} /> {label}</span>
     <span className="cp-card-sub">{stat?.detail ?? ""}{stat?.version ? ` · ${stat.version}` : ""}</span>
-    {stat?.imageReady && engine === "codex_cli" && <span className="cp-badge live" title="ChatGPT subscription image capability; live access still needs testing"><ImageIcon size={12} /> image · {CODEX_SUBSCRIPTION_IMAGE_MODEL}</span>}
+    {import.meta.env.VITE_APP_TARGET !== "archives" && stat?.imageReady && engine === "codex_cli" && <span className="cp-badge live" title="ChatGPT subscription image capability; live access still needs testing"><ImageIcon size={12} /> image · {CODEX_SUBSCRIPTION_IMAGE_MODEL}</span>}
     {stat?.installed && !ready && <button type="button" className="cp-btn" disabled={busy} onClick={() => void login()}><LogIn size={13} /> Connect with {name}</button>}
     {stat?.loggedIn && engine !== "gemini_cli" && <button type="button" className="cp-link-danger" disabled={busy} onClick={() => void logout()}><LogOut size={13} /> Sign out of {name}</button>}
     <button type="button" className="cp-link" disabled={busy} onClick={() => void run(async () => { await refresh(); })}>Re-check</button>
     {scope && <span className="cp-card-sub" title={scope} style={{ flexBasis: "100%", overflowWrap: "anywhere" }}>CLI credential profile: {scope}</span>}
-    {engine === "gemini_cli" && <span className="cp-card-sub" style={{ flexBasis: "100%" }}>Google account sign-out: run <code>/auth signout</code> inside Gemini CLI, then Re-check. Disconnect from Orion below keeps that session.</span>}
+    {engine === "gemini_cli" && <span className="cp-card-sub" style={{ flexBasis: "100%" }}>Google account sign-out: run <code>/auth signout</code> inside Gemini CLI, then Re-check. Disconnect from {productShortName()} below keeps that session.</span>}
     {note && <span role="status" className="cp-card-sub" style={{ color: "var(--neon-cyan)" }}>{note}</span>}
     {error && <span role="alert" className="cp-form-error">{error}</span>}
   </div>;

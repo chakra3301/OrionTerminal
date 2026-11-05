@@ -1,3 +1,5 @@
+import { pencilCanvasSnapshot } from "./pencil/legacyCommands";
+import { exportPencil, placePencilAsset, usePencilWorkspace } from "./pencil/runtime";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Sparkles, X, Wand2, Palette, Eye, Paintbrush, Shuffle, Globe, ImagePlus, Image as ImageIcon, Presentation, Film, Minimize2, Maximize2, PanelRight, PanelRightClose, type LucideIcon } from "lucide-react";
@@ -158,7 +160,7 @@ function loadRailUi(): RailUi {
   return { placement: "float", box: null, collapsed: false };
 }
 
-export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | null }) {
+export function XDesignClaudeRail({ dockTarget, launcher = "floating" }: { dockTarget?: HTMLElement | null; launcher?: "floating" | "hidden" }) {
   const [open, setOpen] = useState(false);
   // Active tool "mode". Clicking a brief-based tool button arms a mode instead
   // of popping a modal: the composer placeholder + a chip above the input show
@@ -255,6 +257,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
   // Track which assistant messages we've already executed commands for so
   // streaming snapshot updates don't re-run the same batch.
   const executedRef = useRef<Set<string>>(new Set());
+  const pencilTurn=useRef<ReturnType<typeof usePencilWorkspace.getState>["editor"]>(null);
   // When true, the next finished assistant reply is treated as an HTML
   // artifact (set by Build webpage / Refine) rather than canvas commands.
   const pendingArtifactRef = useRef(false);
@@ -281,7 +284,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
       const svg = extractSvg(last.content);
       if (svg) {
         const { w, h } = illustrationBox(svg, 420);
-        useXDesign.getState().addShape({
+        if(useXDesign.getState().pencilDocument){void placePencilAsset(svgToDataUrl(svg),"Illustration.svg",500-w/2,350-h/2,w,h).catch(error=>toast.error("Illustration could not be placed",{body:String(error)}));}else useXDesign.getState().addShape({
           kind: "image",
           x: 500 - w / 2,
           y: 350 - h / 2,
@@ -332,15 +335,19 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     }
     const cmds = parseCanvasCommands(last.content);
     if (cmds.length === 0) return;
-    const { applied } = runCanvasCommands(cmds);
-    if (applied > 0) log.info(`xdesign claude: applied ${applied} canvas command(s)`);
+    if(useXDesign.getState().pencilDocument){
+      void import("./pencil/legacyCommands").then(({runPencilCommandsAsync})=>runPencilCommandsAsync(cmds)).then(({applied,results})=>{
+        if(applied>0)log.info(`xdesign claude: applied ${applied} canvas command(s)`);
+        const errors=results.filter(r=>!r.ok).map(r=>r.error).join("; ");if(errors)toast.error("Some design edits could not be applied",{body:errors});
+      }).catch(error=>toast.error("Design edits could not be applied",{body:String(error)}));
+    }else{const {applied}=runCanvasCommands(cmds);if(applied>0)log.info(`xdesign claude: applied ${applied} canvas command(s)`);}
   }, [thread.messages]);
 
   // End history coalescing when the turn finishes (also covers error/cancel,
   // since those flip running off) — manual edits after the reply get normal
   // per-action undo again.
   useEffect(() => {
-    if (!thread.running) useXDesign.getState().endHistoryCoalesce();
+    if (!thread.running){useXDesign.getState().endHistoryCoalesce();pencilTurn.current?.undo.commitBatch();pencilTurn.current=null;}
   }, [thread.running]);
 
   // Build a tiny system-side note describing the current XDesign document so
@@ -348,6 +355,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
   // We attach it to the first turn of each thread only (same trick the
   // archives flow uses with its system prompt prefix).
   const buildCanvasNote = (): string => {
+    if(useXDesign.getState().pencilDocument) return JSON.stringify(pencilCanvasSnapshot());
     const { shapes, selection } = useXDesign.getState();
     if (shapes.length === 0) return "Canvas is empty.";
     const sel = Array.from(selection);
@@ -419,6 +427,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
   // text-only that turn).
   const captureCanvasSnapshot = async (): Promise<string | null> => {
     try {
+      if(useXDesign.getState().pencilDocument){const bytes=await exportPencil("PNG");return await ipc.xdesignSnapshotWrite(Array.from(bytes));}
       const { shapes } = useXDesign.getState();
       // Empty selection set → bounds of every visible shape (full design),
       // not just whatever happens to be selected.
@@ -445,7 +454,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
     // Coalesce every canvas edit this turn makes into one undo step, however
     // many apply calls the agent splits it into. Ended when the turn finishes
     // (see the running-watch effect below).
-    useXDesign.getState().beginHistoryCoalesce();
+    if(useXDesign.getState().pencilDocument){const editor=usePencilWorkspace.getState().editor;if(editor){editor.undo.beginBatch("Design partner edits");pencilTurn.current=editor;}}else useXDesign.getState().beginHistoryCoalesce();
     try {
       const isFirstTurn = !thread.sessionId;
       const note = buildCanvasNote();
@@ -756,7 +765,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
       const ratio = sizeAspect(size);
       const w = 420;
       const h = Math.round(w / ratio);
-      useXDesign.getState().addShape({
+      if(useXDesign.getState().pencilDocument)await placePencilAsset(asset.filePath,`Generated image.${ext}`,500-w/2,350-h/2,w,h);else useXDesign.getState().addShape({
         kind: "image",
         x: 500 - w / 2,
         y: 350 - h / 2,
@@ -933,6 +942,7 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
   }, [intentSeq]);
 
   if (!open) {
+    if (launcher === "hidden") return null;
     return (
       <button
         type="button"
@@ -1100,8 +1110,8 @@ export function XDesignClaudeRail({ dockTarget }: { dockTarget?: HTMLElement | n
 
   // Floating → portal to <body> so it escapes the canvas-stage clip and can
   // move anywhere in the terminal. Docked → portal up to the XDesign shell so
-  // it sits as a real flex column flush to the window's LEFT edge (CSS order:-1),
-  // a mirror of the Properties rail on the right. Falls back to nothing for the
+  // it sits as a real flex column beside the editor. The workspace places it
+  // at the right edge when docked. Falls back to nothing for the
   // one frame before the shell element is captured (placement persisted as dock).
   if (floating) return createPortal(rail, document.body);
   return dockTarget ? createPortal(rail, dockTarget) : null;

@@ -106,6 +106,7 @@ public final class ArchivesStore {
     // MARK: - Apply a merged snapshot (phone DB). Wholesale replace: `merged` is
     // already the converged state, so this also drops anything tombstoned away.
     public func apply(_ merged: SyncPayload) throws {
+        try merged.validate()
         try dbQueue.write { db in
             for table in ["notes", "assets", "tags", "note_tags", "asset_tags",
                           "collections", "mood_boards", "mood_board_assets", "tombstones"] {
@@ -151,19 +152,105 @@ public final class ArchivesStore {
         }
     }
 
+    /// Only helper-owned tracking tables/triggers are added; SQLx migration history is untouched.
+    public func enableDesktopSyncTracking() throws {
+        try dbQueue.write { db in
+            guard try db.tableExists("notes"), try db.tableExists("assets"), try db.tableExists("mood_boards") else {
+                throw SyncSafetyError.invalid("Unsupported desktop database. Update Orion Terminal first.")
+            }
+            try db.execute(sql: "CREATE TABLE IF NOT EXISTS archives_sync_migrations (version INTEGER PRIMARY KEY)")
+            if try Int.fetchOne(db, sql: "SELECT version FROM archives_sync_migrations WHERE version = 1") == nil {
+            try db.execute(sql: "CREATE TABLE IF NOT EXISTS tombstones (entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, deleted_at INTEGER NOT NULL, PRIMARY KEY(entity_type,entity_id))")
+            for (table, entity, time) in [("notes", "note", "updated_at"), ("assets", "asset", "created_at"), ("mood_boards", "moodBoard", "updated_at"), ("collections", "collection", "updated_at")] {
+                try db.execute(sql: """
+                    CREATE TRIGGER archives_sync_delete_\(table) AFTER DELETE ON \(table) BEGIN
+                      INSERT INTO tombstones(entity_type,entity_id,deleted_at)
+                      VALUES('\(entity)',OLD.id,MAX(OLD.\(time)+1,CAST((julianday('now')-2440587.5)*86400000 AS INTEGER)))
+                      ON CONFLICT(entity_type,entity_id) DO UPDATE SET deleted_at=MAX(deleted_at,excluded.deleted_at);
+                    END;
+                    """)
+            }
+            try db.execute(sql: "INSERT INTO archives_sync_migrations(version) VALUES(1)")
+            }
+            if try Int.fetchOne(db, sql: "SELECT version FROM archives_sync_migrations WHERE version = 2") == nil {
+                try db.execute(sql: """
+                    CREATE TRIGGER archives_sync_delete_board_member AFTER DELETE ON mood_board_assets BEGIN
+                      INSERT INTO tombstones(entity_type,entity_id,deleted_at)
+                      VALUES('moodBoardAsset',OLD.board_id || char(1) || OLD.asset_id,MAX(OLD.added_at+1,CAST((julianday('now')-2440587.5)*86400000 AS INTEGER)))
+                      ON CONFLICT(entity_type,entity_id) DO UPDATE SET deleted_at=MAX(deleted_at,excluded.deleted_at);
+                    END;
+                    INSERT INTO archives_sync_migrations(version) VALUES(2);
+                    """)
+            }
+        }
+    }
+
+    public func backup(to path: String) throws {
+        guard !FileManager.default.fileExists(atPath: path) else { throw SyncSafetyError.invalid("Backup destination exists.") }
+        let destination = try DatabaseQueue(path: path)
+        try dbQueue.backup(to: destination)
+        try destination.read { db in
+            guard try String.fetchOne(db, sql: "PRAGMA integrity_check") == "ok" else { throw SyncSafetyError.invalid("Backup integrity check failed.") }
+        }
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
+    }
+
+    public func applyIncoming(_ remote: SyncPayload, assetsDirPath: String) throws -> Int {
+        try remote.validate()
+        return try dbQueue.write { db in
+            let local = SyncPayload(deviceID: "mac", generatedAt: 0,
+                notes: try Self.notes(db), assets: try Self.assets(db), tags: try Self.tags(db),
+                collections: try Self.collections(db), moodBoards: try Self.moodBoards(db),
+                assetTags: try Self.assetTags(db), noteTags: try Self.noteTags(db),
+                moodBoardAssets: try Self.moodBoardAssets(db), tombstones: try Self.tombstones(db))
+            var merged = MergeEngine.merge(local, remote)
+            let collectionIDs = Set(local.collections.map(\.id))
+            merged.notes = merged.notes.map { note in
+                var note = note
+                if let collection = note.collectionID, !collectionIDs.contains(collection) { note.collectionID = nil }
+                return note
+            }
+            try merged.validate()
+            let result = try applyIncomingNotes(merged, db: db)
+            _ = try applyIncomingMedia(merged, assetsDirPath: assetsDirPath, db: db)
+            for tomb in merged.tombstones {
+                try db.execute(sql: "INSERT INTO tombstones(entity_type,entity_id,deleted_at) VALUES(?,?,?) ON CONFLICT(entity_type,entity_id) DO UPDATE SET deleted_at=MAX(deleted_at,excluded.deleted_at)",
+                               arguments: [tomb.entityType.rawValue, tomb.entityID, tomb.deletedAt])
+            }
+            return result.upserted + result.deleted
+        }
+    }
+
     // MARK: - Editing (phone DB)
+
+    public func saveNote(_ note: Note) throws {
+        try SyncPayload(deviceID: "local", generatedAt: 0, notes: [note]).validate()
+        try dbQueue.write { db in
+            if let row = try Row.fetchOne(db, sql: "SELECT * FROM notes WHERE id=?", arguments: [note.id]) {
+                let saved = Self.note(row)
+                if saved.updatedAt > note.updatedAt && (saved.title != note.title || saved.blocksJSON != note.blocksJSON || saved.plaintext != note.plaintext) {
+                    throw SyncSafetyError.invalid("A newer saved version exists. Recover this draft as a new note instead.")
+                }
+            }
+            try db.execute(sql: "UPDATE notes SET title=?, blocks_json=?, plaintext=?, updated_at=MAX(updated_at+1,?) WHERE id=?",
+                arguments: [note.title, note.blocksJSON, note.plaintext, note.updatedAt, note.id])
+            guard db.changesCount == 1 else { throw SyncSafetyError.invalid("Note no longer exists. Recover the draft as a new note.") }
+        }
+    }
 
     public func updateNoteBody(id: String, blocksJSON: String, plaintext: String, updatedAt: Millis) throws {
         try dbQueue.write { db in
-            try db.execute(sql: "UPDATE notes SET blocks_json = ?, plaintext = ?, updated_at = ? WHERE id = ?",
+            try db.execute(sql: "UPDATE notes SET blocks_json = ?, plaintext = ?, updated_at = MAX(updated_at + 1, ?) WHERE id = ?",
                            arguments: [blocksJSON, plaintext, updatedAt, id])
+            guard db.changesCount == 1 else { throw SyncSafetyError.invalid("Note no longer exists; draft kept for recovery.") }
         }
     }
 
     public func updateNoteTitle(id: String, title: String, updatedAt: Millis) throws {
         try dbQueue.write { db in
-            try db.execute(sql: "UPDATE notes SET title = ?, updated_at = ? WHERE id = ?",
+            try db.execute(sql: "UPDATE notes SET title = ?, updated_at = MAX(updated_at + 1, ?) WHERE id = ?",
                            arguments: [title, updatedAt, id])
+            guard db.changesCount == 1 else { throw SyncSafetyError.invalid("Note no longer exists; draft kept for recovery.") }
         }
     }
 
@@ -198,15 +285,19 @@ public final class ArchivesStore {
     /// orion.db's FTS triggers keep `search_index` consistent automatically.
     /// Scoped to `notes` (the only thing the phone can edit today).
     public func applyIncomingNotes(_ remote: SyncPayload) throws -> (upserted: Int, deleted: Int) {
+        try remote.validate()
+        return try dbQueue.write { db in try applyIncomingNotes(remote, db: db) }
+    }
+
+    private func applyIncomingNotes(_ remote: SyncPayload, db: Database) throws -> (upserted: Int, deleted: Int) {
         var upserted = 0
         var deleted = 0
-        try dbQueue.write { db in
+        do {
             try db.execute(sql: "PRAGMA defer_foreign_keys = ON")
             for n in remote.notes {
-                if let existing = try Int64.fetchOne(db, sql: "SELECT updated_at FROM notes WHERE id = ?", arguments: [n.id]),
-                   existing >= n.updatedAt {
-                    continue   // ours is newer or identical
-                }
+                if let existing = try Row.fetchOne(db, sql: "SELECT * FROM notes WHERE id = ?", arguments: [n.id]),
+                   Self.note(existing) == n { continue }
+                if let existing = try Int64.fetchOne(db, sql: "SELECT updated_at FROM notes WHERE id = ?", arguments: [n.id]), existing > n.updatedAt { continue }
                 try db.execute(sql: """
                     INSERT INTO notes (id,title,blocks_json,plaintext,parent_id,kind,location,collection_id,created_at,updated_at)
                     VALUES (?,?,?,?,?,?,?,?,?,?)
@@ -242,16 +333,21 @@ public final class ArchivesStore {
     /// `file_path` on orion.db (absolute, under `assetsDirPath`) or `file_name`
     /// on the phone schema.
     public func applyIncomingMedia(_ remote: SyncPayload, assetsDirPath: String) throws -> (assets: Int, boards: Int) {
+        try remote.validate()
+        return try dbQueue.write { db in try applyIncomingMedia(remote, assetsDirPath: assetsDirPath, db: db) }
+    }
+
+    private func applyIncomingMedia(_ remote: SyncPayload, assetsDirPath: String, db: Database) throws -> (assets: Int, boards: Int) {
         var assetCount = 0
         var boardCount = 0
-        try dbQueue.write { db in
+        do {
             try db.execute(sql: "PRAGMA defer_foreign_keys = ON")
             let hasFilePath = try db.columns(in: "assets").map(\.name).contains("file_path")
             let fileCol = hasFilePath ? "file_path" : "file_name"
 
             for a in remote.assets {
                 if try Bool.fetchOne(db, sql: "SELECT 1 FROM assets WHERE id = ?", arguments: [a.id]) ?? false { continue }
-                let fileVal: String? = a.fileName.map { hasFilePath ? "\(assetsDirPath)/\($0)" : $0 }
+                let fileVal: String? = try a.fileName.map { hasFilePath ? try AssetSafety.url($0, in: URL(fileURLWithPath: assetsDirPath)).path : $0 }
                 try db.execute(sql: """
                     INSERT INTO assets (id,kind,title,\(fileCol),url,metadata_json,mime_type,size_bytes,original_name,created_at)
                     VALUES (?,?,?,?,?,?,?,?,?,?)
@@ -260,7 +356,7 @@ public final class ArchivesStore {
                 assetCount += 1
             }
             for b in remote.moodBoards {
-                if let e = try Int64.fetchOne(db, sql: "SELECT updated_at FROM mood_boards WHERE id = ?", arguments: [b.id]), e >= b.updatedAt { continue }
+                if let e = try Int64.fetchOne(db, sql: "SELECT updated_at FROM mood_boards WHERE id = ?", arguments: [b.id]), e > b.updatedAt { continue }
                 try db.execute(sql: """
                     INSERT INTO mood_boards (id,title,cover_asset_id,created_at,updated_at) VALUES (?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET title=excluded.title, cover_asset_id=excluded.cover_asset_id, updated_at=excluded.updated_at
@@ -268,7 +364,7 @@ public final class ArchivesStore {
                 boardCount += 1
             }
             for r in remote.moodBoardAssets {
-                try db.execute(sql: "INSERT OR IGNORE INTO mood_board_assets (board_id,asset_id,position,added_at) VALUES (?,?,?,?)",
+                try db.execute(sql: "INSERT INTO mood_board_assets (board_id,asset_id,position,added_at) VALUES (?,?,?,?) ON CONFLICT(board_id,asset_id) DO UPDATE SET position=excluded.position, added_at=excluded.added_at WHERE excluded.added_at >= mood_board_assets.added_at",
                                arguments: [r.boardID, r.assetID, r.position, r.addedAt])
             }
             for t in remote.tombstones {
@@ -281,7 +377,7 @@ public final class ArchivesStore {
                 case .moodBoardAsset:
                     let parts = t.entityID.components(separatedBy: "\u{1}")
                     if parts.count == 2 {
-                        try db.execute(sql: "DELETE FROM mood_board_assets WHERE board_id = ? AND asset_id = ?", arguments: [parts[0], parts[1]])
+                        try db.execute(sql: "DELETE FROM mood_board_assets WHERE board_id = ? AND asset_id = ? AND added_at < ?", arguments: [parts[0], parts[1], t.deletedAt])
                     }
                 default: break
                 }
@@ -354,7 +450,7 @@ public final class ArchivesStore {
             try db.execute(sql: "DELETE FROM mood_board_assets WHERE board_id = ? AND asset_id = ?", arguments: [boardID, assetID])
             try db.execute(sql: "INSERT OR REPLACE INTO tombstones (entity_type,entity_id,deleted_at) VALUES ('moodBoardAsset',?,?)",
                            arguments: ["\(boardID)\u{1}\(assetID)", now])
-            try db.execute(sql: "UPDATE mood_boards SET updated_at = ? WHERE id = ?", arguments: [now, boardID])
+            try db.execute(sql: "UPDATE mood_boards SET updated_at = ?, cover_asset_id = CASE WHEN cover_asset_id = ? THEN (SELECT asset_id FROM mood_board_assets WHERE board_id = ? ORDER BY position LIMIT 1) ELSE cover_asset_id END WHERE id = ?", arguments: [now, assetID, boardID, boardID])
         }
     }
 

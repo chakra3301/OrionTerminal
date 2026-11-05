@@ -4,6 +4,7 @@ import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
 import "@blocknote/mantine/style.css";
 import "./note-page.css";
+import { noteSchema } from "./noteSchema";
 
 // --- plaintext walker: a 1:1 port of the desktop src/features/notes/plaintext.ts
 // so the FTS `body`/`plaintext` produced on the phone matches the desktop exactly.
@@ -46,21 +47,32 @@ function postNative(msg: unknown) {
 }
 
 function Editor() {
-  const [editable, setEditable] = useState(true);
-  const editor = useCreateBlockNote();
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [editable, setEditable] = useState(false);
+  const [error, setError] = useState("");
+  const editor = useCreateBlockNote({ schema: noteSchema });
+  const loaded = useRef(false);
+  const previous = useRef("");
 
   // Native injects the initial document once the editor signals it's ready.
   useEffect(() => {
     (window as any).archivesLoad = (json: string, ed: boolean) => {
-      setEditable(!!ed);
+      loaded.current = false;
+      setEditable(false);
       try {
         const blocks = JSON.parse(json);
-        if (Array.isArray(blocks) && blocks.length > 0) {
-          editor.replaceBlocks(editor.document, blocks);
-        }
-      } catch {
-        /* leave the empty default doc */
+        const valid = (rows: any[]): boolean => Array.isArray(rows) && rows.every((block) =>
+          block && typeof block === "object" && block.type in noteSchema.blockSchema &&
+          (block.children === undefined || valid(block.children)));
+        if (!valid(blocks)) throw new Error("This note contains blocks this mobile version cannot edit. Open it in Orion Terminal; the original is preserved.");
+        editor.replaceBlocks(editor.document, blocks.length ? blocks : [{ type: "paragraph", content: [] }]);
+        previous.current = JSON.stringify(editor.document);
+        loaded.current = true;
+        setEditable(!!ed);
+        setError("");
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : "Couldn't safely load this note. Original content is preserved.";
+        setError(message);
+        postNative({ type: "error", message });
       }
     };
     postNative({ type: "ready" });
@@ -69,26 +81,20 @@ function Editor() {
     };
   }, [editor]);
 
-  // Debounced change → native (blocks JSON + derived plaintext).
   useEffect(() => {
     const off = editor.onChange(() => {
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => {
-        const blocks = editor.document;
-        postNative({
-          type: "change",
-          blocks: JSON.stringify(blocks),
-          plaintext: walkBlocksToPlaintext(blocks),
-        });
-      }, 400);
+      if (!loaded.current) return;
+      const blocks = JSON.stringify(editor.document);
+      if (blocks === previous.current) return;
+      previous.current = blocks;
+      // No trailing debounce: navigating away must not discard the last keystrokes.
+      postNative({ type: "change", blocks, plaintext: walkBlocksToPlaintext(editor.document) });
     });
-    return () => {
-      if (timer.current) clearTimeout(timer.current);
-      if (typeof off === "function") off();
-    };
+    return () => { if (typeof off === "function") off(); };
   }, [editor]);
 
-  return <BlockNoteView editor={editor} editable={editable} theme="dark" />;
+  return error ? <div role="alert" style={{ padding: 24, color: "#ff3ea5" }}>{error}</div>
+    : <BlockNoteView editor={editor} editable={editable} theme="dark" />;
 }
 
 createRoot(document.getElementById("root")!).render(<Editor />);

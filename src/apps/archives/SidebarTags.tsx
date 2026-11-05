@@ -31,7 +31,7 @@ export function SidebarTags() {
       <>
         <div className="ar-section">Tags</div>
         <div className="ar-tag-cloud-empty">
-          Add assets or notes — Claude tags them automatically.
+          Tags appear here as you add notes and assets.
         </div>
       </>
     );

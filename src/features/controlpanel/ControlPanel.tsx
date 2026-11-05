@@ -1,9 +1,10 @@
-import { Fragment, Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
 import { useControlPanel, type CpSection } from "@/store/controlPanelStore";
 import { useAppDescriptors } from "@/plugins/appRegistry";
 import { ProvidersPanel } from "./ProvidersPanel";
 import { useControlPanelFocus } from "./useControlPanelFocus";
+import { ThemeBorder } from "@/components/effects/ThemeBorder";
 import { SkillLibraryPanel } from "./SkillLibraryPanel";
 import { AgentForge } from "./AgentForge";
 import { PluginManagerPanel } from "./PluginManagerPanel";
@@ -15,8 +16,9 @@ const CharacterPicker = lazy(() =>
     default: m.CharacterPicker,
   })),
 );
-import { X, Cpu, Hammer, Sparkles, KeyRound, Palette, Image as ImageIcon, Plug, Keyboard, Info, ShieldCheck, Code2, BookOpen, PenTool, Users, Package } from "lucide-react";
+import { X, Cpu, Hammer, Sparkles, KeyRound, Palette, Image as ImageIcon, Plug, Keyboard, Info, ShieldCheck, Code2, BookOpen, PenTool, Users, Package, SlidersHorizontal } from "lucide-react";
 import "./controlpanel.css";
+import "./settingsExperience.css";
 
 const NAV: { key: CpSection; label: string; Icon: LucideIcon }[] = [
   { key: "plugins", label: "Plugins", Icon: Package },
@@ -34,6 +36,13 @@ const NAV: { key: CpSection; label: string; Icon: LucideIcon }[] = [
   { key: "mcp", label: "MCP Servers", Icon: Plug },
   { key: "shortcuts", label: "Shortcuts", Icon: Keyboard },
   { key: "about", label: "About", Icon: Info },
+];
+
+const NAV_GROUPS: { label: string; sections: CpSection[] }[] = [
+  { label: "Workspace", sections: ["theme", "wallpaper", "characters"] },
+  { label: "Intelligence", sections: ["providers", "agents", "skills", "key", "mcp"] },
+  { label: "Applications", sections: ["app-orion", "app-archives", "app-xdesign", "plugins"] },
+  { label: "Personal", sections: ["account", "shortcuts", "about"] },
 ];
 
 const APP_SETTINGS_SECTION: Partial<Record<CpSection, string>> = {
@@ -65,26 +74,24 @@ export function ControlPanel() {
   return (
     <div className="cp-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) hide(); }}>
       <div className="cp-surface" ref={surfaceRef} role="dialog" aria-modal="true" aria-label="Control Panel" tabIndex={-1} onMouseDown={(e) => e.stopPropagation()}>
+        <ThemeBorder />
         <aside className="cp-rail">
-          <div className="cp-rail-title">Control Panel</div>
-          {nav.map((n) => (
-            <Fragment key={n.key}>
-              {n.key === "account" && <div className="cp-rail-divider" />}
-              <button
-                className={`cp-rail-item${section === n.key ? " active" : ""}`}
-                onClick={() => setSection(n.key)}
-              >
-                <n.Icon size={15} strokeWidth={1.75} />{n.label}
-              </button>
-            </Fragment>
-          ))}
+          <div className="cp-rail-brand"><span><SlidersHorizontal size={17} /></span><div>Settings<small>Orion Terminal</small></div></div>
+          <nav aria-label="Settings sections">
+            {NAV_GROUPS.map(group => <div className="cp-rail-group" key={group.label}>
+              <div className="cp-rail-group-label">{group.label}</div>
+              {group.sections.flatMap(key => nav.filter(n => n.key === key)).map(n => <button type="button" key={n.key}
+                className={`cp-rail-item${section === n.key ? " active" : ""}`} aria-current={section === n.key ? "page" : undefined}
+                onClick={() => setSection(n.key)}><n.Icon size={15} strokeWidth={1.6} />{n.label}</button>)}
+            </div>)}
+          </nav>
         </aside>
         <main className="cp-main">
           <header className="cp-main-head">
-            <span>{nav.find((n) => n.key === section)?.label}</span>
+            <div className="cp-head-location"><small>{NAV_GROUPS.find(g => g.sections.includes(section))?.label}</small><span>{nav.find(n => n.key === section)?.label}</span></div>
             <button className="cp-close" onClick={hide} aria-label="Close"><X size={14} /></button>
           </header>
-          <div className="cp-main-body">
+          <div className="cp-main-body" key={section}>
             {section === "plugins" && <PluginManagerPanel />}
             {section === "providers" && <ProvidersPanel />}
             {section === "agents" && <AgentForge />}

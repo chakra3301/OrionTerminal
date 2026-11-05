@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { RefObject } from "react";
 import type { OnMount } from "@monaco-editor/react";
-import { Check, Loader2, Sparkles, StopCircle, X } from "lucide-react";
+import { Check, Sparkles, StopCircle, X } from "lucide-react";
+import { AiActivity } from "@/components/effects/OrionOrb";
 import { useInlineEditStore } from "@/store/inlineEditStore";
 import { useProjectStore } from "@/store/projectStore";
 import { autoCodebaseContext } from "@/features/context/contextProviders";
@@ -379,8 +380,7 @@ export function InlineEditSession({ editorRef, monacoRef, path, mountTick }: Pro
 
       {phase === "streaming" && (
         <div className="or-ke-status">
-          <Loader2 size={11} className="or-ke-spin" />
-          <span>{mode === "ask" ? "thinking…" : "rewriting…"}</span>
+          <AiActivity label={mode === "ask" ? "thinking" : "rewriting"} state={mode === "ask" ? "solving" : "composing"} />
           <button type="button" className="or-ke-mini" onClick={rejectOrClose} title="Stop and restore">
             <StopCircle size={11} /> stop
           </button>

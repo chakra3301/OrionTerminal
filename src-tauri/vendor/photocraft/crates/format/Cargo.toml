@@ -1,0 +1,26 @@
+[package]
+name = "photocraft-format"
+description = "Native .pcraft document bundle: manifest + content-addressed zstd tiles"
+version = "0.3.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+rust-version = "1.95"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[dependencies]
+photocraft-geom = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-color = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-raster = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-doc = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-codecs = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = { version = "1", features = ["unbounded_depth"] }
+thiserror = "2"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+blake3 = { version = "1.8", default-features = false, features = ["pure"] }
+ruzstd = "0.9"
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.28", default-features = false, features = ["fs"] }

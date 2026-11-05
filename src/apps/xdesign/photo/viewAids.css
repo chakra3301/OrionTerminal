@@ -1,0 +1,12 @@
+/* View aids: rulers, grid and guides drawn over the stage in screen space. The root never takes pointer input; only rulers and movable guide strips do. */
+.xd-view-aids { position:absolute;inset:0;pointer-events:none;z-index:5; }
+.xd-view-frame { position:absolute;overflow:hidden;pointer-events:none; }
+.xd-view-content { position:absolute;left:0;top:0; }
+.xd-view-ruler { position:absolute;pointer-events:auto;background:var(--xd-panel);color:var(--xd-text-2);touch-action:none; }
+.xd-view-ruler.is-top { left:0;top:0;border-bottom:1px solid var(--xd-border);cursor:default; }
+.xd-view-ruler.is-left { left:0;top:0;border-right:1px solid var(--xd-border);cursor:default; }
+.xd-view-corner { position:absolute;left:0;top:0;pointer-events:auto;background:var(--xd-panel);border-right:1px solid var(--xd-border);border-bottom:1px solid var(--xd-border);box-sizing:border-box; }
+.xd-view-marker { position:absolute;left:0;top:0;background:var(--xd-text);pointer-events:none; }
+.xd-view-marker.is-x { width:1px; }
+.xd-view-marker.is-y { height:1px; }
+.xd-view-guide-hit { position:absolute;pointer-events:auto;touch-action:none; }

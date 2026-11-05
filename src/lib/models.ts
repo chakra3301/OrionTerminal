@@ -5,6 +5,10 @@ import { parseModelValue } from "@/features/agents/modelSelection";
 export type ModelDef = { id: string; label: string; short: string };
 
 export const MODELS: ModelDef[] = [
+  { id: "claude-opus-5-5", label: "Opus 5.5", short: "opus-5.5" },
+  { id: "claude-sonnet-5-5", label: "Sonnet 5.5", short: "sonnet-5.5" },
+  { id: "claude-fable-5-1", label: "Fable 5.1", short: "fable-5.1" },
+  { id: "claude-haiku-5-5", label: "Haiku 5.5", short: "haiku-5.5" },
   { id: "claude-opus-4-8", label: "Opus 4.8", short: "opus-4.8" },
   { id: "claude-sonnet-5", label: "Sonnet 5", short: "sonnet-5" },
   { id: "claude-sonnet-4-6", label: "Sonnet 4.6", short: "sonnet-4.6" },
@@ -12,7 +16,7 @@ export const MODELS: ModelDef[] = [
   { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", short: "haiku-4.5" },
 ];
 
-export const DEFAULT_MODEL_ID = "claude-opus-4-8";
+export const DEFAULT_MODEL_ID = "claude-opus-5-5";
 
 function rawModel(id: string): string {
   if (!id) return DEFAULT_MODEL_ID;

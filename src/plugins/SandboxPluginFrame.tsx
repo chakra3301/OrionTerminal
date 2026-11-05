@@ -1,10 +1,14 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { AlertTriangle, Loader2, Shield } from "lucide-react";
-import { beginCommunityPluginCall } from "@/plugins/communityActivity";
+import { beginCommunityPluginCall, communityPluginVersion, isCommunityPluginChanging } from "@/plugins/communityActivity";
 import { ipc } from "@/lib/ipc";
+import { preparePluginDocuments } from "./pluginDocument";
 import { toast } from "@/store/toastStore";
 import { useCommunityPlugins } from "@/store/communityPluginStore";
+import { capturePluginAppearance, pluginSkin, type PluginAppearance, type PluginSkin } from "./pluginAppearance";
+import { appearanceClientScript } from "./pluginAppearanceClient";
+import { PluginAppearanceControls } from "./PluginAppearanceControls";
 
 export const PLUGIN_RPC_CHANNEL = "orion-plugin-rpc";
 export const PLUGIN_RPC_VERSION = 1;
@@ -53,7 +57,7 @@ function scriptJson(value: string): string {
   return JSON.stringify(value).replaceAll("<", "\\u003c");
 }
 
-function bootstrapScript(sessionId: string, gestureToken: string): string {
+function bootstrapScript(sessionId: string, gestureToken: string, appearance: PluginAppearance | null = null): string {
   return `(() => {
   "use strict";
   const channel = ${scriptJson(PLUGIN_RPC_CHANNEL)};
@@ -80,8 +84,10 @@ function bootstrapScript(sessionId: string, gestureToken: string): string {
     pending.set(requestId, { resolve, reject });
     parent.postMessage({ channel, version, sessionId, type: "request", requestId, method, params }, "*");
   });
+  ${appearance ? appearanceClientScript(appearance) : "const appearance = null;"}
   const api = Object.freeze({
     apiVersion: "1",
+    ...(appearance ? { appearance } : {}),
     request,
     storage: Object.freeze({
       get: (key) => request("storage.get", { key }),
@@ -123,44 +129,14 @@ function bootstrapScript(sessionId: string, gestureToken: string): string {
 })();`;
 }
 
-function parsePluginHtml(content: string): { head: string; body: string } {
-  const parsed = new DOMParser().parseFromString(content, "text/html");
-  parsed.querySelectorAll("base, meta[http-equiv], iframe, object, embed").forEach((node) => node.remove());
-  parsed.querySelectorAll("script[src], link[href]").forEach((node) => node.remove());
-  parsed.querySelectorAll("a[href]").forEach((node) => node.removeAttribute("href"));
-  return { head: parsed.head.innerHTML, body: parsed.body.innerHTML };
-}
-
 export function buildPluginDocument(
   content: string,
   kind: "ui" | "background",
   sessionId: string,
   gestureToken = `${sessionId}-gesture`,
 ): string {
-  const csp = [
-    "default-src 'none'",
-    "script-src 'unsafe-inline' blob:",
-    "style-src 'unsafe-inline'",
-    "img-src data: blob:",
-    "font-src data:",
-    "media-src data: blob:",
-    "connect-src 'none'",
-    "worker-src blob:",
-    "child-src blob:",
-    "frame-src 'none'",
-    "object-src 'none'",
-    "base-uri 'none'",
-    "form-action 'none'",
-    "navigate-to 'none'",
-  ].join("; ");
-  const baseStyle = kind === "background"
-    ? "html,body{display:none!important}"
-    : "html,body{width:100%;height:100%;margin:0;background:#03060a;color:#e6f4ec;color-scheme:dark}*{box-sizing:border-box}";
-  const parsed = kind === "ui" ? parsePluginHtml(content) : { head: "", body: "" };
-  const pluginScript = kind === "background"
-    ? `<script>(()=>{const code=${scriptJson(content)};const url=URL.createObjectURL(new Blob([code],{type:"text/javascript"}));const script=document.createElement("script");script.src=url;script.onload=()=>URL.revokeObjectURL(url);document.head.appendChild(script)})()</script>`
-    : "";
-  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="referrer" content="no-referrer"><style>${baseStyle}</style><script>${bootstrapScript(sessionId, gestureToken)}</script>${parsed.head}</head><body>${parsed.body}${pluginScript}</body></html>`;
+  const initial = pluginSkin(content, kind) ? capturePluginAppearance() : null;
+  return preparePluginDocuments(content, kind, bootstrapScript(sessionId, gestureToken, initial), sessionId).guard;
 }
 
 export function isPluginRequest(value: unknown, sessionId: string): value is PluginRequest {
@@ -216,6 +192,10 @@ function isRuntimeError(value: unknown, sessionId: string): value is PluginRunti
     && error.message.length <= 300;
 }
 
+function currentPluginVersion(pluginId: string): string {
+  return communityPluginVersion(useCommunityPlugins.getState().installed.find((p) => p.manifest.id === pluginId));
+}
+
 export function SandboxPluginFrame({
   pluginId,
   kind,
@@ -226,10 +206,22 @@ export function SandboxPluginFrame({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const disposingRef = useRef(false);
   const trustedGestureAtRef = useRef(0);
-  const sessionId = useMemo(randomSessionId, [pluginId, kind]);
-  const gestureToken = useMemo(randomSessionId, [pluginId, kind]);
+  const readySessionRef = useRef<string | null>(null);
+  const version = useCommunityPlugins((s) => communityPluginVersion(s.installed.find((p) => p.manifest.id === pluginId)));
+  const sessionId = useMemo(randomSessionId, [pluginId, kind, version]);
+  const gestureToken = useMemo(randomSessionId, [pluginId, kind, version]);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [appearance, setAppearance] = useState<{ session: string; skin: PluginSkin } | null>(null);
+  const appearanceRefresh = useRef<(() => void) | null>(null);
+  const registerAppearance = useCallback((refresh: (() => void) | null) => { appearanceRefresh.current = refresh; }, []);
+  const publishAppearance = useCallback((snapshot: PluginAppearance) => {
+    const active = useCommunityPlugins.getState().installed.find(p => p.manifest.id === pluginId);
+    if (kind !== "ui" || disposingRef.current || !active?.enabled || active.quarantined || currentPluginVersion(pluginId) !== version
+      || isCommunityPluginChanging(pluginId) || readySessionRef.current !== sessionId) return;
+    iframeRef.current?.contentWindow?.postMessage({ channel: PLUGIN_RPC_CHANNEL, version: PLUGIN_RPC_VERSION,
+      sessionId, type: "appearance", appearance: snapshot }, "*");
+  }, [kind, pluginId, sessionId, version]);
   const reportRuntimeFailure = useCommunityPlugins((state) => state.reportRuntimeFailure);
 
   useLayoutEffect(() => {
@@ -242,25 +234,42 @@ export function SandboxPluginFrame({
   useEffect(() => {
     let disposed = false;
     let objectUrl: string | null = null;
+    setError(null); setUrl(null); setAppearance(null);
+    const record = useCommunityPlugins.getState().installed.find((p) => p.manifest.id === pluginId);
+    if (!record?.enabled || record.quarantined) return;
     void ipc.pluginReadEntrypoint(pluginId, kind)
       .then((entrypoint) => {
-        if (disposed) return;
+        if (disposed || currentPluginVersion(pluginId) !== version) return;
+        const skin = pluginSkin(entrypoint.content, kind);
+        if (skin) setAppearance({ session: sessionId, skin });
         const document = buildPluginDocument(entrypoint.content, kind, sessionId, gestureToken);
         objectUrl = URL.createObjectURL(new Blob([document], { type: "text/html" }));
         setUrl(objectUrl);
       })
       .catch((reason) => {
+        if (disposed || currentPluginVersion(pluginId) !== version) return;
         const message = reason instanceof Error ? reason.message : String(reason);
         setError(message);
-        void reportRuntimeFailure(pluginId, `Entrypoint load failed: ${message}`);
+        if (!isCommunityPluginChanging(pluginId)) void reportRuntimeFailure(pluginId, `Entrypoint load failed: ${message}`);
       });
     return () => {
       disposed = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [gestureToken, kind, pluginId, reportRuntimeFailure, sessionId]);
+  }, [gestureToken, kind, pluginId, reportRuntimeFailure, sessionId, version]);
 
   useEffect(() => {
+    if (!url) return;
+    const timer = setTimeout(() => {
+      if (readySessionRef.current !== sessionId && currentPluginVersion(pluginId) === version && !isCommunityPluginChanging(pluginId)) {
+        void reportRuntimeFailure(pluginId, "Sandbox startup timed out. Disable and reopen the package after checking its entrypoint.");
+      }
+    }, 10_000);
+    return () => clearTimeout(timer);
+  }, [url, sessionId, version, pluginId, reportRuntimeFailure]);
+
+  useEffect(() => {
+    let disposed = false;
     const inFlight = new Set<string>();
     const requestTimes: number[] = [];
     let violations = 0;
@@ -274,6 +283,7 @@ export function SandboxPluginFrame({
       result?: unknown,
       responseError?: string,
     ) => {
+      if (disposed || currentPluginVersion(pluginId) !== version) return;
       iframeRef.current?.contentWindow?.postMessage({
         channel: PLUGIN_RPC_CHANNEL,
         version: PLUGIN_RPC_VERSION,
@@ -286,7 +296,17 @@ export function SandboxPluginFrame({
       }, "*");
     };
     const onMessage = (event: MessageEvent) => {
-      if (event.source !== iframeRef.current?.contentWindow) return;
+      const active = useCommunityPlugins.getState().installed.find((p) => p.manifest.id === pluginId);
+      if (!active?.enabled || active.quarantined || disposed || disposingRef.current || currentPluginVersion(pluginId) !== version || event.source !== iframeRef.current?.contentWindow) return;
+      if (isCommunityPluginChanging(pluginId)) {
+        if (isPluginRequest(event.data, sessionId)) respond(event.data.requestId, false, null, "Plugin update in progress; retry after it finishes.");
+        return;
+      }
+      if (event.data?.channel === PLUGIN_RPC_CHANNEL && event.data?.version === PLUGIN_RPC_VERSION && event.data?.sessionId === sessionId && event.data?.type === "ready") {
+        readySessionRef.current = sessionId;
+        appearanceRefresh.current?.();
+        return;
+      }
       if (isRuntimeError(event.data, sessionId)) {
         if (!disposingRef.current) {
           void reportRuntimeFailure(pluginId, `Runtime error: ${event.data.message}`);
@@ -300,6 +320,7 @@ export function SandboxPluginFrame({
         type?: unknown;
         gestureToken?: unknown;
       } | null;
+      if (candidate?.sessionId !== sessionId) return;
       if (isPluginGesture(candidate, sessionId, gestureToken)) {
         trustedGestureAtRef.current = Date.now();
         return;
@@ -323,7 +344,13 @@ export function SandboxPluginFrame({
       }
       requestTimes.push(now);
       inFlight.add(request.requestId);
-      const endActivity = beginCommunityPluginCall(pluginId);
+      let endActivity: () => void;
+      try { endActivity = beginCommunityPluginCall(pluginId); }
+      catch (error) {
+        inFlight.delete(request.requestId);
+        respond(request.requestId, false, null, error instanceof Error ? error.message : String(error));
+        return;
+      }
       const execute = async (): Promise<unknown> => {
         if (request.method !== "workspace.requestAccess") {
           return ipc.pluginBrokerCall(pluginId, request.method, request.params ?? {});
@@ -354,6 +381,7 @@ export function SandboxPluginFrame({
       };
       void execute()
         .then((result) => {
+          if (disposed || currentPluginVersion(pluginId) !== version) return;
           if (request.method === "notifications.show" && result && typeof result === "object") {
             const notification = result as { title?: unknown; body?: unknown };
             if (typeof notification.title === "string") {
@@ -374,12 +402,13 @@ export function SandboxPluginFrame({
         });
     };
     window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [gestureToken, kind, pluginId, reportRuntimeFailure, sessionId]);
+    return () => { disposed = true; window.removeEventListener("message", onMessage); };
+  }, [gestureToken, kind, pluginId, reportRuntimeFailure, sessionId, version]);
 
   if (kind === "background") {
     return url ? (
       <iframe
+        key={sessionId}
         ref={iframeRef}
         className="plugin-background-frame"
         sandbox={PLUGIN_SANDBOX}
@@ -412,7 +441,9 @@ export function SandboxPluginFrame({
   return (
     <div className="plugin-frame-shell">
       <div className="plugin-frame-trust"><Shield size={10} /> Opaque sandbox · brokered access</div>
+      {appearance?.session === sessionId && <PluginAppearanceControls key={sessionId} pluginId={pluginId} skin={appearance.skin} publish={publishAppearance} register={registerAppearance} />}
       <iframe
+        key={sessionId}
         ref={iframeRef}
         className="plugin-ui-frame"
         sandbox={PLUGIN_SANDBOX}

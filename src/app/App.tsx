@@ -3,6 +3,7 @@ import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { EventBridge } from "@/app/EventBridge";
 import { useQuitGuard } from "@/features/recovery/useQuitGuard";
+import { quitRisks } from "@/features/recovery/quitRisks";
 import { useStartupBackupWarning } from "@/features/recovery/useStartupBackupWarning";
 import { useDraftRecovery } from "@/features/recovery/useDraftRecovery";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
@@ -38,6 +39,7 @@ const SplashPreview = import.meta.env.DEV
   : null;
 import { startFileDropOrchestrator } from "@/lib/fileDrop";
 import { useThemeStore } from "@/store/themeStore";
+import { useThemeExtras } from "@/store/themeExtrasStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { useAppConfig, type AppConfigsPersist } from "@/store/appConfigStore";
 import { useWallpaperStore, type WallpaperState } from "@/store/wallpaperStore";
@@ -58,7 +60,9 @@ import { LockScreen } from "@/features/auth/LockScreen";
 import { FirstRunSetup } from "@/features/auth/FirstRunSetup";
 import { useShell, type WindowState } from "@/shell/store/useShell";
 import { loadOrionPluginData } from "@/apps/orion/pluginContributions";
+import { installOrionArchivesHost } from "@/apps/archives/orionArchivesHost";
 
+installOrionArchivesHost();
 installBuiltinCommands();
 installShellCommands();
 installSpotifyCommands();
@@ -73,6 +77,8 @@ async function hydrate() {
     characters,
     modelPrefs,
     reduceGlass,
+    themeExtras,
+    customThemes,
     appConfigs,
     pluginState,
   ] = await Promise.all([
@@ -84,12 +90,16 @@ async function hydrate() {
     ),
     getAppState<Record<string, string>>("models"),
     getAppState<boolean>("reduce_glass"),
+    getAppState<unknown>("theme_extras", true).catch(() => undefined),
+    getAppState<unknown>("custom_themes", true).catch(() => undefined),
     getAppState<AppConfigsPersist>("appconfig"),
     getAppState<PluginEnablementV1>("plugins.state"),
   ]);
 
+  useThemeStore.getState().hydrateCustom(customThemes);
   useThemeStore.getState().hydrate(theme ?? null);
   useThemeStore.getState().hydrateGlass(reduceGlass);
+  useThemeExtras.getState().hydrate(themeExtras);
   if (wallpaper) useWallpaperStore.getState().hydrate(wallpaper);
   if (characters) useCharacterStore.getState().hydrate(characters);
   usePluginManager.getState().hydrate(pluginState);
@@ -328,7 +338,7 @@ export default function App() {
   // True once we're actually displaying the shell (not splash / gate / blank).
   const inShell =
     hydrated && (warm || (probed && splashDone && authPhase === "unlocked"));
-  useQuitGuard(hydrated);
+  useQuitGuard(hydrated, quitRisks);
   useStartupBackupWarning(hydrated);
   useDraftRecovery(hydrated);
   useWindowSizePersistence();

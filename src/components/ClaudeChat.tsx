@@ -1,8 +1,5 @@
-import { memo, useEffect, useRef, useState, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeHighlight from "rehype-highlight";
-import "highlight.js/styles/github-dark.css";
+import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { ChatMarkdown } from "@/components/ChatMarkdown";
 import {
   Sparkles,
   Send,
@@ -17,15 +14,23 @@ import {
   StickyNote,
   Braces,
   X,
+  ArrowUp,
+  Square,
+  AtSign,
 } from "lucide-react";
 import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
 import { useFileDropZone } from "@/lib/fileDrop";
 import { ModelSelect } from "@/components/ModelSelect";
+import { AiActivity, OrionOrb } from "@/components/effects/OrionOrb";
 // Type-only — keeps ClaudeChat decoupled from any provider implementation.
 import type {
   ContextChip,
   ContextSuggestion,
 } from "@/features/context/contextProviders";
+
+function hasChatContent(content: ReactNode): boolean {
+  return typeof content === "string" ? content.trim().length > 0 : content != null && typeof content !== "boolean";
+}
 
 /** Display twin of chatStore's MessagePill — structural, no store import. */
 export type ClaudeChatPill = {
@@ -63,6 +68,19 @@ export type ClaudeChatProps = {
   onNewChat?: () => void;
   /** When provided, typing `@` in the input opens the context picker. */
   contextSearch?: (query: string) => Promise<ContextSuggestion[]>;
+  composerAccessory?: (disabled: boolean) => ReactNode;
+  /**
+   * "rail" (default): the handoff's assistant rail. "agent": Cursor's agent
+   * pane — chat title header, composer box with the model picker inside, the
+   * composer at the top until the chat has messages.
+   */
+  variant?: "rail" | "agent";
+  /** Agent variant: the conversation title shown in the header. */
+  title?: string;
+  /** Agent variant: extra header buttons (history, more…). */
+  headerActions?: ReactNode;
+  /** Agent variant: shown under the composer while the chat is empty (past chats). */
+  emptyState?: ReactNode;
 };
 
 const KIND_ICON: Record<string, typeof FileText> = {
@@ -129,14 +147,7 @@ const MessageBody = memo(function MessageBody({
   content: ReactNode | string;
 }) {
   if (typeof content !== "string") return <>{content}</>;
-  return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeHighlight]}
-    >
-      {content}
-    </ReactMarkdown>
-  );
+  return <ChatMarkdown text={content} />;
 });
 
 /** Brain-pass plan, rendered as a labeled collapsible block in the agent
@@ -296,20 +307,306 @@ export function ClaudeChat(props: ClaudeChatProps) {
     }
   };
 
-  const orbStyle = {
-    background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.6), transparent 50%),
-                 radial-gradient(circle at 70% 70%, ${accentColor}, transparent 60%),
-                 radial-gradient(circle at 30% 70%, var(--neon-cyan), transparent 60%)`,
-    boxShadow: `0 0 16px ${accentColor}66, inset 0 0 8px rgba(0,224,255,0.4)`,
-  } as const;
+  const streaming = running && messages.some(m => m.role === "assistant" && m.pending && hasChatContent(m.content) && m.content !== "…");
 
+  const agent = props.variant === "agent";
   const showOpening = messages.length === 0 && openingLine;
   const showSuggest = !!suggestionChips?.length && messages.length < 2;
+
+  useLayoutEffect(() => {
+    const el = inputElRef.current;
+    if (!agent || !el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 220)}px`;
+  }, [agent, input]);
+
+  const addAt = () => {
+    const next = input && !/\s$/.test(input) ? `${input} @` : `${input}@`;
+    setInput(next);
+    refreshPicker(next, next.length);
+    setTimeout(() => {
+      const el = inputElRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(next.length, next.length);
+    }, 0);
+  };
+
+  function renderComposer() {
+    return (
+        <div
+          ref={inputWrapRef}
+          className={`ot-claude-input${agent ? " ot-agent-composer" : ""}${dragOver ? " drag-over" : ""}`}
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes(ASSET_DRAG_MIME)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+            if (!dragOver) setDragOver(true);
+          }}
+          onDragLeave={(e) => {
+            // Ignore inner-element transitions (e.g. enter the textarea).
+            if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+            setDragOver(false);
+          }}
+          onDrop={(e) => {
+            if (!e.dataTransfer.types.includes(ASSET_DRAG_MIME)) return;
+            e.preventDefault();
+            const path = e.dataTransfer.getData(ASSET_DRAG_MIME);
+            if (path) attachAssetPath(path);
+            setDragOver(false);
+          }}
+        >
+          {picker && (
+            <div className="ot-ctxpick">
+              {picker.results.length === 0 ? (
+                <div className="ot-ctxpick-empty">
+                  {picker.query
+                    ? "no matches"
+                    : "type to search files, folders & notes"}
+                </div>
+              ) : (
+                picker.results.map((s, i) => (
+                  <button
+                    key={`${s.kind}-${s.label}-${i}`}
+                    type="button"
+                    className={`ot-ctxpick-row${i === picker.hi ? " hi" : ""}`}
+                    onMouseEnter={() =>
+                      setPicker((cur) => (cur ? { ...cur, hi: i } : cur))
+                    }
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      pickSuggestion(s);
+                    }}
+                  >
+                    <PillIcon kind={s.kind} size={12} />
+                    <span className="ot-ctxpick-label">{s.label}</span>
+                    {s.detail && (
+                      <span className="ot-ctxpick-detail">{s.detail}</span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+          {chips.length > 0 && (
+            <div className="ot-ctxchips">
+              {chips.map((c) => (
+                <span key={c.id} className="ot-ctxchip">
+                  <PillIcon kind={c.kind} />
+                  <span className="ot-ctxchip-label">{c.label}</span>
+                  <button
+                    type="button"
+                    className="ot-ctxchip-x"
+                    aria-label={`Remove ${c.label}`}
+                    onClick={() =>
+                      setChips((cur) => cur.filter((x) => x.id !== c.id))
+                    }
+                  >
+                    <X size={10} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <textarea
+            ref={inputElRef}
+            aria-label="Message"
+            rows={1}
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              refreshPicker(e.target.value, e.target.selectionStart ?? e.target.value.length);
+            }}
+            placeholder={
+              disabledReason ??
+              placeholder ??
+              (props.contextSearch ? "Ask your AI… (@ to attach context)" : "Ask your AI…")
+            }
+            disabled={!!disabledReason || running || submitting}
+            onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+              if (picker) {
+                if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                  e.preventDefault();
+                  const dir = e.key === "ArrowDown" ? 1 : -1;
+                  setPicker((cur) => {
+                    if (!cur || cur.results.length === 0) return cur;
+                    const n = cur.results.length;
+                    return { ...cur, hi: (cur.hi + dir + n) % n };
+                  });
+                  return;
+                }
+                if ((e.key === "Enter" || e.key === "Tab") && picker.results[picker.hi]) {
+                  e.preventDefault();
+                  pickSuggestion(picker.results[picker.hi]!);
+                  return;
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  closePicker();
+                  return;
+                }
+              }
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+          />
+          {agent ? (
+            <div className="ot-agent-composer-foot">
+              {props.contextSearch && (
+                <button type="button" className="ot-agent-at" title="Add context (@)" aria-label="Add context" onClick={addAt} disabled={!!disabledReason || running || submitting}>
+                  <AtSign size={13} />
+                </button>
+              )}
+              <ModelSelect surface={props.appId} disabled={running || submitting} />
+              <span className="ot-agent-composer-fill" />
+              {running ? (
+                <button type="button" className="send stop" onClick={onCancel} title="Stop (⌘.)" aria-label="Stop response">
+                  <Square size={10} fill="currentColor" />
+                </button>
+              ) : (
+                <button type="button" className="send" onClick={() => void send()} disabled={!input.trim() || !!disabledReason || submitting} title="Send (↵)" aria-label="Send message">
+                  <ArrowUp size={14} />
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+          {running ? (
+            <button
+              type="button"
+              className="send"
+              style={{
+                background: "rgba(var(--neon-magenta-rgb), 0.12)",
+                color: "var(--neon-magenta)",
+              }}
+              onClick={onCancel}
+              title="Cancel (⌘.)"
+              aria-label="Stop response"
+            >
+              <StopCircle size={16} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="send"
+              onClick={() => void send()}
+              disabled={!input.trim() || !!disabledReason || submitting}
+              title="Send (↵)"
+              aria-label="Send message"
+            >
+              <Send size={14} />
+            </button>
+          )}
+            </>
+          )}
+        </div>
+    );
+  }
+
+  function renderNotices() {
+    return (
+      <>
+        {sendError && (
+          <div role="alert" className="ot-agent-notice error">
+            Couldn’t send: {sendError}
+          </div>
+        )}
+        {submitting && !running && <div role="status" className="ot-agent-notice">Preparing message…</div>}
+      </>
+    );
+  }
+
+  function renderSuggestions() {
+    if (!showSuggest) return null;
+    return (
+      <div className="ot-claude-suggest">
+        {suggestionChips!.map((s) => (
+          <button type="button" key={s} className="chip" onClick={() => send(s)}>
+            {s}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  function renderMessages() {
+    return messages.map((m) => {
+      if (m.role === "assistant" && (!hasChatContent(m.content) || (m.pending && m.content === "…")) && !m.pills?.length) return null;
+      return (
+        <div key={m.id} className={`ot-msg ${m.role}`}>
+          {m.planning ? (
+            <PlanningBlock content={m.content} accent={accentColor} />
+          ) : (
+            <MessageBody content={m.content} />
+          )}
+          {m.pills && m.pills.length > 0 && <MessagePills pills={m.pills} />}
+        </div>
+      );
+    });
+  }
+
+  function renderAgent() {
+    const empty = messages.length === 0;
+    return (
+      <aside className="ot-claude-rail agent" data-empty={empty || undefined}>
+        <div className="ot-agent-head">
+          <span className="ot-agent-title" title={props.title || "New Chat"}>{props.title || "New Chat"}</span>
+          <div className="ot-agent-actions">
+            {onNewChat && (
+              <button
+                type="button"
+                className="ot-agent-icon"
+                onClick={() => { setSendError(null); onNewChat(); }}
+                disabled={running || submitting}
+                title="New chat"
+                aria-label="New chat"
+              >
+                <Plus size={15} />
+              </button>
+            )}
+            {props.headerActions}
+          </div>
+        </div>
+        {empty ? (
+          <div className="ot-agent-start scroll">
+            {renderComposer()}
+            {renderNotices()}
+            {props.composerAccessory?.(!!running || submitting)}
+            <div className="ot-agent-intro">{openingLine ?? "Ready when you are."}</div>
+            {renderSuggestions()}
+            {props.emptyState}
+          </div>
+        ) : (
+          <>
+            <div ref={scrollRef} className="ot-claude-messages scroll" onScroll={(e) => {
+              const el = e.currentTarget;
+              followOutput.current = el.scrollHeight - el.scrollTop - el.clientHeight < 64;
+            }}>
+              {renderMessages()}
+              {running && <div className="ot-ai-progress"><AiActivity state={streaming ? "composing" : "solving"} label={streaming ? "responding" : "thinking"} /></div>}
+            </div>
+            {renderSuggestions()}
+            {props.composerAccessory?.(!!running || submitting)}
+            {renderNotices()}
+            <div className="ot-agent-dock">{renderComposer()}</div>
+          </>
+        )}
+        {typeof cost === "number" && cost > 0 ? (
+          <div className="ot-claude-cost">${cost.toFixed(4)}</div>
+        ) : null}
+      </aside>
+    );
+  }
+
+  if (agent) return renderAgent();
 
   return (
     <aside className="ot-claude-rail">
       <div className="ot-claude-header">
-        <div className="ot-claude-orb" style={orbStyle} />
+        <OrionOrb size={24} accent={accentColor} state={streaming ? "composing" : running ? "solving" : submitting ? "connecting" : "idle"} />
         <div className="ot-claude-identity">
           <div className="ot-claude-name">{name}</div>
           <div className="ot-claude-sub">{subtitle}</div>
@@ -345,7 +642,7 @@ export function ClaudeChat(props: ClaudeChatProps) {
         {messages.length === 0 && !openingLine && (
           <div className="ot-claude-empty">
             <div className="sparkle">
-              <Sparkles size={20} color={accentColor} />
+              <OrionOrb size={42} accent={accentColor} />
             </div>
             <div>Ready when you are.</div>
           </div>
@@ -354,6 +651,7 @@ export function ClaudeChat(props: ClaudeChatProps) {
           <div className="ot-msg assistant">{openingLine}</div>
         )}
         {messages.map((m) => {
+          if (m.role === "assistant" && (!hasChatContent(m.content) || (m.pending && m.content === "…")) && !m.pills?.length) return null;
           const userStyle =
             m.role === "user"
               ? {
@@ -364,7 +662,7 @@ export function ClaudeChat(props: ClaudeChatProps) {
           return (
             <div
               key={m.id}
-              className={`ot-msg ${m.role}${m.pending ? " thinking" : ""}`}
+              className={`ot-msg ${m.role}`}
               style={userStyle}
             >
               {m.planning ? (
@@ -376,7 +674,7 @@ export function ClaudeChat(props: ClaudeChatProps) {
             </div>
           );
         })}
-        {running && <div className="ot-msg assistant thinking">thinking</div>}
+        {running && <div className="ot-ai-progress"><AiActivity state={streaming ? "composing" : "solving"} label={streaming ? "responding" : "thinking"} /></div>}
       </div>
 
       {showSuggest && (
@@ -399,161 +697,14 @@ export function ClaudeChat(props: ClaudeChatProps) {
         </div>
       )}
 
+      {props.composerAccessory?.(!!running || submitting)}
       {sendError && (
         <div role="alert" style={{ padding: "8px 14px", fontSize: 12, color: "var(--neon-magenta)", overflowWrap: "anywhere" }}>
           Couldn’t send: {sendError}
         </div>
       )}
       {submitting && !running && <div role="status" style={{ padding: "4px 14px", fontSize: 12, color: "var(--t-secondary)" }}>Preparing message…</div>}
-      <div
-        ref={inputWrapRef}
-        className={`ot-claude-input${dragOver ? " drag-over" : ""}`}
-        onDragOver={(e) => {
-          if (!e.dataTransfer.types.includes(ASSET_DRAG_MIME)) return;
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "copy";
-          if (!dragOver) setDragOver(true);
-        }}
-        onDragLeave={(e) => {
-          // Ignore inner-element transitions (e.g. enter the textarea).
-          if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-          setDragOver(false);
-        }}
-        onDrop={(e) => {
-          if (!e.dataTransfer.types.includes(ASSET_DRAG_MIME)) return;
-          e.preventDefault();
-          const path = e.dataTransfer.getData(ASSET_DRAG_MIME);
-          if (path) attachAssetPath(path);
-          setDragOver(false);
-        }}
-      >
-        {picker && (
-          <div className="ot-ctxpick">
-            {picker.results.length === 0 ? (
-              <div className="ot-ctxpick-empty">
-                {picker.query
-                  ? "no matches"
-                  : "type to search files, folders & notes"}
-              </div>
-            ) : (
-              picker.results.map((s, i) => (
-                <button
-                  key={`${s.kind}-${s.label}-${i}`}
-                  type="button"
-                  className={`ot-ctxpick-row${i === picker.hi ? " hi" : ""}`}
-                  onMouseEnter={() =>
-                    setPicker((cur) => (cur ? { ...cur, hi: i } : cur))
-                  }
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    pickSuggestion(s);
-                  }}
-                >
-                  <PillIcon kind={s.kind} size={12} />
-                  <span className="ot-ctxpick-label">{s.label}</span>
-                  {s.detail && (
-                    <span className="ot-ctxpick-detail">{s.detail}</span>
-                  )}
-                </button>
-              ))
-            )}
-          </div>
-        )}
-        {chips.length > 0 && (
-          <div className="ot-ctxchips">
-            {chips.map((c) => (
-              <span key={c.id} className="ot-ctxchip">
-                <PillIcon kind={c.kind} />
-                <span className="ot-ctxchip-label">{c.label}</span>
-                <button
-                  type="button"
-                  className="ot-ctxchip-x"
-                  aria-label={`Remove ${c.label}`}
-                  onClick={() =>
-                    setChips((cur) => cur.filter((x) => x.id !== c.id))
-                  }
-                >
-                  <X size={10} />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-        <textarea
-          ref={inputElRef}
-          aria-label="Message"
-          rows={1}
-          value={input}
-          onChange={(e) => {
-            setInput(e.target.value);
-            refreshPicker(e.target.value, e.target.selectionStart ?? e.target.value.length);
-          }}
-          placeholder={
-            disabledReason ??
-            placeholder ??
-            (props.contextSearch ? "Ask your AI… (@ to attach context)" : "Ask your AI…")
-          }
-          disabled={!!disabledReason || running || submitting}
-          onKeyDown={(e) => {
-            if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
-            if (picker) {
-              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-                e.preventDefault();
-                const dir = e.key === "ArrowDown" ? 1 : -1;
-                setPicker((cur) => {
-                  if (!cur || cur.results.length === 0) return cur;
-                  const n = cur.results.length;
-                  return { ...cur, hi: (cur.hi + dir + n) % n };
-                });
-                return;
-              }
-              if ((e.key === "Enter" || e.key === "Tab") && picker.results[picker.hi]) {
-                e.preventDefault();
-                pickSuggestion(picker.results[picker.hi]!);
-                return;
-              }
-              if (e.key === "Escape") {
-                e.preventDefault();
-                closePicker();
-                return;
-              }
-            }
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-        />
-        {running ? (
-          <button
-            type="button"
-            className="send"
-            style={{
-              background: "rgba(255, 94, 94, 0.15)",
-              color: "#ff8a8a",
-            }}
-            onClick={onCancel}
-            title="Cancel (⌘.)"
-            aria-label="Stop response"
-          >
-            <StopCircle size={16} />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="send"
-            style={{
-              background: `linear-gradient(135deg, ${accentColor}, var(--neon-cyan))`,
-            }}
-            onClick={() => void send()}
-            disabled={!input.trim() || !!disabledReason || submitting}
-            title="Send (↵)"
-            aria-label="Send message"
-          >
-            <Send size={14} />
-          </button>
-        )}
-      </div>
+      {renderComposer()}
       {typeof cost === "number" && cost > 0 ? (
         <div className="ot-claude-cost">${cost.toFixed(4)}</div>
       ) : null}

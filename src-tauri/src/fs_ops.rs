@@ -114,6 +114,58 @@ pub fn read_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&p).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn theme_read_markdown(path: String) -> Result<String, String> {
+    use std::io::Read;
+    const LIMIT: u64 = 65_536;
+    let path = PathBuf::from(path);
+    let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    if extension != "md" && extension != "markdown" {
+        return Err("Choose a .md or .markdown file.".into());
+    }
+    let metadata = std::fs::metadata(&path).map_err(|_| "Could not read the design file.")?;
+    if !metadata.is_file() || metadata.len() > LIMIT {
+        return Err("Choose a regular Markdown file of 64 KiB or smaller.".into());
+    }
+    let file = std::fs::File::open(path).map_err(|_| "Could not open the design file.")?;
+    if !file.metadata().map_err(|_| "Could not inspect the design file.")?.is_file() {
+        return Err("Choose a regular Markdown file.".into());
+    }
+    let mut bytes = Vec::new();
+    file.take(LIMIT + 1).read_to_end(&mut bytes).map_err(|_| "Could not read the design file.")?;
+    if bytes.len() > LIMIT as usize { return Err("Design Markdown must be 64 KiB or smaller.".into()); }
+    let text = String::from_utf8(bytes).map_err(|_| "Design Markdown must be UTF-8 text.")?;
+    if text.trim().is_empty() || text.contains('\0') { return Err("Choose a non-empty Markdown text file.".into()); }
+    Ok(text)
+}
+
+#[cfg(test)]
+mod theme_import_tests {
+    use super::theme_read_markdown;
+    #[test]
+    fn theme_markdown_import_is_bounded_utf8_and_regular_file_only() {
+        let dir = std::env::temp_dir().join(format!("orion-theme-{}", ulid::Ulid::new()));
+        std::fs::create_dir(&dir).unwrap();
+        let path = dir.join("design.md");
+        let read = || theme_read_markdown(path.to_string_lossy().into_owned());
+        std::fs::write(&path, "# Carbon\nUse graphite.").unwrap();
+        assert_eq!(read().unwrap(), "# Carbon\nUse graphite.");
+        std::fs::write(&path, vec![b'a'; 65_537]).unwrap();
+        assert!(read().is_err());
+        std::fs::write(&path, [0xff, 0xfe]).unwrap();
+        assert!(read().is_err());
+        std::fs::write(&path, b"hello\0world").unwrap();
+        assert!(read().is_err());
+        std::fs::write(&path, "  ").unwrap();
+        assert!(read().is_err());
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        assert!(read().is_err());
+        assert!(theme_read_markdown(dir.join("design.js").to_string_lossy().into_owned()).is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}
+
 /// Read a (binary) file and return its bytes base64-encoded, for media the
 /// webview renders via a `data:` URL — images/video/audio/pdf clicked in the
 /// file tree. Capped so a giant file can't blow up the IPC payload; the
@@ -357,6 +409,16 @@ pub fn save_file_atomic(path: String, contents: String) -> Result<(), String> {
     atomic_write_bytes(&path, contents.as_bytes())
 }
 
+#[tauri::command]
+pub fn write_file_base64(path: String, data: String) -> Result<(), String> {
+    use base64::Engine;
+    if data.len() > 27_000_000 {
+        return Err("TOO_LARGE".into());
+    }
+    let bytes = base64::engine::general_purpose::STANDARD.decode(data.as_bytes()).map_err(|e| e.to_string())?;
+    atomic_write_bytes(&path, &bytes)
+}
+
 pub(crate) fn atomic_write_bytes(path: &str, contents: &[u8]) -> Result<(), String> {
     use std::fs::{rename, OpenOptions};
     use std::io::Write;
@@ -470,6 +532,18 @@ mod save_tests {
         assert_eq!(copy_regular_file(&source, &target, 5).unwrap(), 5);
         assert!(copy_regular_file(&source, &target, 5).is_err());
         assert!(copy_regular_file(&dir, &dir.join("bad"), 100).is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn base64_writes_are_atomic_and_reject_bad_data() {
+        let dir = std::env::temp_dir().join(format!("orion-b64-{}", ulid::Ulid::new()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("preset.alv");
+        write_file_base64(path.to_string_lossy().into_owned(), "AAL/AA==".into()).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), vec![0, 2, 255, 0]);
+        assert!(write_file_base64(path.to_string_lossy().into_owned(), "not base64!".into()).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), vec![0, 2, 255, 0]);
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
         std::fs::remove_dir_all(dir).unwrap();
     }
     #[cfg(unix)]

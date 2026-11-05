@@ -5,7 +5,7 @@ import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
 import {
   BUILTIN_CHARACTERS,
-  ROSIE_ID,
+  DEFAULT_CHARACTER_ID,
   type Character,
   type CustomCharacter,
 } from "@/features/characters/catalog";
@@ -13,6 +13,7 @@ import {
 type Persisted = {
   selectedId: string;
   custom: CustomCharacter[];
+  showInApps: boolean;
 };
 
 type CharacterStore = Persisted & {
@@ -20,43 +21,65 @@ type CharacterStore = Persisted & {
   all: () => Character[];
   selected: () => Character | null;
   setSelected: (id: string) => void;
+  setShowInApps: (show: boolean) => void;
   addCustomFromPath: (sourcePath: string) => Promise<void>;
   removeCustom: (id: string) => Promise<void>;
   /** Resolve a renderable URL for any character. */
   urlFor: (c: Character) => string;
 };
 
-const DEFAULT_SELECTED = ROSIE_ID;
+const DEFAULT_SELECTED: string = DEFAULT_CHARACTER_ID;
+
+// Retired companion ids → their successor in the four-companion lineup.
+const RETIRED: Record<string, string> = {
+  "rosie-stylized": "rosie",
+  "rosie-cybernetic": "rosie",
+  "mushroom-character": "mxshy",
+  mushroom: "mxshy",
+  "angelic-winged-figure": "ang3l",
+  angel: "ang3l",
+};
 
 function persist(s: CharacterStore) {
   void setAppState("characters", {
     selectedId: s.selectedId,
     custom: s.custom,
+    showInApps: s.showInApps,
   } satisfies Persisted);
 }
 
 export const useCharacterStore = create<CharacterStore>((set, get) => ({
   selectedId: DEFAULT_SELECTED,
   custom: [],
+  showInApps: false,
 
   hydrate: (s) =>
-    set((prev) => ({
-      ...prev,
-      selectedId:
-        typeof s.selectedId === "string" ? s.selectedId : prev.selectedId,
-      custom: Array.isArray(s.custom) ? s.custom : prev.custom,
-    })),
+    set((prev) => {
+      const custom = Array.isArray(s.custom) ? s.custom : prev.custom;
+      const saved = typeof s.selectedId === "string" ? s.selectedId : prev.selectedId;
+      const requested = RETIRED[saved] ?? saved;
+      const selectedId = [...BUILTIN_CHARACTERS, ...custom].some((c) => c.id === requested)
+        ? requested
+        : DEFAULT_SELECTED;
+      const showInApps = typeof s.showInApps === "boolean" ? s.showInApps : prev.showInApps;
+      return { custom, selectedId, showInApps };
+    }),
 
   all: () => [...BUILTIN_CHARACTERS, ...get().custom],
 
   selected: () => {
     const { selectedId } = get();
-    return get().all().find((c) => c.id === selectedId) ?? null;
+    return get().all().find((c) => c.id === selectedId) ?? BUILTIN_CHARACTERS[0] ?? null;
   },
 
   setSelected: (id) => {
     if (!get().all().some((c) => c.id === id)) return;
     set({ selectedId: id });
+    persist(get());
+  },
+
+  setShowInApps: (showInApps) => {
+    set({ showInApps });
     persist(get());
   },
 

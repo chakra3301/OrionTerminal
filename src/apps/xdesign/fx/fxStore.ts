@@ -1,8 +1,11 @@
 /**
  * Live state for the open FX scene. One scene at a time (mirrors how
  * `useXDesign` holds one design doc); the projects store hydrates/flushes
- * it when switching projects. Undo/redo intentionally deferred to a later
- * slice — noted in the tracker.
+ * it when switching projects.
+ *
+ * Undo/redo keeps whole-scene snapshots (scenes are immutable and share
+ * structure, so a step costs a few objects). Only document edits record
+ * history; selection and playback state never do.
  */
 
 import { create } from "zustand";
@@ -25,8 +28,16 @@ type ScenePatch = Partial<
 >;
 type LayerPatch = Partial<Pick<FxLayer, "name" | "hidden" | "opacity" | "blend">>;
 
+/** Max undo steps kept per project. */
+const HISTORY_LIMIT = 100;
+/** Same-target edits closer together than this merge into one undo step. */
+const COALESCE_MS = 800;
+
 type FxState = {
   scene: FxScene;
+  /** Undo/redo stacks of prior scenes, oldest first. Cleared on hydrate. */
+  past: FxScene[];
+  future: FxScene[];
   selectedLayerId: string | null;
   playing: boolean;
   /** Bumps to restart scene time (re-fires appear bindings). */
@@ -66,6 +77,13 @@ type FxState = {
   setPlaying: (playing: boolean) => void;
   patchScene: (patch: ScenePatch) => void;
   hydrateFx: (doc: FxDoc) => void;
+  undo: () => void;
+  redo: () => void;
+  /** Everything edited between begin and end is one undo step, whatever
+   * params it touches or however long the pointer pauses. For drags that
+   * write several params (gizmo). Always pair with endGesture. */
+  beginGesture: () => void;
+  endGesture: () => void;
 };
 
 function hslToHex(h: number, s: number, l: number): string {
@@ -134,8 +152,36 @@ export function sanitizeScene(scene: FxScene): FxScene {
   return { ...emptyScene(), ...scene, layers: sane };
 }
 
+/** Coalescing bookkeeping. Module state, not store state: nothing renders
+ * from it, and it must not trigger subscribers. */
+let lastEdit: { key: string; at: number } | null = null;
+let gesture: { pushed: boolean } | null = null;
+
+function resetHistoryRuns() {
+  lastEdit = null;
+  gesture = null;
+}
+
+/** Snapshot `s.scene` onto the undo stack unless this edit continues a run
+ * (open gesture, or same target as the previous edit within COALESCE_MS). */
+function recordHistory(s: FxState, key: string | null): Pick<FxState, "past" | "future"> {
+  const now = Date.now();
+  let merge: boolean;
+  if (gesture) {
+    merge = gesture.pushed;
+    gesture.pushed = true;
+  } else {
+    merge = key !== null && lastEdit?.key === key && now - lastEdit.at < COALESCE_MS;
+  }
+  lastEdit = key === null ? null : { key, at: now };
+  if (merge) return { past: s.past, future: [] };
+  return { past: [...s.past, s.scene].slice(-HISTORY_LIMIT), future: [] };
+}
+
 export const useFxStore = create<FxState>((set, get) => ({
   scene: emptyScene(),
+  past: [],
+  future: [],
   selectedLayerId: null,
   playing: true,
   restartNonce: 0,
@@ -153,7 +199,7 @@ export const useFxStore = create<FxState>((set, get) => ({
       opacity: 1,
       params: defaultParams(spec),
     };
-    set((s) => ({
+    edit(null, (s) => ({
       scene: { ...s.scene, layers: [...s.scene.layers, layer] },
       selectedLayerId: layer.id,
     }));
@@ -170,14 +216,14 @@ export const useFxStore = create<FxState>((set, get) => ({
       opacity: 1,
       params: { ...defaultParams(spec), file: filePath },
     };
-    set((s) => ({
+    edit(null, (s) => ({
       scene: { ...s.scene, layers: [...s.scene.layers, layer] },
       selectedLayerId: layer.id,
     }));
   },
 
   duplicateLayer: (id) =>
-    set((s) => {
+    edit(null, (s) => {
       const i = s.scene.layers.findIndex((l) => l.id === id);
       const src = s.scene.layers[i];
       if (!src) return s;
@@ -199,7 +245,7 @@ export const useFxStore = create<FxState>((set, get) => ({
     }),
 
   randomizeLayer: (id) =>
-    set((s) => ({
+    edit(null, (s) => ({
       scene: {
         ...s.scene,
         layers: s.scene.layers.map((l) => {
@@ -229,7 +275,7 @@ export const useFxStore = create<FxState>((set, get) => ({
     })),
 
   resetParam: (id, key) =>
-    set((s) => ({
+    edit(null, (s) => ({
       scene: {
         ...s.scene,
         layers: s.scene.layers.map((l) => {
@@ -243,13 +289,13 @@ export const useFxStore = create<FxState>((set, get) => ({
     })),
 
   removeLayer: (id) =>
-    set((s) => ({
+    edit(null, (s) => ({
       scene: { ...s.scene, layers: s.scene.layers.filter((l) => l.id !== id) },
       selectedLayerId: s.selectedLayerId === id ? null : s.selectedLayerId,
     })),
 
   patchLayer: (id, patch) =>
-    set((s) => ({
+    edit(`patchLayer:${id}:${Object.keys(patch).join(",")}`, (s) => ({
       scene: {
         ...s.scene,
         layers: s.scene.layers.map((l) => (l.id === id ? { ...l, ...patch } : l)),
@@ -257,7 +303,7 @@ export const useFxStore = create<FxState>((set, get) => ({
     })),
 
   setParam: (id, key, value) =>
-    set((s) => ({
+    edit(`param:${id}:${key}`, (s) => ({
       scene: {
         ...s.scene,
         layers: s.scene.layers.map((l) =>
@@ -267,7 +313,7 @@ export const useFxStore = create<FxState>((set, get) => ({
     })),
 
   setBinding: (id, key, binding) =>
-    set((s) => ({
+    edit(`binding:${id}:${key}:${binding ? 1 : 0}`, (s) => ({
       scene: {
         ...s.scene,
         layers: s.scene.layers.map((l) => {
@@ -292,7 +338,7 @@ export const useFxStore = create<FxState>((set, get) => ({
   setAudioOn: (v) => set({ audioOn: v }),
 
   addKeyframe: (id, key, kf) =>
-    set((s) => ({
+    edit(null, (s) => ({
       scene: {
         ...s.scene,
         layers: s.scene.layers.map((l) =>
@@ -310,7 +356,7 @@ export const useFxStore = create<FxState>((set, get) => ({
     })),
 
   removeKeyframe: (id, key, index) =>
-    set((s) => ({
+    edit(null, (s) => ({
       scene: {
         ...s.scene,
         layers: s.scene.layers.map((l) => {
@@ -329,7 +375,7 @@ export const useFxStore = create<FxState>((set, get) => ({
     })),
 
   setMask: (id, maskLayerId) =>
-    set((s) => ({
+    edit(null, (s) => ({
       scene: {
         ...s.scene,
         layers: s.scene.layers.map((l) =>
@@ -339,7 +385,7 @@ export const useFxStore = create<FxState>((set, get) => ({
     })),
 
   moveLayer: (id, dir) =>
-    set((s) => {
+    edit(null, (s) => {
       const layers = [...s.scene.layers];
       const i = layers.findIndex((l) => l.id === id);
       const j = i + dir;
@@ -351,16 +397,66 @@ export const useFxStore = create<FxState>((set, get) => ({
   selectLayer: (id) => set({ selectedLayerId: id }),
   setPlaying: (playing) => set({ playing }),
 
-  patchScene: (patch) => set((s) => ({ scene: { ...s.scene, ...patch } })),
+  patchScene: (patch) =>
+    edit(`patchScene:${Object.keys(patch).join(",")}`, (s) => ({
+      scene: { ...s.scene, ...patch },
+    })),
 
-  hydrateFx: (doc) =>
+  hydrateFx: (doc) => {
+    resetHistoryRuns();
     set({
       scene: sanitizeScene(doc.scene),
+      past: [],
+      future: [],
       selectedLayerId: null,
       playing: true,
       scrubTime: null,
-    }),
+    });
+  },
+
+  undo: () => travel("past"),
+  redo: () => travel("future"),
+
+  beginGesture: () => {
+    lastEdit = null;
+    gesture = { pushed: false };
+  },
+  endGesture: () => {
+    gesture = null;
+    lastEdit = null;
+  },
 }));
+
+/** `set` for document edits: records history only when the scene really
+ * changed. `key` identifies the edit target for coalescing (null = never
+ * merge). */
+function edit(key: string | null, fn: (s: FxState) => Partial<FxState> | FxState) {
+  useFxStore.setState((s) => {
+    const out = fn(s);
+    if (out === s || !out.scene || out.scene === s.scene) return out;
+    return { ...out, ...recordHistory(s, key) };
+  });
+}
+
+function travel(from: "past" | "future") {
+  useFxStore.setState((s) => {
+    const stack = s[from];
+    const target = stack[stack.length - 1];
+    if (!target) return s;
+    lastEdit = null;
+    gesture = null;
+    const other = from === "past" ? "future" : "past";
+    return {
+      scene: target,
+      [from]: stack.slice(0, -1),
+      [other]: [...s[other], s.scene].slice(-HISTORY_LIMIT),
+      selectedLayerId: target.layers.some((l) => l.id === s.selectedLayerId)
+        ? s.selectedLayerId
+        : null,
+    } as Partial<FxState>;
+  });
+}
+
 
 export function snapshotFxDoc(): FxDoc {
   return { scene: useFxStore.getState().scene };

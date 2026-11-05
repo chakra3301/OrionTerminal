@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSkillsStore } from "@/store/skillsStore";
 import { useMcpServers } from "@/store/mcpServersStore";
 import { BUILTIN_TOOLS } from "@/features/agents/toolCatalog";
@@ -16,12 +16,26 @@ export function SkillEditor({ skill, onClose }: { skill: Skill; onClose: () => v
   const remove = useSkillsStore((s) => s.remove);
   const mcp = useMcpServers((s) => s.servers).filter((x) => x.enabled);
   const [draft, setDraft] = useState<Skill>(skill);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const mounted = useRef(true);
+  const pending = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  async function persist(removeDraft = false) {
+    if (pending.current) return;
+    pending.current = true; setBusy(true); setError(null);
+    try {
+      if (removeDraft) await remove(draft.id); else await save(draft);
+      if (mounted.current) onClose();
+    } catch (e) { if (mounted.current) setError(String(e instanceof Error ? e.message : e)); }
+    finally { pending.current = false; if (mounted.current) setBusy(false); }
+  }
 
   const toggle = (g: ToolGrant) =>
     setDraft((d) => ({ ...d, tools: hasGrant(d.tools, g) ? d.tools.filter((t) => !hasGrant([t], g)) : [...d.tools, g] }));
 
   return (
-    <div className="cp-form">
+    <fieldset className="cp-form" disabled={busy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="cp-form-row" style={{ gap: 16, alignItems: "center" }}>
         <SkillEmblem skill={draft} size={80} equipped />
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -49,11 +63,12 @@ export function SkillEditor({ skill, onClose }: { skill: Skill; onClose: () => v
         })}
       </div>
 
+      {error && <p role="alert">{error}</p>}
       <div className="cp-form-actions">
-        {!skill.builtin && <button className="cp-link-danger" onClick={() => { void remove(draft.id); onClose(); }}>Delete</button>}
+        {!skill.builtin && <button className="cp-link-danger" onClick={() => void persist(true)}>Delete</button>}
         <button className="cp-btn ghost" onClick={onClose}>Cancel</button>
-        <button className="cp-btn" onClick={() => { void save(draft); onClose(); }}>Save skill</button>
+        <button className="cp-btn" onClick={() => void persist()}>{busy ? "Saving…" : "Save skill"}</button>
       </div>
-    </div>
+    </fieldset>
   );
 }

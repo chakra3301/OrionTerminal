@@ -2,266 +2,383 @@ import SwiftUI
 import Foundation
 import ArchivesCore
 import ArchivesStore
+import Darwin
 
-// Lives in the menu bar (LSUIElement), no Dock icon. Advertises over Multipeer
-// at launch and reads the same orion.db the Tauri desktop app uses.
-//
-// orion.db is opened READ-ONLY for now: the phone can pull the Mac's Archives,
-// but writing the phone's changes back into the live desktop DB is deferred
-// until the concurrent-write path (WAL + busy timeout, or a "close the desktop
-// app" guard) is proven safe against real data.
 @MainActor
 final class HelperController: NSObject, NSApplicationDelegate, ObservableObject {
     let sync = MultipeerSync(displayName: Host.current().localizedName ?? "Mac")
-    @Published var dbStatus = "starting…"
+    @Published var dbStatus = "Library access is off"
+    @Published var errorMessage: String?
+    @Published var enabled = false
+    @Published var chatEnabled = false
+    @Published var pendingImport: SyncPayload?
+    @Published var importReview = ""
     private var store: ArchivesStore?
-
-    // Streaming Claude state (all touched only on the main actor).
-    private var streamBuffer = Data()
-    private var streamSessionID: String?
-    private var streamFinalText = ""
-    private var streamErr = ""
-    private var streamRequestID: String?
-    private var streamProcess: Process?
+    private var process: Process?
+    private var requestID: String?
+    private var buffer = Data()
+    private var answer = ""
+    private var history: [(String, String)] = []
+    private var timeout: Task<Void, Never>?
+    private var backups: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("com.lucaorion.archives.synchelper/backups", isDirectory: true)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        configureDB()
-        sync.onPayload = { [weak self] payload in
-            guard let self else { return }
-            if let store = self.store {
-                do {
-                    let n = try store.applyIncomingNotes(payload)
-                    var summary = "from phone: +\(n.upserted) edits, −\(n.deleted) deletes"
-                    if let dir = Self.assetsDir() {
-                        let m = try store.applyIncomingMedia(payload, assetsDirPath: dir.path)
-                        if m.assets > 0 || m.boards > 0 { summary += " · +\(m.assets) photos, +\(m.boards) boards" }
-                    }
-                    self.dbStatus = summary
-                } catch {
-                    self.dbStatus = "write-back failed: \(error.localizedDescription)"
+        // Pairing never implies permission to read the Mac's library or run a model.
+        do {
+            if try PairingSecret.load() == nil { try sync.pair(PairingSecret.generate()) }
+        } catch { errorMessage = error.localizedDescription }
+        sync.onPayload = { [weak self] payload in self?.reviewImport(payload) }
+        sync.onAssetData = { [weak self] name, data in
+            guard let self else { throw SyncSafetyError.invalid("Mac library unavailable.") }
+            try self.receiveAsset(name, data: data)
+        }
+        sync.onChatRequest = { [weak self] id, prompt, _ in self?.runChat(id: id, prompt: prompt) }
+        sync.onChatCancel = { [weak self] id in if self?.requestID == id { self?.cancelChat() } }
+        sync.onDisconnected = { [weak self] in self?.cancelChat(); self?.history = []; self?.pendingImport = nil }
+        sync.start()
+    }
+    func applicationWillTerminate(_ notification: Notification) { cancelChat(); sync.stop() }
+
+    func enableLibrary() {
+        do {
+            let path = Self.orionDBPath()
+            guard FileManager.default.fileExists(atPath: path.path) else { throw SyncSafetyError.invalid("Open Orion Terminal once before enabling sync.") }
+            let opened = try ArchivesStore(path: path.path, createSchema: false)
+            try makeBackup(opened)
+            try opened.enableDesktopSyncTracking()
+            store = opened; enabled = true
+            sync.provideSnapshot = { [weak self] in
+                guard let self, let store = self.store else { throw SyncSafetyError.invalid("Enable library access on your Mac.") }
+                var snap = try store.snapshot(deviceID: "mac", generatedAt: Self.now())
+                snap.haveAssetIDs = snap.assets.compactMap { asset in
+                    guard let name = asset.fileName, let url = try? AssetSafety.url(name, in: Self.assetsDir()),
+                          FileManager.default.fileExists(atPath: url.path) else { return nil }
+                    return asset.id
                 }
+                return snap
             }
-            // Send the Mac's fresh state back so the phone converges too (one-tap two-way),
-            // then stream any image files the phone doesn't have yet.
-            self.sync.sendSnapshot()
-            self.sendMissingAssets(have: Set(payload.haveAssetIDs ?? []))
+            dbStatus = "Library ready · backup before every import"
+        } catch { errorMessage = error.localizedDescription; dbStatus = "Library access failed" }
+    }
+    func disableLibrary() {
+        store = nil; enabled = false; sync.provideSnapshot = nil
+        sync.stop(); dbStatus = "Library access is off"; sync.start()
+    }
+    func copyPairingKey() {
+        do {
+            guard let key = try PairingSecret.load() else { return }
+            NSPasteboard.general.clearContents(); NSPasteboard.general.setString(key, forType: .string)
+            let revision = NSPasteboard.general.changeCount
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(60))
+                if NSPasteboard.general.changeCount == revision { NSPasteboard.general.clearContents() }
+            }
+        } catch { errorMessage = error.localizedDescription }
+    }
+    func rotatePairing() {
+        do { try sync.pair(PairingSecret.generate()); history = []; cancelChat() }
+        catch { errorMessage = error.localizedDescription }
+    }
+    private func makeBackup(_ store: ArchivesStore) throws {
+        try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        let url = backups.appendingPathComponent("\(Self.now())-\(UUID().uuidString).sqlite")
+        try store.backup(to: url.path)
+        let files = try FileManager.default.contentsOfDirectory(at: backups, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "sqlite" }.sorted { $0.lastPathComponent > $1.lastPathComponent }
+        for old in files.dropFirst(10) { try FileManager.default.removeItem(at: old) }
+    }
+    private func reviewImport(_ payload: SyncPayload) {
+        guard let store else { sync.sendSyncError("Enable library access in Archives Sync on your Mac."); return }
+        do {
+            let local = try store.snapshot(deviceID: "mac", generatedAt: Self.now())
+            let merged = MergeEngine.merge(local, payload)
+            try merged.validate()
+            let before = Dictionary(uniqueKeysWithValues: local.notes.map { ($0.id, $0) })
+            let after = Set(merged.notes.map(\.id))
+            let added = merged.notes.filter { before[$0.id] == nil }
+            let changed = merged.notes.filter { before[$0.id] != nil && before[$0.id] != $0 }
+            let deleted = local.notes.filter { !after.contains($0.id) }
+            let lines = added.map { "Add: " + ($0.title.isEmpty ? "Untitled" : $0.title) }
+                + changed.map { "Replace: " + ($0.title.isEmpty ? "Untitled" : $0.title) }
+                + deleted.map { "Delete: " + ($0.title.isEmpty ? "Untitled" : $0.title) }
+            importReview = "\(added.count) new · \(changed.count) changed · \(deleted.count) deleted notes\n"
+                + "\(payload.assets.count) media records · \(payload.moodBoards.count) boards in phone snapshot\n\n"
+                + lines.joined(separator: "\n")
+            pendingImport = payload
+            sync.sendSyncStatus("Review and approve the import in Archives Sync on your Mac.")
+        } catch { sync.sendSyncError(error.localizedDescription) }
+    }
+    func approveImport() {
+        guard let payload = pendingImport else { return }
+        pendingImport = nil; receive(payload)
+    }
+    func rejectImport() {
+        pendingImport = nil; sync.sendSyncError("Import cancelled on your Mac. No phone edits were applied.")
+    }
+    private func receive(_ payload: SyncPayload) {
+        guard let store else { sync.sendSyncError("Enable library access in Archives Sync on your Mac."); return }
+        do {
+            guard !NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == "com.lucaorion.orion-terminal" }) else {
+                throw SyncSafetyError.invalid("Quit Orion Terminal before importing phone edits, so an open desktop editor cannot overwrite them. Then tap Sync again.")
+            }
+            try makeBackup(store)
+            let count = try store.applyIncoming(payload, assetsDirPath: Self.assetsDir().path)
+            dbStatus = "Synced · \(count) note changes · \(Date().formatted(date: .omitted, time: .shortened))"
+            sync.sendSnapshot()
+            let have = Set(payload.haveAssetIDs ?? [])
+            let snap = try store.snapshot(deviceID: "mac", generatedAt: Self.now())
+            let files: [(name: String, url: URL)] = snap.assets.compactMap { asset in
+                guard asset.kind == .image, !have.contains(asset.id), let name = asset.fileName,
+                      let url = try? AssetSafety.url(name, in: Self.assetsDir()),
+                      let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+                      size <= AssetSafety.maxBytes else { return nil }
+                return (name, url)
+            }
+            sync.sendAssetFiles(files)
+        } catch {
+            errorMessage = "Sync failed; backup retained: \(error.localizedDescription)"
+            sync.sendSyncError(error.localizedDescription)
         }
-        sync.onAssetFile = { [weak self] fileName, localURL in self?.receiveAssetFile(fileName: fileName, from: localURL) }
-        sync.onChatRequest = { [weak self] id, prompt, sessionID in self?.runClaude(id: id, prompt: prompt, sessionID: sessionID) }
-        sync.start()   // advertise/browse at launch — NOT from MenuBarExtra content
+    }
+    private func receiveAsset(_ name: String, data: Data) throws {
+        guard let store else { throw SyncSafetyError.invalid("Mac library access is disabled.") }
+        do {
+            let snapshot = try store.snapshot(deviceID: "mac", generatedAt: 0)
+            guard snapshot.assets.contains(where: { $0.kind == .image && $0.fileName == name }) else {
+                throw SyncSafetyError.invalid("Image has no library record. Sync the library first.")
+            }
+            try AssetSafety.publish(data, name: name, in: Self.assetsDir())
+        } catch { errorMessage = error.localizedDescription; throw error }
     }
 
-    /// Stream the subscription Claude CLI (stream-json) for a prompt from the
-    /// phone, resuming `sessionID` for multi-turn. stdout chunks are forwarded to
-    /// the main actor so all parsing/state stays single-threaded. Augments PATH
-    /// (a launchd agent gets a stripped one) and gives the child /dev/null stdin
-    /// (else `claude --print` blocks waiting on an inherited stdin that never EOFs).
-    private func runClaude(id: String, prompt: String, sessionID: String?) {
-        streamProcess?.terminate()
-        streamBuffer = Data(); streamSessionID = nil; streamFinalText = ""; streamErr = ""; streamRequestID = id
-
+    func cancelChat() {
+        timeout?.cancel(); timeout = nil
+        let old = process
+        requestID = nil; process = nil; buffer = Data(); answer = ""; history = []
+        guard let old, old.isRunning else { return }
+        old.terminate()
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            if old.isRunning { kill(old.processIdentifier, SIGKILL) }
+        }
+    }
+    private func runChat(id: String, prompt: String) {
+        guard chatEnabled, process == nil else {
+            sync.sendChatError(id, message: "Enable R.O.S.I.E on your Mac and wait for any active request to finish."); return
+        }
         let home = NSHomeDirectory()
+        let candidates = ["\(home)/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
+        guard let executable = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
+            sync.sendChatError(id, message: "Install Claude Code and sign in on your Mac first."); return
+        }
+        let auth = Process(), output = Pipe()
+        auth.executableURL = URL(fileURLWithPath: executable)
+        auth.arguments = ["auth", "status", "--json"]
         var env = ProcessInfo.processInfo.environment
-        let extra = ["/opt/homebrew/bin", "/usr/local/bin", "\(home)/.local/bin", "\(home)/.claude/local"]
-        env["PATH"] = (extra + [env["PATH"] ?? ""]).joined(separator: ":")
-
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        var args = ["claude", "--print", "--output-format", "stream-json", "--verbose"]
-        if let sid = sessionID, !sid.isEmpty { args += ["--resume", sid] }
-        args += ["--", prompt]
-        proc.arguments = args
-        proc.environment = env
-        proc.currentDirectoryURL = URL(fileURLWithPath: home)
-        proc.standardInput = FileHandle.nullDevice
-        let out = Pipe(); proc.standardOutput = out
-        let errPipe = Pipe(); proc.standardError = errPipe
-        streamProcess = proc
-
-        out.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty else { return }
-            Task { @MainActor in self?.ingestStream(id: id, data: data) }
+        for key in Array(env.keys) where key.hasPrefix("ANTHROPIC_") || key.hasPrefix("CLAUDE_") || key.hasPrefix("CLAUDECODE") { env.removeValue(forKey: key) }
+        auth.environment = env
+        auth.standardInput = FileHandle.nullDevice; auth.standardOutput = output; auth.standardError = FileHandle.nullDevice
+        requestID = id; process = auth
+        do { try auth.run() } catch { cancelChat(); sync.sendChatError(id, message: "Couldn't check Claude sign-in on your Mac."); return }
+        timeout = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .seconds(10)) } catch { return }
+            guard let self, self.requestID == id else { return }
+            self.sync.sendChatError(id, message: "Claude sign-in check timed out."); self.cancelChat()
         }
-        errPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty, let s = String(data: data, encoding: .utf8) else { return }
-            Task { @MainActor in self?.streamErr += s }
-        }
-        proc.terminationHandler = { [weak self] p in
-            let code = p.terminationStatus
-            Task { @MainActor in self?.finishStream(id: id, exitCode: code) }
-        }
-
-        do { try proc.run() }
-        catch {
-            streamRequestID = nil
-            sync.sendChatError(id, message: "couldn't run claude — is the CLI on PATH? \(error.localizedDescription)")
+        Task.detached { [weak self] in
+            var bytes = Data()
+            while true {
+                let chunk = output.fileHandleForReading.availableData
+                if chunk.isEmpty { break }
+                if bytes.count < 16_000 { bytes.append(chunk.prefix(16_000 - bytes.count)) }
+            }
+            auth.waitUntilExit()
+            let status = (try? JSONSerialization.jsonObject(with: bytes)) as? [String: Any]
+            let subscription = auth.terminationStatus == 0 && status?["loggedIn"] as? Bool == true && status?["authMethod"] as? String == "claude.ai"
+            await self?.finishAuth(id: id, prompt: prompt, subscription: subscription)
         }
     }
-
-    private func ingestStream(id: String, data: Data) {
-        guard id == streamRequestID else { return }
-        streamBuffer.append(data)
-        // stream-json emits one complete JSON object per line.
-        while let nl = streamBuffer.firstIndex(of: 0x0a) {
-            let lineData = streamBuffer.subdata(in: streamBuffer.startIndex..<nl)
-            streamBuffer.removeSubrange(streamBuffer.startIndex...nl)
-            guard !lineData.isEmpty,
-                  let obj = (try? JSONSerialization.jsonObject(with: lineData)) as? [String: Any] else { continue }
-            if let sid = obj["session_id"] as? String { streamSessionID = sid }
-            switch obj["type"] as? String {
+    private func finishAuth(id: String, prompt: String, subscription: Bool) {
+        guard requestID == id else { return }
+        timeout?.cancel(); timeout = nil; process = nil; requestID = nil
+        guard subscription else {
+            sync.sendChatError(id, message: "Sign in to a Claude subscription on your Mac (claude auth login). API-key billing is not used by this companion."); return
+        }
+        launchChat(id: id, prompt: prompt)
+    }
+    private func launchChat(id: String, prompt: String) {
+        guard chatEnabled else { sync.sendChatError(id, message: "Enable R.O.S.I.E in Archives Sync on your Mac first."); return }
+        guard process == nil else { sync.sendChatError(id, message: "Your Mac is already answering. Try again when it finishes."); return }
+        let home = NSHomeDirectory()
+        let candidates = ["\(home)/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
+        guard let executable = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
+            sync.sendChatError(id, message: "Install and sign in to Claude Code on your Mac to use R.O.S.I.E."); return
+        }
+        do {
+            let work = FileManager.default.temporaryDirectory.appendingPathComponent("archives-chat-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: executable)
+            proc.arguments = ["--print", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+                              "--tools", "", "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}",
+                              "--setting-sources", "", "--no-session-persistence"]
+            var env = ProcessInfo.processInfo.environment
+            for key in Array(env.keys) where key.hasPrefix("ANTHROPIC_") || key.hasPrefix("CLAUDE_") || key.hasPrefix("CLAUDECODE") { env.removeValue(forKey: key) }
+            env["PATH"] = "\(home)/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+            proc.environment = env; proc.currentDirectoryURL = work
+            let input = Pipe(), output = Pipe(), errors = Pipe()
+            proc.standardInput = input; proc.standardOutput = output; proc.standardError = errors
+            let context = history.suffix(6).map { "User: \($0.0)\nAssistant: \($0.1)" }.joined(separator: "\n\n")
+            let text = "You are R.O.S.I.E, the Archives mobile companion. This is a text-only conversation. You have no tools or library access. Never claim to have read or changed files.\n\n\(context)\n\nUser: \(prompt)"
+            requestID = id; process = proc; buffer = Data(); answer = ""
+            try proc.run()
+            // A worker feeds stdin so a long prompt cannot block the UI on pipe capacity.
+            Task.detached {
+                try? input.fileHandleForWriting.write(contentsOf: Data(text.utf8))
+                try? input.fileHandleForWriting.close()
+            }
+            let stderrTask = Task.detached { () -> String in
+                var bytes = Data()
+                while true {
+                    let chunk = errors.fileHandleForReading.availableData
+                    if chunk.isEmpty { break }
+                    if bytes.count < 4096 { bytes.append(chunk.prefix(4096 - bytes.count)) }
+                }
+                return String(decoding: bytes, as: UTF8.self)
+            }
+            Task.detached { [weak self] in
+                while true {
+                    let chunk = output.fileHandleForReading.availableData
+                    if chunk.isEmpty { break }
+                    await self?.ingest(id: id, data: chunk)
+                }
+                proc.waitUntilExit()
+                let diagnostic = await stderrTask.value
+                await self?.finish(id: id, prompt: prompt, exitCode: proc.terminationStatus, diagnostic: diagnostic)
+                try? FileManager.default.removeItem(at: work)
+            }
+            timeout = Task { @MainActor [weak self] in
+                do { try await Task.sleep(for: .seconds(180)) } catch { return }
+                guard let self, self.requestID == id else { return }
+                self.sync.sendChatError(id, message: "The Mac request timed out. Your next message starts fresh.")
+                self.cancelChat()
+            }
+        } catch {
+            cancelChat(); sync.sendChatError(id, message: "Could not start Claude. Check the Mac installation.")
+        }
+    }
+    private func ingest(id: String, data: Data) {
+        guard requestID == id else { return }
+        guard buffer.count + data.count <= 2_000_000 else {
+            sync.sendChatError(id, message: "Model output exceeded the safety limit."); cancelChat(); return
+        }
+        buffer.append(data)
+        while let newline = buffer.firstIndex(of: 10) {
+            let line = buffer.subdata(in: buffer.startIndex..<newline)
+            buffer.removeSubrange(buffer.startIndex...newline)
+            guard let object = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any] else { continue }
+            switch object["type"] as? String {
+            case "stream_event":
+                if let event = object["event"] as? [String: Any], let delta = event["delta"] as? [String: Any], let text = delta["text"] as? String {
+                    answer += text
+                    if answer.utf8.count > 200_000 { sync.sendChatError(id, message: "Reply exceeded the safety limit."); cancelChat(); return }
+                    sync.sendChatChunk(id, text: answer)
+                }
             case "assistant":
-                if let text = Self.assistantText(obj) {
-                    streamFinalText = text                 // snapshots are full text → replace
-                    sync.sendChatChunk(id, text: text)
+                if let message = object["message"] as? [String: Any], let parts = message["content"] as? [[String: Any]] {
+                    let text = parts.filter { $0["type"] as? String == "text" }.compactMap { $0["text"] as? String }.joined(separator: "\n\n")
+                    if !text.isEmpty { answer = String(text.prefix(200_000)); sync.sendChatChunk(id, text: answer) }
                 }
             case "result":
-                if let r = obj["result"] as? String, !r.isEmpty { streamFinalText = r }
+                if object["is_error"] as? Bool == true {
+                    sync.sendChatError(id, message: "Claude could not complete the request. Check authentication on your Mac."); cancelChat(); return
+                }
+                if let text = object["result"] as? String, !text.isEmpty { answer = String(text.prefix(200_000)) }
             default: break
             }
         }
     }
-
-    private func finishStream(id: String, exitCode: Int32) {
-        guard id == streamRequestID else { return }
-        streamProcess = nil
-        streamRequestID = nil
-        if exitCode == 0 && !streamFinalText.isEmpty {
-            sync.sendChatDone(id, text: streamFinalText, sessionID: streamSessionID)
+    private func finish(id: String, prompt: String, exitCode: Int32, diagnostic: String) {
+        guard requestID == id else { return }
+        if !buffer.isEmpty { ingest(id: id, data: Data([10])) }
+        guard requestID == id else { return }
+        timeout?.cancel(); timeout = nil; process = nil; requestID = nil
+        if exitCode == 0, !answer.isEmpty {
+            history.append((String(prompt.prefix(16_000)), String(answer.prefix(16_000))))
+            history = Array(history.suffix(6))
+            sync.sendChatDone(id, text: answer, sessionID: nil)
         } else {
-            sync.sendChatError(id, message: streamErr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                               ? "claude exited (\(exitCode))" : streamErr.trimmingCharacters(in: .whitespacesAndNewlines))
+            history = []
+            sync.sendChatError(id, message: "Claude failed (\(exitCode)). Open Claude Code on your Mac and check sign-in; then retry.")
         }
     }
-
-    private static func assistantText(_ obj: [String: Any]) -> String? {
-        guard let msg = obj["message"] as? [String: Any],
-              let content = msg["content"] as? [[String: Any]] else { return nil }
-        let parts = content.compactMap { ($0["type"] as? String) == "text" ? $0["text"] as? String : nil }
-        let joined = parts.joined()
-        return joined.isEmpty ? nil : joined
-    }
-
-    private func sendMissingAssets(have: Set<String>) {
-        guard let store, let dir = Self.assetsDir() else { return }
-        guard let snap = try? store.snapshot(deviceID: "mac", generatedAt: 0) else { return }
-        let files: [(name: String, url: URL)] = snap.assets.compactMap { a in
-            guard a.kind == .image, !have.contains(a.id), let fn = a.fileName, !fn.isEmpty else { return nil }
-            let url = dir.appendingPathComponent(fn)
-            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-            // Skip very large files so a sync can't stall on a huge image.
-            if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int64, size > 8_000_000 { return nil }
-            return (fn, url)
-        }
-        sync.sendAssetFiles(files)
-    }
-
-    /// A phone-created image arrived — drop it into the Mac's assets dir (where
-    /// orion.db's `file_path` points). Never overwrites an existing file.
-    private func receiveAssetFile(fileName: String, from src: URL) {
-        guard let dir = Self.assetsDir() else { return }
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let dest = dir.appendingPathComponent(fileName)
-        guard !FileManager.default.fileExists(atPath: dest.path) else { return }
-        try? FileManager.default.copyItem(at: src, to: dest)
-    }
-
-    static func assetsDir() -> URL? {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("com.lucaorion.orion-terminal/assets", isDirectory: true)
-    }
-
-    private func configureDB() {
-        guard let path = Self.orionDBPath() else {
-            dbStatus = "couldn't locate Application Support"; useEmptyProvider(); return
-        }
-        guard FileManager.default.fileExists(atPath: path) else {
-            dbStatus = "orion.db not found — open the desktop app once"; useEmptyProvider(); return
-        }
-        do {
-            // Read/write so phone edits can flow back. Safe against the running
-            // desktop app: SQLite multi-process locking + a 5s busy timeout, and
-            // write-back uses conditional upserts in a transaction (no wholesale writes).
-            let store = try ArchivesStore(path: path, createSchema: false, readOnly: false)
-            self.store = store
-            let count = (try? store.snapshot(deviceID: "mac", generatedAt: 0).notes.count) ?? 0
-            dbStatus = "orion.db ready · \(count) notes (read/write)"
-            sync.provideSnapshot = { [weak store] in
-                var snap = (try? store?.snapshot(deviceID: "mac", generatedAt: Self.now()))
-                    ?? SyncPayload(deviceID: "mac", generatedAt: Self.now())
-                // "have" = the bytes are actually on disk (NOT just a row), so the
-                // phone still sends a file for a row we just wrote but haven't received.
-                if let dir = Self.assetsDir() {
-                    snap.haveAssetIDs = snap.assets.compactMap { a in
-                        guard let fn = a.fileName,
-                              FileManager.default.fileExists(atPath: dir.appendingPathComponent(fn).path) else { return nil }
-                        return a.id
-                    }
-                }
-                return snap
-            }
-        } catch {
-            dbStatus = "orion.db read error: \(error.localizedDescription)"; useEmptyProvider()
-        }
-    }
-
-    private func useEmptyProvider() {
-        sync.provideSnapshot = { SyncPayload(deviceID: "mac", generatedAt: Self.now()) }
-    }
-
     static func now() -> Millis { Millis(Date().timeIntervalSince1970 * 1000) }
-
-    static func orionDBPath() -> String? {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("com.lucaorion.orion-terminal/orion.db").path
+    static func orionDBPath() -> URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("com.lucaorion.orion-terminal/orion.db")
     }
+    static func assetsDir() -> URL { orionDBPath().deletingLastPathComponent().appendingPathComponent("assets", isDirectory: true) }
 }
 
 @main
 struct ArchivesSyncHelperApp: App {
     @NSApplicationDelegateAdaptor(HelperController.self) private var controller
-
     var body: some Scene {
-        MenuBarExtra {
+        MenuBarExtra("Archives Sync", systemImage: "arrow.triangle.2.circlepath") {
             MenuContent(controller: controller, sync: controller.sync)
-        } label: {
-            MenuBarLabel(sync: controller.sync)
-        }
-        .menuBarExtraStyle(.window)
+        }.menuBarExtraStyle(.window)
     }
 }
-
-private struct MenuBarLabel: View {
-    @ObservedObject var sync: MultipeerSync
-    var body: some View {
-        Image(systemName: sync.connectedPeers.isEmpty ? "arrow.triangle.2.circlepath" : "checkmark.icloud")
-    }
-}
-
 private struct MenuContent: View {
     @ObservedObject var controller: HelperController
     @ObservedObject var sync: MultipeerSync
-
+    @State private var confirmRotation = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Archives Sync").font(.headline)
-            Text(controller.dbStatus).font(.caption).foregroundStyle(.secondary)
-            Text(sync.status).font(.caption).foregroundStyle(.secondary)
+        ScrollView {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Archives Sync", systemImage: "lock.shield").font(.headline)
+            Text("Your library. Your devices.").font(.caption).foregroundStyle(.secondary)
+            Text(sync.status).font(.callout)
             Divider()
-            if sync.connectedPeers.isEmpty {
-                Label("Waiting for iPhone…", systemImage: "iphone.gen3")
-                    .font(.callout).foregroundStyle(.secondary)
+            Button("Copy pairing key") { controller.copyPairingKey() }
+            Text("Paste this key in Archives → Sync on your iPhone. Treat it like a password.").font(.caption).foregroundStyle(.secondary)
+            Button("Replace pairing key…") { confirmRotation = true }
+            Divider()
+            Text(controller.dbStatus).font(.caption)
+            if controller.enabled {
+                Button("Sync library now") { sync.sendSnapshot() }.disabled(sync.connectedPeers.isEmpty)
+                Button("Disable library access") { controller.disableLibrary() }
             } else {
-                ForEach(sync.connectedPeers, id: \.self) { peer in
-                    Label(peer.displayName, systemImage: "checkmark.circle.fill").font(.callout)
+                Button("Enable library sync") { controller.enableLibrary() }
+                Text("Allows your paired phone to read and edit Archives. Quit Orion Terminal before importing phone edits. A local database backup is kept before each import.").font(.caption).foregroundStyle(.secondary)
+            }
+            if controller.pendingImport != nil {
+                Divider()
+                Text("Review phone import").font(.headline)
+                ScrollView { Text(controller.importReview).font(.caption).frame(maxWidth: .infinity, alignment: .leading) }.frame(maxHeight: 180)
+                Text("Older phone data may include items deleted before this helper tracked deletions. Approve only changes you recognize; a backup is kept.").font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button("Cancel", role: .cancel) { controller.rejectImport() }
+                    Button("Approve import") { controller.approveImport() }
                 }
-                Button("Sync now") { sync.sendSnapshot() }
+            }
+            Toggle("Allow R.O.S.I.E via Claude", isOn: $controller.chatEnabled)
+                .onChange(of: controller.chatEnabled) { _, enabled in if !enabled { controller.cancelChat() } }
+            Text("Opt-in text chat uses your Mac's Claude account. No model tools or automatic note uploads.").font(.caption).foregroundStyle(.secondary)
+            if let error = controller.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                Button("Dismiss error") { controller.errorMessage = nil }
             }
             Divider()
             Button("Quit Archives Sync") { NSApplication.shared.terminate(nil) }
         }
-        .padding(10)
-        .frame(width: 260)
+        .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+        }.frame(width: 360, height: 560)
+        .confirmationDialog("Replace pairing key?", isPresented: $confirmRotation) {
+            Button("Replace key", role: .destructive) { controller.rotatePairing() }
+        } message: { Text("Disconnects the current phone. Paste the new key on your phone to reconnect.") }
     }
 }

@@ -1,36 +1,8 @@
 import { TAXONOMY } from "./taxonomy";
 import type { RepoData } from "./types";
 
-// High-precision prompt-injection phrasings: text a README might use to address
-// the model directly, never legitimate project documentation. Kept narrow to
-// avoid redacting real docs. Belt-and-suspenders on top of the structural
-// delimiting in buildPrompt — the untrusted-data framing is the primary guard.
-const INJECTION_PATTERNS: RegExp[] = [
-  /ignore\s+(all\s+)?(the\s+)?(previous|prior|above|preceding|earlier)\s+(instructions?|prompts?|messages?)/gi,
-  /disregard\s+(all\s+)?(the\s+)?(previous|prior|above|preceding|earlier)\s+(instructions?|prompts?|text|content)/gi,
-  /forget\s+(all\s+)?(your\s+|the\s+)?(previous\s+|prior\s+)?instructions?/gi,
-  /system\s*prompt\s*:/gi,
-  /\bnew\s+instructions?\s*:/gi,
-  /override\s+(your|the|all)\s+(instructions?|rules?|guidelines?|system)/gi,
-  /you\s+are\s+now\s+(a\s+|an\s+)?(helpful\s+)?(assistant|ai|language\s+model|model|chatbot|claude|gpt|chatgpt)\b/gi,
-];
-
-/**
- * Clean an untrusted README before embedding it in the model prompt. Structural
- * delimiting in buildPrompt is the primary guard; this strips control characters
- * and defangs the most blatant "instructions to the model" so they read as inert
- * text rather than directives. Ported from prompt.js.
- */
-export function sanitizeReadme(text: unknown): string {
-  let s = String(text ?? "");
-  // Strip control characters that could smuggle hidden directives, but keep the
-  // whitespace that carries real structure (tab, newline, carriage return).
-  s = s.replace(/\p{Cc}/gu, (c) => (c === "\n" || c === "\r" || c === "\t" ? c : ""));
-  for (const re of INJECTION_PATTERNS) s = s.replace(re, "[redacted: instruction-like text]");
-  // Collapse runaway blank lines so a padded README can't bury the schema.
-  s = s.replace(/\n{4,}/g, "\n\n\n");
-  return s;
-}
+import { sanitizeReadme } from "@/features/repoAnalysis/sourceText";
+export { sanitizeReadme } from "@/features/repoAnalysis/sourceText";
 
 // The core "should I adopt this?" briefing prompt. Ported verbatim from
 // prompt.js — the wording is tuned; do not reword.

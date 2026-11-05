@@ -12,8 +12,10 @@ import {
   Film as FilmIcon,
   FileQuestion,
 } from "lucide-react";
-import { type SearchHit, type NoteKind } from "@/lib/db";
-import { searchHybrid } from "@/lib/searchHybrid";
+import { searchArchive, type SearchHit, type NoteKind } from "@/lib/db";
+import { useArchiveSearchRevision } from "@/lib/archiveSearchRevision";
+import "./downloads/sidecars.css";
+import { searchHybrid, isArchiveHitVisible } from "@/lib/searchHybrid";
 import { useArchives } from "@/apps/archives/useArchives";
 import { useAssetsStore } from "@/store/assetsStore";
 import { routeToSearchHit } from "@/apps/archives/searchNav";
@@ -26,10 +28,10 @@ export function SidebarSearch() {
   const setQuery = useArchives((s) => s.setSearchQuery);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [pending, setPending] = useState(false);
+  const [keywordOnly, setKeywordOnly] = useState(true);
+  const searchRevision = useArchiveSearchRevision((s) => s.revision);
 
-  // Debounced search — re-runs whenever the input changes. Cancellation via
-  // an effect-scoped `cancelled` flag keeps stale responses from clobbering
-  // a newer search.
+  // Caption indexing can change hits without changing the query.
   useEffect(() => {
     if (!query.trim()) {
       setHits([]);
@@ -39,10 +41,10 @@ export function SidebarSearch() {
     setPending(true);
     let cancelled = false;
     const t = setTimeout(() => {
-      searchHybrid(query, 24)
+      (keywordOnly ? searchArchive(query, 24) : searchHybrid(query, 24))
         .then((rows) => {
           if (cancelled) return;
-          setHits(rows);
+          setHits(rows.filter(isArchiveHitVisible));
         })
         .catch((e) => {
           log.warn("search failed", e);
@@ -56,7 +58,7 @@ export function SidebarSearch() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [query]);
+  }, [query, keywordOnly, searchRevision]);
 
   const close = () => {
     setQuery("");
@@ -94,6 +96,8 @@ export function SidebarSearch() {
       )}
       {showDropdown && (
         <div className="ar-search-results">
+          <label className="ar-sidebar-search-mode"><input type="checkbox" checked={keywordOnly} onChange={(e) => setKeywordOnly(e.target.checked)} />Keyword only · no AI</label>
+          {!keywordOnly && <div className="ar-search-empty">Semantic matching enabled · uses embeddings</div>}
           {pending && hits.length === 0 ? (
             <div className="ar-search-empty">searching…</div>
           ) : hits.length === 0 ? (

@@ -14,7 +14,6 @@ import {
   type NoteKind,
 } from "@/lib/db";
 import { walkBlocksToPlaintext } from "@/features/notes/plaintext";
-import { useWorkspace, allTabs } from "@/components/workspace/workspaceStore";
 import { log } from "@/lib/log";
 import { serialQueue } from "@/lib/serialQueue";
 import { toast } from "@/store/toastStore";
@@ -391,19 +390,21 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   },
 }));
 
+/** Hosts that show notes outside Archives (Orion's workspace tabs) keep their
+ * labels and tabs in step through this; the standalone app has none. */
+export type NoteViewSync = {
+  setLabel: (noteId: string, label: string) => void;
+  closeNote: (noteId: string) => void;
+};
+let noteViewSync: NoteViewSync | null = null;
+export function setNoteViewSync(sync: NoteViewSync | null): void {
+  noteViewSync = sync;
+}
+
 function syncTabLabel(noteId: string, label: string) {
-  const ws = useWorkspace.getState();
-  const all = allTabs(ws.root);
-  const tab = all.find(
-    (t) => t.descriptor.kind === "note" && t.descriptor.noteId === noteId,
-  );
-  if (tab) ws.setLabel(tab.id, label);
+  noteViewSync?.setLabel(noteId, label);
 }
 
 function closeTabsForNote(noteId: string) {
-  const ws = useWorkspace.getState();
-  const matches = allTabs(ws.root).filter(
-    (t) => t.descriptor.kind === "note" && t.descriptor.noteId === noteId,
-  );
-  for (const t of matches) ws.closeTab(t.id);
+  noteViewSync?.closeNote(noteId);
 }

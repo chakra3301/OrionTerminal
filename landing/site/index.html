@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orion Terminal — Think. Make. Connect.</title>
+<meta name="description" content="One desktop for your notes, code and designs, with the AI you already use built into each one. Free public alpha for Apple Silicon Macs.">
+<meta name="theme-color" content="#03060a">
+<meta name="color-scheme" content="dark">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Orion Terminal — Think. Make. Connect.">
+<meta property="og:description" content="Notes, code and design in one desktop, with your AI built into each app. Free public alpha for Apple Silicon Macs.">
+<meta property="og:image" content="assets/social.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preload" href="assets/fonts/sg-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/sg-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/wallpaper.webp" as="image" type="image/webp">
+<link rel="stylesheet" href="css/site.css">
+<script>
+  try { if (localStorage.getItem("orion-site-motion") === "reduced") document.documentElement.dataset.motion = "reduced"; } catch (_) {}
+  document.documentElement.classList.add("js");
+</script>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+<symbol id="i-archive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol>
+<symbol id="i-code-xml" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></symbol>
+<symbol id="i-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+<symbol id="i-command" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/></symbol>
+<symbol id="i-arrow-down-to-line" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></symbol>
+<symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+<symbol id="i-hard-drive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/><line x1="10" x2="10.01" y1="16" y2="16"/></symbol>
+<symbol id="i-shield-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></symbol>
+<symbol id="i-brain-circuit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M9 13a4.5 4.5 0 0 0 3-4"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M12 13h4"/><path d="M12 18h6a2 2 0 0 1 2 2v1"/><path d="M12 8h8"/><path d="M16 8V5a2 2 0 0 1 2-2"/><circle cx="16" cy="13" r=".5"/><circle cx="18" cy="3" r=".5"/><circle cx="20" cy="21" r=".5"/><circle cx="20" cy="8" r=".5"/></symbol>
+<symbol id="i-git-branch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></symbol>
+<symbol id="i-wand-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></symbol>
+<symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+<symbol id="i-lock-keyhole" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+<symbol id="i-book-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+<symbol id="i-sticky-note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z"/><path d="M15 3v4a2 2 0 0 0 2 2h4"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+<symbol id="i-file-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12.5 8 15l2 2.5"/><path d="m14 12.5 2 2.5-2 2.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-github" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-scan-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol>
+<symbol id="i-keyboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+<symbol id="i-feather" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.67 19a2 2 0 0 0 1.416-.588l6.154-6.172a6 6 0 0 0-8.49-8.49L5.586 9.914A2 2 0 0 0 5 11.328V18a1 1 0 0 0 1 1z"/><path d="M16 8 2 22"/><path d="M17.5 15H9"/></symbol>
+</svg>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav" id="nav">
+  <a class="brand" href="#top" aria-label="Orion Terminal, back to top">
+    <img src="assets/orb-160.webp" alt="" width="30" height="30">
+    <span>Orion Terminal</span>
+  </a>
+  <nav class="nav-links" aria-label="Primary">
+    <a href="#desktop">Try it</a>
+    <a href="#apps">Apps</a>
+    <a href="#ai">AI</a>
+    <a href="#local">Privacy</a>
+    <a href="#faq">FAQ</a>
+  </nav>
+  <div class="nav-actions">
+    <button class="k-pill" type="button" data-spotlight-open aria-label="Search this site (Command K)">
+      <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+      <span class="k-pill-label">Search</span>
+      <kbd data-mod-key>⌘K</kbd>
+    </button>
+    <a class="btn btn-primary btn-sm" href="#download"><span>Download<span class="hide-sm"> for Mac</span></span></a>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="top" aria-labelledby="hero-title">
+  <div class="hero-media" aria-hidden="true">
+    <img class="hero-fallback" src="assets/wallpaper.webp" srcset="assets/wallpaper-960.webp 960w, assets/wallpaper.webp 1672w" sizes="100vw" alt="" fetchpriority="high">
+    <canvas id="hero-gl"></canvas>
+    <div class="hero-shade"></div>
+  </div>
+
+  <div class="hero-inner">
+    <p class="eyebrow reveal"><span class="live-dot"></span> Free public alpha · for Apple Silicon Macs</p>
+    <h1 class="hero-title" id="hero-title">
+      <span class="ht-line" style="--i:0"><span class="ht-word" data-accent="green">Think.</span><span class="ht-tag"><b>01</b> Archives 47</span></span>
+      <span class="ht-line" style="--i:1"><span class="ht-word" data-accent="cyan">Make.</span><span class="ht-tag"><b>02</b> Orion</span></span>
+      <span class="ht-line" style="--i:2"><span class="ht-word ht-connect">Connect.</span><span class="ht-tag"><b>03</b> XDesign</span></span>
+    </h1>
+    <p class="hero-lede reveal">One desktop for your notes, code and designs, with the AI you already use built into each one. Everything you make stays linked, searchable and on your Mac.</p>
+    <div class="hero-ctas reveal">
+      <a class="btn btn-primary" href="#download">
+        <svg class="ic" aria-hidden="true"><use href="#i-arrow-down-to-line"/></svg> Download for Mac
+      </a>
+      <a class="btn btn-ghost" href="#desktop">Try it in your browser <svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></a>
+    </div>
+    <p class="hero-meta reveal mono">v0.1.0-alpha.1 · 55.8 MB · macOS on Apple Silicon · Free</p>
+  </div>
+
+  <figure class="hero-orb" aria-hidden="true">
+    <div class="orb-tilt" id="orb-tilt">
+      <div class="orb-halo"></div>
+      <img src="assets/orb-640.webp" alt="" width="640" height="640">
+      <div class="orb-shine"></div>
+    </div>
+    <div class="orb-floor"></div>
+  </figure>
+
+  <button class="hero-hint" type="button" data-spotlight-open>
+    <span>Tip: press</span> <kbd data-mod-key>⌘K</kbd> <span>anywhere to search, just like in the app</span>
+  </button>
+</section>
+
+<!-- ============ LIVE DESKTOP ============ -->
+<section class="desk-section" id="desktop" aria-labelledby="desk-title">
+  <div class="section-head center">
+    <p class="kicker mono">Interactive demo</p>
+    <h2 id="desk-title">It’s a whole desktop.<br><span class="dim">Go ahead, touch it.</span></h2>
+    <p class="section-lede">Orion Terminal runs like its own small operating system: a dock, windows, a menu bar and Spotlight. Drag the windows. Click the dock. Watch the AI work.</p>
+  </div>
+
+  <div class="desk-stage" id="desk-stage">
+    <div class="desk" id="desk" role="application" aria-roledescription="Interactive Orion Terminal demo" aria-label="Orion Terminal demo desktop. Use the dock buttons to switch apps.">
+      <img class="desk-wall" src="assets/wallpaper.webp" alt="" aria-hidden="true" loading="lazy">
+
+      <div class="menubar" aria-hidden="true">
+        <img src="assets/orb-160.webp" alt="" width="14" height="14">
+        <b>Orion Terminal</b>
+        <span class="mb-app" id="mb-app">Archives 47</span>
+        <span class="mb-item">File</span><span class="mb-item">Edit</span><span class="mb-item">View</span><span class="mb-item">Window</span>
+        <span class="mb-spacer"></span>
+        <span class="mb-status"><i></i> claude · listening</span>
+        <span class="mb-clock" id="mb-clock">9:41</span>
+      </div>
+
+      <!-- Archives -->
+      <article class="win" data-app="archives" style="--x:4%;--y:10%;--w:47%;--h:66%;--accent:var(--green)" aria-label="Archives 47 window">
+        <header class="win-bar" data-drag>
+          <span class="lights"><button class="l l-close" data-act="close" aria-label="Close Archives 47"></button><button class="l l-min" data-act="min" aria-label="Minimize Archives 47"></button><button class="l l-max" data-act="max" aria-label="Maximize Archives 47"></button></span>
+          <span class="win-title">ARCHIVES 47 <em>today</em></span>
+          <span class="win-status mono">status : saved</span>
+        </header>
+        <div class="win-body arc">
+          <aside class="arc-side" aria-hidden="true">
+            <span><svg class="ic"><use href="#i-sun"/></svg>Today</span>
+            <span class="on"><svg class="ic"><use href="#i-brain-circuit"/></svg>Brain</span>
+            <span><svg class="ic"><use href="#i-book-open"/></svg>Journal</span>
+            <span><svg class="ic"><use href="#i-sticky-note"/></svg>Notes</span>
+            <span><svg class="ic"><use href="#i-image"/></svg>Mood Boards</span>
+            <span><svg class="ic"><use href="#i-star"/></svg>Favorites</span>
+          </aside>
+          <div class="arc-doc">
+            <p class="arc-crumb mono">Notes / Projects</p>
+            <h3>Launch week</h3>
+            <p class="arc-tags"><span>#launch</span><span>#site</span><span>#ideas</span></p>
+            <p>The hero should feel <i>alive</i>: liquid glass, cursor-aware, never loud. Mock it in <a class="wl">[[Hero frame]]</a> then build it in <a class="wl">[[hero.ts]]</a>.</p>
+            <ul class="arc-check">
+              <li class="done">Moodboard: black chrome, ice light</li>
+              <li class="done">Write the headline</li>
+              <li>Ship the public alpha</li>
+            </ul>
+            <div class="arc-callout"><svg class="ic"><use href="#i-sparkles"/></svg><span>3 notes, 1 file and 1 design mention this page.</span></div>
+          </div>
+          <div class="chat" aria-hidden="true">
+            <p class="chat-head mono"><i></i> <span data-provider-label>claude</span> · listening</p>
+            <div class="chat-log" id="arc-chat"></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Orion -->
+      <article class="win" data-app="orion" style="--x:30%;--y:22%;--w:52%;--h:62%;--accent:var(--cyan)" aria-label="Orion code editor window">
+        <header class="win-bar" data-drag>
+          <span class="lights"><button class="l l-close" data-act="close" aria-label="Close Orion"></button><button class="l l-min" data-act="min" aria-label="Minimize Orion"></button><button class="l l-max" data-act="max" aria-label="Maximize Orion"></button></span>
+          <span class="win-title">ORION <em>orix47</em></span>
+          <span class="win-status mono">main ✓</span>
+        </header>
+        <div class="win-body ori">
+          <aside class="ori-tree mono" aria-hidden="true">
+            <span class="dir">▾ site</span>
+            <span class="f on">hero.ts</span>
+            <span class="f">orb.ts</span>
+            <span class="f">site.css</span>
+            <span class="f">index.html</span>
+            <span class="dir">▸ assets</span>
+          </aside>
+          <div class="ori-main">
+            <div class="ori-tabs mono" aria-hidden="true"><span class="on">hero.ts</span><span>site.css</span></div>
+            <pre class="ori-code mono" id="ori-code" aria-hidden="true"></pre>
+            <div class="ori-inline" id="ori-inline" aria-hidden="true">
+              <span class="mono k">⌘K</span><span class="ori-prompt" id="ori-prompt"></span><span class="caret"></span>
+            </div>
+          </div>
+          <div class="ori-term mono" aria-hidden="true"><span class="g">➜</span> site <span class="c">git:(main)</span> npm run dev <span class="dim2">· ready in 212 ms</span></div>
+        </div>
+      </article>
+
+      <!-- XDesign -->
+      <article class="win" data-app="xdesign" style="--x:50%;--y:8%;--w:46%;--h:58%;--accent:var(--magenta)" aria-label="XDesign window">
+        <header class="win-bar" data-drag>
+          <span class="lights"><button class="l l-close" data-act="close" aria-label="Close XDesign"></button><button class="l l-min" data-act="min" aria-label="Minimize XDesign"></button><button class="l l-max" data-act="max" aria-label="Maximize XDesign"></button></span>
+          <span class="win-title">XDESIGN <em>hero frame</em></span>
+          <span class="win-status mono">100%</span>
+        </header>
+        <div class="win-body xd">
+          <aside class="xd-layers" aria-hidden="true">
+            <p class="mono">Layers</p>
+            <span class="on"><svg class="ic"><use href="#i-sparkles"/></svg>Aurora shader</span>
+            <span><svg class="ic"><use href="#i-feather"/></svg>Think.</span>
+            <span><svg class="ic"><use href="#i-image"/></svg>Orb</span>
+            <span><svg class="ic"><use href="#i-layers"/></svg>Frame</span>
+          </aside>
+          <div class="xd-canvas">
+            <div class="xd-frame">
+              <canvas id="xd-gl" aria-hidden="true"></canvas>
+              <span class="xd-word">THINK.</span>
+              <span class="xd-sel" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+            </div>
+          </div>
+          <aside class="xd-props mono" aria-hidden="true">
+            <p>Blend</p><span class="xd-field">Screen</span>
+            <p>Flow</p><span class="xd-slider"><i style="--v:.68"></i></span>
+            <p>Mouse</p><span class="xd-slider"><i style="--v:.42"></i></span>
+            <p>Export</p><span class="xd-field">HTML embed</span>
+          </aside>
+        </div>
+      </article>
+
+      <nav class="dock" aria-label="Demo dock">
+        <button class="dock-btn" data-open="archives" style="--bg:linear-gradient(135deg,rgba(57,255,136,.45),rgba(57,255,136,.06));--fg:#001008" aria-label="Archives 47"><svg class="ic"><use href="#i-archive"/></svg><span class="tip">Archives 47</span></button>
+        <button class="dock-btn" data-open="orion" style="--bg:linear-gradient(135deg,rgba(0,224,255,.5),rgba(0,224,255,.06));--fg:#011018" aria-label="Orion"><svg class="ic"><use href="#i-code-xml"/></svg><span class="tip">Orion</span></button>
+        <button class="dock-btn" data-open="xdesign" style="--bg:linear-gradient(135deg,rgba(255,62,165,.5),rgba(255,62,165,.06));--fg:#1a0010" aria-label="XDesign"><svg class="ic"><use href="#i-palette"/></svg><span class="tip">XDesign</span></button>
+        <span class="dock-sep" aria-hidden="true"></span>
+        <button class="dock-btn dock-plain" data-spotlight-open aria-label="Spotlight search"><svg class="ic"><use href="#i-search"/></svg><span class="tip">Spotlight</span></button>
+        <button class="dock-btn dock-plain" data-desk-reset aria-label="Reset demo windows"><svg class="ic"><use href="#i-history"/></svg><span class="tip">Reset</span></button>
+      </nav>
+    </div>
+  </div>
+  <p class="desk-note mono">An illustrative recreation, not a screenshot. The real app does much more.</p>
+</section>
+
+<!-- ============ THREE APPS ============ -->
+<section class="apps" id="apps" aria-labelledby="apps-title">
+  <div class="section-head">
+    <p class="kicker mono">Three apps · one place</p>
+    <h2 id="apps-title">Everything you’d open<br>ten apps for.</h2>
+  </div>
+
+  <div class="app-grid">
+    <article class="app-card" style="--accent:var(--green);--accent-rgb:57,255,136">
+      <div class="app-icon" style="--bg:linear-gradient(135deg,rgba(57,255,136,.45),rgba(57,255,136,.06));--fg:#001008"><svg class="ic"><use href="#i-archive"/></svg></div>
+      <p class="app-num mono">01 · Think</p>
+      <h3>Archives 47</h3>
+      <p class="app-tag">Your second brain. Notes, journal, mood boards and media, all in one calm place.</p>
+      <ul class="feat">
+        <li><svg class="ic"><use href="#i-link"/></svg><span><b>[[Wikilinks]] and backlinks</b> connect ideas as you type.</span></li>
+        <li><svg class="ic"><use href="#i-brain-circuit"/></svg><span><b>Brain</b> draws a live map of how everything relates, with no manual linking.</span></li>
+        <li><svg class="ic"><use href="#i-sparkles"/></svg><span><b>Ask your notes.</b> Search by meaning and get answers from what you've written.</span></li>
+        <li><svg class="ic"><use href="#i-image"/></svg><span><b>Mood boards, databases and PDF export</b> for when a note isn't enough.</span></li>
+      </ul>
+      <button class="app-try" type="button" data-try="archives">Open Archives in the demo <svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
+    </article>
+
+    <article class="app-card" style="--accent:var(--cyan);--accent-rgb:0,224,255">
+      <div class="app-icon" style="--bg:linear-gradient(135deg,rgba(0,224,255,.5),rgba(0,224,255,.06));--fg:#011018"><svg class="ic"><use href="#i-code-xml"/></svg></div>
+      <p class="app-num mono">02 · Make</p>
+      <h3>Orion</h3>
+      <p class="app-tag">An AI-first code editor. Describe a change and watch it land, line by line.</p>
+      <ul class="feat">
+        <li><svg class="ic"><use href="#i-wand-sparkles"/></svg><span><b>Inline edits.</b> Highlight code, say what you want, review the diff.</span></li>
+        <li><svg class="ic"><use href="#i-keyboard"/></svg><span><b>Tab autocomplete</b> that finishes the thought you started.</span></li>
+        <li><svg class="ic"><use href="#i-monitor"/></svg><span><b>Live preview and a real terminal</b> right beside your code.</span></li>
+        <li><svg class="ic"><use href="#i-git-branch"/></svg><span><b>Git, checkpoints and language servers</b> built in.</span></li>
+      </ul>
+      <button class="app-try" type="button" data-try="orion">Open Orion in the demo <svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
+    </article>
+
+    <article class="app-card" style="--accent:var(--magenta);--accent-rgb:255,62,165">
+      <div class="app-icon" style="--bg:linear-gradient(135deg,rgba(255,62,165,.5),rgba(255,62,165,.06));--fg:#1a0010"><svg class="ic"><use href="#i-palette"/></svg></div>
+      <p class="app-num mono">03 · Design</p>
+      <h3>XDesign</h3>
+      <p class="app-tag">A design studio for screens, decks and motion. Then turn the design into code.</p>
+      <ul class="feat">
+        <li><svg class="ic"><use href="#i-layers"/></svg><span><b>Canvas, vectors and auto layout</b>, with prototypes you can click through.</span></li>
+        <li><svg class="ic"><use href="#i-file-code"/></svg><span><b>Design to code.</b> Send a frame straight to Orion.</span></li>
+        <li><svg class="ic"><use href="#i-play"/></svg><span><b>Decks</b> exported as HTML, PDF or PowerPoint.</span></li>
+        <li><svg class="ic"><use href="#i-zap"/></svg><span><b>FX studio</b> with live shader layers. Experimental.</span></li>
+      </ul>
+      <button class="app-try" type="button" data-try="xdesign">Open XDesign in the demo <svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
+    </article>
+  </div>
+</section>
+
+<!-- ============ ONE BRAIN ============ -->
+<section class="brain" id="brain" aria-labelledby="brain-title">
+  <div class="brain-copy">
+    <p class="kicker mono">One brain</p>
+    <h2 id="brain-title">Your work, <span class="grad">connected</span> by itself.</h2>
+    <p class="section-lede">A note mentions a file. A file becomes a design. A chat explains the code. Orion Terminal notices the links, so you don't have to keep them in your head.</p>
+    <ol class="brain-steps">
+      <li><span class="mono" style="color:var(--green)">Think</span> Jot an idea in Archives.</li>
+      <li><span class="mono" style="color:var(--cyan)">Make</span> Build it in Orion with the same AI.</li>
+      <li><span class="mono" style="color:var(--magenta)">Design</span> Shape it in XDesign and send it back as code.</li>
+    </ol>
+    <div class="brain-legend mono" aria-hidden="true">
+      <span><i style="background:var(--green)"></i>Notes</span>
+      <span><i style="background:var(--cyan)"></i>Code</span>
+      <span><i style="background:var(--magenta)"></i>Designs</span>
+      <span><i style="background:var(--violet)"></i>Chats</span>
+    </div>
+  </div>
+  <div class="brain-viz">
+    <canvas id="brain-canvas" role="img" aria-label="An animated map of connected notes, code files, designs and chats."></canvas>
+    <p class="brain-label mono" id="brain-label" aria-hidden="true">Drag to orbit · hover a node</p>
+  </div>
+</section>
+
+<!-- ============ SPOTLIGHT BAND ============ -->
+<section class="spot-band" aria-labelledby="spot-title">
+  <div class="spot-copy">
+    <p class="kicker mono">Spotlight</p>
+    <h2 id="spot-title">One keystroke finds anything.</h2>
+    <p class="section-lede">Apps, notes, files, past chats and commands, all in one search. Type <code>&gt;</code> for commands only. This website works the same way.</p>
+    <button class="btn btn-ghost" type="button" data-spotlight-open>Try it now <kbd data-mod-key>⌘K</kbd></button>
+  </div>
+  <div class="spot-demo" aria-hidden="true">
+    <div class="spot-mock">
+      <div class="spot-mock-input"><svg class="ic"><use href="#i-search"/></svg><span id="spot-typed"></span><span class="caret"></span></div>
+      <ul id="spot-mock-results"></ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AI ============ -->
+<section class="ai-section" id="ai" aria-labelledby="ai-title">
+  <div class="section-head center">
+    <p class="kicker mono">Bring your own AI</p>
+    <h2 id="ai-title">Use the AI you<br>already pay for.</h2>
+    <p class="section-lede">Sign in with the account you already have. Pick a different assistant for each app if you like. No new AI subscription required.</p>
+  </div>
+
+  <div class="ai-board">
+    <div class="ai-pick" role="radiogroup" aria-label="Preview an AI provider">
+      <button role="radio" aria-checked="true" data-provider="claude" style="--p:#d97757">Claude</button>
+      <button role="radio" aria-checked="false" data-provider="chatgpt" style="--p:#e6f4ec">ChatGPT</button>
+      <button role="radio" aria-checked="false" data-provider="gemini" style="--p:#7aa7ff">Gemini</button>
+      <button role="radio" aria-checked="false" data-provider="cursor" style="--p:#c8c8c8">Cursor</button>
+    </div>
+
+    <div class="ai-panel">
+      <div class="ai-chat">
+        <p class="chat-head mono"><i></i> <span data-provider-label>claude</span> · listening</p>
+        <div class="ai-msgs" id="ai-msgs" aria-live="polite"></div>
+        <div class="ai-input"><span>Ready when you are.</span><kbd data-mod-key>⌘K</kbd></div>
+      </div>
+      <ul class="ai-facts">
+        <li><svg class="ic"><use href="#i-check"/></svg><div><b>Sign in, don't pay twice</b><span>Connect Claude, ChatGPT or Gemini with the account you already have, or add a Cursor key.</span></div></li>
+        <li><svg class="ic"><use href="#i-settings"/></svg><div><b>Different AI per app</b><span>Set one default, or choose per app and per task.</span></div></li>
+        <li><svg class="ic"><use href="#i-lock-keyhole"/></svg><div><b>Off until you say so</b><span>Background AI starts switched off. Nothing is sent until you ask.</span></div></li>
+        <li><svg class="ic"><use href="#i-feather"/></svg><div><b>Optional, always</b><span>Writing, coding and designing all work with no AI connected.</span></div></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FX ============ -->
+<section class="fx" id="fx" aria-labelledby="fx-title">
+  <div class="fx-stage">
+    <canvas id="fx-gl" role="img" aria-label="A live shader effect from the XDesign FX studio"></canvas>
+    <div class="fx-overlay">
+      <p class="kicker mono">XDesign FX <span class="pill-exp">Experimental</span></p>
+      <h2 id="fx-title">Make things that move.</h2>
+      <p class="section-lede">Over fifty live shader layers: auroras, nebulae, glyph dithering, glitches and more. They react to your cursor and to sound. Export a PNG, a video or a drop-in web embed.</p>
+      <div class="fx-tabs" role="tablist" aria-label="Choose an effect">
+        <button role="tab" aria-selected="true" data-fx="0">Aurora</button>
+        <button role="tab" aria-selected="false" data-fx="1">Nebula</button>
+        <button role="tab" aria-selected="false" data-fx="2">Glyph</button>
+        <button role="tab" aria-selected="false" data-fx="3">Synthwave</button>
+      </div>
+      <p class="fx-hint mono">Move your cursor over the effect · rendered live in your browser</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LOCAL ============ -->
+<section class="local" id="local" aria-labelledby="local-title">
+  <div class="section-head">
+    <p class="kicker mono">Yours, locally</p>
+    <h2 id="local-title">Your work lives on your Mac.<br><span class="dim">Not on our servers.</span></h2>
+  </div>
+  <div class="local-grid">
+    <div class="tile tile-big">
+      <svg class="ic"><use href="#i-hard-drive"/></svg>
+      <h3>Local first</h3>
+      <p>Notes, projects and designs are saved in a database on your computer. There's no Orion account and no Orion cloud.</p>
+      <div class="tile-file mono" aria-hidden="true"><span>~/Library/Application Support/</span><b>orion · saved</b></div>
+    </div>
+    <div class="tile">
+      <svg class="ic"><use href="#i-history"/></svg>
+      <h3>Backups and recovery</h3>
+      <p>Automatic backups, careful saves and draft recovery if the app quits unexpectedly.</p>
+    </div>
+    <div class="tile">
+      <svg class="ic"><use href="#i-github"/></svg>
+      <h3>Open source</h3>
+      <p>The code is public on GitHub under Apache-2.0. Read it, build it, improve it.</p>
+    </div>
+    <div class="tile">
+      <svg class="ic"><use href="#i-cpu"/></svg>
+      <h3>Native and fast</h3>
+      <p>Built on Tauri: a small Mac app that uses the system web engine instead of bundling a whole browser.</p>
+    </div>
+    <div class="tile">
+      <svg class="ic"><use href="#i-shield-check"/></svg>
+      <h3>You stay in control</h3>
+      <p>Background AI is off by default, and assistants only use the tools you allow.</p>
+    </div>
+  </div>
+  <p class="fine">Plain truth: local data and backups are not encrypted, and AI requests go to the provider you choose under its own terms.</p>
+</section>
+
+<!-- ============ DOWNLOAD ============ -->
+<section class="download" id="download" aria-labelledby="dl-title">
+  <div class="dl-glow" aria-hidden="true"></div>
+  <img class="dl-orb" src="assets/orb-640.webp" alt="Orion Terminal app icon" width="640" height="640" loading="lazy">
+  <h2 id="dl-title">Ready when you are.</h2>
+  <p class="section-lede">Free public alpha for Macs with Apple Silicon (M1 or newer).</p>
+  <div class="dl-ctas">
+    <a class="btn btn-primary btn-lg" href="https://github.com/chakra3301/OrionTerminal/releases/download/v0.1.0-alpha.1/Orion-Terminal_aarch64.dmg" rel="noopener">
+      <svg class="ic" aria-hidden="true"><use href="#i-arrow-down-to-line"/></svg> Download for Mac
+    </a>
+    <a class="btn btn-ghost" href="https://github.com/chakra3301/OrionTerminal/releases/tag/v0.1.0-alpha.1" target="_blank" rel="noopener noreferrer">Release notes</a>
+  </div>
+  <p class="hero-meta mono">Orion-Terminal_aarch64.dmg · 55.8 MB · v0.1.0-alpha.1</p>
+
+  <ol class="steps">
+    <li><span class="step-n mono">1</span><h3>Download</h3><p>Get the .dmg above. For extra care, compare its checksum with <code>SHA256SUMS.txt</code> on the release page.</p></li>
+    <li><span class="step-n mono">2</span><h3>Drag to Applications</h3><p>Open the disk image and drag Orion Terminal into your Applications folder.</p></li>
+    <li><span class="step-n mono">3</span><h3>Allow the first open</h3><p>The alpha isn't notarized by Apple yet. If macOS blocks it, go to <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b>.</p></li>
+  </ol>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="faq" id="faq" aria-labelledby="faq-title">
+  <div class="section-head">
+    <p class="kicker mono">Questions</p>
+    <h2 id="faq-title">Good to know.</h2>
+  </div>
+  <div class="faq-list">
+    <details data-k="price cost pay money license"><summary>Is Orion Terminal free?</summary><p>Yes. The public alpha is free and the code is open source. If you connect an AI provider, that provider's own subscription or API pricing applies.</p></details>
+    <details data-k="intel windows linux requirements m1 m2 m3 m4 system compatible"><summary>Which Macs does it run on?</summary><p>Macs with Apple Silicon (M1 or newer). There's no Intel, Windows or Linux build yet.</p></details>
+    <details data-k="api key anthropic billing claude chatgpt openai gemini offline"><summary>Do I need an AI subscription?</summary><p>No. Notes, code and design all work without AI. To use the assistants, connect an account you already have in <b>Control Panel → Providers</b>. Inline code edits and Tab autocomplete use an Anthropic API key, which is billed separately from subscriptions.</p></details>
+    <details data-k="privacy cloud sync backup encryption files"><summary>Where is my data stored?</summary><p>On your Mac, in a local database with automatic backups. There's no Orion cloud. Local data isn't encrypted, so treat it like any other files on your computer. When you use AI, the content you send goes to the provider you chose.</p></details>
+    <details data-k="notary notarized gatekeeper security blocked damaged unidentified developer open anyway"><summary>Why does macOS warn me when I first open it?</summary><p>The alpha is signed but not yet notarized by Apple. Approve only a download you trust, using <b>Open Anyway</b> in Privacy &amp; Security. Please don't turn off Gatekeeper.</p></details>
+    <details data-k="beta bugs stable experimental report issue"><summary>What does “alpha” mean here?</summary><p>It's early. The core apps are ready to use, but some features, like FX, video and 3D tools, are experimental. Accessibility work is still in progress. Back up important work and <a href="https://github.com/chakra3301/OrionTerminal/issues/new" target="_blank" rel="noopener noreferrer">report anything odd</a>.</p></details>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="foot-brand">
+    <img src="assets/orb-160.webp" alt="" width="36" height="36" loading="lazy">
+    <div><b>Orion Terminal</b><span class="mono">Think. Make. Connect.</span></div>
+  </div>
+  <nav class="foot-links" aria-label="Footer">
+    <a href="https://github.com/chakra3301/OrionTerminal" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <a href="https://github.com/chakra3301/OrionTerminal/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+    <a href="https://github.com/chakra3301/OrionTerminal/blob/v0.1.0-alpha.1/BETA.md" target="_blank" rel="noopener noreferrer">Setup guide</a>
+    <a href="../index.html">Classic site</a>
+    <button type="button" class="link-btn" id="motion-toggle" aria-pressed="false">Reduce motion</button>
+  </nav>
+  <p class="foot-fine mono">Apache-2.0 · Not affiliated with Anthropic, OpenAI, Google or Cursor. Product names belong to their owners.</p>
+</footer>
+
+<dialog class="spotlight" id="spotlight" aria-label="Search Orion Terminal">
+  <form method="dialog" class="sp-box" id="sp-form">
+    <div class="sp-input-row">
+      <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+      <input id="sp-input" type="text" autocomplete="off" spellcheck="false" placeholder="Search the site, or type > for commands" role="combobox" aria-expanded="true" aria-controls="sp-results" aria-autocomplete="list" aria-label="Search">
+      <kbd>esc</kbd>
+    </div>
+    <ul class="sp-results" id="sp-results" role="listbox" aria-label="Results"></ul>
+    <p class="sp-foot mono"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>&gt;</kbd> commands</span></p>
+  </form>
+</dialog>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

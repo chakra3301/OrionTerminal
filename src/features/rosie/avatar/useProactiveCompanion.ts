@@ -14,6 +14,7 @@ import {
   activeFilePathInFocused,
 } from "@/components/workspace/workspaceStore";
 import { useCompanionProactive } from "./companionProactiveStore";
+import { companionOnScreen } from "./companionPresence";
 import { dragState } from "./dragState";
 
 // Fallback check-ins if context-aware generation fails or is slow.
@@ -154,7 +155,7 @@ async function generateQuestion(signal: AbortSignal): Promise<string> {
 function canAskNow(): boolean {
   const rs = useRosie.getState();
   return (
-    rs.companionVisible &&
+    companionOnScreen() &&
     !rs.open &&
     !rs.running &&
     !dragState.dragging &&
@@ -201,7 +202,7 @@ export function useProactiveCompanion() {
     let lastId = "";
     return useRosie.subscribe((s, prev) => {
       if (!(prev.running && !s.running)) return; // only on turn completion
-      if (s.open || s.error || !s.companionVisible) return;
+      if (s.open || s.error || !companionOnScreen()) return;
       const last = [...s.messages].reverse().find((m) => m.role === "assistant");
       if (!last || last.id === lastId) return;
       const text = extractSpeakableText(last.content).trim();
