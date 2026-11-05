@@ -461,6 +461,18 @@ body:has(> #root) :is(
   box-shadow: inset 0 0 0 1px rgba(var(--neon-green-rgb), 0.3);
 }
 
+/* Note links follow the highlight colour (BlockNote paints them system blue). */
+body:has(> #root) .a47-window .bn-inline-content a {
+  color: var(--a47-accent);
+  text-decoration-color: rgba(var(--neon-green-rgb), 0.45);
+  text-underline-offset: 2px;
+}
+/* The title is a one-line input: shrink long titles rather than clipping them. */
+body:has(> #root) .a47-window .note-editor-title {
+  font-size: clamp(20px, 2vw, 28px);
+  text-overflow: ellipsis;
+}
+
 @media (prefers-reduced-transparency: reduce) {
   html,
   body {

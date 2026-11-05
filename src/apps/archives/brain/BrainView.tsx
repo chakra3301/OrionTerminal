@@ -37,6 +37,7 @@ import {
   type LayoutNode,
 } from "@/apps/archives/brain/forceLayout";
 import { log } from "@/lib/log";
+import { drawFilaments, type FilamentEdge, type FilamentNode } from "@/apps/archives/brain/filaments";
 
 type MarkerShape = "circle" | "ring" | "square" | "diamond" | "dot";
 
@@ -539,7 +540,8 @@ export function BrainView() {
       if (matches) candidates.push(...matches);
       if (focusSet) candidates.push(...focusSet);
       candidates.push(...hubOrderRef.current);
-      const hubBudget = Math.round(10 * Math.pow(cam.zoom, 1.4));
+      const filaments = archivesHost().brainStyle === "filaments";
+      const hubBudget = filaments ? 0 : Math.round(10 * Math.pow(cam.zoom, 1.4));
 
       if (boxes.length < simNodes.length * 4) boxes = new Float32Array(simNodes.length * 4);
       boxes.fill(-1);
@@ -587,6 +589,35 @@ export function BrainView() {
       ctx.clearRect(0, 0, w, h);
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
+      if (filaments) {
+        const fEdges: FilamentEdge[] = [];
+        for (const e of g.edges) {
+          const ia = byId.get(e.a);
+          const ib = byId.get(e.b);
+          if (ia == null || ib == null) continue;
+          const inFocus = !!focusSet && focusSet.has(e.a) && focusSet.has(e.b);
+          const dimmed = (focusSet && !inFocus) || (matches && !(matches.has(e.a) && matches.has(e.b)));
+          const depth = depthT((proj[ia * 3 + 2]! + proj[ib * 3 + 2]!) / 2);
+          fEdges.push({ ia, ib, weight: e.weight * (EDGE_SPRING[e.kind] ?? 0.5), alpha: dimmed ? 0.15 : inFocus ? 1.6 : 0.55 + depth * 0.6 });
+        }
+        const fNodes: FilamentNode[] = [];
+        for (const n of g.nodes) {
+          const i = byId.get(n.id);
+          if (i == null) continue;
+          const depth = depthT(proj[i * 3 + 2]!);
+          const strong = n.id === focus || n.id === selected || !!matches?.has(n.id);
+          fNodes.push({
+            i,
+            size: Math.max(1.3, Math.min(3.6, 1.1 + Math.sqrt(n.degree) * 0.5)) * (0.75 + depth * 0.5),
+            alpha: isDimmed(n.id) ? 0.2 : strong ? 1 : 0.55 + depth * 0.45,
+            tendrils: Math.min(6, 1 + Math.round(Math.sqrt(n.degree))),
+          });
+        }
+        drawFilaments({ ctx, t: nowMs / 1000, proj, cx: w / 2, cy: h / 2, edges: fEdges, nodes: fNodes, ink, additive: paperDark(), paper, fieldRadius: paperDark() ? Math.min(w, h) * 0.62 : 0 });
+        drawLabels();
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       drawConstruction();
 
       // Links — straight hairlines from box edge (or marker rim) to box edge.
@@ -672,7 +703,17 @@ export function BrainView() {
         drawMarker(ctx, TYPE_MARKER[n.type], proj[i * 3]!, proj[i * 3 + 1]!, markerSize(i));
       }
 
-      // Ruled label boxes.
+      drawLabels();
+
+      raf = requestAnimationFrame(draw);
+    };
+    /** Ruled label boxes for whatever the placement pass gave a box. */
+    const drawLabels = () => {
+      const { byId } = simRef.current;
+      const g = visibleRef.current;
+      const focus = hoverRef.current ?? selectedRef.current;
+      const selected = selectedRef.current;
+      const matches = matchRef.current;
       for (const n of g.nodes) {
         const i = byId.get(n.id);
         if (i == null) continue;
@@ -713,8 +754,11 @@ export function BrainView() {
         if (isSel) drawBrackets(cx, cy, hw, hh, 0.8);
         if (isSel || isFocus) drawReadout(i, cx, cy, hw, hh);
       }
-
-      raf = requestAnimationFrame(draw);
+    };
+    /** Dark grounds get additive light; light ones keep plain ink. */
+    const paperDark = () => {
+      const [r, g2, b] = paper.split(",").map((v) => Number(v));
+      return 0.2126 * (r ?? 0) + 0.7152 * (g2 ?? 0) + 0.0722 * (b ?? 0) < 110;
     };
     const markerSize = (i: number) => {
       const r = simRef.current.nodes[i]!.r * proj[i * 3 + 2]! * cam.zoom;

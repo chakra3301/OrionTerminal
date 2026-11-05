@@ -1,3 +1,13 @@
+## 2026-11-05 (cont. 7) — Archives 47: filament Brain, alchemy demo library
+
+Branch: `alpha/archives-app`. Owner: "can we make the brain look like this" (a glowing neural filament cloud) "and i want you to fill the app with notes and stuff about alchemy just so we can get some cool preview shots ill take care of the media".
+
+Done:
+- **Filament Brain** (`apps/archives/brain/filaments.ts`). Each link is a bundle of 4–10 thin looping curves that sway slowly and add up to light on dark grounds. Nodes are bright points with a soft glow and curling tendrils, and dust drifts along the links. A dark radial field sits behind the cloud so it reads on a frosted window. Labels only appear on hover, selection or search. Interaction (orbit, zoom, drag, select, Ask) is unchanged. It's on only in Archives 47 via `ArchivesHost.brainStyle = "filaments"`; Orion keeps its wireframe. Test: `filaments.test.ts`.
+- **Alchemy library** (`scripts/seed-alchemy-library.py`): 24 notes linked with [[wikilinks]] (the Magnum Opus stages, Philosopher's Stone, Tria Prima, metals, the Emerald Tablet, Ouroboros, lab operations and vessels), 5 journal entries, 2 projects with 3 pages each, 4 collections, 28 tags and 2 past assistant chats. All ids start with `alc-`. It refuses a library holding other notes, and `--replace` only rebuilds its own rows. Seeded into the installed app's library (it was empty); media is left to the owner.
+- In Archives, note links now use the highlight colour (BlockNote painted them system blue). Long note titles shrink to fit instead of clipping.
+- Orion `tsc` passes; the Archives and builtinApps suites pass (41 files, 272 tests). Screenshot: `docs/alpha/archives-app/screenshot-brain.png`.
+
 ## 2026-11-05 (cont. 6) — Archives 47: the background colour only tints the glass
 
 Branch: `alpha/archives-app`. Owner: "the background colour should just tint the glass not make it feel like its a solid colour" plus a glassmorphism reference card (logged in `~/ai/design-refs/FEEDBACK.md`).
