@@ -24,18 +24,6 @@ function useDataDir(): string | null {
   return dir;
 }
 
-function Toggle({ on, label, blurb, onChange }: { on: boolean; label: string; blurb: string; onChange: (on: boolean) => void }) {
-  return (
-    <div className="ot-settings-toggle">
-      <div className="ot-settings-toggle-meta">
-        <div className="ot-settings-toggle-name">{label}</div>
-        <div className="ot-settings-toggle-blurb">{blurb}</div>
-      </div>
-      <button type="button" className={`ot-switch${on ? " on" : ""}`} role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} />
-    </div>
-  );
-}
-
 function Swatch({ hex }: { hex: string }) {
   return <span className="a47-wheel__swatch" style={{ background: hex }} aria-hidden="true" />;
 }
@@ -45,7 +33,6 @@ export function GeneralSection() {
   const accent = useAppearance((s) => s.accent);
   const background = useAppearance((s) => s.background);
   const frosted = useAppearance((s) => s.frosted);
-  const style = useAppearance((s) => s.style);
   const update = useAppearance((s) => s.update);
   const reset = useAppearance((s) => s.reset);
   return (
@@ -54,20 +41,20 @@ export function GeneralSection() {
       <div className="a47-setting">
         <div className="a47-setting__row">
           <div>
-            <div className="a47-setting__title">Style</div>
-            <div className="a47-setting__sub">Glass: Orion's Liquid panes, rounded and floating. Flat: EMP's square panes.</div>
+            <div className="a47-setting__title">Material</div>
+            <div className="a47-setting__sub">Glass: every panel is frosted over your desktop. Solid: opaque panels.</div>
           </div>
-          <div className="a47-segmented" role="radiogroup" aria-label="Style">
-            {(["glass", "flat"] as const).map((key) => (
+          <div className="a47-segmented" role="radiogroup" aria-label="Material">
+            {([true, false] as const).map((on) => (
               <button
-                key={key}
+                key={String(on)}
                 type="button"
                 role="radio"
-                aria-checked={style === key}
-                className={style === key ? "on" : ""}
-                onClick={() => update({ style: key })}
+                aria-checked={frosted === on}
+                className={frosted === on ? "on" : ""}
+                onClick={() => update({ frosted: on })}
               >
-                {key === "glass" ? "Glass" : "Flat"}
+                {on ? "Glass" : "Solid"}
               </button>
             ))}
           </div>
@@ -97,12 +84,6 @@ export function GeneralSection() {
         </div>
         <ColorWheel label="Background" value={background} onChange={(hex, final) => update({ background: hex }, { persist: final })} />
       </div>
-      <Toggle
-        on={frosted}
-        label="Frosted window"
-        blurb="Your desktop shows through, blurred, behind the panels. Turn off for solid panels."
-        onChange={(on) => update({ frosted: on })}
-      />
     </>
   );
 }

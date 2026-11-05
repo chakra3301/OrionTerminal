@@ -1,3 +1,12 @@
+## 2026-11-05 (cont. 4) — Archives 47: Glass = Flat shapes, frosted; buttons follow the highlight colour
+
+Branch: `alpha/archives-app`. Owner: "buttons need to be fix theres some white ones they should just the the accent colour so they change with wtv your selection is. also for the glass i want it to to be exactly the same shapes as flat and everything i just wanted to have it so its all frosted glass over tour desktop like we said earlier" (logged in `~/ai/design-refs/FEEDBACK.md`).
+
+Done:
+- Dropped the Liquid floating-panes layout from the previous entry. Glass now uses exactly the EMP layout, corners and type, with every panel frosted over the desktop. Settings → Appearance → **Material** switches between Glass (default) and Solid. It replaces both the Style switch and the separate Frosted toggle. The `style` field is gone from `appearance.ts`, and old saved values are ignored.
+- Primary buttons (assistant send, Generate, New, Settings/Providers primary and install buttons, prompt OK) are filled with the highlight colour, and `--t-on-accent` picks dark or white text. A scan of every view and Settings section (Playwright, fixture data) found no white-filled buttons on either a dark or a light background.
+- Orion `tsc` passes; the Archives, controlpanel and builtinApps suites pass (48 files, 303 tests). `docs/alpha/archives-app/screenshot-glass.png` was updated (dark/green and white/blue).
+
 ## 2026-11-05 (cont. 3) — Archives 47: Glass style is back (default), Flat is the EMP option
 
 Branch: `alpha/archives-app`. Owner: "i still what the glass theme" (logged in `~/ai/design-refs/FEEDBACK.md`).

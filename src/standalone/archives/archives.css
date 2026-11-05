@@ -369,59 +369,31 @@ body:has(> #root) .cp-surface .cp-rail-item.active svg {
   font-family: var(--f-mono);
 }
 
-/* ── Glass style: Orion's Liquid panes, floating over the frosted window ──
- * The sidebar, main pane and assistant become separate rounded glass sheets
- * with a light rim, a top sheen and a soft drop shadow; gaps between them show
- * the blurred desktop. Liquid radii (--r-*) and Space Grotesk stay in effect. */
-body[data-a47-style="glass"]:has(> #root) .a47-window .ar-shell {
-  padding: 8px 8px 0;
-  box-sizing: border-box;
+/* ── Buttons: primary actions are filled with the highlight colour ─────
+ * Orion paints these white (ink) or as Liquid glass; here they follow the
+ * colour picker, with --t-on-accent picking dark or white text. */
+body:has(> #root) :is(
+  .or-home-btn-primary, .ar-new-btn, .rl-btn--primary, .hm-btn.primary,
+  .ot-prompt-btn.primary, .cc-send:not(.stop), .ar-brain-detail-actions button.ask,
+  .cp-surface .cp-btn:not(.ghost), .cp-surface .ot-settings-btn.primary, .cp-surface .pm-install,
+  .skill-intake .cp-btn:not(.ghost), .ot-claude-input button.send:not([aria-label="Stop response"])
+) {
+  background: var(--a47-accent);
+  color: var(--t-on-accent);
+  border: 1px solid transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
-body[data-a47-style="glass"]:has(> #root) .a47-window :is(.ar-sidebar, .ar-main, .ar-claude-pane) {
-  border: 1px solid var(--a47-rim);
-  border-radius: var(--r-lg);
-  background-image: linear-gradient(180deg, var(--a47-glass-tint), transparent 140px);
-  box-shadow: inset 0 1px 0 var(--a47-sheen), 0 10px 28px -16px rgba(0, 0, 0, 0.45);
-  overflow: hidden;
-}
-body[data-a47-style="glass"]:has(> #root) .a47-window .ar-claude-pane .ot-claude-rail {
-  background: transparent;
-}
-body[data-a47-style="glass"]:has(> #root) .a47-window .ot-resize-handle.vertical {
-  width: 8px;
-  background: transparent;
-}
-body[data-a47-style="glass"]:has(> #root) .a47-window .a47-brand {
-  height: 44px;
-  padding-left: 74px;
-}
-body[data-a47-style="glass"]:has(> #root) .a47-window .ar-sidebar .ar-search {
-  border: 1px solid var(--a47-line);
-  border-radius: var(--r-md);
-  background: var(--a47-glass-tint);
-}
-body[data-a47-style="glass"]:has(> #root) .a47-window .ar-nav {
-  border-radius: var(--r-md);
-}
-body[data-a47-style="glass"]:has(> #root) .a47-window .ar-nav.active {
-  box-shadow: inset 0 0 0 1px rgba(var(--neon-green-rgb), 0.22), inset 0 1px 0 var(--a47-sheen);
-}
-body[data-a47-style="glass"]:has(> #root) .a47-window :is(.ar-card, .ar-note-card, .ar-db-card, .note-editor-body) {
-  border-color: var(--a47-rim);
-  box-shadow: inset 0 1px 0 var(--a47-sheen);
-}
-body[data-a47-style="glass"]:has(> #root) .a47-window .ar-toolbar .crumb {
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: 12px;
-}
-body[data-a47-style="glass"]:has(> #root) .a47-statusbar {
-  background: transparent;
-  border-top: 0;
-}
-body[data-a47-style="glass"]:has(> #root) :is(.cp-surface, .ot-spotlight, .ot-prompt-card) {
-  border-color: var(--a47-rim);
-  box-shadow: inset 0 1px 0 var(--a47-sheen), var(--shadow-window, 0 28px 72px -20px rgba(0, 0, 0, 0.62));
+body:has(> #root) :is(
+  .or-home-btn-primary, .ar-new-btn, .rl-btn--primary, .hm-btn.primary,
+  .ot-prompt-btn.primary, .cc-send:not(.stop), .ar-brain-detail-actions button.ask,
+  .cp-surface .cp-btn:not(.ghost), .cp-surface .ot-settings-btn.primary, .cp-surface .pm-install,
+  .skill-intake .cp-btn:not(.ghost), .ot-claude-input button.send:not([aria-label="Stop response"])
+):hover:not(:disabled) {
+  background: var(--a47-accent);
+  color: var(--t-on-accent);
+  filter: brightness(1.08);
 }
 
 /* Style switch in Settings → Appearance. */
