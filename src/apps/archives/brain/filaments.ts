@@ -46,6 +46,8 @@ export type FilamentFrame = {
   paper: string;
   /** Radius of that field, in px. */
   fieldRadius: number;
+  /** The orb's breath, 0..1: swells the node glow. */
+  breath?: number;
 };
 
 function bezierPoint(
@@ -159,12 +161,14 @@ export function drawFilaments(f: FilamentFrame): void {
     const x = proj[node.i * 3]!;
     const y = proj[node.i * 3 + 1]!;
     const r = node.size;
-    const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 6);
-    glow.addColorStop(0, col(0.45 * node.alpha));
+    const b = f.breath ?? 0.5;
+    const gr = r * (5 + 2 * b);
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, gr);
+    glow.addColorStop(0, col(0.45 * node.alpha * (0.75 + 0.5 * b)));
     glow.addColorStop(1, col(0));
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(x, y, r * 6, 0, TAU);
+    ctx.arc(x, y, gr, 0, TAU);
     ctx.fill();
     ctx.fillStyle = col(Math.min(1, 0.95 * node.alpha + 0.05));
     ctx.beginPath();

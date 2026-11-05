@@ -38,6 +38,7 @@ import {
 } from "@/apps/archives/brain/forceLayout";
 import { log } from "@/lib/log";
 import { drawFilaments, type FilamentEdge, type FilamentNode } from "@/apps/archives/brain/filaments";
+import { breath, ensureFlow, stepFlow, type Flow } from "@/apps/archives/brain/flow";
 
 type MarkerShape = "circle" | "ring" | "square" | "diamond" | "dot";
 
@@ -319,6 +320,10 @@ export function BrainView() {
     if (!ctx) return;
 
     let raf = 0;
+    let flow: Flow | null = null;
+    let spin = 0;
+    let pointer: { x: number; y: number } | null = null;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     let w = 0;
     let h = 0;
     // Projected scratch buffer: [sx, sy, persp] per node.
@@ -501,7 +506,12 @@ export function BrainView() {
       // Slow drift so depth reads; pauses while the user is interacting.
       const idle =
         !dragRef.current && !hover && nowMs - cam.lastInteract > 2000;
-      if (idle) cam.ry += 0.0007;
+      const filaments = archivesHost().brainStyle === "filaments";
+      if (filaments) {
+        // Ease the drift in and out instead of starting and stopping it.
+        spin += ((idle ? 0.0011 : 0) - spin) * 0.02;
+        cam.ry += spin;
+      } else if (idle) cam.ry += 0.0007;
 
       projectAll();
 
@@ -540,7 +550,11 @@ export function BrainView() {
       if (matches) candidates.push(...matches);
       if (focusSet) candidates.push(...focusSet);
       candidates.push(...hubOrderRef.current);
-      const filaments = archivesHost().brainStyle === "filaments";
+      const flowT = (reducedMotion ? 0.25 : 1) * (nowMs / 1000);
+      if (filaments) {
+        flow = ensureFlow(flow, simNodes.length);
+        stepFlow(flow, proj, flowT, dragRef.current ? null : pointer, Math.min(w, h) * 0.22);
+      }
       const hubBudget = filaments ? 0 : Math.round(10 * Math.pow(cam.zoom, 1.4));
 
       if (boxes.length < simNodes.length * 4) boxes = new Float32Array(simNodes.length * 4);
@@ -609,11 +623,11 @@ export function BrainView() {
           fNodes.push({
             i,
             size: Math.max(1.3, Math.min(3.6, 1.1 + Math.sqrt(n.degree) * 0.5)) * (0.75 + depth * 0.5),
-            alpha: isDimmed(n.id) ? 0.2 : strong ? 1 : 0.55 + depth * 0.45,
+            alpha: Math.min(1, (isDimmed(n.id) ? 0.2 : strong ? 1 : 0.55 + depth * 0.45) + 0.45 * (flow?.near[i] ?? 0)),
             tendrils: Math.min(6, 1 + Math.round(Math.sqrt(n.degree))),
           });
         }
-        drawFilaments({ ctx, t: nowMs / 1000, proj, cx: w / 2, cy: h / 2, edges: fEdges, nodes: fNodes, ink, additive: paperDark(), paper, fieldRadius: paperDark() ? Math.min(w, h) * 0.62 : 0 });
+        drawFilaments({ ctx, t: flowT, breath: breath(flowT), proj, cx: w / 2, cy: h / 2, edges: fEdges, nodes: fNodes, ink, additive: paperDark(), paper, fieldRadius: paperDark() ? Math.min(w, h) * 0.62 : 0 });
         drawLabels();
         raf = requestAnimationFrame(draw);
         return;
@@ -820,6 +834,8 @@ export function BrainView() {
       }
     };
     const onPointerMove = (e: PointerEvent) => {
+      const prect = canvas.getBoundingClientRect();
+      pointer = { x: e.clientX - prect.left, y: e.clientY - prect.top };
       const drag = dragRef.current;
       if (!drag) {
         const hit = hitTest(e.clientX, e.clientY);
@@ -883,6 +899,10 @@ export function BrainView() {
 
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
+    const onPointerLeave = () => {
+      pointer = null;
+    };
+    canvas.addEventListener("pointerleave", onPointerLeave);
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("dblclick", onDoubleClick);
     canvas.addEventListener("wheel", onWheel, { passive: false });
@@ -892,6 +912,7 @@ export function BrainView() {
       ro.disconnect();
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerleave", onPointerLeave);
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("dblclick", onDoubleClick);
       canvas.removeEventListener("wheel", onWheel);

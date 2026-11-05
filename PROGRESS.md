@@ -1,3 +1,13 @@
+## 2026-11-05 (cont. 8) — Archives 47: Brain flows like the ROSIE orb
+
+Branch: `alpha/archives-app`. Owner: "i want the movement of the brain to feel more flowy, in orion terminal we made an orb for rosie i want it to be like that feeling".
+
+Done:
+- `apps/archives/brain/flow.ts` reimplements the motion of `shell/dock/orbModel.ts` and `orbCanvas.ts`; Archives 47 can't import `shell/`, so it's a copy, not an import. Each node breathes on its own phase and frequency. A shared slow current sweeps the cloud like water. The cursor pushes nodes aside and they spring back with the orb's damped wobble (same spring and damping constants), brightening while it's near. A ~5.7 s breath swells the node glow, as in the orb's core.
+- The idle rotation eases in and out instead of snapping on and off. Reduced motion slows everything to a quarter speed, as the orb does.
+- Offsets are screen-only, so the layout and hit areas are untouched. Filament style only; Orion's wireframe is unchanged.
+- Tests: `flow.test.ts` (drift bound, cursor push and settle, breath). Recording: `docs/alpha/archives-app/brain-flow.gif`.
+
 ## 2026-11-05 (cont. 7) — Archives 47: filament Brain, alchemy demo library
 
 Branch: `alpha/archives-app`. Owner: "can we make the brain look like this" (a glowing neural filament cloud) "and i want you to fill the app with notes and stuff about alchemy just so we can get some cool preview shots ill take care of the media".
