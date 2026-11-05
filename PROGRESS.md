@@ -1,3 +1,11 @@
+## 2026-11-05 (cont. 5) — Archives 47: Glass now actually see-through
+
+Branch: `alpha/archives-app`. Owner: "on glass its still solid" (screenshot of the installed app).
+
+Cause: `<body>` carries Orion's `bg-bg` utility class, an opaque fill whose class selector beat `archives.css`'s `body { background: transparent }`. The body colour became the page canvas, so the native transparent window and vibrancy were covered. The browser mock-ups missed this because their stand-in wallpaper was painted above the canvas.
+Fix: `body:has(> #root)` / `body.bg-bg:has(> #root)` are transparent (Solid still fills with `--bg-0`); Brain's full-size fill is cleared too. A Playwright scan of every view now finds no opaque full-size layer, and the canvas is transparent.
+Next: the owner confirms the real desktop shows through. `screencapture` has no screen-recording permission here, so the native window couldn't be checked from this side.
+
 ## 2026-11-05 (cont. 4) — Archives 47: Glass = Flat shapes, frosted; buttons follow the highlight colour
 
 Branch: `alpha/archives-app`. Owner: "buttons need to be fix theres some white ones they should just the the accent colour so they change with wtv your selection is. also for the glass i want it to to be exactly the same shapes as flat and everything i just wanted to have it so its all frosted glass over tour desktop like we said earlier" (logged in `~/ai/design-refs/FEEDBACK.md`).

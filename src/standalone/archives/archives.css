@@ -17,7 +17,13 @@ body,
   overflow: hidden;
   background: transparent;
 }
-html[data-a47-frosted="off"] body {
+/* <body> carries Orion's `bg-bg` utility (an opaque fill that also becomes the
+   canvas colour); it must lose here or the native window never shows through. */
+body:has(> #root),
+body.bg-bg:has(> #root) {
+  background: transparent;
+}
+html[data-a47-frosted="off"] body:has(> #root) {
   background: var(--bg-0);
 }
 
@@ -40,6 +46,10 @@ body:has(> #root) .a47-window :is(.ar-shell, .ar-view-host, .ar-today, .ar-notes
 }
 body:has(> #root) .a47-window .ar-main {
   background: var(--a47-surface);
+}
+/* Views that paint their own full-size fill; the pane under them already has the glass. */
+body:has(> #root) .a47-window .ar-brain {
+  background-color: transparent;
 }
 body:has(> #root) .a47-window .ar-sidebar {
   background: var(--a47-sidebar);
