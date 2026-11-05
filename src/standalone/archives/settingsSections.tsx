@@ -45,11 +45,34 @@ export function GeneralSection() {
   const accent = useAppearance((s) => s.accent);
   const background = useAppearance((s) => s.background);
   const frosted = useAppearance((s) => s.frosted);
+  const style = useAppearance((s) => s.style);
   const update = useAppearance((s) => s.update);
   const reset = useAppearance((s) => s.reset);
   return (
     <>
       <h2 className="ot-settings-h2">Appearance</h2>
+      <div className="a47-setting">
+        <div className="a47-setting__row">
+          <div>
+            <div className="a47-setting__title">Style</div>
+            <div className="a47-setting__sub">Glass: Orion's Liquid panes, rounded and floating. Flat: EMP's square panes.</div>
+          </div>
+          <div className="a47-segmented" role="radiogroup" aria-label="Style">
+            {(["glass", "flat"] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                role="radio"
+                aria-checked={style === key}
+                className={style === key ? "on" : ""}
+                onClick={() => update({ style: key })}
+              >
+                {key === "glass" ? "Glass" : "Flat"}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
       <div className="a47-setting">
         <div className="a47-setting__row">
           <div>

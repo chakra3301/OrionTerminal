@@ -1,3 +1,14 @@
+## 2026-11-05 (cont. 3) — Archives 47: Glass style is back (default), Flat is the EMP option
+
+Branch: `alpha/archives-app`. Owner: "i still what the glass theme" (logged in `~/ai/design-refs/FEEDBACK.md`).
+
+Done:
+- Settings → Appearance has a **Style** switch: **Glass** (default) or **Flat**. Glass is Orion's Liquid look: the sidebar, main pane and assistant are separate rounded glass sheets with a rim, a top sheen and a soft shadow, and the gaps show the frosted desktop. It keeps Liquid's radii, Space Grotesk and its glass buttons; on a dark background it runs on Orion's `liquid` theme. Flat is the EMP look from the previous entry.
+- Both styles use the EMP colour wheels and the frosted window. Saved appearances without a style open as Glass.
+- Files: `appearance.ts` (`style`), `archives.css` (`body[data-a47-style="glass"]` block, `.a47-segmented`), `settingsSections.tsx`. Test added in `appearance.test.ts`. Orion `tsc` passes; the Archives, controlpanel and builtinApps suites pass (48 files, 303 tests). Screenshot: `docs/alpha/archives-app/screenshot-glass.png`.
+
+Next: the owner checks Glass on his own desktop.
+
 ## 2026-11-05 (cont. 2) — Archives 47: frosted window, EMP styling, EMP colour picker
 
 Branch: `alpha/archives-app` (worktree `~/Orion_Terminal-worktrees/archives-app`). Owner: "i want it more frosted and hoenestly i want it shaped and styled like emp and i want the same colour pick option as emp" (logged in `~/ai/design-refs/FEEDBACK.md`).

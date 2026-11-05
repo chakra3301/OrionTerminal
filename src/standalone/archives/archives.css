@@ -369,6 +369,84 @@ body:has(> #root) .cp-surface .cp-rail-item.active svg {
   font-family: var(--f-mono);
 }
 
+/* ── Glass style: Orion's Liquid panes, floating over the frosted window ──
+ * The sidebar, main pane and assistant become separate rounded glass sheets
+ * with a light rim, a top sheen and a soft drop shadow; gaps between them show
+ * the blurred desktop. Liquid radii (--r-*) and Space Grotesk stay in effect. */
+body[data-a47-style="glass"]:has(> #root) .a47-window .ar-shell {
+  padding: 8px 8px 0;
+  box-sizing: border-box;
+}
+body[data-a47-style="glass"]:has(> #root) .a47-window :is(.ar-sidebar, .ar-main, .ar-claude-pane) {
+  border: 1px solid var(--a47-rim);
+  border-radius: var(--r-lg);
+  background-image: linear-gradient(180deg, var(--a47-glass-tint), transparent 140px);
+  box-shadow: inset 0 1px 0 var(--a47-sheen), 0 10px 28px -16px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+body[data-a47-style="glass"]:has(> #root) .a47-window .ar-claude-pane .ot-claude-rail {
+  background: transparent;
+}
+body[data-a47-style="glass"]:has(> #root) .a47-window .ot-resize-handle.vertical {
+  width: 8px;
+  background: transparent;
+}
+body[data-a47-style="glass"]:has(> #root) .a47-window .a47-brand {
+  height: 44px;
+  padding-left: 74px;
+}
+body[data-a47-style="glass"]:has(> #root) .a47-window .ar-sidebar .ar-search {
+  border: 1px solid var(--a47-line);
+  border-radius: var(--r-md);
+  background: var(--a47-glass-tint);
+}
+body[data-a47-style="glass"]:has(> #root) .a47-window .ar-nav {
+  border-radius: var(--r-md);
+}
+body[data-a47-style="glass"]:has(> #root) .a47-window .ar-nav.active {
+  box-shadow: inset 0 0 0 1px rgba(var(--neon-green-rgb), 0.22), inset 0 1px 0 var(--a47-sheen);
+}
+body[data-a47-style="glass"]:has(> #root) .a47-window :is(.ar-card, .ar-note-card, .ar-db-card, .note-editor-body) {
+  border-color: var(--a47-rim);
+  box-shadow: inset 0 1px 0 var(--a47-sheen);
+}
+body[data-a47-style="glass"]:has(> #root) .a47-window .ar-toolbar .crumb {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+}
+body[data-a47-style="glass"]:has(> #root) .a47-statusbar {
+  background: transparent;
+  border-top: 0;
+}
+body[data-a47-style="glass"]:has(> #root) :is(.cp-surface, .ot-spotlight, .ot-prompt-card) {
+  border-color: var(--a47-rim);
+  box-shadow: inset 0 1px 0 var(--a47-sheen), var(--shadow-window, 0 28px 72px -20px rgba(0, 0, 0, 0.62));
+}
+
+/* Style switch in Settings → Appearance. */
+.a47-segmented {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--a47-line-strong);
+  border-radius: var(--r-md);
+}
+.a47-segmented button {
+  min-width: 64px;
+  height: 24px;
+  border: 0;
+  border-radius: calc(var(--r-md) - 2px);
+  background: transparent;
+  color: var(--t-secondary);
+  font: 500 12px var(--f-display);
+  cursor: pointer;
+}
+.a47-segmented button.on {
+  background: var(--a47-selected);
+  color: var(--t-primary);
+  box-shadow: inset 0 0 0 1px rgba(var(--neon-green-rgb), 0.3);
+}
+
 @media (prefers-reduced-transparency: reduce) {
   html,
   body {

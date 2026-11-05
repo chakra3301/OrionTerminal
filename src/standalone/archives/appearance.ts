@@ -1,6 +1,7 @@
 /**
  * Archives 47's look, set the EMP way: one highlight colour and one background
- * colour, picked on colour wheels, plus a frosted (see-through) window. Every
+ * colour, picked on colour wheels, plus a frosted (see-through) window and a
+ * style: Orion's Liquid glass (rounded floating panes) or EMP's flat panes. Every
  * surface, ink tier and line is derived from those two colours, so there is no
  * theme list. Stored in app_state "archives.appearance".
  */
@@ -15,20 +16,25 @@ import { isDark, isHex, luminance } from "./color";
 export const DEFAULT_ACCENT = "#39ff88";
 export const DEFAULT_BACKGROUND = "#0a1015";
 
+/** "glass" = Orion's Liquid glass panes; "flat" = EMP's flat, near-square panes. */
+export type AppearanceStyle = "glass" | "flat";
+
 export type Appearance = {
+  style: AppearanceStyle;
   accent: string;
   background: string;
   /** See-through window with the macOS blur behind it. Off = solid surfaces. */
   frosted: boolean;
 };
 
-export const DEFAULT_APPEARANCE: Appearance = { accent: DEFAULT_ACCENT, background: DEFAULT_BACKGROUND, frosted: true };
+export const DEFAULT_APPEARANCE: Appearance = { style: "glass", accent: DEFAULT_ACCENT, background: DEFAULT_BACKGROUND, frosted: true };
 
 /** Accepts whatever app_state returned and fills in defaults. */
 export function normalizeAppearance(raw: unknown): Appearance {
   const r = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const hex = (v: unknown, d: string) => (typeof v === "string" && isHex(v) ? v.toLowerCase() : d);
   return {
+    style: r.style === "flat" ? "flat" : "glass",
     accent: hex(r.accent, DEFAULT_ACCENT),
     background: hex(r.background, DEFAULT_BACKGROUND),
     frosted: typeof r.frosted === "boolean" ? r.frosted : true,
@@ -82,15 +88,23 @@ export function appearanceVariables(a: Appearance): Record<string, string> {
     "--glass-border": `rgba(${inkRgb}, ${dark ? 0.1 : 0.08})`,
     "--glass-border-bright": `rgba(${inkRgb}, ${dark ? 0.18 : 0.15})`,
     "--glass-highlight": `rgba(${inkRgb}, 0.04)`,
+    "--a47-rim": `rgba(${inkRgb}, ${dark ? 0.14 : 0.1})`,
+    "--a47-sheen": `rgba(${inkRgb}, ${dark ? 0.12 : 0.5})`,
+    "--a47-glass-tint": `rgba(${inkRgb}, ${dark ? 0.035 : 0.25})`,
     "--shadow-glow-green": "0 0 0 transparent",
     "--shadow-glow-cyan": "0 0 0 transparent",
     "--shadow-glow-magenta": "0 0 0 transparent",
-    "--r-sm": "2px",
-    "--r-md": "3px",
-    "--r-lg": "5px",
-    "--r-xl": "5px",
-    "--f-display": "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif",
   };
+  if (a.style === "flat") {
+    // EMP: near-square corners and the system font. Glass keeps Orion's Liquid radii and type.
+    Object.assign(vars, {
+      "--r-sm": "2px",
+      "--r-md": "3px",
+      "--r-lg": "5px",
+      "--r-xl": "5px",
+      "--f-display": "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif",
+    });
+  }
   [0, 3, 6, 10].forEach((pct, i) => {
     vars[`--bg-${i}`] = mix(pct);
     vars[`--bg-${i}-solid`] = mix(pct);
@@ -113,12 +127,15 @@ export function applyAppearance(a: Appearance): void {
   const dark = isDark(a.background);
   // Shared components (the note editor, effects) read light/dark from the theme
   // store, so the base theme follows the background's tone.
-  useThemeStore.getState().hydrate(dark ? "minimal" : "ivory-keep");
+  // Glass on a dark background runs on Orion's Liquid theme (its glass buttons and
+  // controls); light backgrounds use Ivory Keep, whose materials are glass too.
+  useThemeStore.getState().hydrate(!dark ? "ivory-keep" : a.style === "glass" ? "liquid" : "minimal");
   for (const key of applied) root.style.removeProperty(key);
   const vars = appearanceVariables(a);
   for (const [key, value] of Object.entries(vars)) root.style.setProperty(key, value);
   applied = Object.keys(vars);
   root.dataset.a47Frosted = a.frosted ? "on" : "off";
+  document.body.dataset.a47Style = a.style;
   void getCurrentWindow()
     .setTheme(dark ? "dark" : "light")
     .catch((e) => log.warn("window theme failed", e));
@@ -139,7 +156,7 @@ export const useAppearance = create<AppearanceState>((set, get) => {
       void setAppState("archives.appearance", next).catch((e) => log.warn("appearance save failed", e));
     }
   };
-  const current = (): Appearance => ({ accent: get().accent, background: get().background, frosted: get().frosted });
+  const current = (): Appearance => ({ style: get().style, accent: get().accent, background: get().background, frosted: get().frosted });
   return {
     ...DEFAULT_APPEARANCE,
     hydrate: (raw) => commit(normalizeAppearance(raw), false),

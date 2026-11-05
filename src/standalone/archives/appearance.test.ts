@@ -7,9 +7,10 @@ import { appearanceVariables, DEFAULT_APPEARANCE, normalizeAppearance } from "./
 
 describe("Archives 47 appearance", () => {
   it("defaults to neon green on a dark frosted window", () => {
-    expect(normalizeAppearance(undefined)).toEqual({ accent: "#39ff88", background: "#0a1015", frosted: true });
+    expect(normalizeAppearance(undefined)).toEqual({ style: "glass", accent: "#39ff88", background: "#0a1015", frosted: true });
     expect(normalizeAppearance({ accent: "nope", background: 4, frosted: "yes" })).toEqual(DEFAULT_APPEARANCE);
-    expect(normalizeAppearance({ accent: "#E8173F", background: "#FFFFFF", frosted: false })).toEqual({
+    expect(normalizeAppearance({ style: "flat", accent: "#E8173F", background: "#FFFFFF", frosted: false })).toEqual({
+      style: "flat",
       accent: "#e8173f",
       background: "#ffffff",
       frosted: false,
@@ -28,6 +29,11 @@ describe("Archives 47 appearance", () => {
   it("switches the ink with the background's tone, as EMP does", () => {
     expect(appearanceVariables(DEFAULT_APPEARANCE)["--t-primary"]).toBe("rgba(242, 245, 243, 0.94)");
     expect(appearanceVariables({ ...DEFAULT_APPEARANCE, background: "#ffffff" })["--t-primary"]).toBe("rgba(31, 35, 40, 0.94)");
+  });
+
+  it("keeps Orion's Liquid radii for glass and EMP's square corners for flat", () => {
+    expect(appearanceVariables(DEFAULT_APPEARANCE)["--r-lg"]).toBeUndefined();
+    expect(appearanceVariables({ ...DEFAULT_APPEARANCE, style: "flat" })["--r-lg"]).toBe("5px");
   });
 
   it("makes surfaces translucent only when frosted, and keeps menus opaque", () => {
