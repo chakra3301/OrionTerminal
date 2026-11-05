@@ -25,7 +25,7 @@ import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { useArchives, type ArchivesView } from "@/apps/archives/useArchives";
-import { setArchivesChatSender } from "@/apps/archives/chatBridge";
+import { setArchivesChatSender, setArchivesPanelToggles } from "@/apps/archives/chatBridge";
 import { useNotesStore } from "@/store/notesStore";
 import { setNoteNavigator } from "@/lib/orionProtocol";
 import { useAssetsStore } from "@/store/assetsStore";
@@ -311,6 +311,15 @@ export function ArchivesApp() {
     if (panel.isCollapsed()) panel.expand();
     else panel.collapse();
   };
+  const togglesRef = useRef({ toggleSidebar, toggleChat });
+  togglesRef.current = { toggleSidebar, toggleChat };
+  useEffect(() => {
+    setArchivesPanelToggles({
+      toggleSidebar: () => togglesRef.current.toggleSidebar(),
+      toggleChat: () => togglesRef.current.toggleChat(),
+    });
+    return () => setArchivesPanelToggles(null);
+  }, []);
 
   return (
     <div className="ar-shell" ref={shellRef}>

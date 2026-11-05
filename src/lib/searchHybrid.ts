@@ -7,7 +7,7 @@ import {
   type ChatOrigin,
 } from "@/lib/db";
 import { semanticSearch, type SemanticHit } from "@/lib/semanticSearch";
-import { appRegistry } from "@/plugins/appRegistry";
+import { archivesHost } from "@/apps/archives/host";
 
 /** Minimum cosine score for a semantic-only hit to surface. The query
  * embedding is L2-normalized so this is a dot product; ~0.35 keeps loose
@@ -114,8 +114,7 @@ async function enrichSemanticHits(
 }
 
 export const isArchiveHitVisible = (hit: SearchHit) =>
-  (hit.chatOrigin !== "orion" || appRegistry.has("orion")) &&
-  (hit.chatOrigin !== "xdesign" || appRegistry.has("xdesign"));
+  hit.entityType !== "chat" || archivesHost().canShowChatOrigin(hit.chatOrigin);
 
 /** Run keyword (FTS5) + semantic searches in parallel, then merge: FTS hits
  * come first (keyword precision wins for exact-name queries), then any

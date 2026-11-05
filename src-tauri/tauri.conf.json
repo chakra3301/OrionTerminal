@@ -20,6 +20,7 @@
       }
     ],
     "security": {
+      "capabilities": ["default"],
       "csp": {
         "default-src": "'self' customprotocol: asset:",
         "connect-src": "'self' blob: asset: http://asset.localhost ipc: http://ipc.localhost https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co",

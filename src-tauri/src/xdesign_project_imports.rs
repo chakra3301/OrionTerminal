@@ -911,7 +911,7 @@ fn connection(app: &AppHandle) -> Result<Connection, String> {
         .path()
         .app_config_dir()
         .map_err(|e| e.to_string())?
-        .join("orion.db");
+        .join(crate::app_profile::db_file());
     let db = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)
         .map_err(|e| e.to_string())?;
     db.busy_timeout(std::time::Duration::from_secs(5))

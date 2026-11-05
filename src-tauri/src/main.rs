@@ -19,5 +19,8 @@ fn main() {
     if std::env::args().nth(1).as_deref() == Some("--mcp-serve") {
         orion_terminal_lib::mcp_server::serve();
     }
+    #[cfg(archives_app)]
+    orion_terminal_lib::run_archives();
+    #[cfg(not(archives_app))]
     orion_terminal_lib::run()
 }

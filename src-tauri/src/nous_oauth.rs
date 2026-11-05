@@ -11,7 +11,6 @@ use keyring::Entry;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-const SERVICE: &str = "personal-workstation";
 pub const PORTAL: &str = "https://portal.nousresearch.com";
 pub const CLIENT_ID: &str = "hermes-cli";
 pub const SCOPE: &str = "inference:invoke";
@@ -22,7 +21,7 @@ fn account(key_ref: &str) -> String {
 }
 
 fn entry(key_ref: &str) -> Result<Entry, String> {
-    Entry::new(SERVICE, &account(key_ref))
+    Entry::new(&crate::app_profile::keychain_service(), &account(key_ref))
         .map_err(|e| format!("Secret storage unavailable ({})", e))
 }
 

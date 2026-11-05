@@ -1,3 +1,85 @@
+## 2026-11-05 — Archives 47 standalone app: build (step 2)
+
+Branch: `alpha/archives-app` in the worktree `~/Orion_Terminal-worktrees/archives-app`, cut from `45f1b14`. Committed, release-built and installed to /Applications with the owner's OK (not pushed). The main checkout and its `node_modules/.vite` were not touched.
+
+The owner chose a clean standalone with nothing carried over from Orion: its own database, no import, keys entered again, all views shipping.
+
+Done:
+1. **Build target.** One source tree, two products. `ORION_APP_TARGET=archives` makes `build.rs` set the `archives_app` cfg. It is a cfg rather than a Cargo feature because `Cargo.toml` is hashed by the license inventory. `main.rs` then runs `archives_app::run`, which registers only Archives' commands and plugins.
+   - Configs: `tauri.archives.conf.json` (+ `.dev`), `capabilities/archives.json`, `vite.archives.config.ts` (port 1447, cache `.vite-archives/`, output `dist-archives/`), `tsconfig.archives.json`, `archives.html`.
+   - Orion's `tauri.conf.json` now pins `capabilities: ["default"]`. Before this change `default` was the only capability file, so Orion's behaviour is the same.
+2. **Data.** `app_profile.rs` sets the database file (`archives.db`), the Keychain service (the bundle id; dev builds get their own) and the backup prefix. `lib/db.ts` opens `sqlite:archives.db` in the Archives build. The data dirs are `com.lucaorion.archives47` and `com.lucaorion.archives47.dev`. All 39 migrations run on a fresh library.
+3. **Decoupling from Orion.** Archives code now reaches Orion only through `apps/archives/host.ts` (`ArchivesHost`).
+   - Orion installs its implementation (`orionArchivesHost.ts`) from the Archives builtin plugin.
+   - Note-tab sync in `notesStore`, the `orion://` fallback opener and the quit-risk check are injected the same way.
+   - The assistant defaults are swapped for Archives-only ones (`standalone/archives/appDefaults.ts`).
+   - The XDesign image-model field and the companion consent row are hidden in the Archives build.
+   - The parent brand name lives in one constant: `standalone/archives/brand.ts`.
+4. **Standalone shell** (`src/standalone/archives/`):
+   - One native window with an overlay title bar showing the save status.
+   - A native menu bar built from the command registry.
+   - ⌘K palette: archive search plus commands; `>` limits it to commands.
+   - A Settings window (⌘,) with AI Providers, Archive Assistant, API Keys and About.
+   - ⌘1–9 switch views.
+   - An event bridge for assistant streams and RepoLens.
+   - Quit guard, draft recovery and Finder drops.
+   - There is no desktop, dock, wallpaper, companion or sign-in.
+5. **Icon.** The dock's Archives glyph in #39ff88 on the black tile is in `src-tauri/icons-archives/`; its source is `icons-archives-source.png`.
+6. **Commands.**
+   - `npm run archives:dev`: dev app on the throwaway data dir.
+   - `npm run archives:build`: release bundle.
+   - `npm run archives:app` (`scripts/install-archives.sh`): build and install to /Applications. Not run.
+   - `scripts/seed-archives-fixtures.py`: seeds demo notes. It refuses any file except a `*.archives47.dev/archives.db`.
+7. **Tests.**
+   - `src/standalone/archives/boundary.test.ts` walks the Archives entry's imports and fails on any Orion-only surface (verified by planting a Dock import). It also checks that the TS and Rust database names match.
+   - Rust tests in `app_profile.rs` and `archives_app.rs`: profiles share nothing, every Archives command is registered, and no Orion-only commands are exposed.
+8. **Verified.**
+   - Orion: `tsc --noEmit`, `npm run build` and `cargo check --bins` pass. Vitest: 607/607 files and 6,044 tests pass.
+   - `cargo test --lib`: 1,562 pass. One timing test, `diffusion_seven…linear_time`, failed under parallel load; it is untouched by this work and passes alone.
+   - Vitest also reported one unhandled timer error from `PhotoStudio.layout.test.tsx` during the full run; that file passes alone (203/203).
+   - Archives: `archives:build-web` passes (typecheck and bundle; no XDesign, Rosie, Incubator, Spotify, Monaco or xterm code in it). `cargo check` passes for the archives target, and the dev app boots on its own `archives.db`.
+   - Screenshots use fixture data only: `docs/alpha/archives-app/screenshot-today.png` and `screenshot-views.png`.
+
+Worktree note: `node_modules` here links into the main checkout, so plain `vitest run` in this worktree hits Vite "Denied ID" errors for assets outside the worktree. That is environment-only; the main checkout and CI are unaffected.
+
+Owner decisions (2026-11-05): commit, release build and install approved; the dev binary name `orion-terminal` is fine. The Settings window's cyan/violet accents are now neon green, scoped to `.a47-settings` in `archives.css` (Orion's Control Panel is unchanged).
+
+Next: the owner inspects the installed app and gives next steps. Still unchecked by hand: the native menu bar, Finder drop, and an assistant send with a real key.
+
+Open question (owner): `--space-4` is 18px in `tokens.css` but 14px in `design/tokens.json`; which is right? The new CSS avoids `--space-4`.
+
+## 2026-11-04 — Archives 47 standalone app: investigation and proposal (step 1, no code)
+
+Branch: `alpha/archives-app` in the worktree `~/Orion_Terminal-worktrees/archives-app`, cut from `45f1b14`. Nothing is committed. The main checkout was not touched, and its uncommitted PROGRESS/ARCHIVE edits and untracked briefs are preserved there. This file is the committed copy, so it lacks the main checkout's 2026-10-29 cont. 3–5 entries; merge both when the branch lands.
+
+Owner's request: make Archives 47 a standalone macOS app, the way EMP is. Step 1 is to investigate and propose, then wait for approval.
+
+Done:
+1. Mapped what Archives needs from the rest of Orion. Proposal: `docs/alpha/archives-app/PROPOSAL.md`; icon preview: `docs/alpha/archives-app/icon-preview.png`.
+   - Archives' TypeScript import closure is 886 files. Cutting about 10 hub edges brings it to 246:
+     - ClaudeChat → contextProviders → builtinApps
+     - dispatchSend → intake
+     - appConfigStore → the orion/xdesign personas
+     - pluginManagerStore → commandStore
+     - searchNav → rosie
+     - useShell.openApp
+   - Native side: about 55 Tauri commands, the `orion.db` tables Archives uses, the per-app persona config, keychain service `personal-workstation`, and 12 plugin contributions.
+2. Recommendation:
+   - Build: (a) an Archives-only build target in this repo, behind an `ArchivesHost` interface.
+   - Data: its own data dir (`com.lucaorion.archives47`), plus a read-only "Import from Orion Terminal" snapshot import.
+   - Scope: all 13 views ship. A native window and menu, an in-app ⌘K palette, and an AI-only Settings window; no dock, companion or accounts.
+   - Dev: port 1447 and the `.dev` identifier for a throwaway data dir.
+   - Install: `npm run archives:app`, only after the owner says yes.
+
+Next: the owner approves or adjusts the proposal, then step 2 (build with tests, Orion gates still green).
+
+Open questions (owner):
+1. Data: own DB + import (recommended), or share `orion.db` live? The risks are in the proposal §2: migration skew can lock the older app out, the in-memory note store can overwrite newer edits, and the media lease and RepoLens boot reconciliation each assume a single app.
+2. Should Archives share Orion's keychain AI keys?
+3. Name the DB `archives.db`?
+4. Disk is at 20 GiB free, and a separate Rust target dir is about 8–10 GB.
+5. Is there a vector source for the Archives glyph?
+
 ## 2026-10-29 (cont. 2) — XDesign: image-to-3D removed
 
 Branch: `validation/alpha-2026-09-14`. At the owner's request, the "3D model" project type (img2model) is removed until something better replaces it. The code stays in git history. Committed and pushed at the owner's request.

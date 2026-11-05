@@ -642,7 +642,7 @@ pub(crate) fn refresh_caption_matches(
     }
     if changed {
         if let Some(app) = crate::app_handle::current() {
-            let expected = app.path().app_config_dir().ok().map(|p| p.join("orion.db"));
+            let expected = app.path().app_config_dir().ok().map(|p| p.join(crate::app_profile::db_file()));
             if c.path()
                 .map(std::path::Path::new)
                 .is_some_and(|p| expected.as_deref() == Some(p))

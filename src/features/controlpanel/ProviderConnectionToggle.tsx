@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
+import { productShortName } from "@/lib/productName";
 import type { Provider } from "@/features/agents/agentTypes";
 import { useProvidersStore } from "@/store/providersStore";
 import { invalidateCodexImageStatus } from "@/apps/xdesign/imageProviderRuntime";
 
-/** On/off for a provider in Orion's model selection. Turning it off keeps chats, settings and
+/** On/off for a provider in the app's model selection. Turning it off keeps chats, settings and
  *  credentials and never signs out of CLI accounts, so it is reversible and needs no confirm. */
 export function ProviderConnectionToggle({ provider }: { provider: Provider }) {
   const [busy, setBusy] = useState(false);
@@ -21,7 +22,7 @@ export function ProviderConnectionToggle({ provider }: { provider: Provider }) {
   };
   return <>
     <button type="button" className={`ot-switch${provider.enabled ? " on" : ""}`} role="switch" aria-checked={provider.enabled}
-      aria-label={`${provider.name} in Orion`} disabled={busy} onClick={() => void toggle()} />
+      aria-label={`${provider.name} in ${productShortName()}`} disabled={busy} onClick={() => void toggle()} />
     {error && <div role="alert" className="cp-form-error cp-prov-error">{error}</div>}
   </>;
 }

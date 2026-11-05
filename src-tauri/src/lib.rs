@@ -1,8 +1,14 @@
+// The Archives 47 build registers only Archives' commands; Orion's are unused there.
+#![cfg_attr(archives_app, allow(dead_code, unused_imports, unused_variables))]
 #![recursion_limit = "256"]
 mod agent_chat;
 mod agent_cli;
 mod api_key;
 mod app_handle;
+pub mod app_profile;
+mod archives_app;
+#[cfg(archives_app)]
+pub use archives_app::run as run_archives;
 mod asset;
 mod autocomplete;
 mod characters;
@@ -308,6 +314,7 @@ fn database_migrations() -> Vec<Migration> {
     ]
 }
 
+#[cfg(not(archives_app))]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = database_migrations();

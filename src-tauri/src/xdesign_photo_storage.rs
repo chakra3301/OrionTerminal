@@ -147,7 +147,7 @@ pub(super) fn write_preview(dir:&Path,version:&str,png:&[u8])->Result<(),String>
     std::fs::hard_link(source,&target).or_else(|_|photocraft_format::atomic_write(&target,png).map_err(std::io::Error::other)).map_err(|e|e.to_string())
 }
 
-fn paths(app:&AppHandle)->Result<(PathBuf,PathBuf),String>{Ok((app.path().app_data_dir().map_err(|e|e.to_string())?.join("assets/xdesign"),app.path().app_config_dir().map_err(|e|e.to_string())?.join("orion.db")))}
+fn paths(app:&AppHandle)->Result<(PathBuf,PathBuf),String>{Ok((app.path().app_data_dir().map_err(|e|e.to_string())?.join("assets/xdesign"),app.path().app_config_dir().map_err(|e|e.to_string())?.join(crate::app_profile::db_file())))}
 pub(super) async fn report(app:AppHandle)->Result<StorageReport,String>{let (root,database)=paths(&app)?;tauri::async_runtime::spawn_blocking(move||{
     let db=Connection::open_with_flags(database,OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(|e|e.to_string())?;let imports=crate::xdesign_project_imports::maintenance_protection(&db)?;let mut report=scan_with_imports(&root,&references(&db)?,&imports,false,SystemTime::now())?;maintenance::attach(&root,&mut report)?;Ok(report)
 }).await.map_err(|e|e.to_string())?}

@@ -8,8 +8,6 @@
 //   orion://asset/<id>
 //   orion://chat/<id>           (future)
 
-import { useWorkspace } from "@/components/workspace/workspaceStore";
-import { appRegistry } from "@/plugins/appRegistry";
 
 export type OrionRef =
   | { kind: "note"; id: string }
@@ -51,19 +49,22 @@ export function setNoteNavigator(fn: ((id: string) => boolean) | null): void {
   noteNavigator = fn;
 }
 
+/** Where a link goes when no note navigator claims it (Orion Terminal opens
+ * workspace tabs). The standalone app leaves this unset. */
+let fallbackOpener: ((ref: OrionRef) => boolean) | null = null;
+export function setOrionUriFallback(fn: ((ref: OrionRef) => boolean) | null): void {
+  fallbackOpener = fn;
+}
+
 export function handleOrionUri(href: string): boolean {
   const ref = parseOrionUri(href);
   if (!ref) return false;
   switch (ref.kind) {
     case "note":
       if (noteNavigator?.(ref.id)) return true;
-      if (!appRegistry.has("orion")) return false;
-      useWorkspace.getState().openTab({ kind: "note", noteId: ref.id });
-      return true;
+      return fallbackOpener?.(ref) ?? false;
     case "asset":
-      if (!appRegistry.has("orion")) return false;
-      useWorkspace.getState().openTab({ kind: "asset-detail", assetId: ref.id });
-      return true;
+      return fallbackOpener?.(ref) ?? false;
     case "chat":
       // future: route to chat list / open chat
       return false;

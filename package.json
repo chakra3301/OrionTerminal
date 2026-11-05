@@ -28,7 +28,12 @@
     "test:native-policy": "node scripts/mcp-policy-smoke.mjs",
     "optimize:characters": "node scripts/optimize-characters.mjs",
     "test:xdesign:fidelity": "node scripts/run-xdesign-fidelity.mjs",
-    "test:xdesign:photoshop": "node scripts/run-xdesign-photoshop.mjs"
+    "test:xdesign:photoshop": "node scripts/run-xdesign-photoshop.mjs",
+    "archives:web": "vite --config vite.archives.config.ts",
+    "archives:build-web": "tsc --noEmit -p tsconfig.archives.json && vite build --config vite.archives.config.ts",
+    "archives:dev": "ORION_APP_TARGET=archives tauri dev --config src-tauri/tauri.archives.conf.json --config src-tauri/tauri.archives.dev.conf.json",
+    "archives:build": "ORION_APP_TARGET=archives tauri build --config src-tauri/tauri.archives.conf.json",
+    "archives:app": "sh scripts/install-archives.sh"
   },
   "dependencies": {
     "@blocknote/mantine": "^0.39.1",

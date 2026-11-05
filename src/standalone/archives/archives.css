@@ -1,0 +1,56 @@
+/* Standalone Archives 47 window chrome. Uses existing tokens only. */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--bg-0);
+  overflow: hidden;
+}
+
+.a47-window {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  color: var(--t-primary);
+  font-family: var(--f-display);
+}
+
+/* The native title bar is an overlay; this strip is the drag area under the
+   traffic lights and carries the note save status, as Orion's title bar does. */
+.a47-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  height: 28px;
+  padding: 0 var(--space-3);
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--bg-1);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.a47-title {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--t-secondary);
+}
+
+.a47-body {
+  flex: 1;
+}
+
+/* Settings: Orion's violet/cyan control accents become Archives' neon green.
+   Scoped to this window; the shared Control Panel CSS is unchanged. */
+.a47-settings,
+.a47-settings * {
+  --neon-cyan: var(--neon-green);
+  --neon-cyan-rgb: var(--neon-green-rgb);
+  --neon-violet: var(--neon-green);
+  --neon-violet-rgb: var(--neon-green-rgb);
+  --acc-rgb: var(--neon-green-rgb);
+}

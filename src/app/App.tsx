@@ -3,6 +3,7 @@ import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { EventBridge } from "@/app/EventBridge";
 import { useQuitGuard } from "@/features/recovery/useQuitGuard";
+import { quitRisks } from "@/features/recovery/quitRisks";
 import { useStartupBackupWarning } from "@/features/recovery/useStartupBackupWarning";
 import { useDraftRecovery } from "@/features/recovery/useDraftRecovery";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
@@ -59,7 +60,9 @@ import { LockScreen } from "@/features/auth/LockScreen";
 import { FirstRunSetup } from "@/features/auth/FirstRunSetup";
 import { useShell, type WindowState } from "@/shell/store/useShell";
 import { loadOrionPluginData } from "@/apps/orion/pluginContributions";
+import { installOrionArchivesHost } from "@/apps/archives/orionArchivesHost";
 
+installOrionArchivesHost();
 installBuiltinCommands();
 installShellCommands();
 installSpotifyCommands();
@@ -335,7 +338,7 @@ export default function App() {
   // True once we're actually displaying the shell (not splash / gate / blank).
   const inShell =
     hydrated && (warm || (probed && splashDone && authPhase === "unlocked"));
-  useQuitGuard(hydrated);
+  useQuitGuard(hydrated, quitRisks);
   useStartupBackupWarning(hydrated);
   useDraftRecovery(hydrated);
   useWindowSizePersistence();

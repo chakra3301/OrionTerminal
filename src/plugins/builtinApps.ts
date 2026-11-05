@@ -7,6 +7,7 @@ import { internalPluginHost } from "@/plugins/host";
 import type { InternalPlugin } from "@/plugins/contracts";
 import { registerCommandCenterEventContributions } from "@/apps/command/pluginContributions";
 import { registerArchivesContributions } from "@/apps/archives/pluginContributions";
+import { installOrionArchivesHost } from "@/apps/archives/orionArchivesHost";
 import { registerXDesignContributions } from "@/apps/xdesign/pluginContributions";
 import { registerOrionContributions } from "@/apps/orion/pluginContributions";
 
@@ -278,6 +279,8 @@ function pluginFor(descriptor: AppDescriptor): InternalPlugin {
       };
       subscriptions.add(registry.register(command, ownerId));
       if (descriptor.id === "archives") {
+        // Added first so it is disposed last: contributions close note tabs through it.
+        subscriptions.add(installOrionArchivesHost());
         registerArchivesContributions(ownerId, subscriptions);
       } else if (descriptor.id === "orion") {
         registerOrionContributions(ownerId, subscriptions);

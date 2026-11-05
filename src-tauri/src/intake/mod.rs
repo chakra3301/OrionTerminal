@@ -661,7 +661,7 @@ fn database(app: &AppHandle) -> Result<Connection, String> {
         .path()
         .app_config_dir()
         .map_err(|_| "App data unavailable")?
-        .join("orion.db");
+        .join(crate::app_profile::db_file());
     let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE)
         .map_err(|_| "Skill database unavailable")?;
     conn.busy_timeout(Duration::from_secs(5))

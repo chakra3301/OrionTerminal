@@ -21,6 +21,7 @@ import {
 import { RefreshCw, Search, Sparkles, ExternalLink, X } from "lucide-react";
 import { useArchives } from "@/apps/archives/useArchives";
 import { openChatById } from "@/apps/archives/searchNav";
+import { archivesHost } from "@/apps/archives/host";
 import { sendToArchivesChat } from "@/apps/archives/chatBridge";
 import { useBrainGraph } from "@/apps/archives/brain/useBrainGraph";
 import {
@@ -951,7 +952,7 @@ export function BrainView() {
         <div className="ar-brain-empty">
           <div className="title">Your brain is empty</div>
           <div className="hint">
-            Everything you create in Orion Terminal — notes, journal entries,
+            Everything you create in {archivesHost().productName} — notes, journal entries,
             projects, chats, media — appears here and links itself
             automatically.
           </div>

@@ -4,7 +4,7 @@ import { FileText, NotebookPen, FolderKanban } from "lucide-react";
 import { OrionOrb } from "@/components/effects/OrionOrb";
 import { useAskArchive, type Source } from "@/features/notes/askArchive";
 import { useArchives } from "@/apps/archives/useArchives";
-import { useShell } from "@/shell/store/useShell";
+import { revealArchives } from "@/apps/archives/host";
 
 const KIND_ICON: Record<string, typeof FileText> = {
   note: FileText,
@@ -24,7 +24,7 @@ function openSource(s: Source) {
     a.setView("notes");
     a.setOpenNoteId(s.id);
   }
-  useShell.getState().openApp("archives");
+  revealArchives();
 }
 
 /** Render an answer string with [n] tokens turned into clickable citation

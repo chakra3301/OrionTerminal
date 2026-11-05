@@ -2,11 +2,10 @@ use keyring::Entry;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 
-const SERVICE: &str = "personal-workstation";
 const ACCOUNT: &str = "anthropic-api-key";
 
 fn entry() -> Result<Entry, String> {
-    Entry::new(SERVICE, ACCOUNT).map_err(|e| {
+    Entry::new(&crate::app_profile::keychain_service(), ACCOUNT).map_err(|e| {
         format!(
             "Secret storage unavailable — is your OS keyring running? ({})",
             e
@@ -53,7 +52,7 @@ pub fn api_key_status() -> Result<bool, String> {
 const GITHUB_ACCOUNT: &str = "github-token";
 
 fn github_entry() -> Result<Entry, String> {
-    Entry::new(SERVICE, GITHUB_ACCOUNT).map_err(|e| {
+    Entry::new(&crate::app_profile::keychain_service(), GITHUB_ACCOUNT).map_err(|e| {
         format!(
             "Secret storage unavailable — is your OS keyring running? ({})",
             e
@@ -107,7 +106,7 @@ const CURSOR_LEGACY_KEY_REF: &str = "builtin:cursor-sdk";
 static CURSOR_KEY_CACHE: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
 
 fn cursor_entry() -> Result<Entry, String> {
-    Entry::new(SERVICE, CURSOR_ACCOUNT).map_err(|e| {
+    Entry::new(&crate::app_profile::keychain_service(), CURSOR_ACCOUNT).map_err(|e| {
         format!(
             "Secret storage unavailable — is your OS keyring running? ({})",
             e

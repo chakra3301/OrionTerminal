@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { productShortName } from "@/lib/productName";
 import { ulid } from "ulid";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { RefreshCw, CheckCircle2, LogIn, ChevronRight, Plus } from "lucide-react";
@@ -23,6 +24,9 @@ import {
   usesOAuth,
   validateProviderDraft,
 } from "@/features/agents/providerDraft";
+
+/** Image models only matter where XDesign generates images (not in the standalone Archives 47 app). */
+const SHOW_IMAGE_MODELS = import.meta.env.VITE_APP_TARGET !== "archives";
 
 const KINDS: ProviderKind[] = ["openai", "google", "openai_compat", "custom"];
 
@@ -86,8 +90,8 @@ function ProviderRow({ provider: p, onSave }: { provider: Provider; onSave: (p: 
             {isCursor && <CursorProviderStatus />}
             {p.kind === "nous_oauth" && <NousProviderStatus keyRef={p.keyRef} />}
             {isApi && <ApiProviderStatus provider={p} onSave={onSave} />}
-            {isImageProvider(p) && <ImageModelField provider={p} />}
-          </> : <div className="cp-card-sub">Off in Orion. Credentials are kept.</div>}
+            {SHOW_IMAGE_MODELS && isImageProvider(p) && <ImageModelField provider={p} />}
+          </> : <div className="cp-card-sub">Off in {productShortName()}. Credentials are kept.</div>}
           <div className="cp-prov-meta">
             <span>{p.kind === "anthropic" || isCli ? "Uses your subscription login" : p.kind === "nous_oauth" ? "Nous Portal account" : "Billed to its own API key"}</span>
             {!p.builtin && <button className="cp-link-danger" disabled={removing} onClick={() => void removeProvider()}>Remove</button>}
@@ -381,7 +385,7 @@ function CursorProviderStatus() {
   };
 
   const installSdk = async () => {
-    if (busy || !await confirmAction({ title: "Install optional Cursor SDK?", body: "Downloads the pinned SDK and dependencies from npm into Orion's application-data directory. The SDK is proprietary and governed by Cursor's terms (cursor.com/terms-of-service), not Orion's Apache license. No API key or paid model request is needed for installation. This may take several minutes.", confirmLabel: "Install SDK" })) return;
+    if (busy || !await confirmAction({ title: "Install optional Cursor SDK?", body: `Downloads the pinned SDK and dependencies from npm into ${productShortName()}'s application-data directory. The SDK is proprietary and governed by Cursor's terms (cursor.com/terms-of-service), not ${productShortName()}'s Apache license. No API key or paid model request is needed for installation. This may take several minutes.`, confirmLabel: "Install SDK" })) return;
     setBusy(true); setErr("");
     try { await ipc.cursorInstallSdk(); await refresh(); }
     catch (error) { setErr(String(error)); }

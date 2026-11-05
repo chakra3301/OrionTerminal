@@ -900,7 +900,28 @@ fn plugin_enabled(plugin_id: &str) -> Result<bool, String> {
     Ok(!disabled_plugin_ids()?.contains(plugin_id))
 }
 
+/// Env var naming the app an MCP server instance serves. The standalone
+/// Archives 47 app sets it to `archives` so its assistant only sees note,
+/// asset and mood-board tools — never the Orion editor, XDesign or Hermes.
+pub const APP_SCOPE_ENV: &str = "ORION_MCP_APP";
+
+fn app_scope() -> Option<String> {
+    std::env::var(APP_SCOPE_ENV)
+        .ok()
+        .or_else(|| crate::app_profile::current().mcp_app.map(str::to_string))
+}
+
+fn tool_in_app_scope(name: &str, scope: Option<&str>) -> bool {
+    match scope {
+        None => true,
+        Some(app) => plugin_for_app(app).is_some_and(|plugin| plugin_for_tool(name) == Some(plugin)),
+    }
+}
+
 fn ensure_tool_plugin_enabled(name: &str) -> Result<(), String> {
+    if !tool_in_app_scope(name, app_scope().as_deref()) {
+        return Err(format!("tool not available in this app: {name}"));
+    }
     let Some(plugin_id) = plugin_for_tool(name) else { return Ok(()) };
     if plugin_enabled(plugin_id)? {
         Ok(())
@@ -939,7 +960,17 @@ pub(crate) fn available_tool_definitions() -> Value {
             HERMES_PLUGIN_ID.to_string(),
         ])
     });
-    crate::mcp_grants::filter(filter_tool_definitions_for_disabled(tool_definitions(), &disabled))
+    let scope = app_scope();
+    let scoped = match filter_tool_definitions_for_disabled(tool_definitions(), &disabled) {
+        Value::Array(tools) => Value::Array(
+            tools
+                .into_iter()
+                .filter(|t| tool_in_app_scope(t.get("name").and_then(Value::as_str).unwrap_or(""), scope.as_deref()))
+                .collect(),
+        ),
+        other => other,
+    };
+    crate::mcp_grants::filter(scoped)
 }
 
 fn tool_list_recent_notes(args: &Value) -> Result<String, String> {
@@ -2744,6 +2775,24 @@ mod tests {
         let missing =
             super::tool_read_file(&serde_json::json!({ "path": "/no/such/orion/file.xyz" }));
         assert!(missing.is_err());
+    }
+
+    #[test]
+    fn archives_scope_offers_only_archives_tools() {
+        let names: Vec<String> = super::tool_definitions()
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|t| t["name"].as_str().map(str::to_string))
+            .filter(|n| super::tool_in_app_scope(n, Some("archives")))
+            .collect();
+        for expected in ["orion_search_archive", "orion_read_note", "orion_create_note", "orion_list_assets", "orion_create_mood_board"] {
+            assert!(names.iter().any(|n| n == expected), "missing {expected}");
+        }
+        for leaked in ["orion_open_file", "orion_run_in_terminal", "orion_xdesign_apply", "orion_hermes_create_task", "orion_open_app", "orion_get_context"] {
+            assert!(!names.iter().any(|n| n == leaked), "leaked {leaked}");
+        }
+        assert!(super::tool_in_app_scope("orion_run_in_terminal", None), "Orion keeps every tool");
     }
 
     #[test]

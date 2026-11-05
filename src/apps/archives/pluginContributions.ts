@@ -6,12 +6,7 @@ import type { DisposableScope } from "@/plugins/contracts";
 import { overlayRegistry } from "@/plugins/overlayRegistry";
 import { internalActionRegistry } from "@/plugins/internalActionRegistry";
 import { internalEventRegistry } from "@/plugins/internalEventRegistry";
-import { useShell } from "@/shell/store/useShell";
-import {
-  activeTabInFocusedPanel,
-  allTabs,
-  useWorkspace,
-} from "@/components/workspace/workspaceStore";
+import { archivesHost, revealArchives } from "@/apps/archives/host";
 import { useNotesStore } from "@/store/notesStore";
 import { useAssetsStore } from "@/store/assetsStore";
 import { useMoodBoardsStore } from "@/store/moodBoardsStore";
@@ -121,9 +116,8 @@ function clearBackgroundTimers(): void {
   backfillTimer = null;
 }
 
-function focusedNoteTab() {
-  const workspace = useWorkspace.getState();
-  return activeTabInFocusedPanel(workspace.root, workspace.focusedPanelId);
+function focusedNoteId(): string | null {
+  return archivesHost().focusedNoteId();
 }
 
 function archiveCommands(): Command[] {
@@ -174,7 +168,7 @@ function archiveCommands(): Command[] {
       group: "Notes",
       run: async () => {
         const note = await useNotesStore.getState().create(null, "note");
-        useShell.getState().openApp("archives");
+        revealArchives();
         useArchives.getState().setView("notes");
         useArchives.getState().setOpenNoteId(note.id);
         useStatusStore.getState().setHint("[ NEW NOTE ]", 1500);
@@ -187,7 +181,7 @@ function archiveCommands(): Command[] {
       group: "Notes",
       run: async () => {
         const note = await useNotesStore.getState().create(null, "journal");
-        useShell.getState().openApp("archives");
+        revealArchives();
         useArchives.getState().setView("journal");
         useArchives.getState().setSelectedNoteId(note.id);
         useStatusStore.getState().setHint("[ NEW JOURNAL ENTRY ]", 1500);
@@ -200,7 +194,7 @@ function archiveCommands(): Command[] {
       group: "Notes",
       run: async () => {
         const note = await useNotesStore.getState().create(null, "project");
-        useShell.getState().openApp("archives");
+        revealArchives();
         useArchives.getState().setView("projects");
         useArchives.getState().setOpenProjectId(note.id);
         useStatusStore.getState().setHint("[ NEW PROJECT ]", 1500);
@@ -212,7 +206,7 @@ function archiveCommands(): Command[] {
       keywords: ["download", "video", "audio", "link", "stacher", "archive"],
       group: "Media",
       run: () => {
-        useShell.getState().openApp("archives");
+        revealArchives();
         useArchives.getState().setView("downloads");
       },
     },
@@ -222,7 +216,7 @@ function archiveCommands(): Command[] {
       keywords: ["brain", "graph", "knowledge", "links", "obsidian", "map", "archive"],
       group: "Notes",
       run: () => {
-        useShell.getState().openApp("archives");
+        revealArchives();
         useArchives.getState().setView("brain");
         useStatusStore.getState().setHint("[ BRAIN ]", 1500);
       },
@@ -234,7 +228,7 @@ function archiveCommands(): Command[] {
       group: "Notes",
       run: async () => {
         const board = await useMoodBoardsStore.getState().create("Untitled board");
-        useShell.getState().openApp("archives");
+        revealArchives();
         useArchives.getState().setView("mood");
         useArchives.getState().setOpenBoardId(board.id);
         useStatusStore.getState().setHint("[ NEW MOOD BOARD ]", 1500);
@@ -245,16 +239,16 @@ function archiveCommands(): Command[] {
       label: "Delete Note",
       keywords: ["note", "delete", "remove"],
       group: "Notes",
-      when: () => focusedNoteTab()?.descriptor.kind === "note",
+      when: () => focusedNoteId() !== null,
       run: async () => {
-        const tab = focusedNoteTab();
-        if (!tab || tab.descriptor.kind !== "note") return;
-        const note = useNotesStore.getState().get(tab.descriptor.noteId);
+        const noteId = focusedNoteId();
+        if (!noteId) return;
+        const note = useNotesStore.getState().get(noteId);
         const approved = await confirmDialog(
           `Delete "${note?.title || "Untitled"}"? This cannot be undone.`,
           { title: "Delete note", kind: "warning" },
         );
-        if (approved) await useNotesStore.getState().remove(tab.descriptor.noteId);
+        if (approved) await useNotesStore.getState().remove(noteId);
       },
     },
     {
@@ -263,7 +257,7 @@ function archiveCommands(): Command[] {
       hotkey: "mod+p",
       keywords: ["link", "note", "reference"],
       group: "Notes",
-      when: () => focusedNoteTab()?.descriptor.kind === "note",
+      when: () => focusedNoteId() !== null,
       run: async () => {
         const handle = getActiveNoteEditor();
         if (!handle) return;
@@ -289,7 +283,7 @@ async function openNoteAction(value: unknown): Promise<void> {
     ? rawKind
     : undefined;
   await useNotesStore.getState().load();
-  useShell.getState().openApp("archives");
+  revealArchives();
   const archives = useArchives.getState();
   const resolvedKind = kind ?? useNotesStore.getState().notes.get(id)?.kind ?? "note";
   if (resolvedKind === "project") {
@@ -349,12 +343,6 @@ function toolResultEvent(value: unknown): void {
   if (isOrionAssetWriteTool(toolName)) scheduleAssetsRefresh();
 }
 
-function closeNoteTabs(): void {
-  const workspace = useWorkspace.getState();
-  for (const tab of allTabs(workspace.root)) {
-    if (tab.descriptor.kind === "note") workspace.closeTab(tab.id);
-  }
-}
 
 function disposeArchivesRuntime(): void {
   clearBackgroundTimers();
@@ -365,7 +353,7 @@ function disposeArchivesRuntime(): void {
   useAskArchive.getState().hide();
   useTemplatePicker.getState().hide();
   useLinkPaletteStore.getState().cancel();
-  closeNoteTabs();
+  archivesHost().closeNoteViews();
 }
 
 export function archivesDisableReason(): string | null {

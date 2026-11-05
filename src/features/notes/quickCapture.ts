@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { useNotesStore } from "@/store/notesStore";
 import { useCollectionsStore } from "@/store/collectionsStore";
 import { useArchives } from "@/apps/archives/useArchives";
-import { useShell } from "@/shell/store/useShell";
+import { revealArchives } from "@/apps/archives/host";
 import { toast } from "@/store/toastStore";
 import { parseCapture } from "./captureText";
 import { log } from "@/lib/log";
@@ -58,7 +58,7 @@ export async function captureNote(
       const a = useArchives.getState();
       a.setView("notes");
       a.setOpenNoteId(note.id);
-      useShell.getState().openApp("archives");
+      revealArchives();
       toast.success("Captured — opened", { body: title });
     } else {
       toast.success("Captured to Inbox", {
@@ -69,7 +69,7 @@ export async function captureNote(
             const a = useArchives.getState();
             a.setView("notes");
             a.setOpenNoteId(note.id);
-            useShell.getState().openApp("archives");
+            revealArchives();
           },
         },
       });

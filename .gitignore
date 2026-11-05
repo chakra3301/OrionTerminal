@@ -57,3 +57,7 @@ DerivedData
 
 # Character source GLBs (126MB originals — optimized copies live in public/characters)
 scripts/characters-src/
+
+# Standalone Archives 47 build output and Vite cache
+dist-archives
+.vite-archives

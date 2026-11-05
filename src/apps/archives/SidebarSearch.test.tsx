@@ -3,6 +3,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { SidebarSearch } from "./SidebarSearch";
+import { setArchivesHost } from "./host";
+import { appRegistry } from "@/plugins/appRegistry";
 const m = vi.hoisted(() => ({ keyword: vi.fn(), semantic: vi.fn(), route: vi.fn(), query: vi.fn() }));
 vi.mock("@/lib/db", () => ({ searchArchive: m.keyword, getDb: vi.fn() }));
 vi.mock("@/lib/semanticSearch", () => ({ semanticSearch: m.semantic }));
@@ -11,8 +13,13 @@ vi.mock("@/apps/archives/useArchives", () => ({ useArchives: (selector: (s: unkn
 vi.mock("@/store/assetsStore", () => ({ useAssetsStore: (selector: (s: unknown) => unknown) => selector({ assets: new Map() }) }));
 vi.mock("@/apps/archives/searchNav", () => ({ routeToSearchHit: m.route }));
 let host: HTMLDivElement; let root: Root;
+// Orion hides chats from disabled apps; the standalone default hides all non-Archives chats.
+let uninstallHost: () => void;
 beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  uninstallHost = setArchivesHost({
+    canShowChatOrigin: (origin) => (origin !== "orion" || appRegistry.has("orion")) && (origin !== "xdesign" || appRegistry.has("xdesign")),
+  });
   vi.useFakeTimers(); m.keyword.mockReset().mockResolvedValue([
     { entityId: "hidden", entityType: "chat", title: "Disabled XDesign secret", snippet: "not visible", chatOrigin: "xdesign" },
     { entityId: "shown", entityType: "chat", title: "Enabled Orion hit", snippet: "quasar", chatOrigin: "orion" },
@@ -20,7 +27,7 @@ beforeEach(async () => {
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   await act(async () => root.render(<SidebarSearch />));
 });
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); });
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); uninstallHost(); });
 describe("Archives keyword-only mode", () => {
   it("does not load semantic embeddings and preserves disabled-app filtering", async () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(160); });

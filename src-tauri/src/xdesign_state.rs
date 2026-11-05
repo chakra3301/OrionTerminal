@@ -67,7 +67,7 @@ pub(crate) fn commit_with_import(conn: &mut Connection, writes: &[StateWrite], l
 
 #[tauri::command]
 pub async fn xdesign_state_commit(app: AppHandle, writes: Vec<StateWrite>, import_receipt:Option<Receipt>) -> Result<(), String> {
-    let path = app.path().app_config_dir().map_err(|e| e.to_string())?.join("orion.db");
+    let path = app.path().app_config_dir().map_err(|e| e.to_string())?.join(crate::app_profile::db_file());
     tauri::async_runtime::spawn_blocking(move || {
         let mut conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE).map_err(|e| e.to_string())?;
         conn.busy_timeout(std::time::Duration::from_secs(5)).map_err(|e| e.to_string())?;

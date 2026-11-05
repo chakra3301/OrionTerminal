@@ -499,7 +499,7 @@ pub async fn subscription_quota(
         .path()
         .app_config_dir()
         .map_err(|_| "Profile unavailable")?
-        .join("orion.db");
+        .join(crate::app_profile::db_file());
     let kind: String = tauri::async_runtime::spawn_blocking(move || {
         let db =
             rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)

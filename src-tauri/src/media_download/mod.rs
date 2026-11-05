@@ -63,9 +63,9 @@ fn db(app: &AppHandle) -> Result<Connection, String> {
         .path()
         .app_config_dir()
         .map_err(|e| e.to_string())?
-        .join("orion.db");
+        .join(crate::app_profile::db_file());
     let c = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE)
-        .map_err(|_| "Downloads database unavailable. Restart with an updated Orion build.")?;
+        .map_err(|_| format!("Downloads database unavailable. Restart with an updated {} build.", crate::app_profile::short_name()))?;
     c.busy_timeout(Duration::from_secs(5))
         .map_err(|e| e.to_string())?;
     c.pragma_update(None, "foreign_keys", true)

@@ -12,7 +12,7 @@ pub(super) struct RuntimeConfig {
 }
 
 pub(super) fn load(app: &AppHandle, provider_id: &str, model: &str) -> Result<RuntimeConfig, String> {
-    let path = app.path().app_config_dir().map_err(|e| e.to_string())?.join("orion.db");
+    let path = app.path().app_config_dir().map_err(|e| e.to_string())?.join(crate::app_profile::db_file());
     let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
         .map_err(|_| "Cannot read the saved provider configuration")?;
     conn.busy_timeout(std::time::Duration::from_secs(1)).map_err(|e| e.to_string())?;

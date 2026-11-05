@@ -51,7 +51,7 @@ fn acquire_at(path: &Path) -> Result<Arc<Owner>, String> {
         return Err("Unexpected download coordination file.".into());
     }
     file.try_lock().map_err(|_| {
-        "Another Orion process owns Downloads. Finish its work before continuing here."
+        format!("Another {} process owns Downloads. Finish its work before continuing here.", crate::app_profile::short_name())
     })?;
     // Never unlink the lease: two inodes would permit two publishers for the same profile.
     let owner = Arc::new(Owner { file });

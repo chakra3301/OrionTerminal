@@ -248,7 +248,7 @@ fn snapshot(src_path: &Path, target: &Path, deadline: Instant) -> Result<(), Str
 
 fn managed_name(name: &str) -> bool {
     let Some(stem) = name
-        .strip_prefix("orion-")
+        .strip_prefix(&format!("{}-", crate::app_profile::current().backup_prefix))
         .and_then(|s| s.strip_suffix(".db"))
     else {
         return false;
@@ -350,7 +350,7 @@ fn prune(dir: &Path, current: &Path, deadline: Instant) -> Result<(), String> {
 }
 
 fn backup_and_rotate(dir: &Path, deadline: Instant) -> Result<Option<String>, String> {
-    let source = dir.join("orion.db");
+    let source = dir.join(crate::app_profile::db_file());
     match fs::symlink_metadata(&source) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(error.to_string()),
@@ -379,7 +379,8 @@ fn backup_and_rotate(dir: &Path, deadline: Instant) -> Result<Option<String>, St
         .map_err(|e| e.to_string())?
         .as_secs();
     let target = backups.join(format!(
-        "orion-{}-{}.db",
+        "{}-{}-{}.db",
+        crate::app_profile::current().backup_prefix,
         stamp_utc(secs),
         ulid::Ulid::new()
     ));

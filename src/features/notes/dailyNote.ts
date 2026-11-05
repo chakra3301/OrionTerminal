@@ -1,6 +1,6 @@
 import { useNotesStore } from "@/store/notesStore";
 import { useArchives } from "@/apps/archives/useArchives";
-import { useShell } from "@/shell/store/useShell";
+import { revealArchives } from "@/apps/archives/host";
 import { toast } from "@/store/toastStore";
 import { log } from "@/lib/log";
 
@@ -36,7 +36,7 @@ export async function openDailyNote(): Promise<void> {
   const goto = (id: string) => {
     useArchives.getState().setSelectedNoteId(id);
     useArchives.getState().setView("journal");
-    useShell.getState().openApp("archives");
+    revealArchives();
   };
 
   if (existing) {

@@ -16,7 +16,7 @@ pub struct Checkpoint { id: String, label: String, created_at: i64, bytes: i64, 
 
 fn identity(id: &str) -> Result<(), String> { ulid::Ulid::from_string(id).map(|_| ()).map_err(|_| "Invalid project checkpoint identity".into()) }
 fn now() -> i64 { SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis().min(i64::MAX as u128) as i64 }
-fn database_path(app: &AppHandle) -> Result<PathBuf, String> { Ok(app.path().app_config_dir().map_err(|e| e.to_string())?.join("orion.db")) }
+fn database_path(app: &AppHandle) -> Result<PathBuf, String> { Ok(app.path().app_config_dir().map_err(|e| e.to_string())?.join(crate::app_profile::db_file())) }
 fn open(path: PathBuf) -> Result<Connection, String> {
     let db = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE).map_err(|e| e.to_string())?;
     db.busy_timeout(std::time::Duration::from_secs(5)).map_err(|e| e.to_string())?;
