@@ -18,7 +18,7 @@ export function seeded(a: number, b: number): number {
 }
 
 /** Strands per link: heavier links get thicker bundles; a frame budget caps the total. */
-export function strandCount(weight: number, edgeCount: number, budget = 3200): number {
+export function strandCount(weight: number, edgeCount: number, budget = 2400): number {
   const wanted = 4 + Math.round(Math.max(0, Math.min(1, weight)) * 6);
   const scale = Math.min(1, budget / Math.max(1, edgeCount * 8));
   return Math.max(2, Math.round(wanted * scale));
@@ -48,7 +48,14 @@ export type FilamentFrame = {
   fieldRadius: number;
   /** The orb's breath, 0..1: swells the node glow. */
   breath?: number;
+  /** Eased cursor the strands part around, its strength 0..1, and its reach in px. */
+  pointer?: { x: number; y: number } | null;
+  push?: number;
+  reach?: number;
 };
+
+/** Points per strand: enough for two travelling waves to read as smooth curves. */
+const SEGMENTS = 18;
 
 function bezierPoint(
   ax: number, ay: number, c1x: number, c1y: number, c2x: number, c2y: number, bx: number, by: number, u: number,
@@ -63,6 +70,10 @@ function bezierPoint(
 
 export function drawFilaments(f: FilamentFrame): void {
   const { ctx, t, proj, ink } = f;
+  const pointer = f.pointer ?? null;
+  const push = pointer ? (f.push ?? 0) : 0;
+  const reach = f.reach ?? 1;
+  const reach2 = reach * reach;
   const col = (a: number) => `rgba(${ink}, ${a})`;
   ctx.save();
   if (f.fieldRadius > 0) {
@@ -95,29 +106,65 @@ export function drawFilaments(f: FilamentFrame): void {
     for (let k = 0; k < n; k++) {
       const s1 = seeded(edge.ia * 131 + k, edge.ib);
       const s2 = seeded(edge.ib * 173 + k, edge.ia);
-      const sway = Math.sin(t * (0.35 + s1 * 0.5) + s2 * TAU);
+      const s3 = seeded(edge.ia * 59 + k * 7, edge.ib * 31 + 5);
+      const s4 = seeded(edge.ib * 89 + k * 13, edge.ia * 17 + 3);
+      // The strand's resting shape: a loose arc, different for every strand.
       const spread = len * (0.12 + 0.5 * s1);
-      const o1 = (s2 - 0.5) * spread * 1.8 + sway * spread * 0.4;
-      const o2 = (s1 - 0.5) * spread * 1.8 - sway * spread * 0.35;
+      const o1 = (s2 - 0.5) * spread * 1.8;
+      const o2 = (s1 - 0.5) * spread * 1.8;
       const c1x = ax + dx * 0.3 + nx * o1;
       const c1y = ay + dy * 0.3 + ny * o1;
       const c2x = ax + dx * 0.7 + nx * o2;
       const c2y = ay + dy * 0.7 + ny * o2;
-      // A loop: the strand overshoots sideways and doubles back near its middle.
-      const loop = (seeded(edge.ia + k * 17, edge.ib * 3) - 0.5) * spread * 1.4 + sway * spread * 0.25;
-      const mx = (c1x + c2x) / 2 + nx * loop;
-      const my = (c1y + c2y) / 2 + ny * loop;
+      // Its own motion: two waves travelling along it at its own speeds and
+      // directions, so no two strands ever move together. Ends stay pinned.
+      const amp = Math.min(46, spread * (0.16 + 0.3 * s3));
+      const waves1 = 0.6 + s2 * 1.6;
+      const waves2 = 1.4 + s4 * 2.2;
+      const sp1 = (s3 > 0.5 ? 1 : -1) * (0.35 + s1 * 1.1);
+      const sp2 = (s4 > 0.5 ? -1 : 1) * (0.5 + s2 * 1.3);
+      const ph1 = s4 * TAU;
+      const ph2 = s3 * TAU;
+      const sens = 0.4 + s2 * 1.2;
+      const at = (u: number): [number, number] => {
+        const [bx0, by0] = bezierPoint(ax, ay, c1x, c1y, c2x, c2y, bx, by, u);
+        const env = Math.sin(Math.PI * u);
+        const off =
+          env * amp * (Math.sin(TAU * waves1 * u - t * sp1 + ph1) + 0.45 * Math.sin(TAU * waves2 * u - t * sp2 + ph2));
+        let x = bx0 + nx * off;
+        let y = by0 + ny * off;
+        if (push > 0) {
+          // The cursor parts the strands; each gives way by its own amount.
+          const qx = x - pointer!.x;
+          const qy = y - pointer!.y;
+          const d2 = qx * qx + qy * qy;
+          if (d2 < reach2) {
+            const d = Math.sqrt(d2) + 1e-3;
+            const fall = 1 - d / reach;
+            const m = fall * fall * reach * 0.32 * sens * env * push;
+            x += (qx / d) * m;
+            y += (qy / d) * m;
+          }
+        }
+        return [x, y];
+      };
       ctx.lineWidth = 0.4 + s1 * 0.55;
       ctx.strokeStyle = col(base * (0.5 + s2));
       ctx.beginPath();
+      // Smooth: quadratic curves through the midpoints of the sampled points.
       ctx.moveTo(ax, ay);
-      ctx.bezierCurveTo(c1x, c1y, c1x + nx * loop * 0.6 + dx * 0.15, c1y + ny * loop * 0.6 + dy * 0.15, mx, my);
-      ctx.bezierCurveTo(c2x - nx * loop * 0.6 - dx * 0.15, c2y - ny * loop * 0.6 - dy * 0.15, c2x, c2y, bx, by);
+      let [qx0, qy0] = at(1 / SEGMENTS);
+      for (let j = 2; j <= SEGMENTS; j++) {
+        const [qx1, qy1] = at(j / SEGMENTS);
+        ctx.quadraticCurveTo(qx0, qy0, (qx0 + qx1) / 2, (qy0 + qy1) / 2);
+        qx0 = qx1;
+        qy0 = qy1;
+      }
+      ctx.lineTo(bx, by);
       ctx.stroke();
       if (k < 2) {
         // Dust drifting along this strand.
-        const u = (t * (0.025 + s1 * 0.05) + s2) % 1;
-        const [px, py] = bezierPoint(ax, ay, c1x, c1y, c2x, c2y, bx, by, u);
+        const [px, py] = at((t * (0.025 + s1 * 0.05) + s2) % 1);
         dust.push(px, py, edge.alpha);
       }
     }
@@ -134,7 +181,7 @@ export function drawFilaments(f: FilamentFrame): void {
       const s2 = seeded(node.i * 313 + k, 11);
       const ang = out + (s1 - 0.5) * 2.4;
       const L = (20 + s2 * 70) * persp;
-      const curl = (s1 > 0.5 ? 1 : -1) * (0.9 + s2 * 1.4) + Math.sin(t * 0.6 + s1 * TAU) * 0.35;
+      const curl = (s1 > 0.5 ? 1 : -1) * (0.9 + s2 * 1.4) + Math.sin(t * (s2 > 0.5 ? 1 : -1) * (0.4 + s1 * 0.9) + s1 * TAU) * 0.6;
       const ex = x + Math.cos(ang) * L;
       const ey = y + Math.sin(ang) * L;
       const c1x = x + Math.cos(ang + curl * 0.4) * L * 0.5;

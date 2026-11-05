@@ -509,7 +509,7 @@ export function BrainView() {
       const filaments = archivesHost().brainStyle === "filaments";
       if (filaments) {
         // Ease the drift in and out instead of starting and stopping it.
-        spin += ((idle ? 0.0011 : 0) - spin) * 0.02;
+        spin += ((idle && !pointer ? 0.0011 : 0) - spin) * 0.08;
         cam.ry += spin;
       } else if (idle) cam.ry += 0.0007;
 
@@ -553,7 +553,7 @@ export function BrainView() {
       const flowT = (reducedMotion ? 0.25 : 1) * (nowMs / 1000);
       if (filaments) {
         flow = ensureFlow(flow, simNodes.length);
-        stepFlow(flow, proj, flowT, dragRef.current ? null : pointer, Math.min(w, h) * 0.22);
+        stepFlow(flow, proj, dragRef.current ? null : pointer, Math.min(w, h) * 0.22);
       }
       const hubBudget = filaments ? 0 : Math.round(10 * Math.pow(cam.zoom, 1.4));
 
@@ -627,7 +627,7 @@ export function BrainView() {
             tendrils: Math.min(6, 1 + Math.round(Math.sqrt(n.degree))),
           });
         }
-        drawFilaments({ ctx, t: flowT, breath: breath(flowT), proj, cx: w / 2, cy: h / 2, edges: fEdges, nodes: fNodes, ink, additive: paperDark(), paper, fieldRadius: paperDark() ? Math.min(w, h) * 0.62 : 0 });
+        drawFilaments({ ctx, t: flowT, breath: breath(flowT), pointer: flow?.pointer ?? null, push: flow?.strength ?? 0, reach: Math.min(w, h) * 0.22, proj, cx: w / 2, cy: h / 2, edges: fEdges, nodes: fNodes, ink, additive: paperDark(), paper, fieldRadius: paperDark() ? Math.min(w, h) * 0.62 : 0 });
         drawLabels();
         raf = requestAnimationFrame(draw);
         return;

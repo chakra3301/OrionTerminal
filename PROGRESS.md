@@ -1,3 +1,13 @@
+## 2026-11-05 (cont. 9) — Archives 47: every Brain strand moves on its own; nodes are anchors
+
+Branch: `alpha/archives-app`. Owner: "i want it to feel like every string is seperate and has its own movement and also because that change now it to hard to click the nodes, the nodes are like anchors and everything else has fluid movement".
+
+Done:
+- Nodes no longer drift. `flow.ts` only eases the cursor and measures how near each node is (for glow), so hit-testing matches what's drawn. The idle spin also stops while the cursor is over the cloud.
+- Each strand is sampled at 18 points and drawn as smooth curves. Two waves travel along it, with speeds, directions, wave counts and phases seeded per strand, so no two strands move together. The ends stay pinned to their nodes. The cursor parts strands, each by its own amount, and they ease back when it leaves. Tendrils also curl at their own speeds.
+- The strand budget dropped from 3200 to 2400 per frame to pay for the extra points.
+- Tests: `flow.test.ts` asserts nodes never move. Recording: `docs/alpha/archives-app/brain-flow.gif`.
+
 ## 2026-11-05 (cont. 8) — Archives 47: Brain flows like the ROSIE orb
 
 Branch: `alpha/archives-app`. Owner: "i want the movement of the brain to feel more flowy, in orion terminal we made an orb for rosie i want it to be like that feeling".

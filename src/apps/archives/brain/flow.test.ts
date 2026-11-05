@@ -4,24 +4,20 @@ import { breath, createFlow, ensureFlow, stepFlow } from "./flow";
 const cloud = () => Float32Array.from([100, 100, 1, 200, 120, 1, 150, 220, 0.8]);
 
 describe("Brain flow", () => {
-  it("drifts every point a few px and never far", () => {
+  it("never moves a node, so clicks land where the node is drawn", () => {
     const proj = cloud();
     const f = createFlow(3);
-    stepFlow(f, proj, 3.2, null, 200);
-    const base = cloud();
-    for (let i = 0; i < 9; i += 3) {
-      const d = Math.hypot(proj[i]! - base[i]!, proj[i + 1]! - base[i + 1]!);
-      expect(d).toBeLessThan(20);
-    }
+    for (let s = 0; s < 30; s++) stepFlow(f, proj, { x: 105, y: 100 }, 200);
+    expect(Array.from(proj)).toEqual(Array.from(cloud()));
   });
 
-  it("pushes points from the cursor and lets them settle back", () => {
+  it("eases the cursor in, glows nearby nodes, and fades out after it leaves", () => {
     const f = createFlow(3);
-    for (let s = 0; s < 6; s++) stepFlow(f, cloud(), 0, { x: 105, y: 100 }, 200);
-    expect(Math.hypot(f.ox[0]!, f.oy[0]!)).toBeGreaterThan(1);
-    expect(f.near[0]!).toBeGreaterThan(0.5);
-    for (let s = 0; s < 600; s++) stepFlow(f, cloud(), 0, null, 200);
-    expect(Math.hypot(f.ox[0]!, f.oy[0]!)).toBeLessThan(0.05);
+    for (let s = 0; s < 60; s++) stepFlow(f, cloud(), { x: 105, y: 100 }, 200);
+    expect(f.strength).toBeGreaterThan(0.9);
+    expect(f.near[0]!).toBeGreaterThan(f.near[2]!);
+    for (let s = 0; s < 400; s++) stepFlow(f, cloud(), null, 200);
+    expect(f.strength).toBeLessThan(0.01);
     expect(f.near[0]!).toBeLessThan(0.01);
   });
 
