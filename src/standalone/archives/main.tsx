@@ -24,7 +24,11 @@ import "./archives.css";
 
 // Must run before the app module loads so shared code reads the right names.
 setProductName(APP_NAME);
-setArchivesHost({ productName: APP_NAME });
+setArchivesHost({
+  productName: APP_NAME,
+  // Lazy so the Settings module loads with the app, not before the host is set.
+  openSettings: () => void import("./ArchivesSettings").then((m) => m.useArchivesSettings.getState().show()),
+});
 
 installPanelDragGuard();
 installPageMenuGuard();

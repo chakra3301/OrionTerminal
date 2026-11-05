@@ -1,3 +1,17 @@
+## 2026-11-05 (cont.) — Archives 47: full Settings panel
+
+Branch: `alpha/archives-app` (worktree `~/Orion_Terminal-worktrees/archives-app`). Owner: "we need settings pannel".
+
+Done:
+1. Settings now has seven sections in three groups (`standalone/archives/ArchivesSettings.tsx`, `settingsSections.tsx`):
+   - App: General (themes, Reduce transparency), Library (library path, Show in Finder, Export all notes, Import Markdown), Shortcuts (generated from the command registry).
+   - AI: AI Providers, Archive Assistant, API Keys.
+   - Help: About.
+2. A visible Settings button is pinned to the bottom of the Archives sidebar. It comes from a new optional `openSettings` hook on `ArchivesHost`; Orion leaves it null, so Orion's sidebar is unchanged. ⌘, and the menu still open Settings too.
+3. Verified: Orion and Archives typechecks pass; the Archives, controlpanel and builtinApps vitest suites pass (46 files, 295 tests). Every section was checked in fixture screenshots.
+
+Next: the owner inspects the reinstalled app.
+
 ## 2026-11-05 — Archives 47 standalone app: build (step 2)
 
 Branch: `alpha/archives-app` in the worktree `~/Orion_Terminal-worktrees/archives-app`, cut from `45f1b14`. Committed, release-built and installed to /Applications with the owner's OK (not pushed). The main checkout and its `node_modules/.vite` were not touched.

@@ -54,3 +54,24 @@ body,
   --neon-violet-rgb: var(--neon-green-rgb);
   --acc-rgb: var(--neon-green-rgb);
 }
+
+/* Sidebar Settings button, pinned to the bottom of the library sidebar. */
+.ar-sidebar .ar-sidebar-settings {
+  margin-top: auto;
+  flex-shrink: 0;
+  border-top: 1px solid var(--glass-border);
+  border-radius: 0 0 var(--r-md) var(--r-md);
+  padding-top: var(--space-2);
+}
+
+.a47-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+.a47-settings-actions .ot-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

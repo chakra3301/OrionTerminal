@@ -21,6 +21,8 @@ export type ArchivesHost = {
   focusedNoteId: () => string | null;
   /** Close any note views the host keeps outside Archives (Orion workspace tabs). */
   closeNoteViews: () => void;
+  /** Opens the host's settings from the Archives sidebar. Null hides the button (Orion has its own Control Panel). */
+  openSettings: (() => void) | null;
   /** Product name shown in empty states ("Orion Terminal", "Archives 47"). */
   productName: string;
 };
@@ -32,6 +34,7 @@ const standaloneDefaults: ArchivesHost = {
   openWebsiteClone: null,
   focusedNoteId: () => getActiveNoteEditor()?.id ?? null,
   closeNoteViews: () => {},
+  openSettings: null,
   productName: "Archives 47",
 };
 

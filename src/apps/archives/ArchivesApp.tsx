@@ -18,7 +18,9 @@ import {
   GraduationCap,
   BrainCircuit,
   ArrowDownToLine,
+  Settings,
 } from "lucide-react";
+import { archivesHost } from "@/apps/archives/host";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppConfig, resolveConfig, appFirstTurnPreamble, appAllowedTools } from "@/store/appConfigStore";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
@@ -458,10 +460,23 @@ function ArchivesSidebar({
 
       <SidebarCollections />
       <SidebarTags />
+      <SidebarSettingsButton />
     </aside>
   );
 }
 
+
+function SidebarSettingsButton() {
+  const open = archivesHost().openSettings;
+  if (!open) return null;
+  return (
+    <button type="button" className="ar-nav ar-sidebar-settings" onClick={open}>
+      <Settings size={14} />
+      <span>Settings</span>
+      <span className="badge">⌘,</span>
+    </button>
+  );
+}
 
 /**
  * Run an ingest action and, if Mood detail has a board open, also attach
