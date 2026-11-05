@@ -33,6 +33,7 @@ export function GeneralSection() {
   const accent = useAppearance((s) => s.accent);
   const background = useAppearance((s) => s.background);
   const frosted = useAppearance((s) => s.frosted);
+  const tint = useAppearance((s) => s.tint);
   const update = useAppearance((s) => s.update);
   const reset = useAppearance((s) => s.reset);
   return (
@@ -42,7 +43,7 @@ export function GeneralSection() {
         <div className="a47-setting__row">
           <div>
             <div className="a47-setting__title">Material</div>
-            <div className="a47-setting__sub">Glass: every panel is frosted over your desktop. Solid: opaque panels.</div>
+            <div className="a47-setting__sub">Glass: every panel is frosted over your desktop, tinted with the background colour. Solid: opaque panels.</div>
           </div>
           <div className="a47-segmented" role="radiogroup" aria-label="Material">
             {([true, false] as const).map((on) => (
@@ -59,6 +60,24 @@ export function GeneralSection() {
             ))}
           </div>
         </div>
+        {frosted && (
+          <label className="a47-tint">
+            <span className="a47-wheel__caption">Tint</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(tint * 100)}
+              aria-label="Glass tint"
+              className="a47-tint__range"
+              style={{ background: `linear-gradient(to right, transparent, ${background})` }}
+              onChange={(e) => update({ tint: Number(e.target.value) / 100 }, { persist: false })}
+              onPointerUp={(e) => update({ tint: Number((e.target as HTMLInputElement).value) / 100 })}
+              onKeyUp={(e) => update({ tint: Number((e.target as HTMLInputElement).value) / 100 })}
+            />
+            <span className="a47-tint__value">{Math.round(tint * 100)}%</span>
+          </label>
+        )}
       </div>
       <div className="a47-setting">
         <div className="a47-setting__row">

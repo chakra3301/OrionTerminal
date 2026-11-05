@@ -7,13 +7,15 @@ import { appearanceVariables, DEFAULT_APPEARANCE, normalizeAppearance } from "./
 
 describe("Archives 47 appearance", () => {
   it("defaults to neon green on a dark frosted window", () => {
-    expect(normalizeAppearance(undefined)).toEqual({ accent: "#39ff88", background: "#0a1015", frosted: true });
+    expect(normalizeAppearance(undefined)).toEqual({ accent: "#39ff88", background: "#0a1015", frosted: true, tint: 0.22 });
     expect(normalizeAppearance({ accent: "nope", background: 4, frosted: "yes" })).toEqual(DEFAULT_APPEARANCE);
     expect(normalizeAppearance({ style: "flat", accent: "#E8173F", background: "#FFFFFF", frosted: false })).toEqual({
       accent: "#e8173f",
       background: "#ffffff",
       frosted: false,
+      tint: 0.22,
     });
+    expect(normalizeAppearance({ tint: 4 }).tint).toBe(1);
   });
 
   it("uses one accent for every app hue", () => {
@@ -33,6 +35,12 @@ describe("Archives 47 appearance", () => {
   it("uses EMP's square corners in Glass and Solid alike", () => {
     expect(appearanceVariables(DEFAULT_APPEARANCE)["--r-lg"]).toBe("5px");
     expect(appearanceVariables({ ...DEFAULT_APPEARANCE, frosted: false })["--r-lg"]).toBe("5px");
+  });
+
+  it("only tints the glass with the background colour", () => {
+    const v = appearanceVariables({ ...DEFAULT_APPEARANCE, background: "#000000" });
+    expect(v["--a47-surface"]).toContain("22%, transparent");
+    expect(appearanceVariables({ ...DEFAULT_APPEARANCE, tint: 0.5 })["--a47-surface"]).toContain("50%, transparent");
   });
 
   it("makes surfaces translucent only when frosted, and keeps menus opaque", () => {

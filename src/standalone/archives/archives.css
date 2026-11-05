@@ -67,9 +67,9 @@ body:has(> #root) .a47-window .ot-resize-handle.vertical {
 /* Cards and editors sit one step up, flat (no card-in-card glow). */
 body:has(> #root) .a47-window :is(.ar-card, .ar-note-card, .ar-db-card, .note-editor-body) {
   background: var(--a47-raised);
-  border: 1px solid var(--a47-line);
+  border: 1px solid var(--a47-rim);
   border-radius: var(--r-lg);
-  box-shadow: none;
+  box-shadow: var(--a47-sheen);
 }
 
 /* ── Sidebar ───────────────────────────────────────────────────────────── */
@@ -404,6 +404,38 @@ body:has(> #root) :is(
   background: var(--a47-accent);
   color: var(--t-on-accent);
   filter: brightness(1.08);
+}
+
+/* Glass tint slider in Settings → Appearance. */
+.a47-tint {
+  display: grid;
+  grid-template-columns: auto 1fr 40px;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+.a47-tint__range {
+  height: 8px;
+  margin: 0;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--a47-line-strong);
+  appearance: none;
+  cursor: pointer;
+}
+.a47-tint__range::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--a47-line-strong);
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  appearance: none;
+}
+.a47-tint__value {
+  color: var(--t-tertiary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 /* Style switch in Settings → Appearance. */

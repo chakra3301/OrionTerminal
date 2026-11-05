@@ -29,7 +29,7 @@
         "transparent": true,
         "windowEffects": {
           "effects": [
-            "underWindowBackground"
+            "sidebar"
           ],
           "state": "active"
         }

@@ -1,3 +1,15 @@
+## 2026-11-05 (cont. 6) — Archives 47: the background colour only tints the glass
+
+Branch: `alpha/archives-app`. Owner: "the background colour should just tint the glass not make it feel like its a solid colour" plus a glassmorphism reference card (logged in `~/ai/design-refs/FEEDBACK.md`).
+
+Done:
+- In Glass, the panels are the background colour at 22% by default (it was 58–84%), so the macOS blur does the frosting and the desktop reads through as soft colour fields. Settings → Appearance → Material has a new **Tint** slider (0–100%, Glass only), saved as `tint` in `archives.appearance`. The sidebar is 75% of the tint and cards are tint +10%.
+- Cards have a thin light rim and a faint top highlight in Glass (`--a47-rim`, `--a47-sheen`).
+- The native window effect changed from `underWindowBackground` to `sidebar`, a lighter and more see-through macOS material.
+- Tests: `appearance.test.ts` covers tint parsing and the alphas. Orion `tsc` passes. Mock-up over the owner's reference image: `docs/alpha/archives-app/screenshot-glass.png`.
+
+Next: the owner checks it on his real desktop and sets the Tint to taste.
+
 ## 2026-11-05 (cont. 5) — Archives 47: Glass now actually see-through
 
 Branch: `alpha/archives-app`. Owner: "on glass its still solid" (screenshot of the installed app).

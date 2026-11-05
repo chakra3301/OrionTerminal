@@ -21,9 +21,18 @@ export type Appearance = {
   background: string;
   /** Glass: see-through panes with the macOS blur behind them. Off = Solid. */
   frosted: boolean;
+  /** Glass only: how strongly the background colour tints the glass, 0..1. */
+  tint: number;
 };
 
-export const DEFAULT_APPEARANCE: Appearance = { accent: DEFAULT_ACCENT, background: DEFAULT_BACKGROUND, frosted: true };
+export const DEFAULT_TINT = 0.22;
+
+export const DEFAULT_APPEARANCE: Appearance = {
+  accent: DEFAULT_ACCENT,
+  background: DEFAULT_BACKGROUND,
+  frosted: true,
+  tint: DEFAULT_TINT,
+};
 
 /** Accepts whatever app_state returned and fills in defaults. */
 export function normalizeAppearance(raw: unknown): Appearance {
@@ -33,6 +42,7 @@ export function normalizeAppearance(raw: unknown): Appearance {
     accent: hex(r.accent, DEFAULT_ACCENT),
     background: hex(r.background, DEFAULT_BACKGROUND),
     frosted: typeof r.frosted === "boolean" ? r.frosted : true,
+    tint: typeof r.tint === "number" && Number.isFinite(r.tint) ? Math.min(1, Math.max(0, r.tint)) : DEFAULT_TINT,
   };
 }
 
@@ -41,12 +51,15 @@ function rgbList(hex: string): string {
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
-/** Surface alphas over the macOS blur. Lower = more of the desktop shows through.
- * Light backgrounds need more cover: a bright desktop bleeds through light glass. */
-export const FROST = {
-  dark: { sidebar: 0.58, surface: 0.7, raised: 0.82 },
-  light: { sidebar: 0.76, surface: 0.84, raised: 0.92 },
-} as const;
+/**
+ * Glass alphas over the macOS blur, from the tint. The background colour only
+ * tints the glass: the macOS material does the blur and the frosting, so the
+ * desktop reads through as soft colour fields. The sidebar is a little clearer
+ * than the main pane, and cards sit one small step up.
+ */
+export function glassAlphas(tint: number) {
+  return { sidebar: tint * 0.75, surface: tint, raised: Math.min(1, tint + 0.1) };
+}
 
 /**
  * CSS variables for <html>. Ink tiers follow EMP (94/74/54/36%); surfaces are
@@ -55,13 +68,13 @@ export const FROST = {
  */
 export function appearanceVariables(a: Appearance): Record<string, string> {
   const dark = isDark(a.background);
-  const f = dark ? FROST.dark : FROST.light;
+  const f = glassAlphas(a.tint);
   const ink = dark ? "#f2f5f3" : "#1f2328";
   const inkRgb = rgbList(ink);
   const accentRgb = rgbList(a.accent);
   const mix = (inkPct: number) => `color-mix(in srgb, ${a.background} ${100 - inkPct}%, ${ink})`;
   const frost = (inkPct: number, alpha: number) =>
-    a.frosted ? `color-mix(in srgb, ${mix(inkPct)} ${Math.round(alpha * 100)}%, transparent)` : mix(inkPct);
+    a.frosted ? `color-mix(in srgb, ${mix(inkPct)} ${Math.round(alpha * 1000) / 10}%, transparent)` : mix(inkPct);
   const onAccent = luminance(a.accent) > 0.4 ? "#06090c" : "#ffffff";
   const vars: Record<string, string> = {
     "--a47-surface": frost(0, f.surface),
@@ -83,6 +96,9 @@ export function appearanceVariables(a: Appearance): Record<string, string> {
     "--glass-border": `rgba(${inkRgb}, ${dark ? 0.1 : 0.08})`,
     "--glass-border-bright": `rgba(${inkRgb}, ${dark ? 0.18 : 0.15})`,
     "--glass-highlight": `rgba(${inkRgb}, 0.04)`,
+    // Glass edges: a thin light rim and a faint top highlight on cards (as in the reference).
+    "--a47-rim": a.frosted ? `rgba(255, 255, 255, ${dark ? 0.12 : 0.45})` : `rgba(${inkRgb}, ${dark ? 0.1 : 0.08})`,
+    "--a47-sheen": a.frosted ? `inset 0 1px 0 rgba(255, 255, 255, ${dark ? 0.08 : 0.5})` : "none",
     "--shadow-glow-green": "0 0 0 transparent",
     "--shadow-glow-cyan": "0 0 0 transparent",
     "--shadow-glow-magenta": "0 0 0 transparent",
@@ -143,7 +159,12 @@ export const useAppearance = create<AppearanceState>((set, get) => {
       void setAppState("archives.appearance", next).catch((e) => log.warn("appearance save failed", e));
     }
   };
-  const current = (): Appearance => ({ accent: get().accent, background: get().background, frosted: get().frosted });
+  const current = (): Appearance => ({
+    accent: get().accent,
+    background: get().background,
+    frosted: get().frosted,
+    tint: get().tint,
+  });
   return {
     ...DEFAULT_APPEARANCE,
     hydrate: (raw) => commit(normalizeAppearance(raw), false),
