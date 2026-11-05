@@ -1,3 +1,23 @@
+## 2026-11-05 (cont. 2) — Archives 47: frosted window, EMP styling, EMP colour picker
+
+Branch: `alpha/archives-app` (worktree `~/Orion_Terminal-worktrees/archives-app`). Owner: "i want it more frosted and hoenestly i want it shaped and styled like emp and i want the same colour pick option as emp" (logged in `~/ai/design-refs/FEEDBACK.md`).
+
+Done:
+1. **Frosted window.** The window is transparent with the macOS under-window blur (`tauri.archives.conf.json`: `transparent`, `windowEffects`). That needs Tauri's `macos-private-api` feature, which is passed as `--features tauri/macos-private-api` in the Archives npm scripts and install script only. `Cargo.toml` and Orion are unchanged. Panes are 58–84% opaque on dark backgrounds and 76–92% on light ones (a bright desktop needs more cover). A "Frosted window" switch in Settings turns it off.
+2. **EMP styling** (`standalone/archives/archives.css`, `chrome.tsx`):
+   - The sidebar starts with the ARCHIVES 47 wordmark (ARCHES outlines from the site, never the font) in the highlight colour, clear of the traffic lights.
+   - Section labels are uppercase, tracked 0.16em, in the highlight colour, each with EMP's dither square.
+   - 29px nav rows with a tinted active band, a 34px top bar with an uppercase crumb, and a 22px status bar ("Library ready", save status, item count, version).
+   - Corners are 2/3/5px, the font is the system font, and there are no glows.
+   - The old title strip is gone; empty parts of the top bar, sidebar header and status bar drag the window, and a double-click zooms it.
+   - The selectors use `body:has(> #root)` so they beat Orion's theme rules without `!important`.
+3. **EMP's colour picker.** `ColorWheel.tsx` and `color.ts` are ported from EMP as is, with the class names prefixed. Settings → Appearance has a Highlight colour wheel and a Background wheel (brightness slider, hex field, Reset), plus the Frosted switch. `appearance.ts` derives everything from those two colours the EMP way: ink at 94/74/54/36%, light ink on dark backgrounds, one accent for every app hue, surfaces mixed from the background. It's stored in app_state `archives.appearance`. The Orion theme list is gone from Archives.
+4. Tests: `appearance.test.ts` and EMP's `color.test.ts`. Orion `tsc` passes, and the Archives, controlpanel and builtinApps suites pass (48 files, 302 tests). Fixture screenshot over a blurred stand-in desktop: `docs/alpha/archives-app/screenshot-frosted.png`.
+
+Next: the owner checks the real frost on his own desktop (the screenshots approximate the macOS blur in Chrome).
+
+Open questions (owner): How frosted is right on his desktop? The dials are `FROST` in `appearance.ts`.
+
 ## 2026-11-05 (cont.) — Archives 47: full Settings panel
 
 Branch: `alpha/archives-app` (worktree `~/Orion_Terminal-worktrees/archives-app`). Owner: "we need settings pannel".

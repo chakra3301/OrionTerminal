@@ -6,6 +6,7 @@ import { installPanelDragGuard } from "@/lib/panelDragGuard";
 import { setProductName } from "@/lib/productName";
 import { setArchivesHost } from "@/apps/archives/host";
 import { APP_NAME } from "./brand";
+import { SidebarBrand } from "./chrome";
 
 import "@fontsource/space-grotesk/300.css";
 import "@fontsource/space-grotesk/400.css";
@@ -26,6 +27,7 @@ import "./archives.css";
 setProductName(APP_NAME);
 setArchivesHost({
   productName: APP_NAME,
+  SidebarHeader: SidebarBrand,
   // Lazy so the Settings module loads with the app, not before the host is set.
   openSettings: () => void import("./ArchivesSettings").then((m) => m.useArchivesSettings.getState().show()),
 });

@@ -57,6 +57,7 @@ export type AppStateKey =
   | "ai.sessionOwners"
   | "ai.background"
   | "appconfig"
+  | "archives.appearance"
   | "plugins.state"
   | "plugins.appearance"
   | "widget.monitor"

@@ -1,17 +1,17 @@
 /** Archives 47's own Settings sections: General, Library, Shortcuts, About. */
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { appConfigDir } from "@tauri-apps/api/path";
-import { Check, Download, FolderOpen, Upload } from "lucide-react";
+import { Download, FolderOpen, Upload } from "lucide-react";
 import { registry, type Command } from "@/commands/registry";
 import { ipc } from "@/lib/ipc";
 import { log } from "@/lib/log";
 import { toast } from "@/store/toastStore";
 import { useNotesStore } from "@/store/notesStore";
-import { THEMES, useThemeStore } from "@/store/themeStore";
-import { ThemeSphere } from "@/features/settings/ThemeSphere";
 import { exportArchiveBackup, importMarkdownFiles } from "@/apps/archives/exportImport";
 import { APP_NAME, APP_TAGLINE } from "./brand";
 import { formatHotkey } from "./hotkeyLabel";
+import { ColorWheel } from "./ColorWheel";
+import { DEFAULT_ACCENT, DEFAULT_BACKGROUND, useAppearance } from "./appearance";
 import { version as APP_VERSION } from "../../../package.json";
 
 function useDataDir(): string | null {
@@ -36,39 +36,49 @@ function Toggle({ on, label, blurb, onChange }: { on: boolean; label: string; bl
   );
 }
 
+function Swatch({ hex }: { hex: string }) {
+  return <span className="a47-wheel__swatch" style={{ background: hex }} aria-hidden="true" />;
+}
+
+/** EMP's appearance settings: a highlight wheel, a background wheel, and the frosted window. */
 export function GeneralSection() {
-  const theme = useThemeStore((s) => s.theme);
-  const setTheme = useThemeStore((s) => s.set);
-  const reduceGlass = useThemeStore((s) => s.reduceGlass);
-  const setReduceGlass = useThemeStore((s) => s.setReduceGlass);
+  const accent = useAppearance((s) => s.accent);
+  const background = useAppearance((s) => s.background);
+  const frosted = useAppearance((s) => s.frosted);
+  const update = useAppearance((s) => s.update);
+  const reset = useAppearance((s) => s.reset);
   return (
     <>
       <h2 className="ot-settings-h2">Appearance</h2>
-      <p className="ot-settings-p">The theme changes surfaces and type. Archives keeps its neon green accent.</p>
-      <div className="ot-theme-picker">
-        {THEMES.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`ot-theme-card${theme === t.id ? " active" : ""}`}
-            data-theme-swatch={t.id}
-            aria-pressed={theme === t.id}
-            onClick={() => setTheme(t.id)}
-          >
-            <ThemeSphere theme={t.id} />
-            <span className="ot-theme-meta">
-              <span className="ot-theme-name">{t.label}</span>
-              <span className="ot-theme-blurb">{t.blurb}</span>
-            </span>
-            <span className="ot-theme-selected" aria-hidden="true">{theme === t.id && <Check size={14} />}</span>
+      <div className="a47-setting">
+        <div className="a47-setting__row">
+          <div>
+            <div className="a47-setting__title">Highlight colour</div>
+            <div className="a47-setting__sub">Section labels, the selected row, the wordmark, links and buttons.</div>
+          </div>
+          <button type="button" className="ot-settings-btn" disabled={accent === DEFAULT_ACCENT} onClick={() => reset("accent")}>
+            <Swatch hex={DEFAULT_ACCENT} /> Reset
           </button>
-        ))}
+        </div>
+        <ColorWheel label="Highlight colour" value={accent} onChange={(hex, final) => update({ accent: hex }, { persist: final })} />
+      </div>
+      <div className="a47-setting">
+        <div className="a47-setting__row">
+          <div>
+            <div className="a47-setting__title">Background</div>
+            <div className="a47-setting__sub">Panels, cards and lines are mixed from it. Light backgrounds switch the text to dark ink.</div>
+          </div>
+          <button type="button" className="ot-settings-btn" disabled={background === DEFAULT_BACKGROUND} onClick={() => reset("background")}>
+            <Swatch hex={DEFAULT_BACKGROUND} /> Reset
+          </button>
+        </div>
+        <ColorWheel label="Background" value={background} onChange={(hex, final) => update({ background: hex }, { persist: final })} />
       </div>
       <Toggle
-        on={reduceGlass}
-        label="Reduce transparency"
-        blurb="Turns off glass and reduces blur. Lighter on the GPU."
-        onChange={setReduceGlass}
+        on={frosted}
+        label="Frosted window"
+        blurb="Your desktop shows through, blurred, behind the panels. Turn off for solid panels."
+        onChange={(on) => update({ frosted: on })}
       />
     </>
   );

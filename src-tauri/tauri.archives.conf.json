@@ -22,11 +22,23 @@
         "center": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "trafficLightPosition": { "x": 14, "y": 15 }
+        "trafficLightPosition": {
+          "x": 14,
+          "y": 15
+        },
+        "transparent": true,
+        "windowEffects": {
+          "effects": [
+            "underWindowBackground"
+          ],
+          "state": "active"
+        }
       }
     ],
     "security": {
-      "capabilities": ["archives"],
+      "capabilities": [
+        "archives"
+      ],
       "csp": {
         "default-src": "'self' customprotocol: asset:",
         "connect-src": "'self' blob: asset: http://asset.localhost ipc: http://ipc.localhost https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co",
@@ -66,7 +78,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app"],
+    "targets": [
+      "app"
+    ],
     "category": "Productivity",
     "shortDescription": "Archives 47 — an Orion Terminal app",
     "copyright": "© 2026 Luca Orion",

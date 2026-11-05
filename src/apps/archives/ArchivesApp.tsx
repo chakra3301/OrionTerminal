@@ -436,8 +436,10 @@ function ArchivesSidebar({
   noteCount: number;
 }) {
   const chatCount = useArchives((s) => s.chatCount);
+  const Header = archivesHost().SidebarHeader;
   return (
     <aside className="ar-sidebar scroll">
+      {Header && <Header />}
       <SidebarSearch />
 
       <div className="ar-section">Library</div>

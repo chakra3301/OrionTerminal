@@ -21,7 +21,7 @@ export const useArchivesSettings = create<SettingsState>((set) => ({
 }));
 
 const NAV: { key: SettingsSection; label: string; Icon: LucideIcon; group: string }[] = [
-  { key: "general", label: "General", Icon: Palette, group: "App" },
+  { key: "general", label: "Appearance", Icon: Palette, group: "App" },
   { key: "library", label: "Library", Icon: Database, group: "App" },
   { key: "shortcuts", label: "Shortcuts", Icon: Keyboard, group: "App" },
   { key: "providers", label: "AI Providers", Icon: Cpu, group: "AI" },

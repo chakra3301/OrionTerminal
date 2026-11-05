@@ -15,7 +15,6 @@ import { getAppState, getDb, setAppState } from "@/lib/db";
 import { log } from "@/lib/log";
 import { startFileDropOrchestrator } from "@/lib/fileDrop";
 import { toast } from "@/store/toastStore";
-import { useThemeStore } from "@/store/themeStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { useAppConfig, type AppConfigsPersist } from "@/store/appConfigStore";
 import { useProvidersStore } from "@/store/providersStore";
@@ -36,6 +35,8 @@ import { installStandaloneCommands, STANDALONE_OWNER } from "./archivesCommands"
 import { installNativeMenu } from "./nativeMenu";
 import { archivesQuitRisks } from "./archivesQuitRisks";
 import { APP_NAME } from "./brand";
+import { loadAppearance } from "./appearance";
+import { StatusBar, useWindowDragging } from "./chrome";
 
 const contributions = new DisposableScope();
 registerArchivesContributions(STANDALONE_OWNER, contributions);
@@ -43,13 +44,12 @@ installStandaloneCommands();
 
 async function hydrate(): Promise<void> {
   await getDb();
-  const [theme, windowSize, modelPrefs, appConfigs] = await Promise.all([
-    getAppState<string>("theme"),
+  const [, windowSize, modelPrefs, appConfigs] = await Promise.all([
+    loadAppearance(),
     getAppState<{ width: number; height: number }>("window_size"),
     getAppState<Record<string, string>>("models"),
     getAppState<AppConfigsPersist>("appconfig"),
   ]);
-  useThemeStore.getState().hydrate(theme ?? null);
   useModelPrefs.getState().hydrate(modelPrefs);
   useAppConfig.getState().hydrate(appConfigs);
   for (const [name, load] of [
@@ -112,16 +112,6 @@ function useFinderDrops() {
   }, []);
 }
 
-/** Drag strip under the macOS traffic lights; the window has no native title bar. */
-function TitleStrip({ status }: { status: (el: HTMLElement | null) => void }) {
-  return (
-    <div className="a47-titlebar" data-tauri-drag-region>
-      <span className="a47-title" data-tauri-drag-region>{APP_NAME}</span>
-      <span ref={status} className="ot-window-title-status" />
-    </div>
-  );
-}
-
 export function ArchivesStandaloneApp() {
   const [hydrated, setHydrated] = useState(false);
   const [statusTarget, setStatusTarget] = useState<HTMLElement | null>(null);
@@ -131,6 +121,7 @@ export function ArchivesStandaloneApp() {
   useWindowSizePersistence();
   useRefreshOnFocus(hydrated);
   useFinderDrops();
+  useWindowDragging();
 
   useEffect(() => {
     hydrate()
@@ -147,7 +138,6 @@ export function ArchivesStandaloneApp() {
       <HotkeyHost />
       <StandaloneEventBridge />
       <div className="a47-window">
-        <TitleStrip status={setStatusTarget} />
         <div className="a47-body ot-window-body">
           {hydrated ? (
             <WindowTitleStatusContext.Provider value={statusTarget}>
@@ -159,6 +149,7 @@ export function ArchivesStandaloneApp() {
             <div className="ot-app-loading"><div className="ot-claude-orb" style={{ width: 28, height: 28 }} /></div>
           )}
         </div>
+        <StatusBar status={setStatusTarget} />
       </div>
       <RecoveryPanel />
       <PluginOverlays />

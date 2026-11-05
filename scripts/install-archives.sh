@@ -8,6 +8,8 @@
 # ~/Library/Application Support/com.lucaorion.archives47 and its own Keychain
 # service. It never reads or writes Orion Terminal's data.
 set -euo pipefail
+# The frosted window needs macOS private APIs (transparent window + vibrancy). The feature is
+# passed here, not in Cargo.toml, so Orion Terminal builds are unchanged.
 
 cd "$(dirname "$0")/.."
 NAME="Archives 47"
@@ -19,7 +21,7 @@ build_only=0
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
 step "$NAME.app (UI + native, release)"
-ORION_APP_TARGET=archives npx tauri build --bundles app --config src-tauri/tauri.archives.conf.json
+ORION_APP_TARGET=archives npx tauri build --bundles app --features tauri/macos-private-api --config src-tauri/tauri.archives.conf.json
 built="src-tauri/target/release/bundle/macos/$NAME.app"
 [[ -d "$built" ]] || { echo "no bundle at $built" >&2; exit 1; }
 

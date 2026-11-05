@@ -5,6 +5,7 @@
  * importing Orion's shell, editor or companion, so the standalone build never
  * pulls those in. Orion installs its implementation in `orionArchivesHost.ts`.
  */
+import type { ComponentType } from "react";
 import type { ChatRow } from "@/lib/db";
 import { getActiveNoteEditor } from "@/features/notes/editorBridge";
 
@@ -23,6 +24,8 @@ export type ArchivesHost = {
   closeNoteViews: () => void;
   /** Opens the host's settings from the Archives sidebar. Null hides the button (Orion has its own Control Panel). */
   openSettings: (() => void) | null;
+  /** Drawn above the sidebar search (the standalone app's wordmark). Null in Orion. */
+  SidebarHeader: ComponentType | null;
   /** Product name shown in empty states ("Orion Terminal", "Archives 47"). */
   productName: string;
 };
@@ -35,6 +38,7 @@ const standaloneDefaults: ArchivesHost = {
   focusedNoteId: () => getActiveNoteEditor()?.id ?? null,
   closeNoteViews: () => {},
   openSettings: null,
+  SidebarHeader: null,
   productName: "Archives 47",
 };
 
