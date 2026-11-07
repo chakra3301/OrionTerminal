@@ -26,8 +26,8 @@ export type ArchivesHost = {
   openSettings: (() => void) | null;
   /** Drawn above the sidebar search (the standalone app's wordmark). Null in Orion. */
   SidebarHeader: ComponentType | null;
-  /** How Brain draws: Orion's ruled wireframe, or glowing filaments (Archives 47). */
-  brainStyle: "wireframe" | "filaments";
+  /** How Brain draws: Orion's ruled wireframe, or living neurons (Archives 47). */
+  brainStyle: "wireframe" | "neurons";
   /** Product name shown in empty states ("Orion Terminal", "Archives 47"). */
   productName: string;
 };

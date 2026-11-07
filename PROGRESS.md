@@ -1,3 +1,14 @@
+## 2026-11-07 — Archives 47: Brain drawn as living neurons
+
+Branch: `alpha/archives-app`. Owner rejected the filament strands: "i dont like. i want it to feel like actually neurons in a brain".
+
+Done:
+- `apps/archives/brain/neurons.ts` replaces `filaments.ts` and `flow.ts` (both deleted). Each note is a nerve cell: an irregular soma with a soft halo and a seeded dendrite tree that branches 2–3 levels and thins toward the tips. Each link is one axon, thicker near the cell and ending in three synaptic branches with small boutons at the target.
+- Signals: cells fire now and then, sending accent-coloured pulses with a fading tail down their axons. An arriving pulse flashes the next cell and may fire it on, so activity cascades. A refractory period and a 36-pulse cap stop runaway activity. Hovering a cell fires it.
+- Cells never move, so clicks are exact. Dendrites and axons sway slightly like tissue. Reduced motion slows signals, stops spontaneous firing and calms the sway.
+- `ArchivesHost.brainStyle` is now `"wireframe" | "neurons"`; Orion keeps the wireframe.
+- Tests: `neurons.test.ts` covers stable dendrites, network reuse, firing and refractory, cascades and the pulse cap. Screenshot `docs/alpha/archives-app/screenshot-brain.png`, recording `brain-flow.gif`.
+
 ## 2026-11-05 (cont. 9) — Archives 47: every Brain strand moves on its own; nodes are anchors
 
 Branch: `alpha/archives-app`. Owner: "i want it to feel like every string is seperate and has its own movement and also because that change now it to hard to click the nodes, the nodes are like anchors and everything else has fluid movement".

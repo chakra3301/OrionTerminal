@@ -37,8 +37,15 @@ import {
   type LayoutNode,
 } from "@/apps/archives/brain/forceLayout";
 import { log } from "@/lib/log";
-import { drawFilaments, type FilamentEdge, type FilamentNode } from "@/apps/archives/brain/filaments";
-import { breath, ensureFlow, stepFlow, type Flow } from "@/apps/archives/brain/flow";
+import {
+  drawNeurons,
+  ensureNetwork,
+  fireCell,
+  stepNetwork,
+  type Network,
+  type NeuronAxon,
+  type NeuronCell,
+} from "@/apps/archives/brain/neurons";
 
 type MarkerShape = "circle" | "ring" | "square" | "diamond" | "dot";
 
@@ -320,7 +327,9 @@ export function BrainView() {
     if (!ctx) return;
 
     let raf = 0;
-    let flow: Flow | null = null;
+    let net: Network | null = null;
+    let lastFrameMs = 0;
+    let lastFired: string | null = null;
     let spin = 0;
     let pointer: { x: number; y: number } | null = null;
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
@@ -403,9 +412,11 @@ export function BrainView() {
       const cs = getComputedStyle(container);
       ink = inkTriplet(ctx, cs.getPropertyValue("--t-primary"));
       paper = inkTriplet(ctx, cs.getPropertyValue("--bg-0"));
+      accent = inkTriplet(ctx, cs.getPropertyValue("--a47-accent") || cs.getPropertyValue("--neon-green"));
     };
     let ink = "";
     let paper = "";
+    let accent = "";
     readInk();
     let inkReadAt = 0;
     const stroke = (a: number) => `rgba(${ink}, ${a})`;
@@ -506,8 +517,8 @@ export function BrainView() {
       // Slow drift so depth reads; pauses while the user is interacting.
       const idle =
         !dragRef.current && !hover && nowMs - cam.lastInteract > 2000;
-      const filaments = archivesHost().brainStyle === "filaments";
-      if (filaments) {
+      const neurons = archivesHost().brainStyle === "neurons";
+      if (neurons) {
         // Ease the drift in and out instead of starting and stopping it.
         spin += ((idle && !pointer ? 0.0011 : 0) - spin) * 0.08;
         cam.ry += spin;
@@ -550,12 +561,7 @@ export function BrainView() {
       if (matches) candidates.push(...matches);
       if (focusSet) candidates.push(...focusSet);
       candidates.push(...hubOrderRef.current);
-      const flowT = (reducedMotion ? 0.25 : 1) * (nowMs / 1000);
-      if (filaments) {
-        flow = ensureFlow(flow, simNodes.length);
-        stepFlow(flow, proj, dragRef.current ? null : pointer, Math.min(w, h) * 0.22);
-      }
-      const hubBudget = filaments ? 0 : Math.round(10 * Math.pow(cam.zoom, 1.4));
+      const hubBudget = neurons ? 0 : Math.round(10 * Math.pow(cam.zoom, 1.4));
 
       if (boxes.length < simNodes.length * 4) boxes = new Float32Array(simNodes.length * 4);
       boxes.fill(-1);
@@ -603,31 +609,54 @@ export function BrainView() {
       ctx.clearRect(0, 0, w, h);
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
-      if (filaments) {
-        const fEdges: FilamentEdge[] = [];
+      if (neurons) {
+        const pairs: Array<[number, number]> = [];
+        const axonEdges: typeof g.edges = [];
         for (const e of g.edges) {
           const ia = byId.get(e.a);
           const ib = byId.get(e.b);
           if (ia == null || ib == null) continue;
+          pairs.push([ia, ib]);
+          axonEdges.push(e);
+        }
+        net = ensureNetwork(net, simNodes.length, pairs);
+        const dt = Math.min(0.05, lastFrameMs ? (nowMs - lastFrameMs) / 1000 : 0.016);
+        lastFrameMs = nowMs;
+        // Hovering a cell makes it fire, so you can watch its signals travel.
+        if (hover && hover !== lastFired) {
+          const hi = byId.get(hover);
+          if (hi != null) fireCell(net, hi, { force: true });
+        }
+        lastFired = hover;
+        stepNetwork(net, nowMs / 1000, dt * (reducedMotion ? 0.35 : 1), { spontaneous: !reducedMotion });
+        const axons: NeuronAxon[] = [];
+        axonEdges.forEach((e, k) => {
           const inFocus = !!focusSet && focusSet.has(e.a) && focusSet.has(e.b);
           const dimmed = (focusSet && !inFocus) || (matches && !(matches.has(e.a) && matches.has(e.b)));
+          const [ia, ib] = pairs[k]!;
           const depth = depthT((proj[ia * 3 + 2]! + proj[ib * 3 + 2]!) / 2);
-          fEdges.push({ ia, ib, weight: e.weight * (EDGE_SPRING[e.kind] ?? 0.5), alpha: dimmed ? 0.15 : inFocus ? 1.6 : 0.55 + depth * 0.6 });
-        }
-        const fNodes: FilamentNode[] = [];
+          axons.push({ e: k, alpha: dimmed ? 0.18 : inFocus ? 1.8 : 0.6 + depth * 0.6 });
+        });
+        const cells: NeuronCell[] = [];
+        const reachBase = Math.min(w, h) * 0.035 * Math.sqrt(cam.zoom);
         for (const n of g.nodes) {
           const i = byId.get(n.id);
           if (i == null) continue;
-          const depth = depthT(proj[i * 3 + 2]!);
+          const persp = proj[i * 3 + 2]!;
+          const depth = depthT(persp);
           const strong = n.id === focus || n.id === selected || !!matches?.has(n.id);
-          fNodes.push({
+          cells.push({
             i,
-            size: Math.max(1.3, Math.min(3.6, 1.1 + Math.sqrt(n.degree) * 0.5)) * (0.75 + depth * 0.5),
-            alpha: Math.min(1, (isDimmed(n.id) ? 0.2 : strong ? 1 : 0.55 + depth * 0.45) + 0.45 * (flow?.near[i] ?? 0)),
-            tendrils: Math.min(6, 1 + Math.round(Math.sqrt(n.degree))),
+            size: Math.max(1.6, Math.min(4.2, 1.4 + Math.sqrt(n.degree) * 0.55)) * (0.75 + depth * 0.5),
+            reach: reachBase * persp * (0.8 + Math.min(1.2, Math.sqrt(n.degree) * 0.25)),
+            alpha: isDimmed(n.id) ? 0.22 : strong ? 1 : 0.6 + depth * 0.4,
           });
         }
-        drawFilaments({ ctx, t: flowT, breath: breath(flowT), pointer: flow?.pointer ?? null, push: flow?.strength ?? 0, reach: Math.min(w, h) * 0.22, proj, cx: w / 2, cy: h / 2, edges: fEdges, nodes: fNodes, ink, additive: paperDark(), paper, fieldRadius: paperDark() ? Math.min(w, h) * 0.62 : 0 });
+        drawNeurons({
+          ctx, t: nowMs / 1000, proj, net, cells, axons, ink, accent,
+          additive: paperDark(), paper, fieldRadius: paperDark() ? Math.min(w, h) * 0.62 : 0,
+          cx: w / 2, cy: h / 2, sway: reducedMotion ? 0.25 : 1,
+        });
         drawLabels();
         raf = requestAnimationFrame(draw);
         return;
