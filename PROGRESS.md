@@ -1,3 +1,13 @@
+## 2026-11-07 (cont. 3) — Archives 47: dragged Brain notes stay where they're dropped
+
+Branch: `alpha/archives-app`. Owner: "when i drag a node i want it to stay wherever i put it".
+
+Done:
+- `apps/archives/brain/pins.ts`: when a drag ends, the note is pinned at its drop point in layout space and saved in `app_state` key `archives.brainPins` (`{ noteId: [x, y, z] }`), so it stays put now and after relaunch. Option-click releases a pin back to the layout. A click without a drag still just selects.
+- Gated by the new `ArchivesHost.pinBrainNodes` (true in Archives 47, false in Orion), so Orion's Brain still springs back as before.
+- Verified in a browser mock-up: a dragged note was still at its drop point 6 s later, and the pin was written to the database. Tests: `pins.test.ts`. Orion `tsc` passes; the Archives suites pass (41 files, 267 tests).
+- Open: the cloud's idle rotation still turns everything (pinned notes keep their place relative to the rest). Turn it off if the owner wants a fixed view.
+
 ## 2026-11-07 (cont. 2) — Archives 47: Brain as veins; every mark is data
 
 Branch: `alpha/archives-app`. Owner: "i dont like how each node is just a hard shape, it should only have veins connecting to its actual connections no empty line and everything on this should be intentional and have a purpose when i say neurons is more of a concept and a design reference than its exact look".

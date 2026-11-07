@@ -58,6 +58,7 @@ export type AppStateKey =
   | "ai.background"
   | "appconfig"
   | "archives.appearance"
+  | "archives.brainPins"
   | "plugins.state"
   | "plugins.appearance"
   | "widget.monitor"

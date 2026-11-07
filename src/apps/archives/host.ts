@@ -28,6 +28,8 @@ export type ArchivesHost = {
   SidebarHeader: ComponentType | null;
   /** How Brain draws: Orion's ruled wireframe, or living neurons (Archives 47). */
   brainStyle: "wireframe" | "neurons";
+  /** Dragged Brain notes stay where they're dropped, across launches (Archives 47). */
+  pinBrainNodes: boolean;
   /** Product name shown in empty states ("Orion Terminal", "Archives 47"). */
   productName: string;
 };
@@ -42,6 +44,7 @@ const standaloneDefaults: ArchivesHost = {
   openSettings: null,
   SidebarHeader: null,
   brainStyle: "wireframe",
+  pinBrainNodes: false,
   productName: "Archives 47",
 };
 

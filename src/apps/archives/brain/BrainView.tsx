@@ -46,6 +46,7 @@ import {
   type Vein,
   type VeinNode,
 } from "@/apps/archives/brain/veins";
+import { loadPins, savePins, type Pins } from "@/apps/archives/brain/pins";
 
 type MarkerShape = "circle" | "ring" | "square" | "diamond" | "dot";
 
@@ -284,14 +285,35 @@ export function BrainView() {
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
 
+  // ── Pinned positions (dragged notes stay put) ─────────────────────────
+  const pinsRef = useRef<Pins>(new Map());
+  const [pinsLoaded, setPinsLoaded] = useState(!archivesHost().pinBrainNodes);
+  useEffect(() => {
+    if (!archivesHost().pinBrainNodes) return;
+    let live = true;
+    void loadPins().then((pins) => {
+      if (!live) return;
+      pinsRef.current = pins;
+      setPinsLoaded(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
   // ── Sync graph → sim (preserve positions across rebuilds) ───────────
   useEffect(() => {
     const sim = simRef.current;
     const prev = new Map(sim.nodes.map((n) => [n.id, n]));
     const nodes: LayoutNode[] = visible.nodes.map((n) => {
       const old = prev.get(n.id);
-      if (old) return { ...old, r: radiusFor(n) };
-      const p = initialPosition(n.id);
+      const pin = pinsRef.current.get(n.id);
+      if (old) {
+        return pin
+          ? { ...old, r: radiusFor(n), x: pin[0], y: pin[1], z: pin[2], fx: pin[0], fy: pin[1], fz: pin[2] }
+          : { ...old, r: radiusFor(n) };
+      }
+      const p = pin ? { x: pin[0], y: pin[1], z: pin[2] } : initialPosition(n.id);
       return {
         id: n.id,
         x: p.x,
@@ -301,9 +323,9 @@ export function BrainView() {
         vy: 0,
         vz: 0,
         r: radiusFor(n),
-        fx: null,
-        fy: null,
-        fz: null,
+        fx: pin ? pin[0] : null,
+        fy: pin ? pin[1] : null,
+        fz: pin ? pin[2] : null,
       };
     });
     const byId = new Map(nodes.map((n, i) => [n.id, i]));
@@ -316,7 +338,7 @@ export function BrainView() {
     }
     simRef.current = { nodes, edges, byId };
     alphaRef.current = Math.max(alphaRef.current, 0.6);
-  }, [visible]);
+  }, [visible, pinsLoaded]);
 
   // ── Render + simulation loop ────────────────────────────────────────
   useEffect(() => {
@@ -846,6 +868,13 @@ export function BrainView() {
       const hit = hitTest(e.clientX, e.clientY);
       if (hit >= 0) {
         const n = simRef.current.nodes[hit]!;
+        if (e.altKey && archivesHost().pinBrainNodes && pinsRef.current.delete(n.id)) {
+          // Option-click: release a pinned note back to the layout.
+          n.fx = n.fy = n.fz = null;
+          savePins(pinsRef.current);
+          alphaRef.current = Math.max(alphaRef.current, 0.4);
+          return;
+        }
         toCamera(n.x, n.y, n.z, scratch);
         dragRef.current = { mode: "node", index: hit, camZ: scratch[2], moved: false };
         n.fx = n.x;
@@ -900,9 +929,16 @@ export function BrainView() {
       if (!drag) return;
       if (drag.mode === "node") {
         const n = simRef.current.nodes[drag.index]!;
-        n.fx = null;
-        n.fy = null;
-        n.fz = null;
+        if (drag.moved && archivesHost().pinBrainNodes) {
+          // Stay where it was dropped, now and next launch.
+          n.vx = n.vy = n.vz = 0;
+          pinsRef.current.set(n.id, [n.fx ?? n.x, n.fy ?? n.y, n.fz ?? n.z]);
+          savePins(pinsRef.current);
+        } else if (!pinsRef.current.has(n.id)) {
+          n.fx = null;
+          n.fy = null;
+          n.fz = null;
+        }
         if (!drag.moved) setSelectedId(n.id);
       } else if (!drag.moved) {
         setSelectedId(null);

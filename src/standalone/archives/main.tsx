@@ -29,6 +29,7 @@ setArchivesHost({
   productName: APP_NAME,
   SidebarHeader: SidebarBrand,
   brainStyle: "neurons",
+  pinBrainNodes: true,
   // Lazy so the Settings module loads with the app, not before the host is set.
   openSettings: () => void import("./ArchivesSettings").then((m) => m.useArchivesSettings.getState().show()),
 });
