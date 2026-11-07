@@ -38,14 +38,14 @@ import {
 } from "@/apps/archives/brain/forceLayout";
 import { log } from "@/lib/log";
 import {
-  drawNeurons,
+  drawVeins,
   ensureNetwork,
   fireCell,
   stepNetwork,
   type Network,
-  type NeuronAxon,
-  type NeuronCell,
-} from "@/apps/archives/brain/neurons";
+  type Vein,
+  type VeinNode,
+} from "@/apps/archives/brain/veins";
 
 type MarkerShape = "circle" | "ring" | "square" | "diamond" | "dot";
 
@@ -629,33 +629,33 @@ export function BrainView() {
         }
         lastFired = hover;
         stepNetwork(net, nowMs / 1000, dt * (reducedMotion ? 0.35 : 1), { spontaneous: !reducedMotion });
-        const axons: NeuronAxon[] = [];
+        const veins: Vein[] = [];
         axonEdges.forEach((e, k) => {
           const inFocus = !!focusSet && focusSet.has(e.a) && focusSet.has(e.b);
           const dimmed = (focusSet && !inFocus) || (matches && !(matches.has(e.a) && matches.has(e.b)));
           const [ia, ib] = pairs[k]!;
           const depth = depthT((proj[ia * 3 + 2]! + proj[ib * 3 + 2]!) / 2);
-          axons.push({ e: k, alpha: dimmed ? 0.18 : inFocus ? 1.8 : 0.6 + depth * 0.6 });
+          veins.push({ e: k, alpha: dimmed ? 0.2 : inFocus ? 1.8 : 0.6 + depth * 0.6 });
         });
-        const cells: NeuronCell[] = [];
-        const reachBase = Math.min(w, h) * 0.035 * Math.sqrt(cam.zoom);
+        // Only notes with links are drawn: a vein node exists where veins meet.
+        const vnodes: VeinNode[] = [];
         for (const n of g.nodes) {
           const i = byId.get(n.id);
-          if (i == null) continue;
+          if (i == null || net.adj[i]!.length === 0) continue;
           const persp = proj[i * 3 + 2]!;
           const depth = depthT(persp);
           const strong = n.id === focus || n.id === selected || !!matches?.has(n.id);
-          cells.push({
+          vnodes.push({
             i,
-            size: Math.max(1.6, Math.min(4.2, 1.4 + Math.sqrt(n.degree) * 0.55)) * (0.75 + depth * 0.5),
-            reach: reachBase * persp * (0.8 + Math.min(1.2, Math.sqrt(n.degree) * 0.25)),
+            root: Math.min(4.5, 0.9 + Math.sqrt(net.adj[i]!.length) * 0.75) * Math.sqrt(cam.zoom) * (0.75 + depth * 0.5),
             alpha: isDimmed(n.id) ? 0.22 : strong ? 1 : 0.6 + depth * 0.4,
+            focus: n.id === selected ? 1 : n.id === focus ? 0.7 : matches?.has(n.id) ? 0.5 : 0,
           });
         }
-        drawNeurons({
-          ctx, t: nowMs / 1000, proj, net, cells, axons, ink, accent,
+        drawVeins({
+          ctx, t: nowMs / 1000, proj, net, nodes: vnodes, veins, ink, accent,
           additive: paperDark(), paper, fieldRadius: paperDark() ? Math.min(w, h) * 0.62 : 0,
-          cx: w / 2, cy: h / 2, sway: reducedMotion ? 0.25 : 1,
+          cx: w / 2, cy: h / 2, sway: reducedMotion ? 0.25 : 1, falloff: 18 * Math.sqrt(cam.zoom),
         });
         drawLabels();
         raf = requestAnimationFrame(draw);

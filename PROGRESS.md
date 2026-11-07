@@ -1,3 +1,14 @@
+## 2026-11-07 (cont. 2) — Archives 47: Brain as veins; every mark is data
+
+Branch: `alpha/archives-app`. Owner: "i dont like how each node is just a hard shape, it should only have veins connecting to its actual connections no empty line and everything on this should be intentional and have a purpose when i say neurons is more of a concept and a design reference than its exact look".
+
+Done:
+- `apps/archives/brain/veins.ts` replaces `neurons.ts` (deleted). Decorative dendrites, synapse branches and solid cell bodies are gone.
+- Each real link is one filled vein: widest where it leaves a note and thinning to a hairline mid-link (`veinWidth`). A note's root width grows with its link count, so busier notes have thicker roots.
+- A note is soft radial light where its veins meet. Notes with no links aren't drawn (still listed in the count and searchable). Hover, selection and search matches glow in the highlight colour.
+- Signals are unchanged: rare, faint pulses in the highlight colour along real links, and only notes with links fire.
+- Tests: `veins.test.ts`.
+
 ## 2026-11-07 (cont.) — Archives 47: subtler neuron firing in the highlight colour
 
 Branch: `alpha/archives-app`. Owner: "make the neurons firing way more sybtle and they should match the highlight colour selected by user".
