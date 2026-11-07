@@ -79,7 +79,7 @@ export type Network = {
   trees: Float32Array[][];
 };
 
-export const MAX_PULSES = 36;
+export const MAX_PULSES = 10;
 export const REFRACTORY = 1.4;
 
 function edgeKey(n: number, edges: ReadonlyArray<readonly [number, number]>): string {
@@ -116,7 +116,7 @@ export function ensureNetwork(
     adj,
     fire: new Float32Array(n),
     rest: new Float32Array(n),
-    next: Float32Array.from({ length: n }, () => 0.5 + rnd() * 10),
+    next: Float32Array.from({ length: n }, () => 2 + rnd() * 30),
     pulses: [],
     trees,
   };
@@ -135,8 +135,8 @@ export function fireCell(
   for (const e of net.adj[i] ?? []) {
     if (e === opts.from) continue;
     if (net.pulses.length >= MAX_PULSES) break;
-    if (rnd() > 0.6) continue;
-    net.pulses.push({ e, dir: net.ends[e * 2] === i ? 1 : -1, u: 0, speed: 0.45 + rnd() * 0.4 });
+    if (rnd() > 0.4) continue;
+    net.pulses.push({ e, dir: net.ends[e * 2] === i ? 1 : -1, u: 0, speed: 0.22 + rnd() * 0.18 });
   }
   return true;
 }
@@ -149,12 +149,12 @@ export function stepNetwork(
   opts: { spontaneous?: boolean; rnd?: () => number } = {},
 ): void {
   const rnd = opts.rnd ?? Math.random;
-  const decay = Math.exp(-dt * 3.2);
+  const decay = Math.exp(-dt * 1.6);
   for (let i = 0; i < net.n; i++) {
     net.fire[i] = net.fire[i]! * decay;
     net.rest[i] = Math.max(0, net.rest[i]! - dt);
     if (opts.spontaneous !== false && t >= net.next[i]!) {
-      net.next[i] = t + 9 + rnd() * 18;
+      net.next[i] = t + 22 + rnd() * 40;
       fireCell(net, i, { rnd });
     }
   }
@@ -167,8 +167,8 @@ export function stepNetwork(
   net.pulses = live;
   for (const p of arrived) {
     const target = p.dir === 1 ? net.ends[p.e * 2 + 1]! : net.ends[p.e * 2]!;
-    net.fire[target] = Math.max(net.fire[target]!, 0.45);
-    if (rnd() < 0.42) fireCell(net, target, { from: p.e, rnd });
+    net.fire[target] = Math.max(net.fire[target]!, 0.35);
+    if (rnd() < 0.25) fireCell(net, target, { from: p.e, rnd });
   }
 }
 
@@ -334,30 +334,30 @@ export function drawNeurons(f: NeuronFrame): void {
     const g = axonGeometry(f, p.e);
     const pos = (u: number) => g.at(p.dir === 1 ? u * 0.86 : 0.86 - u * 0.86);
     const [hx, hy] = pos(p.u);
-    const TAIL = 8;
-    ctx.lineWidth = 1.6;
+    const TAIL = 10;
+    ctx.lineWidth = 1;
     for (let j = 0; j < TAIL; j++) {
       const u0 = Math.max(0, p.u - (j + 1) * 0.022);
       const u1 = Math.max(0, p.u - j * 0.022);
       if (u1 <= 0) break;
       const [x0, y0] = pos(u0);
       const [x1, y1] = pos(u1);
-      ctx.strokeStyle = signal(0.75 * (1 - j / TAIL));
+      ctx.strokeStyle = signal(0.32 * (1 - j / TAIL));
       ctx.beginPath();
       ctx.moveTo(x0, y0);
       ctx.lineTo(x1, y1);
       ctx.stroke();
     }
-    const glow = ctx.createRadialGradient(hx, hy, 0, hx, hy, 9);
-    glow.addColorStop(0, signal(0.7));
+    const glow = ctx.createRadialGradient(hx, hy, 0, hx, hy, 6);
+    glow.addColorStop(0, signal(0.22));
     glow.addColorStop(1, signal(0));
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(hx, hy, 9, 0, TAU);
+    ctx.arc(hx, hy, 6, 0, TAU);
     ctx.fill();
-    ctx.fillStyle = signal(1);
+    ctx.fillStyle = signal(0.6);
     ctx.beginPath();
-    ctx.arc(hx, hy, 1.6, 0, TAU);
+    ctx.arc(hx, hy, 1.1, 0, TAU);
     ctx.fill();
   }
 
@@ -375,9 +375,9 @@ export function drawNeurons(f: NeuronFrame): void {
     ctx.arc(x, y, r * 5, 0, TAU);
     ctx.fill();
     if (fire > 0.02) {
-      const fr = r * (4 + 6 * fire);
+      const fr = r * (3 + 3 * fire);
       const flash = ctx.createRadialGradient(x, y, 0, x, y, fr);
-      flash.addColorStop(0, signal(0.75 * fire));
+      flash.addColorStop(0, signal(0.28 * fire));
       flash.addColorStop(1, signal(0));
       ctx.fillStyle = flash;
       ctx.beginPath();
@@ -391,7 +391,7 @@ export function drawNeurons(f: NeuronFrame): void {
     ctx.ellipse(x, y, r * 1.15, r * 0.85, rot, 0, TAU);
     ctx.fill();
     if (fire > 0.02) {
-      ctx.fillStyle = signal(fire);
+      ctx.fillStyle = signal(0.55 * fire);
       ctx.beginPath();
       ctx.arc(x, y, r * 0.55, 0, TAU);
       ctx.fill();

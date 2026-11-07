@@ -1,3 +1,11 @@
+## 2026-11-07 (cont.) — Archives 47: subtler neuron firing in the highlight colour
+
+Branch: `alpha/archives-app`. Owner: "make the neurons firing way more sybtle and they should match the highlight colour selected by user".
+
+Done:
+- Firing is far rarer and fainter. Cells fire every 22–62 s; 40% of axons carry each firing and 25% of arrivals cascade; at most 10 pulses exist at once. Pulses travel at half speed, with a thin low-alpha tail, a small glow and a soft cell flash.
+- The signal colour is the user's highlight (`--a47-accent`), re-read every second, so changing it in Settings recolours the Brain live. Verified with the owner's yellow `#fff975`: no green pixels in 24 frames.
+
 ## 2026-11-07 — Archives 47: Brain drawn as living neurons
 
 Branch: `alpha/archives-app`. Owner rejected the filament strands: "i dont like. i want it to feel like actually neurons in a brain".
