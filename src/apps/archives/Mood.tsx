@@ -31,6 +31,9 @@ import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
 import { log } from "@/lib/log";
 import { relativeTime } from "@/lib/time";
 
+/** Stable empty list: a fresh `[]` from a store selector re-renders forever (empty boards crashed). */
+const NO_MEMBERS: string[] = [];
+
 export function ArchivesMood() {
   const openBoardId = useArchives((s) => s.openBoardId);
   const boards = useMoodBoardsStore((s) => s.boards);
@@ -247,7 +250,7 @@ function MoodBoardCard({
 const BOARD_TILE_DRAG_MIME = "application/x-orion-board-tile";
 
 function MoodBoardDetail({ board }: { board: MoodBoard }) {
-  const members = useMoodBoardsStore((s) => s.members.get(board.id) ?? []);
+  const members = useMoodBoardsStore((s) => s.members.get(board.id) ?? NO_MEMBERS);
   const removeAssetFromBoard = useMoodBoardsStore((s) => s.removeAsset);
   const renameBoard = useMoodBoardsStore((s) => s.rename);
   const deleteBoard = useMoodBoardsStore((s) => s.remove);

@@ -1,3 +1,12 @@
+## 2026-11-07 (cont. 5) — Fix: opening an empty mood board crashed (also in Orion)
+
+Branch: `alpha/archives-app`. Owner hit "Archives 47 hit an error" when going into Mood Boards.
+
+- Cause: `MoodBoardDetail` in `apps/archives/Mood.tsx` selected `s.members.get(board.id) ?? []`. For a board with no items that returns a fresh array on every read, so React's store subscription re-rendered forever ("Maximum update depth exceeded", React error 185). The file is unchanged from Orion, so Orion has the same crash on empty boards.
+- Fix: a stable `NO_MEMBERS` constant. Reproduced with a copy of the owner's library (an empty board "orion") in the browser mock; the board now opens to "This board is empty".
+- Test: `Mood.selectors.test.ts` rejects `?? []` / `?? {}` in this file's store selectors (fails on the old code). The Archives suites pass.
+- Next: the same fix should land in Orion's main checkout. It's on this branch now and goes in with the merge.
+
 ## 2026-11-07 (cont. 4) — Archives 47: Brain is always alive (idle drift and reshaping)
 
 Branch: `alpha/archives-app`. Owner: "i want it constantly moving like before some type of idle movement even the nodes slowly reshaping etc".
