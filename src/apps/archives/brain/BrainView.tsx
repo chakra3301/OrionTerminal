@@ -47,6 +47,7 @@ import {
   type VeinNode,
 } from "@/apps/archives/brain/veins";
 import { loadPins, savePins, type Pins } from "@/apps/archives/brain/pins";
+import { applyDrift, DRIFT_ALPHA_FLOOR } from "@/apps/archives/brain/drift";
 
 type MarkerShape = "circle" | "ring" | "square" | "diamond" | "dot";
 
@@ -351,9 +352,9 @@ export function BrainView() {
     let raf = 0;
     let net: Network | null = null;
     let lastFrameMs = 0;
+    let lastDriftMs = 0;
     let lastFired: string | null = null;
     let spin = 0;
-    let pointer: { x: number; y: number } | null = null;
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     let w = 0;
     let h = 0;
@@ -522,6 +523,37 @@ export function BrainView() {
     };
 
     const draw = (nowMs: number) => {
+      if (archivesHost().brainStyle === "neurons") {
+        // Idle life: free notes wander on their own slow paths and the layout
+        // keeps relaxing around them, so the network slowly reshapes. The
+        // hovered and dragged notes hold still so they stay easy to grab.
+        const hold = new Set<number>();
+        const sim = simRef.current;
+        const hv = hoverRef.current != null ? sim.byId.get(hoverRef.current) : undefined;
+        if (hv != null) hold.add(hv);
+        const dr = dragRef.current;
+        if (dr && dr.mode === "node") hold.add(dr.index);
+        const t1 = nowMs / 1000;
+        const t0 = lastDriftMs ? Math.max(t1 - 0.05, lastDriftMs / 1000) : t1;
+        lastDriftMs = nowMs;
+        const held = [...hold].map((i) => {
+          const n = sim.nodes[i]!;
+          return [i, n.x, n.y, n.z] as const;
+        });
+        applyDrift(sim.nodes, t0, t1, hold, reducedMotion ? 0.25 : 1);
+        if (alphaRef.current < DRIFT_ALPHA_FLOOR) {
+          stepLayout(sim.nodes, sim.edges, DRIFT_ALPHA_FLOOR);
+        }
+        for (const [i, x, y, z] of held) {
+          const n = sim.nodes[i]!;
+          if (n.fx == null) {
+            n.x = x;
+            n.y = y;
+            n.z = z;
+            n.vx = n.vy = n.vz = 0;
+          }
+        }
+      }
       if (alphaRef.current > 0.02) {
         stepLayout(simRef.current.nodes, simRef.current.edges, alphaRef.current);
         alphaRef.current *= 0.985;
@@ -542,7 +574,7 @@ export function BrainView() {
       const neurons = archivesHost().brainStyle === "neurons";
       if (neurons) {
         // Ease the drift in and out instead of starting and stopping it.
-        spin += ((idle && !pointer ? 0.0011 : 0) - spin) * 0.08;
+        spin += ((!dragRef.current && !hover ? 0.0009 : 0) - spin) * 0.05;
         cam.ry += spin;
       } else if (idle) cam.ry += 0.0007;
 
@@ -892,8 +924,6 @@ export function BrainView() {
       }
     };
     const onPointerMove = (e: PointerEvent) => {
-      const prect = canvas.getBoundingClientRect();
-      pointer = { x: e.clientX - prect.left, y: e.clientY - prect.top };
       const drag = dragRef.current;
       if (!drag) {
         const hit = hitTest(e.clientX, e.clientY);
@@ -964,10 +994,6 @@ export function BrainView() {
 
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
-    const onPointerLeave = () => {
-      pointer = null;
-    };
-    canvas.addEventListener("pointerleave", onPointerLeave);
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("dblclick", onDoubleClick);
     canvas.addEventListener("wheel", onWheel, { passive: false });
@@ -977,7 +1003,6 @@ export function BrainView() {
       ro.disconnect();
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
-      canvas.removeEventListener("pointerleave", onPointerLeave);
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("dblclick", onDoubleClick);
       canvas.removeEventListener("wheel", onWheel);

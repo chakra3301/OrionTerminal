@@ -1,3 +1,14 @@
+## 2026-11-07 (cont. 4) — Archives 47: Brain is always alive (idle drift and reshaping)
+
+Branch: `alpha/archives-app`. Owner: "i want it constantly moving like before some type of idle movement even the nodes slowly reshaping etc".
+
+Done:
+- `apps/archives/brain/drift.ts`: each free note wanders on its own slow 3D path (two sines per axis, periods of about 9–45 s, amplitude 22 layout units). The force layout keeps running at a low floor (`DRIFT_ALPHA_FLOOR` 0.06), so links stretch and neighbours follow, and the network slowly reshapes instead of moving as one block.
+- Pinned notes, the hovered note and the dragged note never drift, so clicking and dragging stay easy. Each note's light also breathes on its own rhythm.
+- The slow rotation now runs all the time, pausing only while a note is hovered or something is dragged.
+- Reduced motion scales the drift to a quarter.
+- Verified: frames 4 s apart show the layout changing, not just rotating, and it stays coherent. Tests: `drift.test.ts`. Recording: `docs/alpha/archives-app/brain-flow.gif`.
+
 ## 2026-11-07 (cont. 3) — Archives 47: dragged Brain notes stay where they're dropped
 
 Branch: `alpha/archives-app`. Owner: "when i drag a node i want it to stay wherever i put it".

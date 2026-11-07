@@ -284,7 +284,8 @@ export function drawVeins(f: VeinFrame): void {
   for (const node of f.nodes) {
     const x = proj[node.i * 3]!;
     const y = proj[node.i * 3 + 1]!;
-    const r = Math.max(2.5, node.root * 3);
+    // Each note's light breathes slowly on its own rhythm.
+    const r = Math.max(2.5, node.root * 3) * (1 + 0.14 * f.sway * Math.sin(f.t * (0.35 + seeded(node.i, 9) * 0.4) + seeded(node.i, 11) * TAU));
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, tissue(Math.min(1, 0.85 * node.alpha * light)));
     g.addColorStop(0.3, tissue(0.35 * node.alpha * light));
