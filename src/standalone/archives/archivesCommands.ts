@@ -38,7 +38,7 @@ export function standaloneCommands(): Command[] {
       id: "archives47.settings",
       label: "Settings…",
       hotkey: "mod+comma",
-      keywords: ["settings", "preferences", "providers", "ai", "keys"],
+      keywords: ["settings", "preferences", "providers", "ai"],
       group: "View",
       run: () => useArchivesSettings.getState().show(),
     },

@@ -1,15 +1,14 @@
 import { create } from "zustand";
-import { BookOpen, Cpu, Database, Info, Keyboard, KeyRound, Palette, SlidersHorizontal, X, type LucideIcon } from "lucide-react";
+import { BookOpen, Cpu, Database, Info, Keyboard, Palette, SlidersHorizontal, X, type LucideIcon } from "lucide-react";
 import { ProvidersPanel } from "@/features/controlpanel/ProvidersPanel";
 import { ArchivesSettings as ArchivesAssistantSettings } from "@/features/controlpanel/ArchivesSettings";
-import { APIKeySection } from "@/features/settings/ApiKeySection";
 import { useControlPanelFocus } from "@/features/controlpanel/useControlPanelFocus";
 import { APP_NAME } from "./brand";
 import { AboutSection, GeneralSection, LibrarySection, ShortcutsSection } from "./settingsSections";
 import "@/features/controlpanel/controlpanel.css";
 import "@/features/controlpanel/settingsExperience.css";
 
-export type SettingsSection = "general" | "providers" | "assistant" | "keys" | "library" | "shortcuts" | "about";
+export type SettingsSection = "general" | "providers" | "assistant" | "library" | "shortcuts" | "about";
 
 type SettingsState = { open: boolean; section: SettingsSection; show: (section?: SettingsSection) => void; hide: () => void };
 
@@ -26,7 +25,6 @@ const NAV: { key: SettingsSection; label: string; Icon: LucideIcon; group: strin
   { key: "shortcuts", label: "Shortcuts", Icon: Keyboard, group: "App" },
   { key: "providers", label: "AI Providers", Icon: Cpu, group: "AI" },
   { key: "assistant", label: "Archive Assistant", Icon: BookOpen, group: "AI" },
-  { key: "keys", label: "API Keys", Icon: KeyRound, group: "AI" },
   { key: "about", label: "About", Icon: Info, group: "Help" },
 ];
 const GROUPS = ["App", "AI", "Help"];
@@ -68,7 +66,6 @@ export function ArchivesSettingsWindow() {
           <div className="cp-main-body" key={section}>
             {section === "providers" && <ProvidersPanel />}
             {section === "assistant" && <ArchivesAssistantSettings />}
-            {section === "keys" && <APIKeySection />}
             {section === "general" && <GeneralSection />}
             {section === "library" && <LibrarySection />}
             {section === "shortcuts" && <ShortcutsSection />}

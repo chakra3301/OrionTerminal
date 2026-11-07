@@ -1,3 +1,9 @@
+## 2026-11-07 (cont. 6) — Archives 47: API Keys removed from Settings
+
+Branch: `alpha/archives-app`. Owner: "remove the api keys section from settings as they are not needed".
+
+- Removed the "API Keys" item and its `APIKeySection` from `standalone/archives/ArchivesSettings.tsx`, and "keys" from the Settings command keywords. The rail is now Appearance, Library, Shortcuts, AI Providers, Archive Assistant, About (checked in the browser mock). Orion's settings are untouched.
+
 ## 2026-11-07 (cont. 5) — Fix: opening an empty mood board crashed (also in Orion)
 
 Branch: `alpha/archives-app`. Owner hit "Archives 47 hit an error" when going into Mood Boards.
