@@ -1,5 +1,7 @@
 ## 2026-11-10 — Orion Studio parent branding and Archives 47 0.1.1
 
+CI follow-up: the old macos-14 GitHub runner was retired on 2026-11-02 and cancelled checks before any steps. Both workflows now use supported macos-15 Apple Silicon; gates are unchanged. Reference: https://github.com/actions/runner-images/issues/13518.
+
 Branch: `alpha/archives-app`. Owner authorized all remaining rebrand work, installer replacement, source push and download publication.
 
 - Renamed current parent product wording and metadata to Orion Studio. Archives 47, its bundle ID, existing library and standalone import boundary are retained; no data migration or library reset.
