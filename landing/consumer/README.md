@@ -30,7 +30,7 @@ The previous site enlarged an 858px mockup's decorative crops and 551px app wind
 - App captures: authentic **2048px** images from the owner's original source used in the earlier Orion video project, rather than fabricated app-window mockups. Clicking a preview opens its full-resolution capture.
 - Workflow strip: real captures, CSS perspective and a vector green/cyan/magenta ribbon.
 - Responsive phone layout, native dialogs, mobile menu and optional night mode retained.
-- Primary download points to the existing public Apple Silicon alpha, `v0.1.0-alpha.1`. GitHub's release API confirmed `Orion-Terminal_aarch64.dmg` and **55,767,670 bytes** on this task. Current development captures are labeled; they do not establish public-alpha feature parity.
+- Primary download points to the Studio Apple Silicon alpha, `v0.1.0-alpha.2`, asset `Orion-Studio_aarch64.dmg`, **67,049,264 bytes**. The installer is built and validated with the Studio rebrand; public asset verification is recorded in `docs/alpha/rename-report.md`. Development captures remain labeled.
 
 ## Assets and provenance
 

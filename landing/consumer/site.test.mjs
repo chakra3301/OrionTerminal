@@ -44,7 +44,7 @@ test('external links are HTTPS and new tabs have opener protection', () => {
 });
 
 test('download is pinned to the verified public alpha, not a fabricated latest asset', () => {
-  assert.match(html, /releases\/download\/v0\.1\.0-alpha\.1\/Orion-Terminal_aarch64\.dmg/);
+  assert.match(html, /releases\/download\/v0\.1\.0-alpha\.2\/Orion-Studio_aarch64\.dmg/);
   assert.doesNotMatch(html, /releases\/latest\/download/);
   assert.match(html, /not notarized/);
   assert.match(html, /Apple Silicon/);

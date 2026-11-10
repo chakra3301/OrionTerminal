@@ -1,6 +1,6 @@
 import { motion } from "./motion.js";
 
-const DMG = "https://github.com/chakra3301/OrionTerminal/releases/download/v0.1.0-alpha.1/Orion-Terminal_aarch64.dmg";
+const DMG = "https://github.com/chakra3301/OrionTerminal/releases/download/v0.1.0-alpha.2/Orion-Studio_aarch64.dmg";
 const REPO = "https://github.com/chakra3301/OrionTerminal";
 const C = { green: "57,255,136", cyan: "0,224,255", magenta: "255,62,165", violet: "177,76,255", ink: "230,244,236", yellow: "230,255,58" };
 
@@ -78,10 +78,10 @@ export function initSpotlight({ desktop } = {}) {
     { g: "Apps", t: "Archives 47", s: "Notes, journal, mood boards · open in demo", i: "archive", c: C.green, k: "notes notion journal wiki second brain", run: openApp("archives") },
     { g: "Apps", t: "Orion", s: "AI code editor · open in demo", i: "code-xml", c: C.cyan, k: "code editor cursor vscode programming", run: openApp("orion") },
     { g: "Apps", t: "XDesign", s: "Design, decks and motion · open in demo", i: "palette", c: C.magenta, k: "design figma canvas prototype deck", run: openApp("xdesign") },
-    { g: "Commands", cmd: true, t: "Download for Mac", s: "Orion-Terminal_aarch64.dmg · 55.8 MB", i: "arrow-down-to-line", c: C.green, k: "dmg install get", run: () => { location.href = DMG; } },
+    { g: "Commands", cmd: true, t: "Download for Mac", s: "Orion-Studio_aarch64.dmg · 67.0 MB", i: "arrow-down-to-line", c: C.green, k: "dmg install get", run: () => { location.href = DMG; } },
     { g: "Commands", cmd: true, t: "Open GitHub", s: "Source code · Apache-2.0", i: "github", c: C.ink, k: "source repo code open", run: ext(REPO) },
-    { g: "Commands", cmd: true, t: "Read release notes", s: "v0.1.0-alpha.1", i: "book-open", c: C.ink, k: "changelog whats new", run: ext(`${REPO}/releases/tag/v0.1.0-alpha.1`) },
-    { g: "Commands", cmd: true, t: "Open setup guide", s: "Install and first launch", i: "settings", c: C.ink, k: "help install guide", run: ext(`${REPO}/blob/v0.1.0-alpha.1/BETA.md`) },
+    { g: "Commands", cmd: true, t: "Read release notes", s: "v0.1.0-alpha.2", i: "book-open", c: C.ink, k: "changelog whats new", run: ext(`${REPO}/releases/tag/v0.1.0-alpha.2`) },
+    { g: "Commands", cmd: true, t: "Open setup guide", s: "Install and first launch", i: "settings", c: C.ink, k: "help install guide", run: ext(`${REPO}/blob/v0.1.0-alpha.2/BETA.md`) },
     { g: "Commands", cmd: true, t: "Reset demo desktop", s: "Put the windows back", i: "history", c: C.cyan, k: "reset windows", run: () => { go("#desktop")(); desktop?.reset(); } },
     { g: "Commands", cmd: true, get t() { return motion.userReduced ? "Turn motion back on" : "Reduce motion"; }, s: "Pause animations on this site", i: "feather", c: C.yellow, k: "animation accessibility motion calm", run: () => motion.setUserReduced(!motion.userReduced) },
     { g: "Commands", cmd: true, t: "Back to top", s: "", i: "arrow-right", c: C.ink, k: "top home start", run: go("#top") },

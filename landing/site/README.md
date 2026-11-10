@@ -35,13 +35,13 @@ Handoff copy used verbatim: `Ready when you are.`, `claude · listening`, `statu
 
 - Rendered screenshots reviewed at 1440, 1024, 768 and 390px. Zero horizontal overflow at 1440/1024/768/600/360.
 - Drag, focus, menubar app name, dock minimize/restore, maximize, reset; Spotlight open, `>` filtering, ranking (e.g. "notary" → Gatekeeper FAQ, "xdes" → XDesign), Enter, Esc, `/`; provider switch; FX tab switching; motion toggle persistence; reduced-motion emulation. No page errors.
-- The download link points at the pinned `v0.1.0-alpha.1` asset `Orion-Terminal_aarch64.dmg`, 55,767,670 bytes, checked against the GitHub API. Nothing was downloaded.
+- The download link points at the pinned Studio `v0.1.0-alpha.2` asset `Orion-Studio_aarch64.dmg`, 67,049,264 bytes. Build and public download verification are recorded in `docs/alpha/rename-report.md`.
 
 **Not verified:** real Safari/WebKit, real GPU frame rates, VoiceOver, Lighthouse, owner visual sign-off. Headless WebGL ran on SwiftShader (software), so real-hardware appearance may be sharper.
 
 ## Honesty notes
 
-Claims are limited to the public alpha (release notes `docs/releases/v0.1.0-alpha.1.md`): Apple Silicon only, ad-hoc signed and not notarized, unencrypted local data, FX/3D experimental, inline edits/Tab need an Anthropic API key, Cursor via key. Post-alpha working-tree features (Incubator, Downloads, custom themes) are deliberately not advertised. The demo is labeled as an illustrative recreation.
+Claims are limited to the public alpha (release notes `docs/releases/v0.1.0-alpha.2.md`): Apple Silicon only, ad-hoc signed and not notarized, unencrypted local data, advanced FX experimental, inline edits/Tab need an Anthropic API key, Cursor via key. Post-alpha working-tree features (Incubator, Downloads, custom themes) are deliberately not advertised. The demo is labeled as an illustrative recreation.
 
 ## Assets and licenses
 

@@ -101,12 +101,15 @@ jobs:
           if [ "${#images[@]}" -ne 1 ]; then echo "Expected exactly one fresh target .dmg"; exit 1; fi
           src="${images[0]}"
           stable="Orion-Studio_aarch64.dmg"
+          # GitHub normalizes spaces in asset names; use the published names in checksums.
+          versioned="$(basename "$src" | tr ' ' '-')"
           cp "$src" "$stable"
+          cp "$src" "$versioned"
           shasum -a 256 "$stable" > SHA256SUMS.txt
-          (cd "$(dirname "$src")" && shasum -a 256 "$(basename "$src")") >> "$GITHUB_WORKSPACE/SHA256SUMS.txt"
+          shasum -a 256 "$versioned" >> SHA256SUMS.txt
           echo "Built: $src -> $stable"
           echo "stable=$stable" >> "$GITHUB_OUTPUT"
-          echo "versioned=$src" >> "$GITHUB_OUTPUT"
+          echo "versioned=$versioned" >> "$GITHUB_OUTPUT"
 
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@v2
