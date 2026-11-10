@@ -1,4 +1,4 @@
-/** Brain — the automatic knowledge graph over everything in Orion Terminal.
+/** Brain — the automatic knowledge graph over everything in Orion Studio.
  * Notes, journal entries, projects, chats, media, mood boards, tags and
  * collections become nodes; wikilinks, hierarchy, tags, board membership,
  * title mentions and semantic-embedding similarity become edges — no manual
@@ -951,7 +951,7 @@ export function BrainView() {
         <div className="ar-brain-empty">
           <div className="title">Your brain is empty</div>
           <div className="hint">
-            Everything you create in Orion Terminal — notes, journal entries,
+            Everything you create in Orion Studio — notes, journal entries,
             projects, chats, media — appears here and links itself
             automatically.
           </div>

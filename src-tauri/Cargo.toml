@@ -2,7 +2,7 @@
 license = "Apache-2.0"
 name = "orion-terminal"
 version = "0.1.0"
-description = "Orion Terminal — personal workstation"
+description = "Orion Studio — personal workstation"
 authors = ["Luca Orion"]
 edition = "2021"
 

@@ -39,7 +39,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     const { error } = this.state;
     if (!error) return this.props.children;
 
-    const where = this.props.label ?? "Orion Terminal";
+    const where = this.props.label ?? "Orion Studio";
     return (
       <div className={`ot-crash${this.props.compact ? " compact" : ""}`}>
         <div className="ot-crash-inner">

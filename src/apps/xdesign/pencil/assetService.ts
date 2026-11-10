@@ -16,7 +16,7 @@ export function assetQuery(value:unknown):string {if(typeof value!=="string"||!v
 export function numeric(value:unknown,min:number,max:number,fallback:number):number {const number=value===undefined?fallback:Number(value);if(!Number.isFinite(number)||number<min||number>max)throw new Error(`Choose a value from ${min} to ${max}.`);return number;}
 export function assetLink(value:unknown):string {if(typeof value!=="string"||value.length>4096)throw new Error("Invalid asset link.");const url=new URL(value);if(url.protocol!=="https:"||url.username||url.password)throw new Error("Invalid asset link.");return url.href;}
 export async function assetInvoke<T>(command:string,args:Record<string,unknown>,signal?:AbortSignal):Promise<T> {
-  if(!isTauri())throw new Error("Open XDesign in Orion Terminal desktop to use online resources.");
+  if(!isTauri())throw new Error("Open XDesign in Orion Studio desktop to use online resources.");
   if(signal?.aborted)throw new Error("Asset request cancelled.");
   return new Promise((resolve,reject)=>{
     let finished=false;

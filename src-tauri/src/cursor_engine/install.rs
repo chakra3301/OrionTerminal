@@ -8,7 +8,7 @@ use std::time::Duration;
 pub async fn cursor_install_sdk(app: AppHandle) -> Result<(), String> {
     let _exclusive = SDK_LIFECYCLE.try_write().map_err(|_| "Stop active Cursor runs before installing its SDK")?;
     if !probe_node_version().await.as_deref().is_some_and(supported_node) {
-        return Err("Install Node 22.13+ and npm, then restart Orion Terminal".into());
+        return Err("Install Node 22.13+ and npm, then restart Orion Studio".into());
     }
     let root = runtime_root(&app)?;
     let marker = root.join(".orion-managed");
@@ -35,9 +35,9 @@ pub async fn cursor_install_sdk(app: AppHandle) -> Result<(), String> {
     if let Ok(system_root) = std::env::var("SystemRoot") { command.env("SystemRoot", system_root); }
     let status = tokio::time::timeout(Duration::from_secs(300), command.status()).await
         .map_err(|_| "Cursor SDK installation timed out; retry when the registry is reachable")?
-        .map_err(|_| "Could not start npm; install Node 22.13+ and restart Orion Terminal")?;
+        .map_err(|_| "Could not start npm; install Node 22.13+ and restart Orion Studio")?;
     if !status.success() { return Err(format!("Cursor SDK installation failed (exit {:?}); check network access and available disk space, then retry", status.code())); }
-    let script = resolve_script(&app).ok_or("Cursor bridge is missing; reinstall Orion Terminal")?;
+    let script = resolve_script(&app).ok_or("Cursor bridge is missing; reinstall Orion Studio")?;
     if !check_sdk(&script, &root).await { return Err("SDK files installed, but the offline module check failed. Verify Node 22.13+ and retry.".into()); }
     Ok(())
 }

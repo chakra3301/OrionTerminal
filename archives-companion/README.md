@@ -1,6 +1,6 @@
 # Archives Companion 0.2
 
-Native SwiftUI iPhone/iPad companion for the **Archives** side of Orion Terminal,
+Native SwiftUI iPhone/iPad companion for the **Archives** side of Orion Studio,
 with a separate macOS menu-bar sync helper. Offline notes, journal, project pages,
 photo capture, media, mood boards and an embedded BlockNote editor. No Orion cloud
 account or analytics. **Both apps must be updated together; protocol v1 is rejected.**
@@ -20,9 +20,9 @@ account or analytics. **Both apps must be updated together; protocol v1 is rejec
 4. In the helper, choose **Enable library sync**. Access defaults off at each launch.
    This grants access to the existing Orion database and installs helper-owned deletion
    tracking, with a verified database backup first. SQLx migration history is untouched.
-5. **Close all phone note editors and quit Orion Terminal on the Mac**, leaving the
+5. **Close all phone note editors and quit Orion Studio on the Mac**, leaving the
    helper running. Tap **Sync library** on the phone, then **Approve import** in the
-   helper after reviewing the changes. Reopen Orion Terminal afterward.
+   helper after reviewing the changes. Reopen Orion Studio afterward.
 
 The first upgrade sync may include old phone items deleted before the helper began
 tracking deletions. Review additions carefully. Cancel applies no phone edits to the Mac.

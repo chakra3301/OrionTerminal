@@ -160,7 +160,7 @@ pub async fn cursor_status(app: AppHandle) -> CursorStatus {
     let supported = version.as_deref().map(supported_node).unwrap_or(false);
     let ready = installed && supported && sdk_ok && key_saved;
     let detail = if version.is_some() && !supported {
-        "Cursor SDK requires Node 22.13 or newer. Upgrade Node and restart Orion Terminal.".into()
+        "Cursor SDK requires Node 22.13 or newer. Upgrade Node and restart Orion Studio.".into()
     } else { detail(installed, sdk_ok, key_saved) };
     CursorStatus {
         installed,
@@ -203,7 +203,7 @@ pub async fn cursor_send(
         version = probe_node_version() => version,
     };
     if !node_version.as_deref().map(supported_node).unwrap_or(false) {
-        return Err("Cursor SDK requires Node 22.13 or newer. Upgrade Node and restart Orion Terminal.".into());
+        return Err("Cursor SDK requires Node 22.13 or newer. Upgrade Node and restart Orion Studio.".into());
     }
     let script = resolve_script(&app).ok_or_else(|| {
         "cursor-agent.mjs not found - rebuild the app or run from the project root".to_string()

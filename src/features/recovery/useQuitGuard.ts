@@ -15,7 +15,7 @@ export function useQuitGuard(bootReady: boolean): void {
       risks: () => quitRisks(ready.current),
       confirm: (risks) => confirm(
         `${risks.map((r) => `• ${r}`).join("\n")}\n\nQuit without saving? Memory-only drafts will be lost. Running operations may finish or be interrupted; quitting is not rollback. Keep working to save or stop them first.`,
-        { title: "Quit Orion Terminal?", kind: "warning", okLabel: "Quit without saving", cancelLabel: "Keep working" },
+        { title: "Quit Orion Studio?", kind: "warning", okLabel: "Quit without saving", cancelLabel: "Keep working" },
       ),
       decide: (requestId, allow) => invoke("app_quit_decide", { requestId, allow }),
       freeze: () => {

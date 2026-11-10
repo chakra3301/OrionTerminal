@@ -1,6 +1,6 @@
 /**
  * WebKit's own context menu offers Back, Forward and Reload, and Reload restarts
- * Orion Terminal, dropping whatever hasn't been saved. Apps open their own
+ * Orion Studio, dropping whatever hasn't been saved. Apps open their own
  * menus; anywhere else a right-click does nothing, as in a native app. Text
  * fields keep Cut/Copy/Paste, and selected text keeps Copy and Look Up; neither
  * of those menus offers Reload.

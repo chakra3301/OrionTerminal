@@ -4,7 +4,7 @@ Created at the owner's explicit `/goal` request on 2026-10-09. The persistent go
 
 ## Outcome
 
-Complete XDesign inside Orion Terminal as the unified Photoshop/Figma replacement across the six remaining areas below. Preserve the canvas-first editor, original 40px grid, collapsible panels and double-click PSD/image entry to the focused Image editor. Preserve user documents, linked placements, native undo and existing dirty work.
+Complete XDesign inside Orion Studio as the unified Photoshop/Figma replacement across the six remaining areas below. Preserve the canvas-first editor, original 40px grid, collapsible panels and double-click PSD/image entry to the focused Image editor. Preserve user documents, linked placements, native undo and existing dirty work.
 
 ### Private nested component properties and ordinary scene composition (2026-10-12)
 

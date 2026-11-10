@@ -10,7 +10,7 @@ struct PrivacyView: View {
                 Text("Sync keeps the ten most recent database backups locally. To remove your phone library and its backups, delete this app. This does not delete the Mac's copy. Treat your pairing key like a password; replace it on the Mac if you lose a device.")
             }
             Section("Beta limits") {
-                Text("Requires the updated Archives Sync Mac helper. Close the phone editor and quit Orion Terminal before importing edits. Images up to 8 MB sync; videos and audio are metadata-only. Unsupported note blocks stay protected from editing. Sync uses last-write-wins; keep backups and avoid editing the same note on both devices between syncs.")
+                Text("Requires the updated Archives Sync Mac helper. Close the phone editor and quit Orion Studio before importing edits. Images up to 8 MB sync; videos and audio are metadata-only. Unsupported note blocks stay protected from editing. Sync uses last-write-wins; keep backups and avoid editing the same note on both devices between syncs.")
             }
             Section("Open source") {
                 if let legal {

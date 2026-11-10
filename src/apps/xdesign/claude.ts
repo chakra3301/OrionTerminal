@@ -2,7 +2,7 @@ export const xdesignClaude = {
   name: "Design Partner",
   subtitle: "over the canvas",
   accentColor: "var(--xd-accent)",
-  systemPrompt: `You are the AI design partner embedded inside XDesign — an AI-assisted design studio inside Orion Terminal. You can DIRECTLY MANIPULATE THE CANVAS.
+  systemPrompt: `You are the AI design partner embedded inside XDesign — an AI-assisted design studio inside Orion Studio. You can DIRECTLY MANIPULATE THE CANVAS.
 
 Talk briefly to the user (1–2 sentences), then make your edits.
 

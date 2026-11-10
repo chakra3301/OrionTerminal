@@ -4,13 +4,13 @@ Status: local directory packages; distribution signing and archive installation 
 
 ## Security model
 
-Community code never runs in Orion Terminal's React tree. UI and startup background entrypoints run in `sandbox="allow-scripts"` frames without `allow-same-origin`. Their documents use a network-denied CSP and receive no Tauri, SQLite, Zustand, shell DOM, filesystem, process, provider-key, or raw event access.
+Community code never runs in Orion Studio's React tree. UI and startup background entrypoints run in `sandbox="allow-scripts"` frames without `allow-same-origin`. Their documents use a network-denied CSP and receive no Tauri, SQLite, Zustand, shell DOM, filesystem, process, provider-key, or raw event access.
 
 The sandbox gets one frozen `window.orion` object. Calls cross a source-bound, versioned `postMessage` channel. The trusted host binds the package identity, and the native broker re-checks installed state and grants on every request.
 
 ## Try the sample
 
-1. Run Orion Terminal in Tauri.
+1. Run Orion Studio in Tauri.
 2. Open **Control Panel → Plugins**.
 3. Choose **Install package**.
 4. Select `examples/plugins/hello-orion.orion-plugin`.

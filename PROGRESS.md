@@ -1,3 +1,9 @@
+## 2026-11-10 — Studio branding on the boot branch
+
+Branch: `alpha/boot-experience`. Renamed current product copy and the welcome prototype to Orion Studio. The in-progress boot's dimensional title now spells STUDIO; sound tick panning follows its six letters. Focused boot tests: 37 passed across nine files; TypeScript passed. The fixed-time 8.5-second browser render was inspected with the exact fonts.
+
+Only tracked branding is committed. The owner's pre-existing, unaccepted boot implementation remains in the working tree, including its updated title; it is not integrated into the public Studio installer. Native boot acceptance and integration remain open. Existing data, domain, X handle and internal identifiers stay stable.
+
 ## 2026-10-29 (cont. 2) — XDesign: image-to-3D removed
 
 Branch: `validation/alpha-2026-09-14`. At the owner's request, the "3D model" project type (img2model) is removed until something better replaces it. The code stays in git history. Committed and pushed at the owner's request.

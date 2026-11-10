@@ -35,7 +35,7 @@ export function FirstRunSetup() {
   };
   const shownError = localError ?? error;
   const fieldName = step === "username" ? "Username" : "Password";
-  const submitLabel = step === "username" ? "Next" : "Enter Orion Terminal";
+  const submitLabel = step === "username" ? "Next" : "Enter Orion Studio";
 
   return (
     <>

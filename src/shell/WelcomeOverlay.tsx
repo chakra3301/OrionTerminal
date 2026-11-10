@@ -103,7 +103,7 @@ export function WelcomeOverlay() {
         </div>
         {isFirstLaunch ? (
           <div className="ot-welcome-firstrun">
-            <div className="ot-welcome-firstrun-title">Welcome to Orion Terminal.</div>
+            <div className="ot-welcome-firstrun-title">Welcome to Orion Studio.</div>
             <div className="ot-welcome-firstrun-body">
               Start with Archives for thinking, Orion for code, or XDesign
               for visuals. Use each app's model picker to choose its AI.

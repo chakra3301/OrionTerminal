@@ -46,7 +46,7 @@ https://github.com/Jakubantalik/thinking-orbs
 
 ## OpenAI OAuth
 
-Orion Terminal's native ChatGPT subscription transport was informed by the
+Orion Studio's native ChatGPT subscription transport was informed by the
 OpenAI OAuth project.
 
 Copyright 2026 Evan Zhou and OpenAI OAuth contributors  
@@ -55,7 +55,7 @@ https://github.com/EvanZhouDev/openai-oauth
 Licensed under the Apache License, Version 2.0. A copy is included at
 `THIRD_PARTY_LICENSES/openai-oauth-Apache-2.0.txt`.
 
-OpenAI OAuth and Orion Terminal's subscription bridge are unofficial community
+OpenAI OAuth and Orion Studio's subscription bridge are unofficial community
 integrations and are not affiliated with, endorsed by, or sponsored by OpenAI.
 
 ## RepoLens adaptations

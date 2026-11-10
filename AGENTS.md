@@ -1,4 +1,4 @@
-# Orion Terminal
+# Orion Studio
 
 <!-- CLAUDE.md in this repo is a symlink to this file. Edit AGENTS.md only. -->
 
@@ -6,14 +6,14 @@ Durable orientation for agents. Keep it lean: what it is, locked decisions, stac
 
 ## Summary
 
-**Orion Terminal** is a JARVIS-style personal workstation: one desktop OS shell hosting three deeply-integrated apps with a selectable AI embedded inside each as a context-specific collaborator.
+**Orion Studio** is a JARVIS-style personal workstation: one desktop OS shell hosting three deeply-integrated apps with a selectable AI embedded inside each as a context-specific collaborator.
 
 - Shell: wallpaper, menubar, dock, in-canvas windows, Spotlight (⌘K)
 - App 1 — **Archives 47**: personal Notion (notes, journal, mood boards, media). Green accent.
 - App 2 — **Orion**: AI-first code editor (file tree, Monaco, live preview, terminal, inline Claude edits). Cyan accent.
 - App 3 — **XDesign**: design studio UI shell (Figma + PS + Illustrator + Unicorn.studio hybrid). Magenta accent.
 
-"Orion Terminal" is the product. "Orion" is the editor app inside it. **Never reuse `OrionTerminal` as a component name.**
+"Orion Studio" is the product. "Orion" is the editor app inside it. **Never reuse `OrionTerminal` as a component name.**
 
 ## Session routine
 
