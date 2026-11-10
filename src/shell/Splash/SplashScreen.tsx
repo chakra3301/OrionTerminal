@@ -99,7 +99,7 @@ export function SplashScreen({
       </div>
       {mode === "launch" && (
         <div className="ot-splash-label">
-          <span className="ot-splash-mark">ORION TERMINAL</span>
+          <span className="ot-splash-mark">ORION STUDIO</span>
           <span className="ot-splash-sub">initializing core</span>
         </div>
       )}

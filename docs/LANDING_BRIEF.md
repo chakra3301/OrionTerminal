@@ -1,4 +1,4 @@
-# Orion Terminal — Landing Page Design Brief & Agent Handoff
+# Orion Studio — Landing Page Design Brief & Agent Handoff
 
 > Paste everything below into your designer agent. It is self-contained: positioning, brand tokens, real product copy, page structure, motion direction, and deliverable spec.
 
@@ -6,11 +6,11 @@
 
 ## ROLE
 
-You are a senior product/brand designer + front-end engineer. Design and build a **single-page marketing site** for **Orion Terminal**. Output a complete, self-contained `index.html` (inline `<style>` + minimal vanilla JS, no build step) that looks like a flagship product launch — think Linear, Raycast, Vercel, Arc. Bold, dark, premium, motion-aware. It must feel like the product: a neo-Tokyo neon terminal with frosted glass.
+You are a senior product/brand designer + front-end engineer. Design and build a **single-page marketing site** for **Orion Studio**. Output a complete, self-contained `index.html` (inline `<style>` + minimal vanilla JS, no build step) that looks like a flagship product launch — think Linear, Raycast, Vercel, Arc. Bold, dark, premium, motion-aware. It must feel like the product: a neo-Tokyo neon terminal with frosted glass.
 
 ## THE PRODUCT (what you're selling)
 
-**Orion Terminal** is a JARVIS-style personal workstation: **one desktop OS-style shell** (wallpaper, menubar, dock, draggable in-canvas windows, a unified `⌘K` Spotlight) hosting **three deeply-integrated apps**, with **Claude embedded inside each app** as a context-aware collaborator — not bolted on in a sidebar.
+**Orion Studio** is a JARVIS-style personal workstation: **one desktop OS-style shell** (wallpaper, menubar, dock, draggable in-canvas windows, a unified `⌘K` Spotlight) hosting **three deeply-integrated apps**, with **Claude embedded inside each app** as a context-aware collaborator — not bolted on in a sidebar.
 
 The three apps (each has its own accent color — use them as the section identity):
 
@@ -20,7 +20,7 @@ The three apps (each has its own accent color — use them as the section identi
 
 One command registry, one Claude brain, cross-app memory surfaced in Spotlight. Local-first (SQLite, atomic saves, rotating backups). Built with Tauri 2 + React 19 + Rust.
 
-> Naming rule: the **product** is "Orion Terminal." "Orion" is the editor app *inside* it. Never imply Orion Terminal is just a code editor.
+> Naming rule: the **product** is "Orion Studio." "Orion" is the editor app *inside* it. Never imply Orion Studio is just a code editor.
 
 ## AUDIENCE & TONE
 
@@ -84,7 +84,7 @@ glow-magenta: 0 0 24px -4px rgba(255,62,165,0.5)
 5. **Feature grid** — 6–8 glass cards: In-canvas windowing (60fps), Tab autocomplete, Real LSP, `[[wikilinks]]` + backlinks, Generative design + brand systems, Decks export, Local-first SQLite, 5 themes (incl. Liquid glass).
 6. **Tech strip** — quiet mono row of the stack: Tauri 2 · React 19 · Rust · Monaco · SQLite · Three.js.
 7. **Download / CTA** — repeat the beta CTA; note **macOS (Apple Silicon), unsigned beta** with a one-line "right-click → Open" hint; link to BETA.md.
-8. **Footer** — minimal, mono, GitHub link, "Personal project · © 2026 Orion Terminal."
+8. **Footer** — minimal, mono, GitHub link, "Personal project · © 2026 Orion Studio."
 
 ## MOTION & INTERACTION
 

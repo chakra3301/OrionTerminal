@@ -1,5 +1,5 @@
 /**
- * What Archives needs from whatever hosts it. Orion Terminal hosts Archives as
+ * What Archives needs from whatever hosts it. Orion Studio hosts Archives as
  * an in-canvas window next to its other apps; the standalone Archives 47 app
  * hosts it as the whole window. Archives code calls these hooks instead of
  * importing Orion's shell, editor or companion, so the standalone build never
@@ -30,7 +30,7 @@ export type ArchivesHost = {
   brainStyle: "wireframe" | "neurons";
   /** Dragged Brain notes stay where they're dropped, across launches (Archives 47). */
   pinBrainNodes: boolean;
-  /** Product name shown in empty states ("Orion Terminal", "Archives 47"). */
+  /** Product name shown in empty states ("Orion Studio", "Archives 47"). */
   productName: string;
 };
 

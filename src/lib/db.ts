@@ -5,7 +5,7 @@ import { log } from "@/lib/log";
 import { decodeVectorBytes, encodeVectorBytes } from "./vectorStorage";
 
 /** Must match app_profile.rs: the standalone Archives 47 build keeps its own
- * library file and never opens Orion Terminal's. */
+ * library file and never opens Orion Studio's. */
 export const DB_URL = import.meta.env.VITE_APP_TARGET === "archives" ? "sqlite:archives.db" : "sqlite:orion.db";
 
 let dbPromise: Promise<Database> | null = null;

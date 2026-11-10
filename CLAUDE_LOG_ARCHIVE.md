@@ -1,3 +1,7 @@
+## 2026-11-10 — Archives 47 parent rebrand release
+
+Owner authorized Studio branding, installation and publication. Current parent-brand strings, native About and shared product metadata now say Orion Studio; own app identity and existing library remain stable. Release configuration is 0.1.1. Dependency fixes mirror main `f133315`, with official SQLx SQLite FFI compatibility vendor patch and complete provenance/licenses. Native arm64 release build, signature/DMG verification and installed-app smoke check passed. Existing library opens and About identifies the Studio parent. The final standalone import-boundary suite passes four tests; earlier standalone suite passed 270 tests. Site download SHA and exact artifact receipt are in the top PROGRESS entry. No standalone feature merge into main.
+
 ## 2026-10-29 (cont.) — Claude / XDesign: image-to-3D removed
 
 Owner: "remove the image to 3d in x design because it doesnt really work well untill we find something new to replace it." Removed the "3D model" project kind end to end, test-first where behaviour remains (legacy registry entries, Home start list, MCP tool list). Owner DB checked read-only first: its registry holds one design project and no 3D projects.

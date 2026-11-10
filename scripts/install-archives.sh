@@ -6,10 +6,10 @@
 #
 # Archives 47 has its own bundle id (com.lucaorion.archives47), its own library at
 # ~/Library/Application Support/com.lucaorion.archives47 and its own Keychain
-# service. It never reads or writes Orion Terminal's data.
+# service. It never reads or writes Orion Studio's data.
 set -euo pipefail
 # The frosted window needs macOS private APIs (transparent window + vibrancy). The feature is
-# passed here, not in Cargo.toml, so Orion Terminal builds are unchanged.
+# passed here, not in Cargo.toml, so Orion Studio builds are unchanged.
 
 cd "$(dirname "$0")/.."
 NAME="Archives 47"

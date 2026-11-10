@@ -49,7 +49,7 @@ export function setNoteNavigator(fn: ((id: string) => boolean) | null): void {
   noteNavigator = fn;
 }
 
-/** Where a link goes when no note navigator claims it (Orion Terminal opens
+/** Where a link goes when no note navigator claims it (Orion Studio opens
  * workspace tabs). The standalone app leaves this unset. */
 let fallbackOpener: ((ref: OrionRef) => boolean) | null = null;
 export function setOrionUriFallback(fn: ((ref: OrionRef) => boolean) | null): void {

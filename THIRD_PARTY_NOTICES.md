@@ -46,7 +46,7 @@ https://github.com/Jakubantalik/thinking-orbs
 
 ## OpenAI OAuth
 
-Orion Terminal's native ChatGPT subscription transport was informed by the
+Orion Studio's native ChatGPT subscription transport was informed by the
 OpenAI OAuth project.
 
 Copyright 2026 Evan Zhou and OpenAI OAuth contributors  
@@ -55,7 +55,7 @@ https://github.com/EvanZhouDev/openai-oauth
 Licensed under the Apache License, Version 2.0. A copy is included at
 `THIRD_PARTY_LICENSES/openai-oauth-Apache-2.0.txt`.
 
-OpenAI OAuth and Orion Terminal's subscription bridge are unofficial community
+OpenAI OAuth and Orion Studio's subscription bridge are unofficial community
 integrations and are not affiliated with, endorsed by, or sponsored by OpenAI.
 
 ## RepoLens adaptations
@@ -243,6 +243,15 @@ History, format and raster tile APIs. Snapshot references, weak source identitie
 native history reconstruction and exact-byte tile re-sharing are Orion-owned
 adapters. Native labels, layer targets, past/redo and source pixels are retained.
 The same PhotoCraft copyright and retained grants above apply.
+
+## SQLx SQLite compatibility patch
+
+`src-tauri/vendor/sqlx-sqlite` contains the published SQLx SQLite 0.8.6 driver
+(MIT OR Apache-2.0), with its original licenses. Only its SQLite FFI requirement
+changes to `libsqlite3-sys` 0.39.1 so Tauri 2 and rusqlite share patched SQLite
+3.54.1. The Rust driver source is unchanged. Upstream archive identity and the
+modification are recorded in `src-tauri/vendor/sqlx-sqlite/ORION_CHANGES.md`;
+the distribution inventory checks the complete vendored source tree.
 
 ## Scope and provenance limits
 

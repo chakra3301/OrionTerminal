@@ -72,7 +72,7 @@ export function findLegacyImage(shapeId: string) {
 }
 
 function requireDesktop() {
-  if (!isTauri()) throw new Error("Image editing uses Orion Terminal’s native engine. Open this project in the desktop app.");
+  if (!isTauri()) throw new Error("Image editing uses Orion Studio’s native engine. Open this project in the desktop app.");
 }
 
 /** What the workspace's controls show: locked, except for gestures and edit commands. */

@@ -1,6 +1,6 @@
 fn main() {
     // `ORION_APP_TARGET=archives` builds the standalone Archives 47 app
-    // (src/archives_app.rs) from this crate instead of Orion Terminal. A cfg
+    // (src/archives_app.rs) from this crate instead of Orion Studio. A cfg
     // rather than a Cargo feature keeps Cargo.toml (hashed by the license
     // inventory) unchanged.
     println!("cargo:rustc-check-cfg=cfg(archives_app)");

@@ -66,6 +66,19 @@ test('rejects stale locks, altered archives, and escaping material paths', () =>
   assert.throws(() => checkDistributionLicenses(root), /leaves the repository/);
 }));
 
+test('rejects changes and symlinks in a reviewed vendored source tree', () => fixture(({ root, put, manifest }) => {
+  const dir = 'src-tauri/vendor/driver';
+  put(`${dir}/src/lib.rs`, 'reviewed source');
+  Object.assign(manifest.native[0], { sourceDirectory: dir, sourceTreeSha256: sha256(`src/lib.rs\0${sha256('reviewed source')}\n`) });
+  put('resources/distribution-license-manifest.json', JSON.stringify(manifest));
+  checkDistributionLicenses(root);
+  put(`${dir}/src/lib.rs`, 'changed');
+  assert.throws(() => checkDistributionLicenses(root), /Changed vendored source/);
+  put(`${dir}/src/lib.rs`, 'reviewed source');
+  fs.symlinkSync(path.join(root, 'notice.txt'), path.join(root, dir, 'linked'));
+  assert.throws(() => checkDistributionLicenses(root), /Symlink in vendored source/);
+}));
+
 test('excludes only generated Finder metadata without deleting original inputs', () => fixture(({ root, put }) => {
   const original = put('public/.DS_Store', 'private metadata'); put('dist/nested/.DS_Store', 'copy'); const keep = put('dist/nested/keep.txt', 'keep');
   const plugin = excludeFinderMetadata(); plugin.configResolved({ root, build: { outDir: 'dist' } }); plugin.closeBundle();

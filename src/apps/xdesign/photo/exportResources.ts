@@ -5,7 +5,7 @@ import { useXDProjects } from "../projectsStore";
 export async function fullResolutionPhotoPath(photoId:string):Promise<string> {
   const projectId=useXDProjects.getState().activeId;
   const doc=useXDesign.getState().photoDocuments[photoId];
-  if(!projectId||!doc||!isTauri())throw new Error("Open the image in Orion Terminal before exporting its full resolution");
+  if(!projectId||!doc||!isTauri())throw new Error("Open the image in Orion Studio before exporting its full resolution");
   return invoke<string>("xdesign_photo_render",{projectId,photoId,version:doc.version});
 }
 export async function resolvePhotoExportImages(svg:string):Promise<string> {

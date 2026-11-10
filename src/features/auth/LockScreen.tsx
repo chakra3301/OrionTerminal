@@ -49,7 +49,7 @@ export function LockScreen() {
           <div className="ot-auth-title">
             {displayName ? `Welcome back, ${displayName}.` : "Welcome back."}
           </div>
-          <div className="ot-auth-sub">Orion Terminal is locked.</div>
+          <div className="ot-auth-sub">Orion Studio is locked.</div>
 
           <label className="ot-auth-field">
             <span>Username</span>

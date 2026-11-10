@@ -45,7 +45,7 @@ final class HelperController: NSObject, NSApplicationDelegate, ObservableObject 
     func enableLibrary() {
         do {
             let path = Self.orionDBPath()
-            guard FileManager.default.fileExists(atPath: path.path) else { throw SyncSafetyError.invalid("Open Orion Terminal once before enabling sync.") }
+            guard FileManager.default.fileExists(atPath: path.path) else { throw SyncSafetyError.invalid("Open Orion Studio once before enabling sync.") }
             let opened = try ArchivesStore(path: path.path, createSchema: false)
             try makeBackup(opened)
             try opened.enableDesktopSyncTracking()
@@ -122,7 +122,7 @@ final class HelperController: NSObject, NSApplicationDelegate, ObservableObject 
         guard let store else { sync.sendSyncError("Enable library access in Archives Sync on your Mac."); return }
         do {
             guard !NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == "com.lucaorion.orion-terminal" }) else {
-                throw SyncSafetyError.invalid("Quit Orion Terminal before importing phone edits, so an open desktop editor cannot overwrite them. Then tap Sync again.")
+                throw SyncSafetyError.invalid("Quit Orion Studio before importing phone edits, so an open desktop editor cannot overwrite them. Then tap Sync again.")
             }
             try makeBackup(store)
             let count = try store.applyIncoming(payload, assetsDirPath: Self.assetsDir().path)
@@ -353,7 +353,7 @@ private struct MenuContent: View {
                 Button("Disable library access") { controller.disableLibrary() }
             } else {
                 Button("Enable library sync") { controller.enableLibrary() }
-                Text("Allows your paired phone to read and edit Archives. Quit Orion Terminal before importing phone edits. A local database backup is kept before each import.").font(.caption).foregroundStyle(.secondary)
+                Text("Allows your paired phone to read and edit Archives. Quit Orion Studio before importing phone edits. A local database backup is kept before each import.").font(.caption).foregroundStyle(.secondary)
             }
             if controller.pendingImport != nil {
                 Divider()

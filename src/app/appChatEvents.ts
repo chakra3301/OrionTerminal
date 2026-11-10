@@ -1,6 +1,6 @@
 /**
  * Native chat-stream events (`claude:event`, `claude:exit`, `chat:*`) routed
- * into the per-app chat rails. Shared by Orion Terminal's EventBridge and the
+ * into the per-app chat rails. Shared by Orion Studio's EventBridge and the
  * standalone Archives 47 app so both stream replies the same way.
  */
 import type { ContentBlock } from "@/store/chatStore";

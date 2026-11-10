@@ -1,6 +1,6 @@
 /// <reference types="vitest" />
 // Vite config for the standalone Archives 47 app. Same source tree as Orion
-// Terminal; `archives.html` is the entry and a few Orion-only modules are
+// Studio; `archives.html` is the entry and a few Orion-only modules are
 // swapped for Archives stand-ins (the assistant defaults) so the bundle never contains the editor,
 // XDesign, Command Center, Hermes, Incubator or the companions.
 import { defineConfig } from "vite";

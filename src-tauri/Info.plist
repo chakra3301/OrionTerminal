@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Orion Terminal uses the microphone to transcribe your voice into the R.O.S.I.E agent.</string>
+  <string>Orion Studio uses the microphone to transcribe your voice into the R.O.S.I.E agent.</string>
 </dict>
 </plist>

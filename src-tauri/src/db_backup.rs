@@ -87,12 +87,13 @@ fn check_deadline(deadline: Instant) -> Result<(), String> {
     }
 }
 
-fn configure(conn: &Connection, deadline: Instant) -> Result<(), String> {
+fn configure(conn: &mut Connection, deadline: Instant) -> Result<(), String> {
     conn.busy_timeout(Duration::from_millis(100))
         .map_err(|e| e.to_string())?;
     conn.pragma_update(None, "trusted_schema", false)
         .map_err(|e| e.to_string())?;
-    conn.progress_handler(10_000, Some(move || Instant::now() >= deadline));
+    conn.progress_handler(10_000, Some(move || Instant::now() >= deadline))
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -209,12 +210,12 @@ fn snapshot(src_path: &Path, target: &Path, deadline: Instant) -> Result<(), Str
     let temp = scratch.0.join("snapshot.db");
     let reserved = private_file(&temp)?;
     {
-        let src = Connection::open_with_flags(src_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        let mut src = Connection::open_with_flags(src_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
             .map_err(|e| e.to_string())?;
-        configure(&src, deadline)?;
+        configure(&mut src, deadline)?;
         let mut dst = Connection::open_with_flags(&temp, OpenFlags::SQLITE_OPEN_READ_WRITE)
             .map_err(|e| e.to_string())?;
-        configure(&dst, deadline)?;
+        configure(&mut dst, deadline)?;
         {
             let backup = Backup::new(&src, &mut dst).map_err(|e| e.to_string())?;
             loop {
@@ -248,7 +249,7 @@ fn snapshot(src_path: &Path, target: &Path, deadline: Instant) -> Result<(), Str
 
 fn managed_name(name: &str) -> bool {
     let Some(stem) = name
-        .strip_prefix(&format!("{}-", crate::app_profile::current().backup_prefix))
+        .strip_prefix("orion-")
         .and_then(|s| s.strip_suffix(".db"))
     else {
         return false;
@@ -326,12 +327,12 @@ fn prune(dir: &Path, current: &Path, deadline: Instant) -> Result<(), String> {
         uri.query_pairs_mut()
             .append_pair("mode", "ro")
             .append_pair("immutable", "1");
-        let conn = Connection::open_with_flags(
+        let mut conn = Connection::open_with_flags(
             uri.as_str(),
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
         )
         .map_err(|e| e.to_string())?;
-        configure(&conn, deadline)?;
+        configure(&mut conn, deadline)?;
         if validate(&conn, deadline).is_ok() {
             valid.push(path);
         }
@@ -350,7 +351,7 @@ fn prune(dir: &Path, current: &Path, deadline: Instant) -> Result<(), String> {
 }
 
 fn backup_and_rotate(dir: &Path, deadline: Instant) -> Result<Option<String>, String> {
-    let source = dir.join(crate::app_profile::db_file());
+    let source = dir.join("orion.db");
     match fs::symlink_metadata(&source) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(error.to_string()),
@@ -379,8 +380,7 @@ fn backup_and_rotate(dir: &Path, deadline: Instant) -> Result<Option<String>, St
         .map_err(|e| e.to_string())?
         .as_secs();
     let target = backups.join(format!(
-        "{}-{}-{}.db",
-        crate::app_profile::current().backup_prefix,
+        "orion-{}-{}.db",
         stamp_utc(secs),
         ulid::Ulid::new()
     ));

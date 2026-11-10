@@ -124,7 +124,7 @@ pub fn hermes_env(app: &tauri::AppHandle) -> Option<(&'static str, String)> {
     let dir = app.path().app_data_dir().ok()?.join("hermes-session");
     std::fs::create_dir_all(&dir).ok()?;
     let file = dir.join("config.yaml");
-    let body = "# Written by Orion Terminal for Hermes runs in a project folder.\nterminal:\n  cwd: \".\"\n";
+    let body = "# Written by Orion Studio for Hermes runs in a project folder.\nterminal:\n  cwd: \".\"\n";
     if std::fs::read_to_string(&file).ok().as_deref() != Some(body) {
         std::fs::write(&file, body).ok()?;
     }

@@ -1,4 +1,4 @@
-# Orion Terminal — Design
+# Orion Studio — Design
 
 Moved verbatim from the "Design tokens" section of the old CLAUDE.md (2026-10-09). Values are mirrored in [tokens.json](tokens.json); the implementation is `src/styles/tokens.css`.
 

@@ -484,7 +484,7 @@ export function installBuiltinCommands() {
   // Only surfaced once sign-in is enabled (an account exists).
   registry.register({
     id: "auth.lock",
-    label: "Lock Orion Terminal",
+    label: "Lock Orion Studio",
     keywords: ["lock", "sign out", "log out", "logout", "secure", "session"],
     group: "View",
     when: () => useAuth.getState().hasAccount,
@@ -517,7 +517,7 @@ export function installBuiltinCommands() {
 
   registry.register({
     id: "help.open",
-    label: "Help: Orion Terminal Guide",
+    label: "Help: Orion Studio Guide",
     keywords: ["help", "docs", "guide", "manual", "how to", "getting started", "about"],
     group: "View",
     run: () => useHelp.getState().show(),

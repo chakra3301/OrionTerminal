@@ -7,7 +7,7 @@ import { log } from "@/lib/log";
 /**
  * Resume a conversation by chat id. Archives chats (origin 'archives', or a
  * legacy null origin without a project) restore into the Archives rail.
- * Anything else goes to the host: in Orion Terminal that opens the owning app
+ * Anything else goes to the host: in Orion Studio that opens the owning app
  * (Orion editor, XDesign, R.O.S.I.E); the standalone app has none.
  * Safe to call from anywhere (sidebar search, command palette, Past chats list).
  */

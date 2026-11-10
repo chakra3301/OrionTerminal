@@ -2,7 +2,7 @@
 license = "Apache-2.0"
 name = "orion-terminal"
 version = "0.1.0"
-description = "Orion Terminal — personal workstation"
+description = "Orion Studio — personal workstation"
 authors = ["Luca Orion"]
 edition = "2021"
 
@@ -35,9 +35,9 @@ portable-pty = "0.9"
 parking_lot = "0.12"
 once_cell = "1"
 # Used by the in-process MCP server (mode-switched via --mcp-serve) to read
-# the Orion SQLite DB directly. Its libsqlite3-sys version must match sqlx;
-# 0.32 allows sqlx 0.8.6 rather than pinning the vulnerable sqlx 0.8.0.
-rusqlite = { version = "0.32", features = ["bundled", "backup", "hooks"] }
+# the Orion SQLite DB directly. Match the patched SQLx driver below so both
+# paths use SQLite 3.54.1 (RUSTSEC-2026-0459), without a database migration.
+rusqlite = { version = "0.41", features = ["bundled", "backup", "hooks", "fallible_uint"] }
 # Match the frontend `ulid` package — note ids etc. should be the same
 # shape regardless of who creates them (frontend zustand stores vs. the
 # in-process MCP server's write tools).
@@ -74,3 +74,8 @@ opt-level = 3
 # the pinned revision above saves new objects without two F_FULLFSYNCs each.
 [patch."https://github.com/storytold/photocraft"]
 photocraft-format = { path = "vendor/photocraft/crates/format" }
+
+# Tauri 2 still requires SQLx 0.8. This driver changes only its SQLite FFI
+# requirement; see vendor/sqlx-sqlite/ORION_CHANGES.md.
+[patch.crates-io]
+sqlx-sqlite = { path = "vendor/sqlx-sqlite" }

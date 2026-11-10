@@ -1,4 +1,4 @@
-/** Brain — the automatic knowledge graph over everything in Orion Terminal.
+/** Brain — the automatic knowledge graph over everything in Orion Studio.
  * Notes, journal entries, projects, chats, media, mood boards, tags and
  * collections become nodes; wikilinks, hierarchy, tags, board membership,
  * title mentions and semantic-embedding similarity become edges — no manual

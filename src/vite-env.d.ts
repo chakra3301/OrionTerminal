@@ -4,6 +4,6 @@ declare module "virtual:xdesign-script-worker" { const source: string; export de
 declare module "virtual:xdesign-native-react-worker" { const bundle: { source: string; notices: { name: string; source: string }[] }; export default bundle; }
 
 interface ImportMetaEnv {
-  /** "archives" in the standalone Archives 47 build; unset in Orion Terminal. */
+  /** "archives" in the standalone Archives 47 build; unset in Orion Studio. */
   readonly VITE_APP_TARGET?: string;
 }

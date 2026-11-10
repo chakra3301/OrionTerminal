@@ -8,7 +8,7 @@ export const HELP_SECTIONS: HelpSection[] = [
   {
     id: "welcome",
     title: "Welcome",
-    body: `# Orion Terminal
+    body: `# Orion Studio
 
 A personal workstation: one desktop shell hosting three deeply-integrated apps,
 with Claude embedded inside each as a context-specific collaborator.

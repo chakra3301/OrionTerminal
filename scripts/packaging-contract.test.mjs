@@ -30,7 +30,7 @@ test("clean verification builds emitted resources before compiling native tests"
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
   const steps = pkg.scripts.verify.split(/\s*&&\s*/);
   for (const gate of ["npm run typecheck", "npm test", "npm run test:bridges", "npm run build", "npm run test:native"]) {
-    assert.ok(steps.includes(gate), `Missing verification gate: ${gate}`);
+    assert.ok(steps.some(step => step === gate || step.startsWith(`${gate} -- `)), `Missing verification gate: ${gate}`);
   }
   assert.ok(steps.indexOf("npm run build") < steps.indexOf("npm run test:native"), "Tauri requires the emitted dist/licenses resources even when compiling tests");
   const release = readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");

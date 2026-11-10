@@ -6,7 +6,7 @@ import { withPencilTask } from "./pencil/runtime";
 import { usePhotoWorkspace } from "./photo/runtime";
 
 export async function openProjectFile(sourcePath?: string): Promise<void> {
-  if (!isTauri()) throw new Error("Open portable XDesign projects in the Orion Terminal desktop app.");
+  if (!isTauri()) throw new Error("Open portable XDesign projects in the Orion Studio desktop app.");
   const path = sourcePath ?? await open({ multiple: false, filters: [{ name: "XDesign project", extensions: ["xdesign"] }] });
   if (typeof path !== "string") return;
   await useXDProjects.getState().importDesignProject(async (projectId, assets) => {
@@ -18,7 +18,7 @@ export async function openProjectFile(sourcePath?: string): Promise<void> {
 }
 
 export async function saveProjectFile(): Promise<void> {
-  if (!isTauri()) throw new Error("Save portable XDesign projects in the Orion Terminal desktop app.");
+  if (!isTauri()) throw new Error("Save portable XDesign projects in the Orion Studio desktop app.");
   const { activeId, registry } = useXDProjects.getState();
   const project = registry.find(item => item.id === activeId);
   if (!activeId || !project || project.kind && project.kind !== "design") throw new Error("Open a design project to save a project file.");

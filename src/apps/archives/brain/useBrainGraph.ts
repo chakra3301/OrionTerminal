@@ -1,4 +1,4 @@
-/** Assembles the Brain graph from everything live in Orion Terminal:
+/** Assembles the Brain graph from everything live in Orion Studio:
  * zustand stores (notes / assets / mood boards / collections) plus two async
  * SQLite reads (chats, embedding vectors). Rebuilds automatically when store
  * data changes; chats + vectors refresh on mount and via refresh(). */

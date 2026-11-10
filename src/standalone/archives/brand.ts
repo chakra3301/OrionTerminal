@@ -1,9 +1,9 @@
 /**
  * Archives 47's brand strings. The parent brand may be renamed, so it lives in
- * exactly one constant; `scripts/archives-app.mjs` reads it from this file for
- * the bundle description.
+ * exactly one constant. Keep the standalone bundle description in
+ * `src-tauri/tauri.archives.conf.json` in sync.
  */
-export const PARENT_BRAND = "Orion Terminal";
+export const PARENT_BRAND = "Orion Studio";
 
 export const APP_NAME = "Archives 47";
 export const APP_TAGLINE = `an ${PARENT_BRAND} app`;

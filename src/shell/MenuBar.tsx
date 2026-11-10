@@ -147,7 +147,7 @@ export function MenuBar() {
       <ThemeBorder />
       <div className="ot-menubar-logo">
         <BrandMark decorative className="ot-menubar-mark" />
-        <span>ORION TERMINAL</span>
+        <span>ORION STUDIO</span>
       </div>
       <div className="ot-menubar-sep" />
       <div className="ot-menubar-items">

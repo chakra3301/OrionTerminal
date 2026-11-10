@@ -2,7 +2,7 @@
 //! `archives_app` cfg (set by build.rs when ORION_APP_TARGET=archives) and `tauri.archives.conf.json`. It has its own
 //! bundle identifier (so its own data dir), its own database (`archives.db`),
 //! its own keychain service, and registers only the native commands Archives
-//! uses. Nothing here reads or writes Orion Terminal's data.
+//! uses. Nothing here reads or writes Orion Studio's data.
 
 use tauri::Manager;
 

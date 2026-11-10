@@ -183,7 +183,7 @@ export function ArchivesChats() {
             <MessageSquare size={20} />
             <div className="title">No conversations yet</div>
             <div className="hint">
-              {archivesHost().productName === "Orion Terminal"
+              {archivesHost().productName === "Orion Studio"
                 ? "Start a thread in Orion's Code Companion or the Archive Assistant. Replies land here."
                 : "Start a thread with the Archive Assistant. Replies land here."}
             </div>

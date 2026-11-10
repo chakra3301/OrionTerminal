@@ -10,7 +10,7 @@ import { log } from "@/lib/log";
 import { formatHotkey } from "./hotkeyLabel";
 
 /** The standalone app's ⌘K: archive search plus Archives commands. A leading
- * `>` limits it to commands, the same as Orion Terminal's Spotlight. */
+ * `>` limits it to commands, the same as Orion Studio's Spotlight. */
 type PaletteState = { open: boolean; query: string; show: (query?: string) => void; hide: () => void };
 
 export const usePalette = create<PaletteState>((set) => ({

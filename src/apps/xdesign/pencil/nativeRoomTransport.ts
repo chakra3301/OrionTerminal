@@ -26,7 +26,7 @@ type Operation = { kind: 'sync'; message: RoomRequest } | { kind: 'create'; name
   | { kind: 'putImageChunk'; requestId: string; index: number; message: RoomImageChunk }
   | { kind: 'imageChunk'; imageId: string; revisionId: string; index: number };
 const abortError = () => new DOMException('The room operation was cancelled.', 'AbortError');
-function desktop(): void { if (!isTauri()) throw new Error('Open XDesign in Orion Terminal desktop to connect a shared room.'); }
+function desktop(): void { if (!isTauri()) throw new Error('Open XDesign in Orion Studio desktop to connect a shared room.'); }
 export { roomServerOrigin } from './roomOrigin';
 import { roomServerOrigin } from './roomOrigin';
 
@@ -52,7 +52,7 @@ function nativeFailure(value: unknown): Error {
       return new RoomRequestFailure(message, record.status as number, record.code);
     }
   }
-  return new RoomRequestFailure('The desktop room bridge is unavailable. Reopen Orion Terminal with the updated application.', 422, 'bridge');
+  return new RoomRequestFailure('The desktop room bridge is unavailable. Reopen Orion Studio with the updated application.', 422, 'bridge');
 }
 function object(value: unknown, keys: string[]): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !keys.includes(key))) throw new Error('Invalid room management response.');

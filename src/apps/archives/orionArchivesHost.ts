@@ -1,5 +1,5 @@
 /**
- * Orion Terminal's implementation of the Archives host: Archives is a window
+ * Orion Studio's implementation of the Archives host: Archives is a window
  * in the in-canvas shell, Orion editor/XDesign/R.O.S.I.E chats open in their
  * own apps, and RepoLens website clones open in the Orion editor. Only Orion
  * imports this file; the standalone Archives 47 build never does.
@@ -181,6 +181,6 @@ export function installOrionArchivesHost(): () => void {
         if (tab.descriptor.kind === "note") workspace.closeTab(tab.id);
       }
     },
-    productName: "Orion Terminal",
+    productName: "Orion Studio",
   });
 }

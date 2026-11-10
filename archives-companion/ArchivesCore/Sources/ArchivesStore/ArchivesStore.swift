@@ -156,7 +156,7 @@ public final class ArchivesStore {
     public func enableDesktopSyncTracking() throws {
         try dbQueue.write { db in
             guard try db.tableExists("notes"), try db.tableExists("assets"), try db.tableExists("mood_boards") else {
-                throw SyncSafetyError.invalid("Unsupported desktop database. Update Orion Terminal first.")
+                throw SyncSafetyError.invalid("Unsupported desktop database. Update Orion Studio first.")
             }
             try db.execute(sql: "CREATE TABLE IF NOT EXISTS archives_sync_migrations (version INTEGER PRIMARY KEY)")
             if try Int.fetchOne(db, sql: "SELECT version FROM archives_sync_migrations WHERE version = 1") == nil {

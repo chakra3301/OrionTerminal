@@ -1,5 +1,5 @@
 /* ============================================================
-   Orion Terminal — themes
+   Orion Studio — themes
    Each theme overrides the :root design tokens (tokens.css) via a
    `data-theme` attribute on <html>. The vast majority of the UI reads
    var(--token), so overriding tokens reskins the app wholesale.

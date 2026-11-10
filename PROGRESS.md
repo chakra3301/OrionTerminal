@@ -1,3 +1,13 @@
+## 2026-11-10 — Orion Studio parent branding and Archives 47 0.1.1
+
+Branch: `alpha/archives-app`. Owner authorized all remaining rebrand work, installer replacement, source push and download publication.
+
+- Renamed current parent product wording and metadata to Orion Studio. Archives 47, its bundle ID, existing library and standalone import boundary are retained; no data migration or library reset.
+- Mirrored the reviewed release dependency updates from main `f133315`: Cursor SDK 1.1.0, patched production libraries and SQLite 3.54.1. Official SQLx 0.8.6 driver source is vendored with its SQLite FFI version requirement adjusted; provenance, notices and license verification are retained.
+- Passed: TypeScript, 270 tests in 43 files before dependency refresh, final standalone production frontend build with refreshed installed dependencies, native release build, deep/strict signature verification, arm64 and stable bundle-ID checks. Installed `/Applications/Archives 47.app`; native About reads “an Orion Studio app” and the existing 37-note library opens. Previous app retained in the private task-cache backup.
+- Packaged `Archives47_0.1.1_aarch64.dmg`, 39,556,950 bytes, SHA-256 `ff2c1a48876ce0bbab995641fa7bae343145b3488adcd0cf4ea8f914801ba5d0`; hdiutil verification passes. Archives site download metadata is updated separately.
+- No standalone feature merge into main. Domain and X handle stay unchanged. Native boot/welcome acceptance remains separate.
+
 ## 2026-11-07 (cont. 6) — Archives 47: API Keys removed from Settings
 
 Branch: `alpha/archives-app`. Owner: "remove the api keys section from settings as they are not needed".

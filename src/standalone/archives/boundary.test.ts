@@ -1,5 +1,5 @@
 // @vitest-environment node
-// Archives 47 is built from Orion Terminal's source tree. This test walks the
+// Archives 47 is built from Orion Studio's source tree. This test walks the
 // standalone entry's static imports and fails if it reaches any Orion-only
 // surface (editor, XDesign app, Command Center, Hermes, Incubator, companions,
 // the desktop shell). Small pure helpers it legitimately shares are listed.

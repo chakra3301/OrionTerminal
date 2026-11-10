@@ -203,12 +203,6 @@
       }
     ]
   },
-  "dompurify@3.4.15": {
-    "license": "(MPL-2.0 OR Apache-2.0)",
-    "selectedLicense": "Apache-2.0",
-    "reason": "Select the Apache-2.0 alternative explicitly offered by DOMPurify 3.4.15. The published package contains the complete Apache LICENSE and alternative LICENSE-MPL, collected directly without modifying either.",
-    "files": []
-  },
   "pako@1.0.11": {
     "license": "(MIT AND Zlib)",
     "reason": "Pako requires MIT AND Zlib. MIT LICENSE is collected from the published package; the complete additional Zlib notice is retained verbatim from its unmodified lib/zlib/deflate.js source header.",
@@ -236,5 +230,11 @@
         "origin": "https://raw.githubusercontent.com/open-pencil/yoga/main/LICENSE (inspected 2026-10-07)"
       }
     ]
+  },
+  "dompurify@3.4.17": {
+    "license": "(MPL-2.0 OR Apache-2.0)",
+    "selectedLicense": "Apache-2.0",
+    "reason": "Select the Apache-2.0 alternative explicitly offered by DOMPurify 3.4.17. The published package contains the complete Apache LICENSE and alternative LICENSE-MPL, collected directly without modifying either.",
+    "files": []
   }
 }

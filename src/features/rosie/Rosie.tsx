@@ -351,7 +351,7 @@ export function Rosie() {
               <div className="examples">
                 <span>“open archives”</span>
                 <span>“find notes about onboarding”</span>
-                <span>“switch to the Orion Terminal project”</span>
+                <span>“switch to the Orion Studio project”</span>
                 <span>“make a journal entry for today”</span>
               </div>
               <button

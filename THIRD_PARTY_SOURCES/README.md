@@ -1,6 +1,6 @@
 # Matching source for MPL-covered dependencies
 
-Orion Terminal distributes BlockNote and selected native crates under the Mozilla Public License 2.0 as part of a larger work. Their matching, unmodified published source archives are included **with this application**, not merely offered through a future download promise.
+Orion Studio distributes BlockNote and selected native crates under the Mozilla Public License 2.0 as part of a larger work. Their matching, unmodified published source archives are included **with this application**, not merely offered through a future download promise.
 
 In the macOS app, use Finder → Show Package Contents → `Contents/Resources/_up_/THIRD_PARTY_SOURCES/`. Extract `.tgz` / `.crate` archives with `tar -xf <archive>` or an archive reader. Reading/extracting source does not require running its scripts. The source remains under MPL-2.0; the full license is in the adjacent `THIRD_PARTY_LICENSES/MPL-2.0.txt`. Orion's root Apache license does not replace it.
 

@@ -1,4 +1,4 @@
-//! Which product this process is: Orion Terminal, or a standalone app built
+//! Which product this process is: Orion Studio, or a standalone app built
 //! from the same crate (Archives 47). The profile decides the database file,
 //! the keychain service and the name used in user-facing messages, so two
 //! products never share data or credentials. Set once at startup; anything
@@ -15,7 +15,7 @@ pub struct Profile {
     pub keychain_service: String,
     /// Short name for messages ("Orion", "Archives 47").
     pub short_name: &'static str,
-    /// Full product name ("Orion Terminal", "Archives 47").
+    /// Full product name ("Orion Studio", "Archives 47").
     pub product_name: &'static str,
     /// Prefix of startup database backups (`<prefix>-<stamp>-<ulid>.db`).
     pub backup_prefix: &'static str,
@@ -28,7 +28,7 @@ pub fn orion() -> Profile {
         db_file: "orion.db",
         keychain_service: "personal-workstation".into(),
         short_name: "Orion",
-        product_name: "Orion Terminal",
+        product_name: "Orion Studio",
         backup_prefix: "orion",
         mcp_app: None,
     }
@@ -76,7 +76,7 @@ pub fn short_name() -> &'static str {
 }
 
 pub fn product_name() -> &'static str {
-    PROFILE.get().map(|p| p.product_name).unwrap_or("Orion Terminal")
+    PROFILE.get().map(|p| p.product_name).unwrap_or("Orion Studio")
 }
 
 pub fn db_path_in(config_dir: &std::path::Path) -> PathBuf {
@@ -126,7 +126,7 @@ mod tests {
         assert_eq!(sqlite_url(), "sqlite:orion.db");
         assert_eq!(keychain_service(), "personal-workstation");
         assert_eq!(short_name(), "Orion");
-        assert_eq!(product_name(), "Orion Terminal");
+        assert_eq!(product_name(), "Orion Studio");
         assert_eq!(
             db_path_in(std::path::Path::new("/x")),
             std::path::PathBuf::from("/x/orion.db")
