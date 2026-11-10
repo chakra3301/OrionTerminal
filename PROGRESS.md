@@ -1,5 +1,7 @@
 ## 2026-11-10 — Studio alpha completion and release gates
 
+CI follow-up: the old macos-14 GitHub runner was retired on 2026-11-02 and cancelled checks before any steps. Both workflows now use supported macos-15 Apple Silicon; gates are unchanged. Reference: https://github.com/actions/runner-images/issues/13518.
+
 Branch: `validation/alpha-2026-09-14`. Owner authorized all six remaining rebrand items, including commits, publication and installed-app replacement. Preserve the existing domain, X handle, bundle/data identities and original Rosie dock orb.
 
 Completed: Studio wording in boot/welcome prototypes and standalone Archives; source release configuration/notes for alpha 2; new Rosie teaser 02 v24 web derivative with identical audio and frame count; refreshed website version labels and four spec sheets. Boot branding-only commit `7c11c44` is pushed; unaccepted boot/welcome features remain separate. Release dependency compatibility is committed as `f133315`; official SQLx driver provenance and narrowly changed FFI requirement are documented in its vendored ORION_CHANGES.md.

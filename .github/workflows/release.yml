@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   build-macos:
-    runs-on: macos-14 # Apple Silicon runner (aarch64)
+    runs-on: macos-15 # Apple Silicon runner (aarch64)
     env:
       # Match verification's bounded Vite build budget; not an app runtime flag.
       NODE_OPTIONS: --max-old-space-size=4096
