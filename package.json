@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test:bridges": "node --test scripts/*.test.mjs",
     "test:native": "cd src-tauri && cargo test --locked --lib",
-    "verify": "npm run typecheck && npm test && npm run test:bridges && npm run build && npm run test:native",
+    "verify": "npm run typecheck && npm test -- --maxWorkers=2 && npm run test:bridges && npm run build && npm run test:native",
     "doctor": "node scripts/doctor.mjs",
     "sync:fx-tools": "node scripts/sync-fx-tools.mjs",
     "sync:preview-csp": "node scripts/sync-preview-csp.mjs",
@@ -78,16 +78,16 @@
   },
   "overrides": {
     "monaco-editor": {
-      "dompurify": "3.4.15"
+      "dompurify": "3.4.17"
     },
     "@blocknote/core": {
       "uuid": "11.1.1"
     },
     "@connectrpc/connect-node": {
-      "undici": "6.28.1"
+      "undici": "6.29.1"
     },
     "@huggingface/transformers": {
-      "sharp": "0.35.4"
+      "sharp": "0.35.5"
     },
     "onnxruntime-node": {
       "adm-zip": "0.6.1"
@@ -104,7 +104,7 @@
     "node": ">=22.13.0"
   },
   "devDependencies": {
-    "@cursor/sdk": "1.0.31",
+    "@cursor/sdk": "1.1.0",
     "@gltf-transform/core": "^4.3.0",
     "@gltf-transform/extensions": "^4.4.0",
     "@gltf-transform/functions": "^4.4.0",

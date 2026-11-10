@@ -1,9 +1,9 @@
 {
   "target": "aarch64-apple-darwin",
   "scope": "Selected native normal/build graph; build-only crates conservatively included",
-  "cargoLockSha256": "da8c71017ac7891c4102ac178fb424c1677b1ca2856be240cd8f0e0351f83e9c",
-  "cargoManifestSha256": "65584f29938468222ad203279b36f2c9c477a0808091a8b1200ed95e9ee02ff9",
-  "npmLockSha256": "d126b502ec8d7dcf7a1695f15e9f7459ce2b30bac63c97ce556ff81beba3e62b",
+  "cargoLockSha256": "b32ed6ed0d26b8a9deb0dbb3c42ccf68eab0fe9bd6bfb9f7509d83570cc44dab",
+  "cargoManifestSha256": "819ddf6e7c22b6e14f67f589b4f91df5fb977c734a06db3279010307b6f8cb9b",
+  "npmLockSha256": "e1a6c475217116ce45cc26b505110364b71b834e94de862115d1e289c2d4f922",
   "native": [
     {
       "name": "adler2",
@@ -12,14 +12,6 @@
       "crateSha256": "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa",
       "notice": "THIRD_PARTY_LICENSES/native/adler2-2.0.1.md",
       "noticeSha256": "c879c22eb1300e50b7249bf4aba654f46eb0bdb55d983c24c5f63e798a7f7990"
-    },
-    {
-      "name": "ahash",
-      "version": "0.8.12",
-      "license": "MIT OR Apache-2.0",
-      "crateSha256": "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75",
-      "notice": "THIRD_PARTY_LICENSES/native/ahash-0.8.12.md",
-      "noticeSha256": "c29a822f52bebbe1307d3156bbb1c9ca1576cbb32abbb9d1e3c43a65779012ff"
     },
     {
       "name": "aho-corasick",
@@ -1079,14 +1071,6 @@
     },
     {
       "name": "hashbrown",
-      "version": "0.14.5",
-      "license": "MIT OR Apache-2.0",
-      "crateSha256": "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1",
-      "notice": "THIRD_PARTY_LICENSES/native/hashbrown-0.14.5.md",
-      "noticeSha256": "7e8741442c52d4d5d4548257728bc88b3ec9896e4a4c8c2d6250e1aadde4b7d7"
-    },
-    {
-      "name": "hashbrown",
       "version": "0.15.5",
       "license": "MIT OR Apache-2.0",
       "crateSha256": "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1",
@@ -1111,11 +1095,11 @@
     },
     {
       "name": "hashlink",
-      "version": "0.9.1",
+      "version": "0.12.2",
       "license": "MIT OR Apache-2.0",
-      "crateSha256": "6ba4ff7128dee98c7dc9794b6a411377e1404dba1c97deb8d1a55297bd25d8af",
-      "notice": "THIRD_PARTY_LICENSES/native/hashlink-0.9.1.md",
-      "noticeSha256": "15c94a52ae9606d604e2254d201471bac7269a571b420371ed67901b6bf71566"
+      "crateSha256": "a596f1b20ed2cc5ecac41a164aaebc7258057060f06c0cf7a2ba3991ee7990fb",
+      "notice": "THIRD_PARTY_LICENSES/native/hashlink-0.12.2.md",
+      "noticeSha256": "cfb5070226362ced7a4424a4b9ef7e2d807a12c7250b51dd7e9270d17ad22d6d"
     },
     {
       "name": "heck",
@@ -1471,11 +1455,11 @@
     },
     {
       "name": "libsqlite3-sys",
-      "version": "0.30.1",
+      "version": "0.39.1",
       "license": "MIT",
-      "crateSha256": "2e99fb7a497b1e3339bc746195567ed8d3e24945ecd636e3619d20b9de9e9149",
-      "notice": "THIRD_PARTY_LICENSES/native/libsqlite3-sys-0.30.1.md",
-      "noticeSha256": "53265cb6977767389d2b2ba7c18024053b1249cf1a142755bd72419e23231166"
+      "crateSha256": "14a5f01b87b92705d07b433c06f96cbc764637d81a0bffb5734ce17cf0f9a2b3",
+      "notice": "THIRD_PARTY_LICENSES/native/libsqlite3-sys-0.39.1.md",
+      "noticeSha256": "22dca35c2c80585ab5f902762f00e168045574bc6bd4d7763e248d18c891a3b3"
     },
     {
       "name": "linebender_resource_handle",
@@ -2371,11 +2355,11 @@
     },
     {
       "name": "rusqlite",
-      "version": "0.32.1",
+      "version": "0.41.1",
       "license": "MIT",
-      "crateSha256": "7753b721174eb8ff87a9a0e799e2d7bc3749323e773db92e0984debb00019d6e",
-      "notice": "THIRD_PARTY_LICENSES/native/rusqlite-0.32.1.md",
-      "noticeSha256": "8f6daeb64d628f04ad9edc0bc735d8d551914dca69976b4f51bc45ee6e8be163"
+      "crateSha256": "da9bba6f3506135e120a6586df05be18b48d18896600646a4bec8f993d91a594",
+      "notice": "THIRD_PARTY_LICENSES/native/rusqlite-0.41.1.md",
+      "noticeSha256": "32c462a1e4046927c3663802a4982e285c776256798bbabbf9d53b10f487aa65"
     },
     {
       "name": "rust_decimal",
@@ -2403,11 +2387,11 @@
     },
     {
       "name": "rustls",
-      "version": "0.23.45",
+      "version": "0.23.46",
       "license": "Apache-2.0 OR ISC OR MIT",
-      "crateSha256": "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634",
-      "notice": "THIRD_PARTY_LICENSES/native/rustls-0.23.45.md",
-      "noticeSha256": "7221cc24c938be73764ebe15dc7b8a9feee84315611219980db573255f002550"
+      "crateSha256": "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf",
+      "notice": "THIRD_PARTY_LICENSES/native/rustls-0.23.46.md",
+      "noticeSha256": "bd9d382f86b0ea0789b91dbee48bd199bf0d3ce76c7f41feec62393879a2b9f0"
     },
     {
       "name": "rustls-pki-types",
@@ -2419,19 +2403,19 @@
     },
     {
       "name": "rustls-webpki",
-      "version": "0.103.15",
+      "version": "0.103.16",
       "license": "ISC",
-      "crateSha256": "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2",
-      "notice": "THIRD_PARTY_LICENSES/native/rustls-webpki-0.103.15.md",
-      "noticeSha256": "1259f2df8558f6f3e628b8914b05adc1039692fa9971ec77b63a947f564acdc6"
+      "crateSha256": "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281",
+      "notice": "THIRD_PARTY_LICENSES/native/rustls-webpki-0.103.16.md",
+      "noticeSha256": "729ac043c9c6eed95919086d623e5fe4649cf0044a96d8b1f1f82d7dbb417575"
     },
     {
       "name": "ruzstd",
-      "version": "0.9.0",
+      "version": "0.9.1",
       "license": "MIT",
-      "crateSha256": "a252f5e20f038fe7b4ea53e073e65398d652c864cc162fc77c56c2f13717b888",
-      "notice": "THIRD_PARTY_LICENSES/native/ruzstd-0.9.0.md",
-      "noticeSha256": "f00e34d6b8187f28b5530f6c24b1d4b6de796b6f93a5647b88d7fa6872b81b9d"
+      "crateSha256": "69e4ce4a039f42bf25920b95667e4d789e98749ab11bbb8d2c2936f788421bb5",
+      "notice": "THIRD_PARTY_LICENSES/native/ruzstd-0.9.1.md",
+      "noticeSha256": "7d8682d36996d08057743df7b5ffa64a8f7fa3324afc249eade757f817ab61c1"
     },
     {
       "name": "ryu",
@@ -2741,7 +2725,11 @@
       "name": "sqlx-sqlite",
       "version": "0.8.6",
       "license": "MIT OR Apache-2.0",
+      "vendoredFrom": "https://crates.io/crates/sqlx-sqlite/0.8.6",
       "crateSha256": "c2d12fe70b2c1b4401038055f90f151b78208de1f9f89a7dbfd41587a10c3eea",
+      "localChanges": "src-tauri/vendor/sqlx-sqlite/ORION_CHANGES.md",
+      "sourceDirectory": "src-tauri/vendor/sqlx-sqlite",
+      "sourceTreeSha256": "4de05bb03dbed68dd3ef457b02f23d1327269042358e65ff3c6fd872daf0f0aa",
       "notice": "THIRD_PARTY_LICENSES/native/sqlx-sqlite-0.8.6.md",
       "noticeSha256": "8ebf802fd0a0a45c43e6bd0c03d8c7a066db5db9ffdd690f7721e2ef13a41adf"
     },
@@ -3035,11 +3023,11 @@
     },
     {
       "name": "tokio",
-      "version": "1.53.1",
+      "version": "1.53.3",
       "license": "MIT",
-      "crateSha256": "202caea871b69668250d242070849eb495be178ed697a3e98aebce5bc81a0bed",
-      "notice": "THIRD_PARTY_LICENSES/native/tokio-1.53.1.md",
-      "noticeSha256": "60fc59af8d188964fbc38333bc4fa59c9fd235d5e7ac27d47d8e777cfea805ba"
+      "crateSha256": "ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e",
+      "notice": "THIRD_PARTY_LICENSES/native/tokio-1.53.3.md",
+      "noticeSha256": "8b17215fd593e1d9c11910547ace66a53e56838ee5b2b1d57e4942d386ad1ffb"
     },
     {
       "name": "tokio-macros",
@@ -3403,11 +3391,11 @@
     },
     {
       "name": "webpki-roots",
-      "version": "1.0.9",
+      "version": "1.0.10",
       "license": "CDLA-Permissive-2.0",
-      "crateSha256": "7dcd9d09a39985f5344844e66b0c530a33843579125f23e21e9f0f220850f22a",
-      "notice": "THIRD_PARTY_LICENSES/native/webpki-roots-1.0.9.md",
-      "noticeSha256": "3d42aa6b2faa8ef40f0fff7aa3420241e461f728e8e898ad4a19791c7e2b99b4"
+      "crateSha256": "1c1c8e20c8a38fc7d65abfe74eb7280e4aa667e8eec8bc84996d2874810748d9",
+      "notice": "THIRD_PARTY_LICENSES/native/webpki-roots-1.0.10.md",
+      "noticeSha256": "22ab59e0a044642437c5e41e5577407811e9df076e38caf2a630ea3c850156a2"
     },
     {
       "name": "weezl",

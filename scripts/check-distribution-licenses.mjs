@@ -20,6 +20,23 @@ export function checkDistributionLicenses(root) {
   if (!manifest.native?.length || !manifest.sources?.length) throw new Error('Empty license/source inventory');
   for (const pkg of manifest.native) {
     if (!pkg.license || sha256(read(pkg.notice)) !== pkg.noticeSha256) throw new Error(`Missing or changed native notice: ${pkg.name}`);
+    if (pkg.sourceDirectory) {
+      const dir = path.resolve(root, pkg.sourceDirectory);
+      if (!dir.startsWith(root + path.sep) || !fs.realpathSync(dir).startsWith(root + path.sep)) throw new Error('Vendored source leaves the repository');
+      const files = [];
+      const visit = current => {
+        for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+          if (entry.isSymbolicLink()) throw new Error('Symlink in vendored source');
+          const file = path.join(current, entry.name);
+          if (entry.isDirectory()) visit(file);
+          else if (entry.isFile()) files.push(path.relative(dir, file).split(path.sep).join('/'));
+          else throw new Error('Special file in vendored source');
+        }
+      };
+      visit(dir);
+      const tree = files.sort().map(file => `${file}\0${sha256(read(path.join(pkg.sourceDirectory, file)))}\n`).join('');
+      if (sha256(tree) !== pkg.sourceTreeSha256) throw new Error(`Changed vendored source: ${pkg.name}`);
+    }
     if (pkg.license === 'MPL-2.0' && !manifest.sources.some(source => source.name === pkg.name && source.version === pkg.version)) throw new Error(`Missing MPL source: ${pkg.name}`);
   }
   for (const entry of manifest.adapted ?? []) {

@@ -24,6 +24,8 @@ jobs:
     env:
       # Match verification's bounded Vite build budget; not an app runtime flag.
       NODE_OPTIONS: --max-old-space-size=4096
+      CARGO_BUILD_JOBS: 2
+      RUST_TEST_THREADS: 1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -79,15 +81,15 @@ jobs:
       - name: Verify packaged MCP grants without a model or user profile
         run: |
           test "$(uname -m)" = arm64
-          npm run test:native-policy -- --binary "$PWD/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Terminal.app/Contents/MacOS/orion-terminal"
+          npm run test:native-policy -- --binary "$PWD/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Studio.app/Contents/MacOS/orion-terminal"
 
       - name: Rehearse packaged cold recovery without a live profile
         run: |
-          python3 scripts/rehearse-profile-recovery.py --binary "$PWD/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Terminal.app/Contents/MacOS/orion-terminal" --report "$RUNNER_TEMP/profile-recovery.json"
+          python3 scripts/rehearse-profile-recovery.py --binary "$PWD/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Studio.app/Contents/MacOS/orion-terminal" --report "$RUNNER_TEMP/profile-recovery.json"
 
       - name: Verify release bundle and disk image
         run: |
-          codesign --verify --deep --strict "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Terminal.app"
+          codesign --verify --deep --strict "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Studio.app"
           for image in src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg; do hdiutil verify "$image"; done
 
       - name: Stage release asset (stable name)
@@ -98,7 +100,7 @@ jobs:
           images=(src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg)
           if [ "${#images[@]}" -ne 1 ]; then echo "Expected exactly one fresh target .dmg"; exit 1; fi
           src="${images[0]}"
-          stable="Orion-Terminal_aarch64.dmg"
+          stable="Orion-Studio_aarch64.dmg"
           cp "$src" "$stable"
           shasum -a 256 "$stable" > SHA256SUMS.txt
           (cd "$(dirname "$src")" && shasum -a 256 "$(basename "$src")") >> "$GITHUB_WORKSPACE/SHA256SUMS.txt"
@@ -110,8 +112,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.value }}
-          name: Orion Terminal — ${{ steps.tag.outputs.value }}
-          body_path: docs/releases/v0.1.0-alpha.1.md
+          name: Orion Studio — ${{ steps.tag.outputs.value }}
+          body_path: docs/releases/${{ steps.tag.outputs.value }}.md
           # Alpha builds must not replace the stable /releases/latest target.
           prerelease: true
           fail_on_unmatched_files: true

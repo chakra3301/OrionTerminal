@@ -87,12 +87,13 @@ fn check_deadline(deadline: Instant) -> Result<(), String> {
     }
 }
 
-fn configure(conn: &Connection, deadline: Instant) -> Result<(), String> {
+fn configure(conn: &mut Connection, deadline: Instant) -> Result<(), String> {
     conn.busy_timeout(Duration::from_millis(100))
         .map_err(|e| e.to_string())?;
     conn.pragma_update(None, "trusted_schema", false)
         .map_err(|e| e.to_string())?;
-    conn.progress_handler(10_000, Some(move || Instant::now() >= deadline));
+    conn.progress_handler(10_000, Some(move || Instant::now() >= deadline))
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -209,12 +210,12 @@ fn snapshot(src_path: &Path, target: &Path, deadline: Instant) -> Result<(), Str
     let temp = scratch.0.join("snapshot.db");
     let reserved = private_file(&temp)?;
     {
-        let src = Connection::open_with_flags(src_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        let mut src = Connection::open_with_flags(src_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
             .map_err(|e| e.to_string())?;
-        configure(&src, deadline)?;
+        configure(&mut src, deadline)?;
         let mut dst = Connection::open_with_flags(&temp, OpenFlags::SQLITE_OPEN_READ_WRITE)
             .map_err(|e| e.to_string())?;
-        configure(&dst, deadline)?;
+        configure(&mut dst, deadline)?;
         {
             let backup = Backup::new(&src, &mut dst).map_err(|e| e.to_string())?;
             loop {
@@ -326,12 +327,12 @@ fn prune(dir: &Path, current: &Path, deadline: Instant) -> Result<(), String> {
         uri.query_pairs_mut()
             .append_pair("mode", "ro")
             .append_pair("immutable", "1");
-        let conn = Connection::open_with_flags(
+        let mut conn = Connection::open_with_flags(
             uri.as_str(),
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
         )
         .map_err(|e| e.to_string())?;
-        configure(&conn, deadline)?;
+        configure(&mut conn, deadline)?;
         if validate(&conn, deadline).is_ok() {
             valid.push(path);
         }

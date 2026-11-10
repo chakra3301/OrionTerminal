@@ -99,7 +99,15 @@ def prepare():
             for filename in ["LICENSE-MIT", "LICENSE-APACHE", "NOTICE"]:
                 texts.append((filename, (root.parents[1]/filename).read_text(), f"https://github.com/storytold/photocraft/blob/{commit}/{filename}"))
             source_identity = {"vendoredFrom": photocraft_source, "sourceRevision": commit, "localChanges": "src-tauri/vendor/photocraft/ORION_CHANGES.md"}
-        elif package["source"].startswith("git+"):
+        elif package["source"] is None and root == ROOT/"src-tauri/vendor/sqlx-sqlite":
+            if (name, version) != ("sqlx-sqlite", "0.8.6"):
+                raise ValueError("Unreviewed local SQLite driver")
+            files = sorted(p for p in root.rglob('*') if p.is_file())
+            if any(p.is_symlink() for p in root.rglob('*')):
+                raise ValueError("Symlink in vendored SQLite driver")
+            tree = ''.join(f'{p.relative_to(root).as_posix()}\0{digest(p.read_bytes())}\n' for p in files)
+            source_identity = {"vendoredFrom": "https://crates.io/crates/sqlx-sqlite/0.8.6", "crateSha256": "c2d12fe70b2c1b4401038055f90f151b78208de1f9f89a7dbfd41587a10c3eea", "localChanges": "src-tauri/vendor/sqlx-sqlite/ORION_CHANGES.md", "sourceDirectory": "src-tauri/vendor/sqlx-sqlite", "sourceTreeSha256": digest(tree.encode())}
+        elif package["source"] and package["source"].startswith("git+"):
             if package["source"] != photocraft_source or not name.startswith("photocraft-"): raise ValueError(f"Unreviewed git dependency: {key}")
             commit = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], timeout=10).decode().strip()
             if commit != photocraft_source.split("#")[1]: raise ValueError("Git dependency revision differs from Cargo.lock")

@@ -18,6 +18,8 @@ jobs:
     env:
       # Vite's full editor/ML graph exceeds Node 22's default ~2 GiB heap.
       NODE_OPTIONS: --max-old-space-size=4096
+      CARGO_BUILD_JOBS: 2
+      RUST_TEST_THREADS: 1
     steps:
       - uses: actions/checkout@v4
         with:
