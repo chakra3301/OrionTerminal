@@ -8,4 +8,4 @@ export function initializeImageStorage():Promise<void>{
   return initialized??=invoke<ImageStorageReport>("xdesign_storage_startup").then(()=>{}).catch(()=>{});
 }
 export function imageStorageReport():Promise<ImageStorageReport|null>{return isTauri()?invoke("xdesign_storage_report"):Promise.resolve(null);}
-export function scheduleImageCompaction(enabled:boolean):Promise<boolean>{if(!isTauri())return Promise.reject(new Error("Image history compaction is available in the Orion Terminal desktop app."));return invoke("xdesign_storage_schedule_compaction",{enabled});}
+export function scheduleImageCompaction(enabled:boolean):Promise<boolean>{if(!isTauri())return Promise.reject(new Error("Image history compaction is available in the Orion Studio desktop app."));return invoke("xdesign_storage_schedule_compaction",{enabled});}

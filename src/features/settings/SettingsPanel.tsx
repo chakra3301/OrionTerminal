@@ -962,7 +962,7 @@ function formatHotkey(hk: string): string {
 export function AboutSection() {
   return (
     <>
-      <h2 className="ot-settings-h2">Orion Terminal</h2>
+      <h2 className="ot-settings-h2">Orion Studio</h2>
       <p className="ot-settings-p">
         A personal workstation: Orion for code, Archives 47 for knowledge and
         XDesign for visuals, with an AI collaborator inside each.

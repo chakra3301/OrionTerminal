@@ -8,12 +8,8 @@ import { ThemeBorder } from "@/components/effects/ThemeBorder";
 import { DockIcon } from "./dock/DockIcon";
 import { RosieOrb } from "./dock/RosieOrb";
 import { decodeName, dockApps, dockLabel, fixedDockAccent, magnifyScale, pickLifted } from "./dock/logic";
-import archivesGlyph from "@/assets/dock/glyph-archives.png";
-import orionGlyph from "@/assets/dock/glyph-orion.png";
-import xdesignGlyph from "@/assets/dock/glyph-xdesign.png";
-import incubatorGlyph from "@/assets/dock/glyph-rosie.png";
+import { appGlyph } from "@/identity/appGlyph";
 
-const GLYPHS: Record<string, string> = { archives: archivesGlyph, orion: orionGlyph, xdesign: xdesignGlyph, incubator: incubatorGlyph };
 type Item = { id: string; name: string; color: string; Icon?: LucideIcon; glyph?: string; shortcut?: string; coachId?: string; utility?: boolean; orb?: boolean; active?: boolean; onClick: () => void };
 const colorStyle = (color: string) => ({ "--dock-color": color }) as CSSProperties;
 
@@ -64,7 +60,7 @@ export function Dock() {
   };
   const activeIds = new Set(windows.filter((w) => !w.minimized).map((w) => w.app));
   const items: Item[] = [
-    ...apps.map((app) => ({ id: app.id, name: app.name, color: fixedDockAccent(app.accent), Icon: app.dock.Icon, glyph: GLYPHS[app.id], coachId: `app-${app.id}`, active: activeIds.has(app.id), onClick: () => handleDockClick(app.id) })),
+    ...apps.map((app) => ({ id: app.id, name: app.name, color: fixedDockAccent(app.accent), Icon: app.dock.Icon, glyph: appGlyph(app.id), coachId: `app-${app.id}`, active: activeIds.has(app.id), onClick: () => handleDockClick(app.id) })),
     { id: "rosie", name: "R.O.S.I.E", color: "var(--dock-cyan)", shortcut: "⌘L", coachId: "rosie", orb: true, onClick: () => useRosie.getState().togglePanel() },
     { id: "spotlight", name: "Spotlight", color: "var(--dock-utility)", shortcut: "⌘K", coachId: "spotlight", utility: true, Icon: Search, onClick: () => openSpotlight() },
     { id: "control", name: "Control Panel", color: "var(--dock-utility)", shortcut: "⌘,", utility: true, Icon: SlidersHorizontal, onClick: () => useControlPanel.getState().show() },

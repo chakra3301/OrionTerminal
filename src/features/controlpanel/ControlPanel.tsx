@@ -76,7 +76,7 @@ export function ControlPanel() {
       <div className="cp-surface" ref={surfaceRef} role="dialog" aria-modal="true" aria-label="Control Panel" tabIndex={-1} onMouseDown={(e) => e.stopPropagation()}>
         <ThemeBorder />
         <aside className="cp-rail">
-          <div className="cp-rail-brand"><span><SlidersHorizontal size={17} /></span><div>Settings<small>Orion Terminal</small></div></div>
+          <div className="cp-rail-brand"><span><SlidersHorizontal size={17} /></span><div>Settings<small>Orion Studio</small></div></div>
           <nav aria-label="Settings sections">
             {NAV_GROUPS.map(group => <div className="cp-rail-group" key={group.label}>
               <div className="cp-rail-group-label">{group.label}</div>

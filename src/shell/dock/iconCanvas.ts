@@ -9,6 +9,7 @@ type Mask = { img: HTMLCanvasElement; box: { x: number; y: number; w: number; h:
 const masks = new Map<string, Promise<Mask>>();
 export function loadMask(src: string): Promise<Mask> {
   let pending = masks.get(src);
+  if (pending) { masks.delete(src); masks.set(src, pending); }
   if (!pending) {
     pending = (async () => {
       const image = new Image(); image.src = src; await image.decode();
@@ -22,7 +23,9 @@ export function loadMask(src: string): Promise<Mask> {
       return { img: c, box: { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 } };
     })();
     masks.set(src, pending);
-    void pending.catch(() => masks.delete(src));
+    // Generated identities can be unbounded; retired 512px masks must not accumulate forever.
+    if (masks.size > 64) masks.delete(masks.keys().next().value!);
+    void pending.catch(() => { if (masks.get(src) === pending) masks.delete(src); });
   }
   return pending;
 }

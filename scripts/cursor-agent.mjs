@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Headless Cursor SDK runner for Orion Terminal.
+ * Headless Cursor SDK runner for Orion Studio.
  * Reads one JSON config line on stdin, streams NDJSON events on stdout.
  *
  * Config: { apiKey, model, prompt, cwd, systemAppend?, agentId? }

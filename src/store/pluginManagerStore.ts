@@ -188,7 +188,7 @@ export const usePluginManager = create<PluginManagerState>((set, get) => ({
       log.error("plugin enablement update failed", pluginId, error);
       set({
         error: runtimeRollbackFailed
-          ? `${message} Runtime recovery failed; restart Orion Terminal.`
+          ? `${message} Runtime recovery failed; restart Orion Studio.`
           : message,
       });
       return false;

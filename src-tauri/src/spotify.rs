@@ -394,7 +394,7 @@ pub async fn spotify_connect(client_id: String) -> Result<SpotifyStatus, String>
                     .await;
                 continue;
             }
-            let body = "<!doctype html><html><body style=\"font-family:-apple-system,sans-serif;background:#06090d;color:#e6f4ec;display:flex;align-items:center;justify-content:center;height:100vh;margin:0\"><div style=\"text-align:center\"><h2>Authorization received</h2><p>Finishing up \u{2014} return to Orion Terminal.</p></div></body></html>";
+            let body = "<!doctype html><html><body style=\"font-family:-apple-system,sans-serif;background:#06090d;color:#e6f4ec;display:flex;align-items:center;justify-content:center;height:100vh;margin:0\"><div style=\"text-align:center\"><h2>Authorization received</h2><p>Finishing up \u{2014} return to Orion Studio.</p></div></body></html>";
             let resp = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                 body.len(),

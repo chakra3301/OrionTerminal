@@ -1,7 +1,7 @@
-Orion Terminal
-Copyright 2026 Orion Terminal contributors
+Orion Studio
+Copyright 2026 Orion Studio contributors
 
-Original Orion Terminal source code and creator-owned built-in assets in
+Original Orion Studio source code and creator-owned built-in assets in
 public/characters/, public/companion/, public/wallpapers/stock.png,
 app-icon.png and its generated
 src-tauri/icons/ variants are licensed under the Apache License, Version 2.0.

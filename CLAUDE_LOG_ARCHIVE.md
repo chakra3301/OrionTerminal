@@ -1,3 +1,24 @@
+## 2026-11-10 — Studio alpha completion
+
+Owner authorized the six remaining rebrand items and publication. Reviewed dependency compatibility is in `f133315`; current Studio branding and deterministic app/skill identity renderers are committed with this entry. Original Rosie dock renderer and stable storage/bundle/repository/domain/X identities are retained. The public README and alpha guide point at alpha 2. Boot branding is pushed separately as `7c11c44`; unaccepted boot/welcome features and companion briefs are excluded from this commit. Full UI 6,067 passed / three skipped, native 1,556 passed / 20 ignored, final backup/Cursor 20 passed, bridge 263 passed, TypeScript, production frontend, license and production audit gates passed. Concurrent memory-pressure UI rerun was stopped and is not a passing receipt. Final installer/publication receipts are tracked in `docs/alpha/rename-report.md` and the next PROGRESS entry.
+
+## 2026-10-29 (cont. 2) — Claude / Orion Terminal: dock handoff, boot prototypes v1–v7 and sound
+
+Commander role for the alpha roadmap: Claude does frontend and visual work, GPT 6.1 (Codex) does backend and long jobs, one worktree each. Dock redesign handed to GPT from an approved spec and mockups, then applied to the main checkout for the owner's smoke test at their request (see PROGRESS cont. 4).
+
+Boot experience, built as throwaway prototypes in the visual companion:
+- v1–v4 picture: Orion constellation, the owner's 3D logo, the owner's sword GLB striking it, then an anime impact frame at the owner's request ("inverted colours and add glyph dither to the mix and some glitch"). Approved: "amazong now we need sound".
+- v5 sound: procedural Web Audio rendered once per mode with OfflineAudioContext; the picture follows the audio clock; peak-normalised to -1 dBFS.
+- v6: the owner asked for "something like this low 808" from teaser v16. Measured the teaser's bass (a long saturated 808 in D, slides on big moments, slow fade-in, dark tone) and added a sliding 808 with an original line.
+- v7: "deeper i want to feel it in my sou;". The fundamental (37 Hz) leads instead of the octave; each note dives in from two octaves up. Sub band +10 dB over v6, the rest of the mix within 1 dB. Approved: "amazing lets call this done here".
+
+Rulings:
+1. Copied the teaser 808's character, not its notes (copyrighted track). Cost if wrong: the owner wants it closer; adjust the line without copying it.
+2. The 808 replaced v5's booms, sub hums and slow-motion drone to keep the low end clean. Cost if wrong: they come back from `boot-sound.js`.
+3. v7 is fundamental-led, so on laptop speakers it sounds lighter than v6. Cost if wrong: add saturation so the overtones carry it.
+
+Verification: no listening possible; checked by measurement (band levels, pitch tracking, harmonics vs the teaser, spectrograms) and in-page audio/picture sync.
+
 ## 2026-10-29 (cont.) — Claude / XDesign: image-to-3D removed
 
 Owner: "remove the image to 3d in x design because it doesnt really work well untill we find something new to replace it." Removed the "3D model" project kind end to end, test-first where behaviour remains (legacy registry entries, Home start list, MCP tool list). Owner DB checked read-only first: its registry holds one design project and no 3D projects.

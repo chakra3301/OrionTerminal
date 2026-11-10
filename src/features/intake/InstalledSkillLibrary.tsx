@@ -7,6 +7,7 @@ import { installedSkills } from "./installedApi";
 import { sameSkillSource } from "./skillDiff";
 import { SkillDiffReview } from "./SkillDiffReview";
 import type { InstalledSkill, IntakeCandidate } from "./contracts";
+import { ParticleOrb } from "@/identity/ParticleOrb";
 
 export function SkillInstallReview({ candidate, disabled, onInstall }: { candidate: IntakeCandidate; disabled: boolean; onInstall: (target: InstalledSkill | null, acknowledged: boolean) => void }) {
   const packages = useSkillsStore((s) => s.packages);
@@ -49,7 +50,10 @@ function InstalledCard({ item, disabled }: { item: InstalledSkill; disabled: boo
   }
   const change = (action: "enable" | "disable" | "rollback" | "remove", version?: string) => useSkillsStore.getState().changePackage(item.skillId, item.active.id, action, version);
   return <article className="skill-intake-preview" aria-busy={busy}>
-    <h4>{item.active.metadata.name} · {item.enabled ? "Enabled for selection" : "Disabled"}</h4>
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <ParticleOrb identity={`skill:${item.skillId}`} accent="" size={56} />
+      <h4>{item.active.metadata.name} · {item.enabled ? "Enabled for selection" : "Disabled"}</h4>
+    </div>
     <p>Immutable original · zero tool grants · {item.active.totalBytes.toLocaleString()} preserved bytes. Use in Orion text chat or attach in Agent Forge. Re-inspect the same source for updates.</p>
     <p>{item.active.repository ? `${item.active.repository.url} · ${item.active.repository.commit}` : `${item.active.sourceLabel} · ${item.active.entrypoint}`}</p>
     <details className="skill-intake-identity"><summary>Version identity</summary><dl><dt>Active version</dt><dd><code>{item.active.id}</code></dd><dt>Snapshot SHA-256</dt><dd><code>{item.active.artifactHash}</code></dd></dl></details>

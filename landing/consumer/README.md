@@ -1,4 +1,4 @@
-# Orion Terminal marketing website — concept 26
+# Orion Studio marketing website — concept 26
 
 A crisp, responsive implementation of the approved ice-white THINK. MAKE. CONNECT. design. This folder updates only the marketing website at `/Users/lucaorion/Orion_Terminal/landing/consumer`; the app source and original `landing/index.html` are separate.
 

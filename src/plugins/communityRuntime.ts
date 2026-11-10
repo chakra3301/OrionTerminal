@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
-import { Blocks } from "lucide-react";
+import { generatedAppIcon } from "@/identity/GeneratedAppIcon";
+import { identityAccent } from "@/identity/color";
 import { registry, type Command } from "@/commands/registry";
 import { appRegistry, type AppDescriptor } from "@/plugins/appRegistry";
 import { DisposableScope } from "@/plugins/contracts";
@@ -42,8 +43,13 @@ function descriptorFor(
   app: PluginAppContributionV1,
   index: number,
 ): AppDescriptor {
-  const accent = ACCENTS[app.accent ?? "cyan"];
   const id = communityAppId(record.manifest.id, app.id);
+  const generated = identityAccent(`app:${id}`);
+  const accent = app.accent ? ACCENTS[app.accent] : {
+    css: generated,
+    rgb: [1, 3, 5].map((i) => parseInt(generated.slice(i, i + 2), 16)).join(","),
+    foreground: "#011018",
+  };
   const window = app.window ?? {};
   return {
     id,
@@ -63,7 +69,7 @@ function descriptorFor(
       },
     },
     dock: {
-      Icon: Blocks,
+      Icon: generatedAppIcon(id),
       background: `linear-gradient(135deg, rgba(${accent.rgb},0.4), rgba(${accent.rgb},0.05))`,
       glow: `0 0 14px -2px rgba(${accent.rgb},0.45)`,
       foreground: accent.foreground,

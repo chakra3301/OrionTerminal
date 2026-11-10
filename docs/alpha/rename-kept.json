@@ -1,0 +1,2557 @@
+{
+  "generatedAt": "2026-11-10",
+  "pattern": "orion[ _-]?terminal",
+  "records": [
+    {
+      "file": ".github/workflows/ci.yml",
+      "line": 38,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "          python3 scripts/rehearse-profile-recovery.py --binary \"$PWD/src-tauri/target/debug/orion-terminal\" --report \"$RUNNER_TEMP/profile-recovery.json\"",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": ".github/workflows/release.yml",
+      "line": 82,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "          npm run test:native-policy -- --binary \"$PWD/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Studio.app/Contents/MacOS/orion-terminal\"",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": ".github/workflows/release.yml",
+      "line": 86,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "          python3 scripts/rehearse-profile-recovery.py --binary \"$PWD/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Studio.app/Contents/MacOS/orion-terminal\" --report \"$RUNNER_TEMP/profile-recovery.json\"",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "AGENTS.md",
+      "line": 16,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "\"Orion Studio\" is the product. \"Orion\" is the editor app inside it. **Never reuse `OrionTerminal` as a component name.**",
+      "keepReason": "Locked component naming prohibition retained."
+    },
+    {
+      "file": "AGENTS.md",
+      "line": 106,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "- Don't reuse `OrionTerminal` as a component name.",
+      "keepReason": "Locked component naming prohibition retained."
+    },
+    {
+      "file": "BETA.md",
+      "line": 80,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "\"/path/to/Orion Studio.app/Contents/MacOS/orion-terminal\" \\",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "BETA.md",
+      "line": 96,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "[Report an issue](https://github.com/chakra3301/OrionTerminal/issues/new). Please use redacted, minimal examples rather than raw profiles or credentials.",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 1,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "## 2026-10-29 (cont. 2) \u2014 Claude / Orion Terminal: dock handoff, boot prototypes v1\u2013v7 and sound",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 150,
+      "matches": [
+        "Orion_Terminal",
+        "Orion Terminal"
+      ],
+      "excerpt": "- Build 26 (`/Users/lucaorion/Orion_Terminal/src-tauri/target/release/bundle/macos/Orion Terminal.app`) starts on `HOME=/tmp/xd-release-home` and opens its window with an empty log; it was then quit. `/Applications` was not replaced.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 1182,
+      "matches": [
+        "orion_terminal"
+      ],
+      "excerpt": "All gates share binary src-tauri/target/debug/deps/orion_terminal_lib-95152455547bd39f,173,957,744bytes/SHA43b4288eff080deb5240334f14409fd738105197240ac66fb51fa72a1aab7ec5. Record SHA8c1c05fa05e1b70aa7cc958f54c58a712eeb598b60b47178c69484df5",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 2937,
+      "matches": [
+        "orion_terminal"
+      ],
+      "excerpt": "Engine 428,323 bytes / 282 inputs / seven notices / no warnings, SHA 3639aeaae6fbc53601eb079ab07772cb9994113ca75bfef7d0e25680b0b6eda5. Worker 1,905,078 bytes / 697 inputs, SHA 2aa3a47f6d50a73081afdecad46291bb350649963415fb45a10d043f2040c7dd",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 2969,
+      "matches": [
+        "orion_terminal"
+      ],
+      "excerpt": "Engine **414,440 bytes / 281 inputs / seven notices**, SHA `1513cc8899aec2997b2878f1461418d405163ac79631b7e06a145b4805404424`. Worker **1,905,078 bytes / 697 inputs / one production copy / 23 embedded packages / 285 notices**, unchanged SHA",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 3358,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- Project history schedules/cancels compaction for the next Orion Terminal launch and shows results/errors. Startup preflight and native ZIP-to-shared-directory conversion preserve raw manifests/blobs/previews and every version/source/view/",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 3674,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "# Orion Terminal \u2014 Session Log Archive",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 3826,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "Created a separate offline-built Tauri host/private identifier `com.lucaorion.orion-terminal.downloads-codec-proof-01`, using byte-identical production downloader/process modules and existing dependencies/CSP/asset scope, with four relevant",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 3844,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "Active `target/debug/orion-terminal` uses owner main profile. Narrow read-only query for the exact screenshot title and ffprobe of its file found asset01M46ZNS6SX2THTZE99YXVFE5S, `Marathon - Cryo Archive Durandal Override Intro Cinematic`,4",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 3922,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "42focusedtests/5files+tsc/Vite/offlineCOWTauri/ad-hocstrictdeep pass; fresh offscreen native WebKit Liquid/reduced/Ivory fixture, no window presented or owner input/profile inspected. Bright transparent fixture exposes possible white-ink co",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 3930,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "Separate Material Proof IDcom.lucaorion.orion-terminal.material-proof-20261003/SHA993f23ec\u2026 packaged, unlaunched, profile absent; one-use owner launcher verifies identity, strips credential environment, uses emptyCLIhomes/deniedguards (not ",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 3942,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "Moved Reload into loaded-only queue initially broke hydration retry; existing test caught it, fixed heading/reload independent of loaded record presentation, failure retained. Final75tests/ninefiles+tsc/diff/notices pass. One private fronte",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 3948,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "Separate UI Proof IDcom.lucaorion.orion-terminal.incubator-ui-proof-20261003/private profile/empty homes/deniedCLI guards. First native build exposed containment shrinking the flex child: definite flex/width/min-width fixed and original bun",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 3974,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "253featurefrontend/3optinskipped +2actualheadlesspassed;87native/7ignored;38ownedadapters/tsc/notices/diff green. OneprivatecorrectiveVite/offlineTauribuild/ad-hocstrictdeepverification, product IncubatorV1Candidate/newidentifier com.lucaor",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 4010,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "Owner \u201ccontinue\u201d advanced bounded E0 native acceptance, not E1 or more faults. Fresh Appearance Proof/profile/target (com.lucaorion.orion-terminal.appearance-proof), no production/old-proof replacement or credential copy/provider send. Capt",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 4022,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Owner before that asks things brought into Incubator match Orion Terminal styling. Persistent direction recorded: native-feeling interiors/chrome follow active host theme, not only wrapping foreign UI; preserve behavior/brand/semanticconten",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 4190,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Owner requested an app/plugin named Incubator as the home for everything brought into Orion Terminal, keeping direct Settings access, and repo-link paste/drop instead of folder-only input. Added `@orion/incubator` via existing built-in desc",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 4416,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Actual note primary-save failure and native journal writes passed; **no process crash occurred**. Pre-kill checks refused because automation edited existing synthetic fixture.ts in the old split pane rather than the new crash-draft-proof.tx",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 4502,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "RepoLens website routing now uses native provider-qualified resolution, real Codex auth home/config isolation, pinned/private MCP setup, and bounded/safe managed artifact operations. Shared dispatcher persists provider/account-reference own",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 4638,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- **Report bodies now render image artifacts as inline clickable thumbnails** instead of just an Open chip. Pure `isImageArtifact(seg)` in `ccArtifacts.ts` (+1 test) flags `.png/.jpg/.gif/.webp/.svg` path segments; `MessageBody` renders the",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 4655,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- **Provisioned** via `rsync -rl` into `$APPDATA/com.lucaorion.orion-terminal/command-center/divisions/design`. **Updated `cc-prof-cap-design` row** (sqlite3): name\u2192\"PI Designer\", `wiki_root`\u2192`command-center/divisions/design`, `skill_ids_js",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 5114,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- **Asset bytes / thumbnails:** `SyncPayload.haveAssetIDs` (optional \u2192 back-compat). `MultipeerSync` split into `sendSnapshot()` (JSON) + `sendAssetFiles()` (sendResource). Helper, after write-back, streams image files the phone lacks (kind",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 5148,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- **Helper reads the real `orion.db`** read-only (`~/Library/Application Support/com.lucaorion.orion-terminal/orion.db`) and serves it as its snapshot, so the phone pulls actual Archives. Menu shows \"reading orion.db \u00b7 N notes\". **Phone\u2192Mac",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 5471,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- **Mode-switched binary**: `orion-terminal --mcp-serve` becomes a stdio MCP server instead of booting the Tauri UI. main.rs short-circuits on argv before falling through to `lib::run()`. Same binary, no second build target \u2014 sidesteps bund",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 5475,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- **Verified end-to-end**: piped MCP requests to the built binary against the user's actual `~/Library/Application Support/com.lucaorion.orion-terminal/orion.db` \u2014 initialize, tools/list, list_recent_notes, search_archive all returned real ",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 5535,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "- **Suppressed claude's \"Error installing VS Code extension: ERR_STREAM_PREMATURE_CLOSE\" warning.** Claude tries to auto-install `anthropic.claude-code` on first launch when it detects an IDE-like env; the install fails because `code` CLI i",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 5540,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "- New `claude-code` tab kind in workspace (singleton, routes to terminal role). New `OrionClaudeCodePanel` mirrors `OrionTerminalPanel`'s xterm.js setup with a per-instance ulid pty id. Lucide `Bot` icon, violet accent.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 5705,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- `tauri.conf.json` enables the asset protocol with scope `$APPDATA/assets/**` + `$APPDATA/com.lucaorion.orion-terminal/assets/**`, so the frontend can use `convertFileSrc(filePath)` to render thumbnails without round-tripping bytes through",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 5766,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "- Removed: `src/apps/orion/TabStrip.tsx` (panel tab strip is generic now), the fake `dev / build / tests` terminal-bar tabs, the fixed-width `OrionTerminalShell` wrapper. Old fixed Tailwind columns kept as `.or-files` / `.or-terminal-wrap` ",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 5774,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Reproduce later if needed: `shasum -a 384 src-tauri/migrations/000N_*.sql` \u2192 `UPDATE _sqlx_migrations SET checksum = x'...' WHERE version = N` against `~/Library/Application Support/com.lucaorion.orion-terminal/orion.db`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "CLAUDE_LOG_ARCHIVE.md",
+      "line": 5785,
+      "matches": [
+        "orion terminal",
+        "orion_terminal"
+      ],
+      "excerpt": "- Read master brief + design handoff (extracted from `~/Downloads/orion terminal (1).zip` to `./design_handoff_orion_terminal/`).",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 6,
+      "matches": [
+        "orionterminal"
+      ],
+      "excerpt": "- Main, EMP and Archives sites are live under their existing orionterminal.app domains. Regenerated share cards, named companion artwork, four live teasers/poster, demo screenshots/spec sheets. Updated demo dock selector and rejected empty ",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 25,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "Branch: `validation/alpha-2026-09-14`. Nothing new committed. `45f1b14` (logo mark) is still not pushed. The launch screen is still uncommitted in `~/Orion_Terminal-worktrees/boot`, waiting for the owner's smoke test.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 36,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "2. Throwaway prototype: `~/Orion_Terminal-worktrees/logs/welcome-prototype/welcome-v1.html`, served on port 1537. Use `?models=/models-v2` for the shrunk models and `?reduced` for reduced motion. The flow:",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 50,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "1. GPT 6.1 ran this in `~/Orion_Terminal-worktrees/companions` (branch `alpha/companion-models` from `45f1b14`, uncommitted). The first run stopped with \"model at capacity\" before changing any files. It was resumed with the same session and",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 69,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "1. GPT 6.1 built it in `~/Orion_Terminal-worktrees/dock` from `docs/alpha/briefs/03-dock-redesign.md` and the spec `docs/superpowers/specs/2026-10-29-dock-redesign-design.md`. The owner smoke-tested it in this checkout and approved it.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 75,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "2. Spec: `docs/superpowers/specs/2026-10-29-boot-experience-design.md` (reference: `\u2026-boot-experience-reference/`; runnable copy: `~/Orion_Terminal-worktrees/logs/boot-prototype-v7/`). Brief: `docs/alpha/briefs/04-boot-experience.md`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 76,
+      "matches": [
+        "Orion_Terminal",
+        "Orion_Terminal"
+      ],
+      "excerpt": "3. GPT 6.1 is building it in `~/Orion_Terminal-worktrees/boot` (branch `alpha/boot-experience` from `487becb`). Log: `~/Orion_Terminal-worktrees/logs/boot.log`; final message: `boot-last.md`; report: `docs/alpha/boot-report.md` in the workt",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 100,
+      "matches": [
+        "ORION TERMINAL",
+        "Orion_Terminal",
+        "Orion_Terminal"
+      ],
+      "excerpt": "Owner decision: renaming to \"Orion Studio\" is deferred to the very end (app, website, GitHub, docs, videos). The wordmark stays \"ORION TERMINAL\"; only the logo mark changes now. Rename prep is kept for later: briefs in `docs/alpha/briefs/01",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 104,
+      "matches": [
+        "ORION TERMINAL"
+      ],
+      "excerpt": "2. Menubar: the pulsing green dot is replaced by the mark (10px tall, text colour), next to \"ORION TERMINAL\". The unused `ot-pulse` keyframes are removed.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 632,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- **Scratch-HOME release instance**: build 10 (PID 93531) was stopped and build 11 relaunched as PID 30915, with `HOME=/tmp/xd-release-home`. The release app was relaunched only after a wait for the owner to go idle. `/Applications/Orion Te",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 1052,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no new dependencies. `/Applications/Orion Terminal.app` untouched.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 1087,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no new Tauri commands; no new dependencies. `/Applications/Orion T",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 1133,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no new Tauri commands. `/Applications/Orion Terminal.app` untouche",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 1158,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no new Tauri commands (everything runs through the existing photo ",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 1189,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged; no Tauri command signatures changed (everything runs through the e",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 1229,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. No Rust, Cargo or Tauri command changes. `/Applications/Orion Terminal.app` untouched. P",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 1288,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged. No Tauri command signatures changed. `/Applications/Orion Terminal",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 1316,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged. No Tauri command signatures changed. `/Applications/Orion Terminal",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 1346,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed; no commit authorised. Cargo.toml unchanged. No Tauri command signatures changed. `/Applications/Orion Terminal",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 1385,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Branch: `validation/alpha-2026-09-14`, still 6 commits ahead of origin (latest 56acd17). **Uncommitted**, not staged, not pushed. The owner has not authorised a commit for this work. Cargo.toml is unchanged, so no licence refresh. No Tauri ",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 1458,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Branch: `validation/alpha-2026-09-14`. **Uncommitted**, not staged, not pushed; the owner has not authorised a commit for this work. Cargo.toml is unchanged, so no licence refresh. No Tauri command signatures changed. Photoshop was not touc",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 1537,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Live checks ran on release builds launched with the scratch HOME (`/tmp/xd-release-home`) and a scratch image only. Photoshop was not touched in this step, and `/Applications/Orion Terminal.app` was not replaced.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 1665,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- `/Applications/Orion Terminal.app` was not replaced.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 2136,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- Editing `PhotoStudio.tsx` often crashes HMR into the root ErrorBoundary (\"Orion Terminal hit an error\"). This is dev-only; `touch index.html` recovers it.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 2359,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- While these edits were hot-reloaded, the dev app crashed once (\"Orion Terminal hit an error.\", at App's `usePluginManager` call). A webview Reload loaded the same code cleanly, so this was a dev-only HMR artifact.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 2361,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "  - The ErrorBoundary's \"Reload Orion Terminal\" button only resets the boundary and didn't recover.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 5549,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- Project history schedules/cancels compaction for the next Orion Terminal launch and shows results/errors. Startup preflight and native ZIP-to-shared-directory conversion preserve raw manifests/blobs/previews and every version/source/view/",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 6099,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Follow-up: native HTTP binding, persisted session ownership, RepoLens auth isolation, exact MCP grant enforcement, subscription preflight, and cancellation races hardened. Restricted Codex/Cursor turns start fresh; reviewed CLI families: Co",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "PROGRESS.md",
+      "line": 6149,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "**Brain (2026-07-10, `3597873`):** Archives \u2192 **Brain** \u2014 automatic Obsidian-style knowledge graph over everything in Orion Terminal. `src/apps/archives/brain/`: `graphBuild.ts` (pure, tested \u2014 nodes = notes/journal/projects/chats/media/boa",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "README.md",
+      "line": 15,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "### [\u2b07\ufe0f Releases for macOS (Apple Silicon)](https://github.com/chakra3301/OrionTerminal/releases)",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "README.md",
+      "line": 17,
+      "matches": [
+        "OrionTerminal",
+        "OrionTerminal"
+      ],
+      "excerpt": "[![Download](https://img.shields.io/github/v/release/chakra3301/OrionTerminal?include_prereleases&label=download%20.dmg&color=39ff88)](https://github.com/chakra3301/OrionTerminal/releases)",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "README.md",
+      "line": 27,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "1. Choose a **`.dmg`** from the [**Releases page**](https://github.com/chakra3301/OrionTerminal/releases). For the new alpha, compare its SHA-256 with the attached `SHA256SUMS.txt` before opening it.",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "archives-companion/ArchivesSyncHelper/ArchivesSyncHelperApp.swift",
+      "line": 124,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "            guard !NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == \"com.lucaorion.orion-terminal\" }) else {",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "archives-companion/ArchivesSyncHelper/ArchivesSyncHelperApp.swift",
+      "line": 321,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "            .appendingPathComponent(\"com.lucaorion.orion-terminal/orion.db\")",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "design/DESIGN.md",
+      "line": 5,
+      "matches": [
+        "orion_terminal"
+      ],
+      "excerpt": "References: [design handoff](../design_handoff_orion_terminal/README.md) \u00b7 [BMW M theme analysis](../DESIGN.md) \u00b7 `src/styles/tokens.css`.",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "design_handoff_orion_terminal/Orion Terminal.html",
+      "line": 6,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "  <title>Orion Terminal</title>",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/README.md",
+      "line": 1,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "# Handoff: Orion Terminal",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/README.md",
+      "line": 9,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "The files bundled with this handoff are **design references created in HTML/React/CSS** \u2014 high-fidelity prototypes that show the intended look, layout, and behavior of Orion Terminal. They are **not production code to ship directly.** They ",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/README.md",
+      "line": 26,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Orion Terminal is one app that contains three apps, plus a J.A.R.V.I.S.-style assistant.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/README.md",
+      "line": 30,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "| Shell | Orion Terminal | Wallpaper, menubar, dock, draggable windows, Spotlight (\u2318K), system clock |",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/README.md",
+      "line": 127,
+      "matches": [
+        "ORION TERMINAL"
+      ],
+      "excerpt": "- Left: `ORION TERMINAL` wordmark with a pulsing green dot (2s ease-in-out, opacity 1\u21940.4)",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/README.md",
+      "line": 215,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- Opening line: \"I noticed you wrote about Orion Terminal yesterday and again this morning \u2014 want me to start a thread linking the two entries?\"",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/README.md",
+      "line": 265,
+      "matches": [
+        "Orion-Terminal"
+      ],
+      "excerpt": "   - **Three artboards** in the demo: \"Orion Hero / Frame 02\" (selected, 540\u00d7340) with a stylized mini-Orion-Terminal inside; \"Onboarding / Frame 01\" (280\u00d7180) with a single Claude orb centered; \"Logo / Mark\" (220\u00d7180) showing a vector Orio",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/README.md",
+      "line": 358,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "| `Orion Terminal.html` | Root document \u2014 loads React, Babel, fonts, all source files |",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/README.md",
+      "line": 368,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "| `src/orion.jsx` | `OrionApp`, `OrionTreeNode`, `OrionEditor` (with syntax tokens), `OrionPreview`, `OrionTerminalPanel`, mock code + tree data |",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/README.md",
+      "line": 406,
+      "matches": [
+        "OrionTerminal",
+        "OrionTerminal",
+        "OrionTerminal",
+        "Orion Terminal"
+      ],
+      "excerpt": "1. **The two-OrionTerminal bug.** I (the designer) initially named both the workstation and the code-editor's terminal pane `OrionTerminal`. They were loaded via separate Babel scripts so the second declaration overrode the first \u2192 `OrionAp",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/archives-views.jsx",
+      "line": 71,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "    { t: \"Orion Terminal \u2014 north star\", p: \"A workstation that's a collaborator, not a launcher. Apps as rooms. Claude as ambient presence\u2026\", tag: \"systems\", color: \"green\", date: \"May 4\" },",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/archives.jsx",
+      "line": 77,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "          { role: \"assistant\", content: \"I noticed you wrote about Orion Terminal yesterday and again this morning \u2014 want me to start a thread linking the two entries?\" },",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/archives.jsx",
+      "line": 139,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "                { t: \"Orion Terminal \u2014 north star\", tag: \"systems\", color: \"green\" },",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/claude-chat.jsx",
+      "line": 26,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "        system: systemHint || \"You are Claude, embedded in Orion Terminal as a context-specific assistant. Reply concisely (1-3 sentences). No markdown headers.\",",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/main.jsx",
+      "line": 8,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "  { id: \"orion\", title: \"Orion\", icon: \"orion\", bg: \"linear-gradient(135deg, rgba(0,224,255,0.18), rgba(177,76,255,0.12))\", fg: \"#00e0ff\", glow: \"0 0 12px rgba(0,224,255,0.35)\", titlebar: \"ORION \u00b7 orion-terminal \u00b7 Orion.tsx\", accent: \"var(-",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/main.jsx",
+      "line": 12,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "function OrionTerminal() {",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/main.jsx",
+      "line": 107,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "    { id: \"orion\", label: \"Open Orion\", hint: \"orion-terminal \u00b7 3 changes\", icon: \"orion\", k: \"\u23182\" },",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/main.jsx",
+      "line": 168,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "ReactDOM.createRoot(document.getElementById(\"root\")).render(<OrionTerminal />);",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/orion.jsx",
+      "line": 4,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "  { type: \"folder\", name: \"orion-terminal\", open: true, children: [",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/orion.jsx",
+      "line": 164,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "function OrionTerminalPanel() {",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/orion.jsx",
+      "line": 176,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "        <div><span className=\"dim\">~/orion-terminal $</span> <span className=\"ok\">npm run dev</span></div>",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/orion.jsx",
+      "line": 183,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "        <div><span className=\"path\">~/orion-terminal $</span> <span style={{ color: \"var(--t-primary)\" }}>_</span><span style={{ color: \"var(--neon-green)\" }}>\u258c</span></div>",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/orion.jsx",
+      "line": 243,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "        <OrionTerminalPanel />",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/wallpaper.jsx",
+      "line": 55,
+      "matches": [
+        "ORION TERMINAL"
+      ],
+      "excerpt": "        <span>ORION TERMINAL</span>",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/xdesign.jsx",
+      "line": 94,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "  // The \"design\" being built is a stylized version of Orion Terminal itself",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/src/xdesign.jsx",
+      "line": 138,
+      "matches": [
+        "ORION TERMINAL"
+      ],
+      "excerpt": "              <span style={{ fontSize: 7, color: \"#e6f4ec\", letterSpacing: \"0.2em\", fontFamily: \"var(--f-mono)\" }}>ORION TERMINAL</span>",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "design_handoff_orion_terminal/styles.css",
+      "line": 1,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "/* === Orion Terminal \u2014 Liquid Glass / Dark / Neon === */",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/LANDING_BRIEF.md",
+      "line": 99,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "- GitHub: `https://github.com/chakra3301/OrionTerminal`",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "docs/LANDING_BRIEF.md",
+      "line": 100,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "- Beta release (DMG): `https://github.com/chakra3301/OrionTerminal/releases/tag/v0.1.0-beta.1`",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "docs/LANDING_BRIEF.md",
+      "line": 101,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "- Install/known-issues: `https://github.com/chakra3301/OrionTerminal/blob/main/BETA.md`",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-06-14-phase-3.4-layout-systems-brief.md",
+      "line": 16,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "- Locked stack \u2014 don't propose alternatives. Don't reuse the name `OrionTerminal`. Comments explain *why*, not *what*.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-11-inference-migration.md",
+      "line": 9,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- **Apache-2.0** for original Orion Terminal code and creator-owned models in `public/characters/` and `public/companion/`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-11-polish-audit.md",
+      "line": 26,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- `package-clean.log`: **packaged `.app` build exit 0**, at `src-tauri/target/release/bundle/macos/Orion Terminal.app`. `codesign --verify --deep --strict` passed (ad-hoc signing, not notarization). No fresh DMG was built.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-11-release-closure.md",
+      "line": 43,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- Product: `Orion Terminal Validation`",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-11-release-closure.md",
+      "line": 44,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Identifier: `com.lucaorion.orion-terminal.validation`",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-11-release-closure.md",
+      "line": 45,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Data: its own `~/Library/Application Support/com.lucaorion.orion-terminal.validation/orion.db`",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-12-archives-save-recovery.md",
+      "line": 28,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Fresh isolated **Orion Terminal Validation** app/DMG. Initial PID34045, normal restart PID34199. Executable SHA256: `a32bb87acfa76996e85818fb74f8f7c92de209327cbaa32d03920abbf5710e9f`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-12-background-ai-image-workflow.md",
+      "line": 16,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Only the isolated **Orion Terminal Validation** profile was used, with API-key environment overrides removed and its existing private ChatGPT OAuth session retained.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-12-backup-recovery.md",
+      "line": 27,
+      "matches": [
+        "Orion Terminal",
+        "orion-terminal"
+      ],
+      "excerpt": "\"/path/to/updated/Orion Terminal.app/Contents/MacOS/orion-terminal\" \\",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-12-draft-recovery.md",
+      "line": 42,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "During correction, Spotlight's highlighted result was **Lock Orion Terminal**, despite Open Orion being the first textual match (mouse hover affected selection). Automation pressed Return without inspecting that selection and locked Validat",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-12-format-project-recovery.md",
+      "line": 25,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "In **Orion Terminal Validation** only:",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-12-save-safety-release-rehearsal.md",
+      "line": 16,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Rebuilt **Orion Terminal Validation** only. Created a disposable canvas and installed a short-lived SQLite trigger scoped exclusively to its document and the intended new name. It rejected real native writes with `Validation injected save f",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-12-subscription-live.md",
+      "line": 3,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "The user completed OAuth in **Orion Terminal Validation** and authorized bounded subscription-only tests. No API fallback, unrelated account login/logout, credential copying, production-data changes, commit, or release was performed. The pl",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-12-ui-callback-lifetimes.md",
+      "line": 29,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- Rebuilt **Orion Terminal Validation**, normal quit first, then verified deep/strict ad-hoc signature and ran packaged model-free MCP policy smoke. Production was untouched.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-13-alpha-release-gates.md",
+      "line": 34,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "| Remote CI | **Passed at `86ec7cf`:** [run34893323117](https://github.com/chakra3301/OrionTerminal/actions/runs/34893323117),198 frontend files/1254 tests,31 Node,240 Rust+1 ignored, recovery rehearsal and scoped dependency audits. New fir",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-13-alpha-release-gates.md",
+      "line": 78,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "  --binary \"/absolute/path/to/built/orion-terminal\" \\",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-13-modal-accessibility.md",
+      "line": 15,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Final **Orion Terminal Accessibility Proof** SHA256:",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-13-native-profile-recovery.md",
+      "line": 7,
+      "matches": [
+        "Orion Terminal",
+        "orion-terminal"
+      ],
+      "excerpt": "Isolated app: **Orion Terminal Recovery Proof**, identifier `com.lucaorion.orion-terminal.recovery-proof`. No production/Validation profile was used as fixture input. No real credentials copied or cloud AI calls made. Validation was normall",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-14-validation-candidate.md",
+      "line": 20,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "- GitHub access verified for `chakra3301/OrionTerminal` (public); Actions enabled. The verification workflow has read-only contents permissions and does not persist checkout credentials. It runs on branch pushes. The release workflow requir",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-14-validation-candidate.md",
+      "line": 28,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "[Run34890638947](https://github.com/chakra3301/OrionTerminal/actions/runs/34890638947), commit `7a815e5c3b82fcdd1e8bb40f995890942f5e124a`: fresh dependency install, TypeScript,198 frontend files/1254 tests and30 Node tests passed. Native co",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-14-validation-candidate.md",
+      "line": 32,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "[Run34891224808](https://github.com/chakra3301/OrionTerminal/actions/runs/34891224808), commit `bbee4d14c53fb62da2d287d23a5b3fe974b6cc0f`:198 frontend/1254 tests and31 Node contracts passed; Vite then exhausted Node22's approximately2 GiB h",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/aaa-rebuild/2026-09-14-validation-candidate.md",
+      "line": 34,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "[Run34891822689](https://github.com/chakra3301/OrionTerminal/actions/runs/34891822689), commit `2ca291826bbaf19983b8cd33ae5905ffd728d6d7`: full verification (198 frontend/1254 tests,31 Node,240 Rust passed/1 ignored), generated recovery reh",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/alpha/briefs/03-dock-redesign.md",
+      "line": 7,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "- Worktree: `/Users/lucaorion/Orion_Terminal-worktrees/dock`, branch `alpha/dock-redesign`, cut from `2aabd42`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/alpha/briefs/03-dock-redesign.md",
+      "line": 9,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "- The main checkout `/Users/lucaorion/Orion_Terminal` is the owner's live dev app. It is running on port 1420. Read from it, but never write to it.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/alpha/briefs/03-dock-redesign.md",
+      "line": 17,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "- **The spec** is the authority: `/Users/lucaorion/Orion_Terminal/docs/superpowers/specs/2026-10-29-dock-redesign-design.md`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/alpha/briefs/03-dock-redesign.md",
+      "line": 18,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "- **The visual reference** is the mockup: `/Users/lucaorion/Orion_Terminal/docs/superpowers/specs/2026-10-29-dock-redesign-reference/dock-mockup.html`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/archives-downloads-native-recovery.md",
+      "line": 9,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Own identifier/profile: `com.lucaorion.orion-terminal.downloads-codec-proof-01`.",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/architecture/archives-downloads-native-recovery.md",
+      "line": 18,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "Private derivative: `~/Library/Application Support/com.lucaorion.orion-terminal.downloads-codec-proof-01/assets/01M4790RYBB2Z0YH2NBD0DZ2AX.mp4`.",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/architecture/archives-downloads-stacher-parity.md",
+      "line": 21,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "The owner's active process was `src-tauri/target/debug/orion-terminal`. A read-only, title-filtered query against **only the reported asset** in the active app database found:",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/architecture/capability-importer-analysis-native-acceptance.md",
+      "line": 7,
+      "matches": [
+        "Orion Terminal",
+        "orion-terminal"
+      ],
+      "excerpt": "- Same **Orion Terminal Skill Proof**, identifier `com.lucaorion.orion-terminal.skill-proof`, executable SHA-256 `372813aa37f3a7b56a6678279e49e3cd57abe7fad91f79d9927230ad16b9d88f`. No product edit, rebuild, suite rerun, dependency, commit o",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-appearance-native-acceptance.md",
+      "line": 9,
+      "matches": [
+        "Orion Terminal",
+        "orion-terminal"
+      ],
+      "excerpt": "- Fresh **Orion Terminal Appearance Proof**, identifier `com.lucaorion.orion-terminal.appearance-proof`, separate target/frontend/profile. Existing Skill Proof and production app were not replaced or launched.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-background-acceptance.md",
+      "line": 7,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Reused `com.lucaorion.orion-terminal.incubator-proof`, generated profile and empty CLI homes from [native lifecycle acceptance](capability-importer-native-lifecycle.md).",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-chatgpt-native-acceptance.md",
+      "line": 7,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Reused updated Skill Proof SHA-256 `372813aa37f3a7b56a6678279e49e3cd57abe7fad91f79d9927230ad16b9d88f`, identifier/profile `com.lucaorion.orion-terminal.skill-proof`. No source edits, rebuild, automated-suite rerun or dependency installati",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-chatgpt-preflight.md",
+      "line": 23,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "One justified offline native rebuild uses unchanged private frontend output and the same separate identifier/profile `com.lucaorion.orion-terminal.skill-proof`. Ad-hoc signing and strict/deep signature verification passed; not notarized or ",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-chatgpt-preflight.md",
+      "line": 26,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- Updated `target/release/bundle/macos/Orion Terminal Skill Proof.app` executable SHA-256: `372813aa37f3a7b56a6678279e49e3cd57abe7fad91f79d9927230ad16b9d88f`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-forge-selection-acceptance.md",
+      "line": 8,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Profile/identifier: `com.lucaorion.orion-terminal.skill-proof`; executable SHA-256 remains `b0af66e21b06fe552454531759105640fbc66f824d7ff41951f41b5fd5578204`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-native-lifecycle.md",
+      "line": 7,
+      "matches": [
+        "Orion Terminal",
+        "orion-terminal"
+      ],
+      "excerpt": "- Ad-hoc-signed release-profile app **Orion Terminal Incubator Proof**, identifier `com.lucaorion.orion-terminal.incubator-proof`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-native-lifecycle.md",
+      "line": 8,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- App: `/tmp/incubator-native-proof/target/aarch64-apple-darwin/release/bundle/macos/Orion Terminal Incubator Proof.app`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-native-lifecycle.md",
+      "line": 9,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Generated profile: `~/Library/Application Support/com.lucaorion.orion-terminal.incubator-proof`. No production profile was copied or edited.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-native-lifecycle.md",
+      "line": 57,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- Protected production `/Applications/Orion Terminal.app`, repository debug executable, and prior Onboarding Proof executable hashes remained unchanged. Production profile was not used by the control/evidence helpers.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-native-send-guards.md",
+      "line": 7,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "Reused Skill Proof `com.lucaorion.orion-terminal.skill-proof`, executable SHA-256 `372813aa37f3a7b56a6678279e49e3cd57abe7fad91f79d9927230ad16b9d88f`. Evidence remains under `~/.local/share/orion-proof/skills-20260928/`. No product edits, re",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/architecture/capability-importer-scope.md",
+      "line": 15,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Owner-selected app/plugin name: **Incubator**, the home for everything brought into Orion Terminal. The shared Intake workflow also remains directly accessible in Settings; existing Skill Codex/Plugin Manager retain installed-capability lif",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-skill-native-acceptance.md",
+      "line": 12,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- Bundle: `target/release/bundle/macos/Orion Terminal Skill Proof.app` beneath that root.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-skill-native-acceptance.md",
+      "line": 13,
+      "matches": [
+        "orion-terminal",
+        "orion-terminal"
+      ],
+      "excerpt": "- Identifier/profile: `com.lucaorion.orion-terminal.skill-proof`; `~/Library/Application Support/com.lucaorion.orion-terminal.skill-proof`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-static-app-preparation.md",
+      "line": 3,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "2026-10-01. **Owner approved the shown E0 appearance and subsequent E1 implementation. E1's deterministic recipe/contracts and bounded native source-capture/persistence slices are implemented and offline checked; [generated-candidate stagin",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-static-app-preparation.md",
+      "line": 24,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "**Owner direction:** things brought into Incubator should fit Orion Terminal visually, not just sit inside a themed outer window. Reading this as functional app adaptation in the restrained modern Control Panel/workstation language\u2014not a ne",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-ui-polish.md",
+      "line": 23,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "App: `<namespace>/target/release/bundle/macos/Orion Terminal Incubator UI Proof.app`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-ui-polish.md",
+      "line": 25,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Identifier: `com.lucaorion.orion-terminal.incubator-ui-proof-20261003`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-ui-polish.md",
+      "line": 45,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Use the **already-open separate UI Proof app**, not `/Applications/Orion Terminal.app` or the owner's Appearance Proof.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-ui-redesign.md",
+      "line": 27,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- App: `<namespace>/target/release/bundle/macos/Orion Terminal Incubator Design Proof.app`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-ui-redesign.md",
+      "line": 28,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Identifier: `com.lucaorion.orion-terminal.incubator-design-proof-20261003`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-ui-redesign.md",
+      "line": 30,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- Native title: **Orion Terminal \u2014 Incubator Design Proof**, distinguishable from the previous preview.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-v1-closeout.md",
+      "line": 44,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- Bundle: evidence root `target/release/bundle/macos/Orion Terminal Incubator V1 Candidate.app`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-v1-closeout.md",
+      "line": 45,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Identifier: `com.lucaorion.orion-terminal.incubator-v1-candidate`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-v1-live-acceptance.md",
+      "line": 9,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Reused the verified private **Incubator Native Proof**, identifier `com.lucaorion.orion-terminal.incubator-v1-candidate`, executable SHA-256 `e7f4811e3d5d4bbd50f644e96cf2edc3c16e231538278f8b8bde9a7d03ad7692`. No build/product-code changes",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-v1-native-acceptance.md",
+      "line": 9,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Own identifier/profile: `com.lucaorion.orion-terminal.incubator-v1-candidate`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-v1-native-acceptance.md",
+      "line": 11,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- After the scoped scrollbar correction, a separate private COW target/bundle was built: `target/release/bundle/macos/Orion Terminal Incubator Native Proof.app`, same owned identifier/profile, SHA-256 `e7f4811e3d5d4bbd50f644e96cf2edc3c16e23",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/capability-importer-workspace-acceptance.md",
+      "line": 7,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "Reused the same ad-hoc-signed Incubator Proof binary/profile, identifier `com.lucaorion.orion-terminal.incubator-proof`, executable SHA-256 `31d14dcea9450112b7336075a59c9feaba91556f8b31ae57c16a284ed0dc1a7c`. Production, repository debug and",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/frontend-liquid-refinement.md",
+      "line": 18,
+      "matches": [
+        "Orion Terminal",
+        "orion-terminal"
+      ],
+      "excerpt": "Bundle: `<namespace>/target/release/bundle/macos/Orion Terminal Liquid Refinement Proof.app`; ID `com.lucaorion.orion-terminal.liquid-refinement-proof-20261003`; executable SHA `6e3303ddbbb06506d92b8e531d1f45d8ffb73d19015c2ed2f0fb14394d205b",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/frontend-materials.md",
+      "line": 37,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- Bundle: `<namespace>/target/release/bundle/macos/Orion Terminal Material Proof.app`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/frontend-materials.md",
+      "line": 38,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Identifier: `com.lucaorion.orion-terminal.material-proof-20261003`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/frontend-materials.md",
+      "line": 39,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- Native title: **Orion Terminal \u2014 Material Proof**.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/incubator-repository-intake.md",
+      "line": 3,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "2026-09-16. Owner requested **Incubator** as the app/plugin home for everything brought into Orion Terminal, while retaining Settings access, and requested repository-link paste/drop instead of folder-only input. **Implemented; native UI/ow",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/architecture/xdesign/README.md",
+      "line": 244,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "The preceding pass on 2026-10-08 passed all 2,099 frontend tests (311 passing files, three skipped files/tests), all 98 native XDesign tests and all 73 bridge checks. The native authored Photoshop acceptance test is explicitly ignored in or",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/architecture/xdesign/README.md",
+      "line": 252,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "Channel compositing and design paint geometry validated on 2026-10-08: the final full frontend regression passed 2,031 tests (297 files; three tests/files skipped), all 87 native XDesign tests passed, and all 73 bridge tests passed. TypeScr",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/architecture/xdesign/README.md",
+      "line": 254,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "Image feedback, library publishing and geometry work validated on 2026-10-08: the full frontend regression passed 2,008 tests (294 files; three tests/files skipped), all 79 native XDesign tests passed, and all 73 bridge tests passed. All 50",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/architecture/xdesign/README.md",
+      "line": 256,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "Recovery and editor depth validated on 2026-10-08: 1,928 frontend tests passed (287 files; three tests/files skipped), all 57 native XDesign tests passed, and 73 bridge tests passed. TypeScript, the production frontend bundle and `cargo bui",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/architecture/xdesign/README.md",
+      "line": 260,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "Channels and mask editing validated on 2026-10-08: 1,874 frontend tests passed (280 files, three tests/files skipped), including eight new cases for channel controls, mask gestures/tones, native brush targeting, stale previews, URL cleanup ",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/architecture/xdesign/README.md",
+      "line": 268,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "The desktop development binary also builds successfully with `cargo build --locked --bin orion-terminal`, including the new image, tile and font commands. Use the normal `npm run tauri dev` workflow to launch this source checkout with its f",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/architecture/xdesign/photoshop-parity/dialogs.md",
+      "line": 5,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "Read-only audit. Photoshop sources: `.../Contents/Required/layouts/**/*.exv` (legacy), `drover_layouts/**/*.eve`, `UIColors.txt`, `menu_strings.txt`. XDesign root: `~/Orion_Terminal/src/.../photo/` (abbreviated `photo/`). Tags: `(from memor",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/architecture/xdesign/photoshop-parity/panels.md",
+      "line": 5,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "Evidence: XDesign claims are `path:line` (repo `~/Orion_Terminal/src/apps/xdesign/`, `PS.tsx` = `photo/PhotoStudio.tsx`). Photoshop claims cite files under `/Applications/Adobe Photoshop 2026/.../Contents/Required/layouts/` (`PS:`). Items m",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/orion-terminal-state-2026-09-22.html",
+      "line": 7,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "  <title>Orion Terminal \u2014 State of the Workstation</title>",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/orion-terminal-state-2026-09-22.html",
+      "line": 20,
+      "matches": [
+        "ORION TERMINAL"
+      ],
+      "excerpt": "  <header class=\"top\"><div class=\"brand\"><span class=\"brandmark\">\u2733</span><span>ORION TERMINAL</span></div><div class=\"topright\"><span class=\"live\">\u25cf FIELD REPORT</span><span>22 SEP 2026</span><span>01 / CURRENT STATE</span></div></header>",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/orion-terminal-state-2026-09-22.html",
+      "line": 21,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "  <div class=\"hero\"><div class=\"orb\" aria-hidden=\"true\"></div><div class=\"eyebrow\">A complete product and engineering portrait</div><h1>One desk.<br><em>Many minds.</em></h1><p class=\"intro\">Orion Terminal is a local-first, AI-aware desktop",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/orion-terminal-state-2026-09-22.html",
+      "line": 27,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "    <section class=\"section\" id=\"shell\"><div class=\"kicker\">02 / The desktop shell</div><h2>The frame that makes it feel like a place.</h2><p class=\"lead\">Orion Terminal treats the desktop itself as a product. The shell owns navigation, win",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/orion-terminal-state-2026-09-22.html",
+      "line": 46,
+      "matches": [
+        "ORION TERMINAL"
+      ],
+      "excerpt": "  </main></div><footer class=\"foot\"><span>ORION TERMINAL / STATE OF THE WORKSTATION</span><span>Prepared from local source \u00b7 22 September 2026</span></footer>",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/releases/v0.1.0-alpha.1.md",
+      "line": 1,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "# Orion Terminal \u2014 public alpha",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/releases/v0.1.0-alpha.1.md",
+      "line": 15,
+      "matches": [
+        "Orion-Terminal"
+      ],
+      "excerpt": "**Apple Silicon Mac only.** Download **`Orion-Terminal_aarch64.dmg`** and `SHA256SUMS.txt` below. The other DMG is an identical version-named copy\u2014you only need one.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/releases/v0.1.0-alpha.1.md",
+      "line": 17,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "Compare `shasum -a 256 <downloaded-file>` with the checksum, open the DMG, and drag Orion Terminal into Applications. Back up existing work before upgrading.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/releases/v0.1.0-alpha.1.md",
+      "line": 21,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "[Install and setup guide](https://github.com/chakra3301/OrionTerminal/blob/v0.1.0-alpha.1/BETA.md).",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/releases/v0.1.0-alpha.1.md",
+      "line": 36,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "The baseline `86ec7cf` passed [remote CI](https://github.com/chakra3301/OrionTerminal/actions/runs/34893323117). A recipient reported successful installation on a previously unused Apple Silicon Mac running Tahoe 26.6, core save/reopen/PNG ",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/releases/v0.1.0-alpha.1.md",
+      "line": 38,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "[Report an issue](https://github.com/chakra3301/OrionTerminal/issues/new) with steps, build/tag, expected versus actual behavior and redacted screenshots. Never upload credentials, raw profiles/databases or private transcripts.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/reports/2026-09-11-readiness-report.html",
+      "line": 7,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "  <meta name=\"description\" content=\"Orion Terminal readiness report: verified improvements, remaining risks, provider coverage, and the path to release sign-off.\">",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/reports/2026-09-11-readiness-report.html",
+      "line": 8,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "  <title>Orion Terminal \u00b7 What remains</title>",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/reports/2026-09-11-readiness-report.html",
+      "line": 186,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "        <p style=\"font-size:12px;overflow-wrap:anywhere;\"><strong style=\"font-weight:500;\">Fresh application:</strong><br><code>src-tauri/target/release/bundle/macos/Orion Terminal.app</code></p>",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/reports/2026-09-11-readiness-report.html",
+      "line": 198,
+      "matches": [
+        "ORION TERMINAL"
+      ],
+      "excerpt": "      <span>ORION TERMINAL \u00b7 Readiness snapshot \u00b7 2026-09-11<br>Standalone, offline report. No analytics, network requests, credentials, or live status polling.</span>",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/research/cursor-2026.md",
+      "line": 10,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "pivot \u2014 they stay for Tab + visible diffs, not the swarm UI. (Orion Terminal already has",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/research/orion-frontend-2026.md",
+      "line": 1,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "# Orion Terminal frontend: Apple-tier research and proposal",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/research/xdesign-controls-2026-10-28/adjustments.md",
+      "line": 7,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "- **XDesign evidence** paths are relative to `/Users/lucaorion/Orion_Terminal/src/apps/xdesign/photo/` unless prefixed.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/research/xdesign-controls-2026-10-28/adjustments.md",
+      "line": 8,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "  - `host:` means `/Users/lucaorion/Orion_Terminal/src-tauri/src/`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/research/xdesign-controls-2026-10-28/paint-retouch.md",
+      "line": 26,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "- UI = `/Users/lucaorion/Orion_Terminal/src/apps/xdesign/photo/`",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/research/xdesign-controls-2026-10-28/paint-retouch.md",
+      "line": 27,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "- Host = `/Users/lucaorion/Orion_Terminal/src-tauri/src/`",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/research/xdesign-controls-2026-10-28/select-type-shape-view.md",
+      "line": 7,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "- `photo/` = `~/Orion_Terminal/src/apps/xdesign/photo/`",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/research/xdesign-controls-2026-10-28/select-type-shape-view.md",
+      "line": 8,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "- `host/` = `~/Orion_Terminal/src-tauri/src/`",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/security/2026-09-11-tool-grants.md",
+      "line": 26,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- `npm run test:native-policy -- --binary /absolute/path/to/orion-terminal` runs a built executable in MCP mode against a disposable database and filesystem fixture. It does not launch the desktop, access a production profile, or call a mod",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/setup-and-verification.md",
+      "line": 77,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- `npm run test:native-policy -- --binary /absolute/path/to/orion-terminal`: adversarial packaged MCP checks against disposable fixtures, without a model or production profile.",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/setup-and-verification.md",
+      "line": 83,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "CI runs locked verification, npm production auditing, target-aware native auditing and `python3 scripts/rehearse-profile-recovery.py --binary /absolute/path/to/orion-terminal --report /tmp/recovery-report.json`; release CI also checks the p",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/specs/boot-auth-onboarding.md",
+      "line": 107,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "   sqlite3 ~/Library/Application\\ Support/com.lucaorion.orion-terminal/orion.db \\",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-15-repolens-website-ripper.md",
+      "line": 64,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "cd ~/Orion_Terminal && mkdir -p resources/website-cloner-scaffold",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-19-performance-memory-fixes.md",
+      "line": 1,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "# Orion Terminal \u2014 Performance & Memory Fixes Implementation Plan",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-19-performance-memory-fixes.md",
+      "line": 62,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "cd /Users/lucaorion/Orion_Terminal",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/superpowers/plans/2026-10-28-xdesign-controls-parity.md",
+      "line": 3,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "> **For agentic workers:** five builders run in parallel: four UI groups, each in its own git worktree, and one host-Rust group in the main tree. Each keeps a ledger in `.superpowers/sdd/2026-10-28-xdesign-controls-parity/<group>.md` (absol",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/superpowers/plans/2026-10-28-xdesign-home-previews.md",
+      "line": 18,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "- **Repo:** `~/Orion_Terminal`, branch `validation/alpha-2026-09-14`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/superpowers/plans/2026-10-28-xdesign-home-previews.md",
+      "line": 34,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "  - Never the owner's projects, the dev instance, or `/Applications/Orion Terminal.app`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/superpowers/plans/2026-10-28-xdesign-home-previews.md",
+      "line": 577,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- [ ] **Step 4: Build 26.** Run `npm run tauri build -- --bundles app`. Expected: exit 0. Don't replace `/Applications/Orion Terminal.app`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/superpowers/specs/2026-06-13-repolens-archives-design.md",
+      "line": 15,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "into Orion Terminal as **a new section inside the Archives app**, called **RepoLens**,",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/superpowers/specs/2026-06-15-repolens-design-md-extractor-design.md",
+      "line": 17,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "- Each rip's cloned project lives at `<project_path>` = `$APPDATA/repolens/websites/<id>/project/`. `$APPDATA` on macOS = `~/Library/Application Support/com.lucaorion.orion-terminal`.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/superpowers/specs/2026-06-16-control-panel-agent-forge-design.md",
+      "line": 11,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "A new **Control Panel** \u2014 a dedicated in-canvas surface that becomes the single home for every Orion Terminal setting and option \u2014 plus two new subsystems it hosts:",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/superpowers/specs/2026-06-24-xdesign-webpage-edit-and-visual-fixes-design.md",
+      "line": 12,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "XDesign is the design app inside **Orion Terminal** (Tauri 2 + React 19 + Vite + TS). Its AI rail is `src/apps/xdesign/XDesignClaudeRail.tsx`. There are **two separate worlds**:",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/superpowers/specs/2026-10-29-dock-redesign-design.md",
+      "line": 21,
+      "matches": [
+        "Orion Terminal"
+      ],
+      "excerpt": "- No rename. \"Orion Terminal\", the wordmark and the bundle ID stay as they are (the rename is deferred to the end of the alpha).",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "docs/superpowers/specs/2026-10-29-dock-redesign-design.md",
+      "line": 220,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "  - Never use `OrionTerminal` as a component name.",
+      "keepReason": "Historical record, reference material or original task brief; retained verbatim."
+    },
+    {
+      "file": "landing/consumer/README.md",
+      "line": 3,
+      "matches": [
+        "Orion_Terminal"
+      ],
+      "excerpt": "A crisp, responsive implementation of the approved ice-white THINK. MAKE. CONNECT. design. This folder updates only the marketing website at `/Users/lucaorion/Orion_Terminal/landing/consumer`; the app source and original `landing/index.html",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "landing/consumer/README.md",
+      "line": 33,
+      "matches": [
+        "Orion-Terminal"
+      ],
+      "excerpt": "- Primary download points to the existing public Apple Silicon alpha, `v0.1.0-alpha.1`. GitHub's release API confirmed `Orion-Terminal_aarch64.dmg` and **55,767,670 bytes** on this task. Current development captures are labeled; they do not",
+      "keepReason": "Existing published release filename retained until a new app release."
+    },
+    {
+      "file": "landing/consumer/index.html",
+      "line": 35,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "        <a href=\"https://github.com/chakra3301/OrionTerminal/releases\" target=\"_blank\" rel=\"noopener noreferrer\">Changelog <span class=\"sr-only\">(opens in a new tab)</span></a>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/consumer/index.html",
+      "line": 43,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "      <a href=\"https://github.com/chakra3301/OrionTerminal/releases\" target=\"_blank\" rel=\"noopener noreferrer\">Changelog \u2197</a>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/consumer/index.html",
+      "line": 141,
+      "matches": [
+        "OrionTerminal",
+        "OrionTerminal"
+      ],
+      "excerpt": "      <nav aria-label=\"Footer navigation\"><a href=\"#product\">Product</a><a href=\"#apps\">Apps</a><a href=\"https://github.com/chakra3301/OrionTerminal/releases\" target=\"_blank\" rel=\"noopener noreferrer\">Changelog \u2197</a><a class=\"icon-button gi",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/consumer/index.html",
+      "line": 143,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "    <div class=\"footer-meta\"><p>Made for curious minds. Built in the open.</p><div><a href=\"https://github.com/chakra3301/OrionTerminal/blob/v0.1.0-alpha.1/BETA.md\" target=\"_blank\" rel=\"noopener noreferrer\">Alpha guide \u2197</a><button class=\"t",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/consumer/index.html",
+      "line": 152,
+      "matches": [
+        "OrionTerminal",
+        "Orion-Terminal"
+      ],
+      "excerpt": "    <a class=\"button download-file\" href=\"https://github.com/chakra3301/OrionTerminal/releases/download/v0.1.0-alpha.1/Orion-Terminal_aarch64.dmg\">Download alpha <svg class=\"icon\" aria-hidden=\"true\"><use href=\"assets/icons.svg#download\"></u",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/consumer/index.html",
+      "line": 155,
+      "matches": [
+        "OrionTerminal",
+        "OrionTerminal"
+      ],
+      "excerpt": "    <div class=\"download-links\"><a href=\"https://github.com/chakra3301/OrionTerminal/blob/v0.1.0-alpha.1/BETA.md\" target=\"_blank\" rel=\"noopener noreferrer\">Installation guide \u2197</a><a href=\"https://github.com/chakra3301/OrionTerminal/release",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/consumer/package.json",
+      "line": 2,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "  \"name\": \"orion-terminal-marketing\",",
+      "keepReason": "Machine package/binary identity retained."
+    },
+    {
+      "file": "landing/consumer/site.test.mjs",
+      "line": 47,
+      "matches": [
+        "Orion-Terminal"
+      ],
+      "excerpt": "  assert.match(html, /releases\\/download\\/v0\\.1\\.0-alpha\\.1\\/Orion-Terminal_aarch64\\.dmg/);",
+      "keepReason": "Existing published release filename retained until a new app release."
+    },
+    {
+      "file": "landing/index.html",
+      "line": 392,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "      <a href=\"https://github.com/chakra3301/OrionTerminal\" target=\"_blank\" rel=\"noopener\">GitHub</a>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/index.html",
+      "line": 414,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "      <a class=\"btn lg\" href=\"https://github.com/chakra3301/OrionTerminal\" target=\"_blank\" rel=\"noopener\">View source \u2197</a>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/index.html",
+      "line": 515,
+      "matches": [
+        "orionterminal"
+      ],
+      "excerpt": "              <span class=\"chip\" style=\"border-color:rgba(255,62,165,.4);color:var(--magenta)\">orionterminal.dev \u2192</span>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/index.html",
+      "line": 597,
+      "matches": [
+        "OrionTerminal",
+        "Orion-Terminal"
+      ],
+      "excerpt": "        <a class=\"btn solid lg\" href=\"https://github.com/chakra3301/OrionTerminal/releases/latest/download/Orion-Terminal_aarch64.dmg\" rel=\"noopener\" id=\"dl-btn\">Download for macOS</a>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/index.html",
+      "line": 598,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "        <a class=\"btn lg\" href=\"https://github.com/chakra3301/OrionTerminal/blob/main/BETA.md\" target=\"_blank\" rel=\"noopener\">Read the beta guide</a>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/index.html",
+      "line": 615,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "      <a href=\"https://github.com/chakra3301/OrionTerminal\" target=\"_blank\" rel=\"noopener\">GitHub</a>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/index.html",
+      "line": 616,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "      <a href=\"https://github.com/chakra3301/OrionTerminal/releases/tag/v0.1.0-beta.1\" target=\"_blank\" rel=\"noopener\">Releases</a>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/index.html",
+      "line": 617,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "      <a href=\"https://github.com/chakra3301/OrionTerminal/blob/main/BETA.md\" target=\"_blank\" rel=\"noopener\">Beta guide</a>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/index.html",
+      "line": 815,
+      "matches": [
+        "orionterminal"
+      ],
+      "excerpt": "  let y=140; x.font='600 26px '+MONO; const chip='orionterminal.dev \u2192', cw=x.measureText(chip).width+44;",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/site/README.md",
+      "line": 38,
+      "matches": [
+        "Orion-Terminal"
+      ],
+      "excerpt": "- The download link points at the pinned `v0.1.0-alpha.1` asset `Orion-Terminal_aarch64.dmg`, 55,767,670 bytes, checked against the GitHub API. Nothing was downloaded.",
+      "keepReason": "Existing published release filename retained until a new app release."
+    },
+    {
+      "file": "landing/site/index.html",
+      "line": 448,
+      "matches": [
+        "OrionTerminal",
+        "Orion-Terminal"
+      ],
+      "excerpt": "    <a class=\"btn btn-primary btn-lg\" href=\"https://github.com/chakra3301/OrionTerminal/releases/download/v0.1.0-alpha.1/Orion-Terminal_aarch64.dmg\" rel=\"noopener\">",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/site/index.html",
+      "line": 451,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "    <a class=\"btn btn-ghost\" href=\"https://github.com/chakra3301/OrionTerminal/releases/tag/v0.1.0-alpha.1\" target=\"_blank\" rel=\"noopener noreferrer\">Release notes</a>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/site/index.html",
+      "line": 453,
+      "matches": [
+        "Orion-Terminal"
+      ],
+      "excerpt": "  <p class=\"hero-meta mono\">Orion-Terminal_aarch64.dmg \u00b7 55.8 MB \u00b7 v0.1.0-alpha.1</p>",
+      "keepReason": "Existing published release filename retained until a new app release."
+    },
+    {
+      "file": "landing/site/index.html",
+      "line": 474,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "    <details data-k=\"beta bugs stable experimental report issue\"><summary>What does \u201calpha\u201d mean here?</summary><p>It's early. The core apps are ready to use, but some features, like FX, video and 3D tools, are experimental. Accessibility w",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/site/index.html",
+      "line": 486,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "    <a href=\"https://github.com/chakra3301/OrionTerminal\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub</a>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/site/index.html",
+      "line": 487,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "    <a href=\"https://github.com/chakra3301/OrionTerminal/releases\" target=\"_blank\" rel=\"noopener noreferrer\">Releases</a>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/site/index.html",
+      "line": 488,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "    <a href=\"https://github.com/chakra3301/OrionTerminal/blob/v0.1.0-alpha.1/BETA.md\" target=\"_blank\" rel=\"noopener noreferrer\">Setup guide</a>",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/site/js/spotlight.js",
+      "line": 3,
+      "matches": [
+        "OrionTerminal",
+        "Orion-Terminal"
+      ],
+      "excerpt": "const DMG = \"https://github.com/chakra3301/OrionTerminal/releases/download/v0.1.0-alpha.1/Orion-Terminal_aarch64.dmg\";",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/site/js/spotlight.js",
+      "line": 4,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "const REPO = \"https://github.com/chakra3301/OrionTerminal\";",
+      "keepReason": "Existing domain, repository or published release URL retained for compatibility."
+    },
+    {
+      "file": "landing/site/js/spotlight.js",
+      "line": 81,
+      "matches": [
+        "Orion-Terminal"
+      ],
+      "excerpt": "    { g: \"Commands\", cmd: true, t: \"Download for Mac\", s: \"Orion-Terminal_aarch64.dmg \u00b7 55.8 MB\", i: \"arrow-down-to-line\", c: C.green, k: \"dmg install get\", run: () => { location.href = DMG; } },",
+      "keepReason": "Existing published release filename retained until a new app release."
+    },
+    {
+      "file": "package-lock.json",
+      "line": 2,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "  \"name\": \"orion-terminal\",",
+      "keepReason": "Machine package/binary identity retained."
+    },
+    {
+      "file": "package-lock.json",
+      "line": 8,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "      \"name\": \"orion-terminal\",",
+      "keepReason": "Machine package/binary identity retained."
+    },
+    {
+      "file": "package.json",
+      "line": 2,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "  \"name\": \"orion-terminal\",",
+      "keepReason": "Machine package/binary identity retained."
+    },
+    {
+      "file": "scripts/audit-native.mjs",
+      "line": 11,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "  if (![...packages].some(name => name.startsWith(\"orion-terminal@\"))) {",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "scripts/audit-native.test.mjs",
+      "line": 14,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "  const packages = parsePackageTree(\"orion-terminal v0.1.0 (/fixture)\\nunic-common v0.9.0\\nunic-common v0.9.0 (*)\\n\");",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "scripts/mcp-policy-smoke.mjs",
+      "line": 10,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "  \"Usage: node scripts/mcp-policy-smoke.mjs --binary /absolute/path/to/orion-terminal\");",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "scripts/sync-license-materials.py",
+      "line": 81,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "    packages = sorted((p for p in metadata['packages'] if (p['name'], p['version']) in selected and p['name'] != 'orion-terminal'), key=lambda p: (p['name'], p['version']))",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/Cargo.lock",
+      "line": 3477,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "name = \"orion-terminal\"",
+      "keepReason": "Machine package/binary identity retained."
+    },
+    {
+      "file": "src-tauri/Cargo.toml",
+      "line": 3,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "name = \"orion-terminal\"",
+      "keepReason": "Machine package/binary identity retained."
+    },
+    {
+      "file": "src-tauri/Cargo.toml",
+      "line": 10,
+      "matches": [
+        "orion_terminal"
+      ],
+      "excerpt": "name = \"orion_terminal_lib\"",
+      "keepReason": "Machine package/binary identity retained."
+    },
+    {
+      "file": "src-tauri/src/agent_chat.rs",
+      "line": 654,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "        .env(\"TERM_PROGRAM\", \"OrionTerminal\")",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/src/agent_cli.rs",
+      "line": 180,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "        .env(\"TERM_PROGRAM\", \"OrionTerminal\")",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/src/cli_auth.rs",
+      "line": 12,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "    if app.config().identifier != \"com.lucaorion.orion-terminal.validation\" {",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/src/intake/github.rs",
+      "line": 282,
+      "matches": [
+        "Orion-Terminal"
+      ],
+      "excerpt": "        .user_agent(\"Orion-Terminal-Incubator/1\")",
+      "keepReason": "Stable network User-Agent identity retained."
+    },
+    {
+      "file": "src-tauri/src/main.rs",
+      "line": 8,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "            eprintln!(\"Usage: orion-terminal --restore-db-copy BACKUP NEW_DIRECTORY\");",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/src/main.rs",
+      "line": 11,
+      "matches": [
+        "orion_terminal"
+      ],
+      "excerpt": "        match orion_terminal_lib::db_backup::restore_copy(std::path::Path::new(&args[0]), std::path::Path::new(&args[1])) {",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/src/main.rs",
+      "line": 20,
+      "matches": [
+        "orion_terminal"
+      ],
+      "excerpt": "        orion_terminal_lib::mcp_server::serve();",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/src/main.rs",
+      "line": 22,
+      "matches": [
+        "orion_terminal"
+      ],
+      "excerpt": "    orion_terminal_lib::run()",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/src/mcp_config.rs",
+      "line": 2,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "//! reach our in-process MCP server (mode-switched `orion-terminal --mcp-serve`).",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/src/mcp_server.rs",
+      "line": 3,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "//! tools available). We piggy-back on the main `orion-terminal` binary by",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/src/terminal.rs",
+      "line": 261,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "    builder.env(\"TERM_PROGRAM\", \"OrionTerminal\");",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/src/xdesign_web.rs",
+      "line": 122,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "            .user_agent(\"Mozilla/5.0 (compatible; OrionTerminal/1.0; +brand-extract)\")",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/tauri.conf.json",
+      "line": 5,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "  \"identifier\": \"com.lucaorion.orion-terminal\",",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/tauri.conf.json",
+      "line": 55,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "          \"$APPDATA/com.lucaorion.orion-terminal/assets/**\",",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/tauri.conf.json",
+      "line": 57,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "          \"$APPDATA/com.lucaorion.orion-terminal/wallpapers/**\",",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/tauri.conf.json",
+      "line": 59,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "          \"$APPDATA/com.lucaorion.orion-terminal/characters/**\",",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/tauri.conf.json",
+      "line": 61,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "          \"$APPDATA/com.lucaorion.orion-terminal/repolens/**\",",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src-tauri/tauri.conf.json",
+      "line": 63,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "          \"$APPDATA/com.lucaorion.orion-terminal/command-center/**\"",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src/apps/orion/OrionApp.tsx",
+      "line": 25,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "import { OrionTerminalPanel } from \"@/apps/orion/Terminal\";",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src/apps/orion/OrionApp.tsx",
+      "line": 47,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "          <OrionTerminalPanel",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src/apps/orion/Terminal.tsx",
+      "line": 11,
+      "matches": [
+        "OrionTerminal"
+      ],
+      "excerpt": "export function OrionTerminalPanel({",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src/apps/orion/pluginContributions.ts",
+      "line": 448,
+      "matches": [
+        "Orion terminal"
+      ],
+      "excerpt": "    return \"Close every Orion terminal and interactive agent session before disabling the plugin.\";",
+      "keepReason": "The terminal feature inside the Orion editor, not the product name."
+    },
+    {
+      "file": "src/features/help/helpContent.ts",
+      "line": 156,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "   sqlite3 ~/Library/Application\\\\ Support/com.lucaorion.orion-terminal/orion.db \\\\",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src/features/settings/SettingsPanel.tsx",
+      "line": 974,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "        <dd>com.lucaorion.orion-terminal</dd>",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src/features/settings/SettingsPanel.tsx",
+      "line": 976,
+      "matches": [
+        "orion-terminal"
+      ],
+      "excerpt": "        <dd className=\"mono\">~/Library/Application Support/com.lucaorion.orion-terminal/</dd>",
+      "keepReason": "Machine identity, binary, path, namespace, data directory, fixture or stable API symbol retained."
+    },
+    {
+      "file": "src/store/pluginManagerStore.test.ts",
+      "line": 310,
+      "matches": [
+        "Orion terminal"
+      ],
+      "excerpt": "      expect(usePluginManager.getState().error).toMatch(/Close every Orion terminal/);",
+      "keepReason": "The terminal feature inside the Orion editor, not the product name."
+    }
+  ]
+}

@@ -12,7 +12,7 @@ describe("BrandMark", () => {
   it("draws the chamfered ring with a square hole and the two corner squares", () => {
     const svg = svgOf(renderToStaticMarkup(<BrandMark />));
     expect(svg.getAttribute("role")).toBe("img");
-    expect(svg.getAttribute("aria-label")).toBe("Orion Terminal");
+    expect(svg.getAttribute("aria-label")).toBe("Orion Studio");
     expect(svg.getAttribute("viewBox")).toBe("-118 -66 236 132");
     expect(svg.getAttribute("fill")).toBe("currentColor");
     const [ring, ...squares] = [...svg.querySelectorAll("path")];

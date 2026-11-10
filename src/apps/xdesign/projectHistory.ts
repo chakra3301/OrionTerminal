@@ -5,7 +5,7 @@ import { usePencilWorkspace, withPencilTask } from "./pencil/runtime";
 import { trackXDesignActivity } from "./runtimeActivity";
 
 export type ProjectCheckpoint = { id: string; label: string; createdAt: number; bytes: number; automatic: boolean };
-function desktop() { if (!isTauri()) throw new Error("Project history is available in the Orion Terminal desktop app."); }
+function desktop() { if (!isTauri()) throw new Error("Project history is available in the Orion Studio desktop app."); }
 function activeProject() {
   desktop();
   const { activeId, transitioning, registry } = useXDProjects.getState();

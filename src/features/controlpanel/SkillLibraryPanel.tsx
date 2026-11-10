@@ -12,8 +12,8 @@ export function SkillLibraryPanel() {
   const loadError = useSkillsStore((s) => s.error);
   const loaded = useSkillsStore((s) => s.loaded);
 
-  const newSkill = (): Skill => ({ id: ulid(), name: "New Skill", icon: "", accent: "#b14cff", instructions: "", tools: [], builtin: false });
-  const duplicate = (s: Skill): Skill => ({ ...s, id: ulid(), name: `${s.name} (copy)`, builtin: false });
+  const newSkill = (): Skill => ({ id: ulid(), name: "New Skill", icon: "", accent: "", instructions: "", tools: [], builtin: false });
+  const duplicate = (s: Skill): Skill => ({ ...s, id: ulid(), name: `${s.name} (copy)`, accent: "", builtin: false });
 
   if (editing) return <SkillEditor skill={editing} onClose={() => setEditing(null)} />;
 

@@ -1,3 +1,124 @@
+## 2026-11-10 — Studio alpha completion and release gates
+
+Branch: `validation/alpha-2026-09-14`. Owner authorized all six remaining rebrand items, including commits, publication and installed-app replacement. Preserve the existing domain, X handle, bundle/data identities and original Rosie dock orb.
+
+Completed: Studio wording in boot/welcome prototypes and standalone Archives; source release configuration/notes for alpha 2; new Rosie teaser 02 v24 web derivative with identical audio and frame count; refreshed website version labels and four spec sheets. Boot branding-only commit `7c11c44` is pushed; unaccepted boot/welcome features remain separate. Release dependency compatibility is committed as `f133315`; official SQLx driver provenance and narrowly changed FFI requirement are documented in its vendored ORION_CHANGES.md.
+
+Validation: full frontend 6,067 passed / three skipped; full native on updated SQLite 1,556 passed / 20 ignored; final backup adapter 14 passed and Cursor native six passed; all 263 bridges passed. Final TypeScript, production frontend, license checks and both production audits passed; selected native audit has no blocking findings. A later concurrent frontend run hit memory pressure/timeouts and was stopped; do not label that run passing. Installer builds now run serially with bounded Cargo jobs. The original healing algorithm and three-second threshold are unchanged and pass.
+
+Next: finish freshly packaged app checks/installation, publish alpha 2 and the Archives 0.1.1 download, deploy updated sites, then replace this pending publication note with receipts. A private integrity-checked SQLite profile backup is saved in the task cache. Details: docs/alpha/rename-report.md. Native boot acceptance/integration and the remaining launch roadmap are still open.
+
+## 2026-11-10 — Orion Studio rebrand; three websites live
+
+Branch: `validation/alpha-2026-09-14`. Owner requested Orion Studio everywhere while keeping the existing domain and X handle. Application and media source changes are **uncommitted**; no app install, release or source push. Website repos use local commits per their AGENTS; built static sites were deployed to the existing domains.
+
+- Updated current product copy, Tauri product/window names, prompts, help/settings/onboarding, current docs, phone sync helper/editor and future release bundle paths. Kept bundle/data/package/IPC identities and the existing public alpha download. BETA explains its old filename until a new release.
+- Main, EMP and Archives sites are live under their existing orionterminal.app domains. Regenerated share cards, named companion artwork, four live teasers/poster, demo screenshots/spec sheets. Updated demo dock selector and rejected empty captures. Original logo geometry, Rosie dock orb and accepted icon/orb renderers preserved.
+- Media: source changes copied back to canonical video studio; original delivered movies untouched. Seven finished web/master outputs retain original audio and timing. The older teaser 02 needs a lettering-only patch because original 3D plates are missing; partial renders are marked, reproduction documented.
+- Passed: frontend build/typecheck, 260 bridge tests, 10 landing tests, license check, 30 Swift tests, mobile editor and three website builds. Full Vitest had six failing files; all passed focused reruns after license refresh/timing retry, not a claimed clean full-suite rerun. Rust: 1,555 passed / one failed / 20 ignored; unchanged healing runtime check remains above its 3-second budget (4.62s isolated). No native bundle packaged.
+- Handoff: `docs/alpha/rename-report.md`; every remaining tracked old-name match classified in `rename-kept.json`. Prior dirty work and historical log bodies retained.
+- Next: native package/permission smoke checks and performance gate before a future app release. Domain/X migration stays with owner. No open naming decisions.
+
+## 2026-11-10 — Approved icons and skill orbs integrated
+
+Branch: `validation/alpha-2026-09-14`. Owner accepted the preview: “alright thats goo enough fir now lets get those in”. Changes brought from `alpha/icon-orb-system` into this main development checkout. **Uncommitted; no push, release or installed-app replacement.**
+
+- Integrated deterministic generated app/plugin icons, keeping the four approved main-app masks. Unknown apps use the same glass dock treatment; community app registry/list icons also generate automatically.
+- Integrated spatial particle orbs in Skill Library, Agent Forge, skill editor and installed/imported skill cards. Eight real 3D interior forms, five seeded folded particle surface treatments, per-identity colours, Automatic colour selection and independent motion. Custom accents are preserved; legacy repeated starter colours resolve at render time without database edits.
+- Rosie stays exactly as approved: `RosieOrb.tsx` and `orbModel.ts` unchanged, original renderer paint fingerprint and particle/link checks pass. Skill orbs retain reduced-motion handling, hidden/offscreen suspension, shared RAF, pointer springs and static fallback.
+- Preserved all pre-existing dirty documents and boot/companion work; did not copy the worktree's PROGRESS over this file. Added the review source/export script and `docs/alpha/icon-orb-report.md`.
+- Validation: 57 tests passed across 15 files using the main Vite config; `git diff --check` passed. `npm run build` passed (TypeScript + production Vite build); dependency browser-externalization and large-chunk warnings only. Existing jsdom canvas warnings exercise passing fallbacks.
+- Next: native WKWebView motion/performance and light/mobile visual checks during launch validation. The current visual state is accepted for integration. No new dependency, schema, backend or skill-instruction changes.
+
+## 2026-10-29 (cont. 5) — Welcome flow prototype; new companion models shrunk
+
+Branch: `validation/alpha-2026-09-14`. Nothing new committed. `45f1b14` (logo mark) is still not pushed. The launch screen is still uncommitted in `~/Orion_Terminal-worktrees/boot`, waiting for the owner's smoke test.
+
+Welcome flow (roadmap item 3, sign-in and sign-up). Owner's request: after the launch screen, first-time users travel into a space, pick a username, then pick a companion, then enter the app. Everything stays local.
+1. Settled with the owner:
+   - There's no password at sign-up unless one is enabled in Control Panel.
+   - The username prefills the Control Panel sign-in.
+   - There's a "Replay welcome" option.
+   - Models: Rosie→`rosie`, Angel→`ang3l`, Mushroom→`mxshy`, Suki→`suki`. Jester is a new 5th companion, OT-05, and has no card yet.
+   - Idle and happy clips play while browsing, and a clap plays on pick.
+   - Reduced motion shows still poses.
+   - Nothing goes into the app until the owner approves the look.
+2. Throwaway prototype: `~/Orion_Terminal-worktrees/logs/welcome-prototype/welcome-v1.html`, served on port 1537. Use `?models=/models-v2` for the shrunk models and `?reduced` for reduced motion. The flow:
+   - the launch end frame;
+   - a star-streak traverse into a dark, fogged space;
+   - "What should we call you?";
+   - a descent to a 5-companion ring (accent rim light, list, ←/→, click, Esc back);
+   - "Welcome, NAME." with a clap;
+   - fade to the desktop.
+   Captures are in `/tmp/welcome-check/`. There are no console errors in normal or reduced motion. Claude fixed a reduced-motion bug where Enter on the name also chose the companion.
+3. Claude's calls, to confirm with the owner:
+   - Jester's accent is gold `#ffc23a`.
+   - Copy: "You can switch any time." and "Welcome, NAME." with "CODE · NAME · Online".
+   - In the ring, the next and previous companions sit off-screen and the two far ones show from behind.
+
+New companion models (brief `docs/alpha/briefs/05-companion-models.md`):
+1. GPT 6.1 ran this in `~/Orion_Terminal-worktrees/companions` (branch `alpha/companion-models` from `45f1b14`, uncommitted). The first run stopped with "model at capacity" before changing any files. It was resumed with the same session and finished.
+2. Output: `public/characters/v2/{rosie,mxshy,ang3l,suki,jester}.glb` plus `manifest.json`, 2.67–3.69 MB each (inputs were 12.0–17.4 MB).
+   - Every triangle, material extension (clearcoat), texture slot and clip is kept (74 clips).
+   - Animation data is bit-identical, with zero joint error at 30 fps.
+   - Textures went from 2K to 1K WebP.
+3. Report: `docs/alpha/companion-models-report.md` in the worktree. Gates: the optimizer fidelity check passed; vitest 32/32; typecheck 0; `licenses:check` passed.
+4. Claude's visual check compared the originals with v2 in the prototype, including a Retina-size close-up of all five. They're indistinguishable except for a barely softer small "ORION" print. No 2K re-run is needed.
+
+Next:
+1. The owner reacts to the welcome prototype, and Claude iterates until they approve the look.
+2. Then: the welcome spec (`docs/superpowers/specs/2026-10-29-welcome-flow-design.md`), a builder check, and a GPT brief 06 to build it.
+3. Launch screen: the owner's smoke test, then commit. Ask whether to push `45f1b14`.
+4. Later: Jester's card, app-interaction sounds, skill orbs, roadmap items 4–9, the rename last.
+
+## 2026-10-29 (cont. 4) — Dock committed; launch screen handed to GPT 6.1; next: sign-in and sign-up
+
+Branch: `validation/alpha-2026-09-14`. The dock is committed as `487becb` and **pushed** (owner: "push the dock"). The logo mark (cont. 3) is committed as `45f1b14`, **not pushed** (owner: "yes commit logo mark"). The PROGRESS/ARCHIVE edits and the boot spec and briefs are uncommitted.
+
+Dock (roadmap: dock app icons + skill orbs):
+1. GPT 6.1 built it in `~/Orion_Terminal-worktrees/dock` from `docs/alpha/briefs/03-dock-redesign.md` and the spec `docs/superpowers/specs/2026-10-29-dock-redesign-design.md`. The owner smoke-tested it in this checkout and approved it.
+2. Gates passed before the commit. The job's full suite: 6,038 passed, 3 skipped. Report: `docs/alpha/dock-report.md`.
+3. Command Center and Hermes are hidden from the dock only; they stay registered and open from Spotlight.
+
+Launch screen (roadmap item 2):
+1. Owner-approved: the boot-v4 picture (star chart, 3D logo, sword strike, anime impact frame, glyph dither, title) and the boot-v7 sound (procedural Web Audio rendered offline, one long 808 in D). First launch: the full scene with the title. Later launches: from the logo, no star chart and no title.
+2. Spec: `docs/superpowers/specs/2026-10-29-boot-experience-design.md` (reference: `…-boot-experience-reference/`; runnable copy: `~/Orion_Terminal-worktrees/logs/boot-prototype-v7/`). Brief: `docs/alpha/briefs/04-boot-experience.md`.
+3. GPT 6.1 is building it in `~/Orion_Terminal-worktrees/boot` (branch `alpha/boot-experience` from `487becb`). Log: `~/Orion_Terminal-worktrees/logs/boot.log`; final message: `boot-last.md`; report: `docs/alpha/boot-report.md` in the worktree.
+4. Claude's calls in the spec: the boot plays once per app launch, including warm (valid-session) launches, which used to skip the splash; a reload in the same run doesn't replay it (`sessionStorage`). "Startup sound" switch after "Reduce transparency", default on (`app_state` `boot.sound`). First/later via `app_state` `boot.seen`. Reduced motion: a still logo frame, no sound.
+5. The teaser's music ("Welcome Speranza", ARC Raiders) is copyrighted. The boot copies the character of its 808, not its notes.
+6. **Built, verified by Claude, uncommitted.** GPT's gates: typecheck 0, focused 270/270, `licenses:check` passed, `npm test` 6,075 passed / 3 skipped. Claude's browser check (headless Chrome, port 1535; captures in `/tmp/boot-check/claude/`):
+   - Picture matches the prototype at every brief timestamp (first 2.0/4.0/5.2/7.0/8.5 s, later 4.0/5.2 s); 1440×900 is contained with no bars; the reveal over the desktop works mid-fade; a reload doesn't replay it.
+   - Sound with autoplay allowed: AudioContext running, `boot.sound` 819 ms, the rendered buffer equals the prototype's (48 kHz stereo, 9.65 s, peak 0.891, envelope correlation 1.0), started at 3.2 s in later mode; the context is closed after unmount. Blocked autoplay: plays silently.
+   - Reduced motion: one frame drawn and held, no AudioContext, unmount ~2.75 s after mount. Click and key skip: unmount ~1.1–1.2 s after input, contexts closed.
+   - Headless frame times (software GL, not representative): first frame 840 ms, models 795 ms, draw avg 9 ms.
+   - Claude moved one misplaced import in `SettingsPanel.tsx` (typecheck 0, settings tests 21/21). No Rust changed, so `cargo test --lib` wasn't run.
+   - Not checkable in a browser: first mode reading `boot.seen` from SQLite, the Startup sound switch saving, lock-screen and first-run reveals, real-GPU/WKWebView frame rate. These need the owner's smoke test in the Tauri app.
+
+Open questions (for Hermes):
+1. 20 dock-local CSS properties need canon names in `design/tokens.json`: `--dock-green --dock-cyan --dock-yellow --dock-magenta --dock-violet --dock-utility --dock-orb-core --dock-radius --dock-backdrop --dock-smoked-fill --dock-milky-fill --dock-smoked-border --dock-milky-border --dock-shadow --dock-smoked-edge --dock-milky-edge --dock-sheen --dock-divider --dock-reduced-fill --dock-color`. Values: `docs/alpha/dock-report.md`, "Token gaps for Hermes". All are scoped to `.ot-dock-wrap`; no global token changed.
+
+Next:
+1. Launch screen: the owner's smoke test in the Tauri app, then commit on their approval (the worktree branch `alpha/boot-experience`).
+2. Owner: push `487becb`? Commit the logo mark?
+3. Roadmap item 3, sign-in and sign-up: glass cards, onboarding (welcome and manifesto → character selection → the existing first-launch guide), "Choose your companion".
+4. Later: app-interaction sounds; skill orbs and the icon pipeline; items 4–9; the rename last.
+
+## 2026-10-29 (cont. 3) — New logo mark in the app; rename deferred
+
+Branch: `validation/alpha-2026-09-14`. **Uncommitted** (not yet authorized).
+
+Owner decision: renaming to "Orion Studio" is deferred to the very end (app, website, GitHub, docs, videos). The wordmark stays "ORION TERMINAL"; only the logo mark changes now. Rename prep is kept for later: briefs in `docs/alpha/briefs/01-rename-orion-studio.md` and `02-video-rename.md` (untracked), a partial in-repo patch at `~/Orion_Terminal-worktrees/logs/rename-partial-2026-10-29.patch`, and the video inventory at `~/Orion_Terminal-worktrees/logs/video-inventory-partial/`. No video or media file was changed.
+
+Done:
+1. `src/components/BrandMark.tsx`: the new mark as an SVG (chamfered ring, square hole, two corner squares; `currentColor`). Its geometry was measured from the owner's flat logo and matches it to within 1 px (no mismatched pixels away from edges). Test: `BrandMark.test.tsx`.
+2. Menubar: the pulsing green dot is replaced by the mark (10px tall, text colour), next to "ORION TERMINAL". The unused `ot-pulse` keyframes are removed.
+3. App icon: a white mark on a black macOS-style rounded square (824px tile on a 1024 canvas). `app-icon.png` was replaced and `npx tauri icon` regenerated all 50 files in `src-tauri/icons`. Revert with `git checkout -- app-icon.png src-tauri/icons`.
+
+Gates: `npm run typecheck` exit 0; vitest `BrandMark`, `menus`, `EditorMenus` 27/27.
+Not verified: the live menubar render. Headless Chrome hung on this machine; the owner's running dev app hot-reloads the change.
+
+Next: the owner's call on dock and skill icons; then roadmap item 2 (boot + sound, using `~/Downloads/Orion-Studio-Logo.glb`).
+
 ## 2026-10-29 (cont. 2) — XDesign: image-to-3D removed
 
 Branch: `validation/alpha-2026-09-14`. At the owner's request, the "3D model" project type (img2model) is removed until something better replaces it. The code stays in git history. Committed and pushed at the owner's request.

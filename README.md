@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="docs/assets/icon.png" width="128" alt="Orion Terminal" />
+<img src="docs/assets/icon.png" width="128" alt="Orion Studio" />
 
-# Orion Terminal
+# Orion Studio
 
-**A JARVIS-style personal workstation — one desktop shell, deeply integrated apps, and your choice of context-aware AI collaborator.**
+**A personal workstation — one desktop shell, deeply integrated apps, and your choice of context-aware AI collaborator.**
 
 [![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)](https://tauri.app)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
@@ -22,10 +22,10 @@
 
 ## Download & install (macOS, Apple Silicon)
 
-**Public alpha**, not a stable release. Choose `v0.1.0-alpha.1` for these changes; earlier beta downloads predate them. See the [alpha guide](BETA.md).
+**Public alpha**, not a stable release. Choose [Orion Studio `v0.1.0-alpha.2`](https://github.com/chakra3301/OrionTerminal/releases/tag/v0.1.0-alpha.2); earlier beta downloads predate these changes. See the [alpha guide](BETA.md).
 
 1. Choose a **`.dmg`** from the [**Releases page**](https://github.com/chakra3301/OrionTerminal/releases). For the new alpha, compare its SHA-256 with the attached `SHA256SUMS.txt` before opening it.
-2. Open the `.dmg` and drag **Orion Terminal** into **Applications**.
+2. Open the `.dmg` and drag **Orion Studio** into **Applications**.
 3. The app is **ad-hoc signed, not notarized**, so macOS may warn it can’t verify the developer. Approve only a build you trust:
    - **macOS 14 Sonoma & earlier:** right-click the app → **Open** → **Open** in the dialog.
    - **macOS 15 Sequoia & later:** double-click (it’s blocked once), then go to **System Settings → Privacy & Security** → scroll down → **Open Anyway**.
@@ -38,7 +38,7 @@
 
 ## What it is
 
-Orion Terminal is a single desktop OS-style shell — wallpaper, menubar, dock, draggable in-canvas windows, and a unified Spotlight (`⌘K`) — hosting three core apps plus Hermes and Command. Shared AI rails receive app-specific context and use the connector/model you select. Specialist capabilities differ; see the [setup and capability matrix](docs/setup-and-verification.md).
+Orion Studio is a single desktop OS-style shell — wallpaper, menubar, dock, draggable in-canvas windows, and a unified Spotlight (`⌘K`) — hosting three core apps plus Hermes and Command. Shared AI rails receive app-specific context and use the connector/model you select. Specialist capabilities differ; see the [setup and capability matrix](docs/setup-and-verification.md).
 
 | App | What it is | Accent |
 | --- | --- | --- |

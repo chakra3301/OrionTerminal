@@ -74,8 +74,8 @@ social = Image.alpha_composite(social, veil)
 social.alpha_composite(logo.resize((56, 56), Image.Resampling.LANCZOS), (47, 35))
 draw = ImageDraw.Draw(social)
 font = assets / "fonts" / "anton.ttf"
-draw.text((120, 49), "ORION TERMINAL", font=ImageFont.truetype(str(font), 23), fill="#20304d")
+draw.text((120, 49), "ORION STUDIO", font=ImageFont.truetype(str(font), 23), fill="#20304d")
 for i, line in enumerate(("THINK.", "MAKE.", "CONNECT.")):
     draw.text((48, 145 + i * 116), line, font=ImageFont.truetype(str(font), 107), fill="#090d13")
-social.convert("RGB").save(assets / "social.jpg", quality=92)
+social.convert("RGB").save(assets / "social-studio.jpg", quality=92)
 print("Prepared reference-derived artwork and the existing Orion product mark.")

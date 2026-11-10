@@ -108,7 +108,7 @@ struct SyncView: View {
                             }
                             .buttonStyle(.plain)
                             .padding(.top, 4)
-                            Text("Close the phone editor and quit Orion Terminal on your Mac before syncing edits. Reopen the desktop app afterward.")
+                            Text("Close the phone editor and quit Orion Studio on your Mac before syncing edits. Reopen the desktop app afterward.")
                                 .font(.caption).foregroundStyle(Theme.tSecondary)
                             Button("Disconnect") { sync.stop() }
                         }

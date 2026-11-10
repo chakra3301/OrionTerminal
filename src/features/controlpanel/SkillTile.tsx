@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { Skill } from "@/features/agents/agentTypes";
 import { SkillEmblem } from "./SkillEmblem";
 import { hexToRgb } from "./sigil";
+import { skillAccent } from "@/identity/color";
 
 /** A skill rendered as an equippable emblem tile — used by the Skill Library
  *  and the Forge inventory. */
@@ -22,7 +23,7 @@ export function SkillTile({
     <button
       type="button"
       className={`cp-skill${equipped ? " on" : ""}`}
-      style={{ "--acc-rgb": hexToRgb(skill.accent) } as CSSProperties}
+      style={{ "--acc-rgb": hexToRgb(skillAccent(skill.id || skill.name, skill.accent)) } as CSSProperties}
       onClick={onClick}
       disabled={disabled}
       title={title}

@@ -223,7 +223,7 @@ describe("Project comment workflow",()=>{
   it('opens sharing without remounting the local canvas and keeps the desktop-only connection form disabled in a browser', async () => {
     const editor = usePencilWorkspace.getState().editor, surface = container.querySelector('canvas'); await click('Share');
     await vi.waitFor(async () => { await act(async () => {}); expect(container.querySelector('[aria-label="Share design"]')).not.toBeNull(); });
-    expect(container.querySelector<HTMLInputElement>('[aria-label="Room server"]')!.matches(':disabled')).toBe(true); expect(container.textContent).toContain('Orion Terminal desktop'); await click('Close');
+    expect(container.querySelector<HTMLInputElement>('[aria-label="Room server"]')!.matches(':disabled')).toBe(true); expect(container.textContent).toContain('Orion Studio desktop'); await click('Close');
     expect(usePencilWorkspace.getState().editor).toBe(editor); expect(container.querySelector('canvas')).toBe(surface); expect(canvas.mount).toHaveBeenCalledOnce();
   });
   it('reopens a saved viewer with authoring disabled while retaining layer selection, comments search and export', async () => {

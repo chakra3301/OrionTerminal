@@ -1,13 +1,11 @@
 /* ============================================================================
    Control Panel — cohesive with the Orion shell (glass surfaces, neon tokens,
-   Space Grotesk + JetBrains Mono, mono eyebrows). Skills render as animated
-   SVG emblems (SkillEmblem), echoing the Learn mastery badge. No emoji.
+   Space Grotesk + JetBrains Mono, mono eyebrows). Skills render as spatial
+   particle orbs (SkillEmblem). No emoji.
    Accent is carried per-element via --acc-rgb (a "r, g, b" triplet).
    ========================================================================== */
 
 @keyframes cp-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-@keyframes se-scan { from { transform: translateY(-14px); } to { transform: translateY(14px); } }
-@keyframes se-pulse { 0%, 100% { opacity: .82; } 50% { opacity: 1; } }
 
 /* ── Overlay + surface ───────────────────────────────────────────────────── */
 .cp-overlay {
@@ -86,20 +84,7 @@
 .cp-eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--glass-border); }
 .cp-count { color: var(--neon-violet); font-variant-numeric: tabular-nums; }
 
-/* ── Skill emblem (SVG) ──────────────────────────────────────────────────── */
-.se { display: block; overflow: visible; }
-.se-plate { fill: rgba(var(--acc-rgb), 0.05); stroke: rgba(var(--acc-rgb), 0.5); stroke-width: 1.2px; }
-.se-sigil { fill: none; stroke: rgba(var(--acc-rgb), 0.95); stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round;
-  filter: drop-shadow(0 0 3px rgba(var(--acc-rgb), 0.45)); }
-.se-reticle, .se-subdial { transform-box: fill-box; transform-origin: center; }
-.se.on .se-plate { fill: rgba(var(--acc-rgb), 0.13); stroke: rgba(var(--acc-rgb), 0.9); }
-.se.on { filter: drop-shadow(0 0 7px rgba(var(--acc-rgb), 0.5)); }
-@media (prefers-reduced-motion: no-preference) {
-  .se-reticle { animation: lb-spin 22s linear infinite; }
-  .se-subdial { animation: lb-spin-r 30s linear infinite; }
-  .se-scan { animation: se-scan 3.4s ease-in-out infinite alternate; }
-  .se.on .se-sigil { animation: se-pulse 3s ease-in-out infinite; }
-}
+.skill-orb { display: inline-flex; }
 
 /* ── Skill tiles ─────────────────────────────────────────────────────────── */
 .cp-skill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; margin-bottom: 18px; }

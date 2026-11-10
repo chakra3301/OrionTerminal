@@ -77,7 +77,7 @@ export async function startVoiceCapture(): Promise<void> {
   // instead of letting the user wait through a silent recording.
   if (firstTrack && (firstTrack.muted || firstTrack.label === "")) {
     const detail = firstTrack.muted ? "muted by OS" : "no device label";
-    const msg = `Mic not delivering audio (${detail}). On macOS in dev mode you must grant mic access to the PARENT process (the Terminal/iTerm/VS Code window that ran \`npm run tauri dev\`), not Orion Terminal itself. Open System Settings → Privacy & Security → Microphone, enable that app, fully quit it, then re-run tauri dev. Or use \`npm run tauri build\` and launch the bundled .app instead.`;
+    const msg = `Mic not delivering audio (${detail}). On macOS in dev mode you must grant mic access to the PARENT process (the Terminal/iTerm/VS Code window that ran \`npm run tauri dev\`), not Orion Studio itself. Open System Settings → Privacy & Security → Microphone, enable that app, fully quit it, then re-run tauri dev. Or use \`npm run tauri build\` and launch the bundled .app instead.`;
     log.warn("[voice] " + msg);
     stream.getTracks().forEach((t) => t.stop());
     voice.setStatus("error");
@@ -228,7 +228,7 @@ export async function stopAndTranscribe(): Promise<string> {
     log.warn("[voice] blob too small — mic likely captured no audio");
     useVoice.getState().setStatus("error");
     useVoice.getState().setError(
-      "No audio captured. Check macOS System Settings → Privacy & Security → Microphone and ensure Orion Terminal is allowed.",
+      "No audio captured. Check macOS System Settings → Privacy & Security → Microphone and ensure Orion Studio is allowed.",
     );
     return "";
   }

@@ -1,6 +1,6 @@
 /** Brain graph builder (Archives → Brain). Pure — no stores, no DB — so the
  * whole linking model is unit-testable. Takes a snapshot of everything in
- * Orion Terminal (notes, chats, assets, boards, tags, collections, stored
+ * Orion Studio (notes, chats, assets, boards, tags, collections, stored
  * embedding vectors) and produces a deduped node+edge set.
  *
  * Link sources, in order of confidence:

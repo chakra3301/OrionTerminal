@@ -7,6 +7,10 @@ import {
   deactivateCommunityPlugin,
 } from "@/plugins/communityRuntime";
 import type { InstalledCommunityPlugin } from "@/plugins/communityTypes";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { generateGlyph } from "@/identity/glyph";
+import { identityAccent } from "@/identity/color";
 
 const record: InstalledCommunityPlugin = {
   manifest: {
@@ -40,6 +44,8 @@ describe("community declarative contribution runtime", () => {
   it("registers and owner-disposes app and command surfaces", () => {
     activateCommunityPlugin(record);
     const appId = communityAppId(record.manifest.id, "hello");
+    const Icon = appRegistry.get(appId)!.dock.Icon;
+    expect(renderToStaticMarkup(createElement(Icon))).toContain(generateGlyph(`app:${appId}`).path);
     expect(appRegistry.get(appId)?.renderer).toEqual({
       kind: "sandboxed-plugin",
       pluginId: record.manifest.id,
@@ -64,5 +70,14 @@ describe("community declarative contribution runtime", () => {
     } as unknown as InstalledCommunityPlugin;
     expect(() => activateCommunityPlugin(invalid)).toThrow("invoke is not supported");
     expect(appRegistry.has(communityAppId(record.manifest.id, "bad"))).toBe(false);
+  });
+
+  it("generates identity colours for apps without a requested accent", () => {
+    activateCommunityPlugin({ ...record, manifest: { ...record.manifest, contributes: {
+      apps: [{ id: "hello", name: "Hello" }, { id: "second", name: "Second" }],
+    } } });
+    const first = communityAppId(record.manifest.id, "hello"), second = communityAppId(record.manifest.id, "second");
+    expect(appRegistry.get(first)?.accent).toBe(identityAccent(`app:${first}`));
+    expect(appRegistry.get(second)?.accent).not.toBe(appRegistry.get(first)?.accent);
   });
 });

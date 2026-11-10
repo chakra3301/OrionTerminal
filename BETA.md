@@ -1,6 +1,8 @@
-# Orion Terminal — Public alpha guide
+# Orion Studio — Public alpha guide
 
-An open-source alpha for macOS Apple Silicon. Expect rough edges, back up important work, and report reproducible problems. Choose **`v0.1.0-alpha.1`** for this source; older beta downloads predate these changes. Check the release's commit, checksum and [tested scope](docs/aaa-rebuild/2026-09-13-alpha-release-gates.md).
+An open-source alpha for macOS Apple Silicon. Expect rough edges, back up important work, and report reproducible problems. Choose **`v0.1.0-alpha.2`** for Orion Studio; older beta downloads predate these changes. Check the release's commit, checksum and [tested scope](docs/aaa-rebuild/2026-09-13-alpha-release-gates.md).
+
+Download **`Orion-Studio_aarch64.dmg`** from the [Studio alpha release](https://github.com/chakra3301/OrionTerminal/releases/tag/v0.1.0-alpha.2). Existing installations keep the same bundle identifier and data directory. Quit Orion Terminal before opening Orion Studio; after confirming your work opens, remove the older application from Applications. The historical `v0.1.0-alpha.1` download retains its original name and checksum.
 
 ---
 
@@ -8,7 +10,7 @@ An open-source alpha for macOS Apple Silicon. Expect rough edges, back up import
 
 Personal builds are **ad-hoc signed but not notarized**, so macOS Gatekeeper may warn on first launch. A warning—or an ad-hoc signature—does not establish whether a download is safe. Only open builds from a source you trust.
 
-1. Open the `.dmg` and drag **Orion Terminal** to **Applications**.
+1. Open the `.dmg` and drag **Orion Studio** to **Applications**.
 2. First launch is blocked with an “unverified developer” warning. To get past it once:
    - **macOS 14 Sonoma & earlier:** right-click the app → **Open** → confirm **Open**.
    - **macOS 15 Sequoia & later:** double-click once (it’s blocked), then **System Settings → Privacy & Security** → scroll down → **Open Anyway**.
@@ -37,7 +39,7 @@ First launch is a glass **Username → Password** input, with arrow/Enter to con
 These are test suggestions, not blanket acceptance. The [bounded alpha scope and remaining release gates](docs/aaa-rebuild/2026-09-13-alpha-release-gates.md) distinguish tested core workflows from experimental specialists.
 
 - **Shell** — drag windows, `⌘K` Spotlight, dock, true fullscreen (`⌃⌘F`) and `⌃⌘Tab` to switch apps in fullscreen.
-- **Themes** — Control Panel → Appearance. Try all five, especially **Liquid**. Toggle **Reduce transparency** to confirm it strips the glass.
+- **Themes** — Control Panel → Appearance. Try Liquid, Minimal, BMW M and Ivory Keep. Toggle **Reduce transparency** to confirm it strips the glass.
 - **Archives 47** — notes, journal, `[[wikilinks]]`, databases, ask-your-archive search.
 - **Orion** — open a folder, edit with Monaco, live preview, terminal, inline Claude edits + Tab autocomplete.
 - **XDesign** — generate a design, extract a brand from a URL, edit on the canvas, export to HTML/PDF/PPTX.
@@ -75,7 +77,7 @@ This source build creates private startup snapshots under the app configuration 
 To rehearse recovery without replacing a live profile, use an executable built from this updated source:
 
 ```sh
-"/path/to/Orion Terminal.app/Contents/MacOS/orion-terminal" \
+"/path/to/Orion Studio.app/Contents/MacOS/orion-terminal" \
   --restore-db-copy "/path/to/backups/orion-…db" "/path/to/NEW-directory"
 ```
 

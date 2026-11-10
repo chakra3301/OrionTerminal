@@ -4,6 +4,7 @@ import { useMcpServers } from "@/store/mcpServersStore";
 import { BUILTIN_TOOLS } from "@/features/agents/toolCatalog";
 import type { Skill, ToolGrant } from "@/features/agents/agentTypes";
 import { SkillEmblem } from "./SkillEmblem";
+import { identityAccent } from "@/identity/color";
 
 const ACCENTS = ["#b14cff", "#00e0ff", "#39ff88", "#e6ff3a", "#ff3ea5"];
 
@@ -41,6 +42,7 @@ export function SkillEditor({ skill, onClose }: { skill: Skill; onClose: () => v
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
           <input className="cp-input" placeholder="Skill name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <div className="forge-accents">
+            <button type="button" className={`forge-dot${!draft.accent ? " on" : ""}`} style={{ background: identityAccent(`skill:${draft.id}`), color: identityAccent(`skill:${draft.id}`) }} onClick={() => setDraft({ ...draft, accent: "" })} aria-label="Automatic colour" title="Automatic colour" />
             {ACCENTS.map((c) => (
               <button key={c} type="button" className={`forge-dot${draft.accent === c ? " on" : ""}`} style={{ background: c, color: c }} onClick={() => setDraft({ ...draft, accent: c })} aria-label="accent" />
             ))}

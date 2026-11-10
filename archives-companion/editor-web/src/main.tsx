@@ -63,7 +63,7 @@ function Editor() {
         const valid = (rows: any[]): boolean => Array.isArray(rows) && rows.every((block) =>
           block && typeof block === "object" && block.type in noteSchema.blockSchema &&
           (block.children === undefined || valid(block.children)));
-        if (!valid(blocks)) throw new Error("This note contains blocks this mobile version cannot edit. Open it in Orion Terminal; the original is preserved.");
+        if (!valid(blocks)) throw new Error("This note contains blocks this mobile version cannot edit. Open it in Orion Studio; the original is preserved.");
         editor.replaceBlocks(editor.document, blocks.length ? blocks : [{ type: "paragraph", content: [] }]);
         previous.current = JSON.stringify(editor.document);
         loaded.current = true;

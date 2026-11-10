@@ -1,4 +1,4 @@
-# Orion Terminal · consumer site (`landing/site/`)
+# Orion Studio · consumer site (`landing/site/`)
 
 A third, standalone site. `landing/index.html` (classic) and `landing/consumer/` (icy-reference build) are untouched. Static HTML/CSS/vanilla ES modules, no build step, no dependencies, CDNs, trackers or remote requests. About 820 KB total.
 
@@ -15,7 +15,7 @@ Open **http://127.0.0.1:4319/site/**. ES modules need HTTP; `file://` won't run 
 | Section | What it does |
 | --- | --- |
 | Hero | The real stock wallpaper (`public/wallpapers/stock.png`) rendered as a live liquid surface in raw WebGL2: cursor-trail ripples, refraction with chromatic edges, cyan/green specular on the chrome. The orb tilts toward the cursor. Owner copy: *Think. Make. Connect.* |
-| Interactive desktop | A working mini Orion Terminal: draggable windows, traffic lights, double-click maximize, dock focus/minimize, live clock, scroll-driven 3D settle. Scripted scenes (Archives chat, Orion ⌘K inline-edit diff, XDesign live aurora layer) only run while visible. Phones get a dedicated one-app-at-a-time layout. |
+| Interactive desktop | A working mini Orion Studio: draggable windows, traffic lights, double-click maximize, dock focus/minimize, live clock, scroll-driven 3D settle. Scripted scenes (Archives chat, Orion ⌘K inline-edit diff, XDesign live aurora layer) only run while visible. Phones get a dedicated one-app-at-a-time layout. |
 | Apps | Three cards using the real Dock glyphs/gradients (Lucide `Archive`, `Code2`, `Palette`). "Open in the demo" jumps up and focuses that window. |
 | One brain | A 3D force-directed knowledge graph (canvas 2D, additive glow, signal pulses), with drag-to-orbit and hover neighborhoods. |
 | Spotlight | **⌘K / Ctrl K or `/` opens a real site-wide Spotlight.** It fuzzy-matches sections, apps and FAQ, and `>` limits results to commands, as in the app. |
