@@ -1,0 +1,46 @@
+{
+  "tag": "v0.1.0-alpha.2",
+  "sourceCommit": "9237c570c595e8bfa809c8c6bad2d26146ae7ef2",
+  "bytes": 67049264,
+  "sha256": "03034d7e7d25751af11eedf0db9ca6312c938616450f14b56fd7587cac2911a4",
+  "binarySha256": "d55808e01a94bf60a36d157a4d05b1f6d6a531d34b76896b8a7e2cc03fdc077b",
+  "appName": "Orion Studio",
+  "bundleIdentifier": "com.lucaorion.orion-terminal",
+  "architecture": "arm64",
+  "signing": "ad-hoc, unnotarized",
+  "appCodeCommit": "5b11b22d28b51a5ee9f5ef61bfabc889de1ad029",
+  "finalFrontend": {
+    "testsPassed": 6067,
+    "testsSkipped": 3,
+    "filesPassed": 614,
+    "filesSkipped": 3,
+    "seconds": 283.4
+  },
+  "packagedPolicy": "passed",
+  "packagedRecovery": "passed on synthetic fixtures; live/historical promotion not claimed",
+  "dmgSignatureAndExactBinary": "passed",
+  "nativeLaunch": "Existing locked profile recognized; Studio About verified. Desktop acceptance pending owner unlock.",
+  "publicDownloadVerified": true,
+  "releaseUrl": "https://github.com/chakra3301/OrionTerminal/releases/tag/v0.1.0-alpha.2",
+  "mainSite": {
+    "url": "https://orionterminal.app/",
+    "commit": "f038c93",
+    "deploymentId": "dpl_G9wEuwojDZeJzqJpwtv3QPa11YTe",
+    "teaser02": "https://orionterminal.app/video/teaser-02-studio-v24.mp4",
+    "teaserSha256": "7fc5d4d2a0b3eddaa0560633d603120b58493b9b6f71d014545924f41ca49d71"
+  },
+  "archives": {
+    "version": "0.1.1",
+    "sourceCommit": "8979eb0",
+    "siteCommit": "cf8ef04",
+    "download": "https://archives.orionterminal.app/download/Archives47_0.1.1_aarch64.dmg",
+    "sha256": "ff2c1a48876ce0bbab995641fa7bae343145b3488adcd0cf4ea8f914801ba5d0",
+    "installedNativeAboutVerified": true
+  },
+  "bootBrandingCommit": "7c11c44",
+  "automaticDuplicateReleaseRun": {
+    "id": 42923434452,
+    "conclusion": "cancelled after manual publication to retain the already verified assets; all local release gates passed"
+  },
+  "remoteVerification": "Separate GitHub verification may still be running; it is not represented as a completed pass."
+}

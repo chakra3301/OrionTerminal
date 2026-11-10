@@ -1,3 +1,13 @@
+## 2026-11-10 — Studio rebrand rollout completed
+
+Branch: `validation/alpha-2026-09-14`; main and validation source are pushed. All six authorized follow-ups are complete: boot/welcome wording, standalone Archives parent, installed Studio app, public source/README, Studio alpha 2 download, and approved Rosie v24 on the main live site.
+
+- Published `v0.1.0-alpha.2` at source `9237c57`. Both 67,049,264-byte DMGs and checksum file verified from the public download; SHA-256 `03034d7e7d25751af11eedf0db9ca6312c938616450f14b56fd7587cac2911a4`. Signed arm64 app is installed as `/Applications/Orion Studio.app`; native About/menu and existing locked-profile recognition pass. Previous app and integrity-checked database backup preserved privately.
+- Final frontend: 6,067 passed, three skipped, zero failures (283.4 s). Native: 1,556 passed, 20 ignored; final backup/Cursor checks 20 passed. Bridges 263 passed; packaging/landing 18 passed. TypeScript, production build, license checks, both production audits, selected native advisory gate, packaged tool policy, synthetic recovery, signature and exact-binary DMG checks pass. No performance threshold or release gate was weakened.
+- Main site live deployment `dpl_G9wEuwojDZeJzqJpwtv3QPa11YTe`, source `f038c93`: alpha 2 links, refreshed spec sheets/demo and the full mint Rosie v24 teaser. Production video hash/audio/timing, playlist action frame and phone layout verified. Archives 47 0.1.1 installed and live; source `8979eb0`, site `cf8ef04`, public DMG SHA verified. Boot branding-only `7c11c44` pushed separately.
+- GitHub runner configuration is repaired; remote verification is separate from the completed local gates. The duplicate automatic release run was cancelled after manual publication to preserve the already verified assets.
+- Handoff and exact receipts: `docs/alpha/rename-report.md`, `docs/alpha/studio-alpha2-release.json`. Original HTML checklist updated. Next: owner unlock for native desktop/orb visual acceptance; domain/X changes when owner is ready. Unaccepted new boot/welcome integration and other alpha roadmap work remain open. Original Rosie dock orb, profile identity, domain and X handle preserved.
+
 ## 2026-11-10 — Studio alpha completion and release gates
 
 CI follow-up: the old macos-14 GitHub runner was retired on 2026-11-02 and cancelled checks before any steps. Both workflows now use supported macos-15 Apple Silicon; gates are unchanged. Reference: https://github.com/actions/runner-images/issues/13518.
