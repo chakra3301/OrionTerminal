@@ -17,20 +17,24 @@ import {
   ScanSearch,
   GraduationCap,
   BrainCircuit,
+  ArrowDownToLine,
+  Settings,
 } from "lucide-react";
+import { archivesHost } from "@/apps/archives/host";
 import { ClaudeChat, type ClaudeChatMessage } from "@/components/ClaudeChat";
 import { useAppConfig, resolveConfig, appFirstTurnPreamble, appAllowedTools } from "@/store/appConfigStore";
 import { useAppChat, registerStream, forgetStream } from "@/store/appChatStore";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { dispatchSend, dispatchCancel, toRuntimeHistory } from "@/features/agents/dispatchSend";
 import { useArchives, type ArchivesView } from "@/apps/archives/useArchives";
-import { setArchivesChatSender } from "@/apps/archives/chatBridge";
+import { setArchivesChatSender, setArchivesPanelToggles } from "@/apps/archives/chatBridge";
 import { useNotesStore } from "@/store/notesStore";
 import { setNoteNavigator } from "@/lib/orionProtocol";
 import { useAssetsStore } from "@/store/assetsStore";
 import { useMoodBoardsStore } from "@/store/moodBoardsStore";
 import { listAllChats, upsertChat } from "@/lib/db";
 import { scheduleReindex } from "@/lib/embeddingIndexer";
+import { watchArchiveCaptionChanges } from "@/lib/archiveCaptionEvents";
 import { log } from "@/lib/log";
 import { useFileDropZone } from "@/lib/fileDrop";
 import { ArchivesToday } from "@/apps/archives/Today";
@@ -38,6 +42,7 @@ import { ArchivesNotes } from "@/apps/archives/Notes";
 import { ArchivesJournal } from "@/apps/archives/Journal";
 import { ArchivesProjects } from "@/apps/archives/Projects";
 import { ArchivesMedia } from "@/apps/archives/Media";
+import { ArchivesDownloads } from "@/apps/archives/downloads/Downloads";
 import { ArchivesMood } from "@/apps/archives/Mood";
 import { ArchivesChats } from "@/apps/archives/Chats";
 import { ArchivesDatabase } from "@/apps/archives/database/ArchivesDatabase";
@@ -67,6 +72,7 @@ const LIBRARY: NavItem[] = [
   { key: "notes", label: "Notes", Icon: StickyNote },
   { key: "mood", label: "Mood Boards", Icon: Image },
   { key: "media", label: "Media", Icon: Film },
+  { key: "downloads", label: "Downloads", Icon: ArrowDownToLine },
   { key: "favorites", label: "Favorites", Icon: Star },
   { key: "chats", label: "Past chats", Icon: MessageSquare },
 ];
@@ -78,6 +84,7 @@ const LIBRARY: NavItem[] = [
 const knownChatIds = new Set<string>();
 
 export function ArchivesApp() {
+  useEffect(watchArchiveCaptionChanges, []);
   const archivesCfg = useAppConfig((s) => s.configs.archives);
   const acfg = useMemo(() => resolveConfig("archives", archivesCfg), [archivesCfg]);
   const view = useArchives((s) => s.view);
@@ -306,6 +313,15 @@ export function ArchivesApp() {
     if (panel.isCollapsed()) panel.expand();
     else panel.collapse();
   };
+  const togglesRef = useRef({ toggleSidebar, toggleChat });
+  togglesRef.current = { toggleSidebar, toggleChat };
+  useEffect(() => {
+    setArchivesPanelToggles({
+      toggleSidebar: () => togglesRef.current.toggleSidebar(),
+      toggleChat: () => togglesRef.current.toggleChat(),
+    });
+    return () => setArchivesPanelToggles(null);
+  }, []);
 
   return (
     <div className="ar-shell" ref={shellRef}>
@@ -357,6 +373,7 @@ export function ArchivesApp() {
               {view === "notes" && <ArchivesNotes />}
               {view === "mood" && <ArchivesMood />}
               {view === "media" && <ArchivesMedia />}
+              {view === "downloads" && <ArchivesDownloads />}
               {view === "favorites" && <ArchivesFavorites />}
               {view === "chats" && <ArchivesChats />}
               {view === "database" && <ArchivesDatabase />}
@@ -419,8 +436,10 @@ function ArchivesSidebar({
   noteCount: number;
 }) {
   const chatCount = useArchives((s) => s.chatCount);
+  const Header = archivesHost().SidebarHeader;
   return (
     <aside className="ar-sidebar scroll">
+      {Header && <Header />}
       <SidebarSearch />
 
       <div className="ar-section">Library</div>
@@ -431,6 +450,7 @@ function ArchivesSidebar({
             type="button"
             key={it.key}
             className={`ar-nav${view === it.key ? " active" : ""}`}
+            aria-current={view === it.key ? "page" : undefined}
             onClick={() => setView(it.key)}
           >
             <Icon size={14} />
@@ -442,10 +462,23 @@ function ArchivesSidebar({
 
       <SidebarCollections />
       <SidebarTags />
+      <SidebarSettingsButton />
     </aside>
   );
 }
 
+
+function SidebarSettingsButton() {
+  const open = archivesHost().openSettings;
+  if (!open) return null;
+  return (
+    <button type="button" className="ar-nav ar-sidebar-settings" onClick={open}>
+      <Settings size={14} />
+      <span>Settings</span>
+      <span className="badge">⌘,</span>
+    </button>
+  );
+}
 
 /**
  * Run an ingest action and, if Mood detail has a board open, also attach

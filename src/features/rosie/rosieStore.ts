@@ -105,7 +105,7 @@ type RosieState = {
  * so we inline it once and rely on `--resume` for continuity afterward). */
 const SYSTEM_PROMPT = [
   "You are R.O.S.I.E (Recursive Oracle: Sentient Interface Entity), the",
-  "central AI agent inside Orion Terminal — a JARVIS-",
+  "central AI agent inside Orion Studio — a JARVIS-",
   "style personal workstation that hosts three apps: Archives 47 (notes,",
   "journal, projects, mood boards), Orion (code editor with file tree,",
   "Monaco, and a terminal), and XDesign (design studio).",

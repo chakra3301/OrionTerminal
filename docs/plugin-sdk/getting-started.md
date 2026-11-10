@@ -4,13 +4,13 @@ Status: local directory packages; distribution signing and archive installation 
 
 ## Security model
 
-Community code never runs in Orion Terminal's React tree. UI and startup background entrypoints run in `sandbox="allow-scripts"` frames without `allow-same-origin`. Their documents use a network-denied CSP and receive no Tauri, SQLite, Zustand, shell DOM, filesystem, process, provider-key, or raw event access.
+Community code never runs in Orion Studio's React tree. UI and startup background entrypoints run in `sandbox="allow-scripts"` frames without `allow-same-origin`. Their documents use a network-denied CSP and receive no Tauri, SQLite, Zustand, shell DOM, filesystem, process, provider-key, or raw event access.
 
 The sandbox gets one frozen `window.orion` object. Calls cross a source-bound, versioned `postMessage` channel. The trusted host binds the package identity, and the native broker re-checks installed state and grants on every request.
 
 ## Try the sample
 
-1. Run Orion Terminal in Tauri.
+1. Run Orion Studio in Tauri.
 2. Open **Control Panel → Plugins**.
 3. Choose **Install package**.
 4. Select `examples/plugins/hello-orion.orion-plugin`.
@@ -20,6 +20,10 @@ The sandbox gets one frozen `window.orion` object. Calls cross a source-bound, v
 The sample proves namespaced persistence and brokered notifications while showing that Tauri authority is absent.
 
 For opaque filesystem access, install `examples/plugins/workspace-lens.orion-plugin`. Its **Choose folder** button must be triggered by a real click or key press. Orion's trusted host opens the folder picker and returns only a random resource handle, display label, and read/write flags—never an absolute path.
+
+## Incubator: inspect and install without activation
+
+Incubator and Settings → Skills also offer **Local app packages** for prepared directories. This separate path snapshots bounded source bytes, reviews exact permissions, and installs **disabled**. Enable explicitly in Plugin Manager later. It only accepts new identities and physical directories with bounded ASCII-relative paths; no symlinks, package-manager builds, repository conversion or automatic background startup. Updated native commands are required; there is no fallback to ordinary installation. The ordinary Plugin Manager retains its activation behavior, but [reviewed updates](../architecture/capability-importer-package-updates.md) now use captured bytes, installed-state binding and active-call/frame-version guards; they require an updated native binary. A sample-derived package now has [isolated native lifecycle acceptance](../architecture/capability-importer-native-lifecycle.md); [workspace grants/revocation/re-consent](../architecture/capability-importer-workspace-acceptance.md) also passed in a temporary-folder native fixture. Broader crash, workspace edge-case and hostile-package acceptance remains pending. See [implementation limits and acceptance](../architecture/capability-importer-local-packages.md).
 
 ## Package layout
 
@@ -33,7 +37,11 @@ hello-orion.orion-plugin/
 
 Directory packages are copied into Orion's app-data directory after inspection. The host rejects symlinks, special files, traversal, missing entrypoints, unknown authority-bearing manifest fields, more than 512 files, files over 5 MiB, manifests over 64 KiB, and packages over 25 MiB. The package is fingerprinted before permission review and fingerprinted again during installation to prevent review/install substitution.
 
-UI v1 is a single self-contained HTML entrypoint. External scripts, stylesheets, nested frames, object/embed content, meta refresh, and network access are removed or denied. Inline CSS and JavaScript are supported inside the opaque sandbox.
+UI v1 is a single self-contained HTML entrypoint. External scripts, stylesheets, nested frames, object/embed content, meta refresh, and network access are removed or denied. Inline CSS and classic standalone `<script>` bodies are supported inside the opaque sandbox. Scripts run after document parsing through the existing CSP-pinned opaque evaluator; use `addEventListener`, not HTML event-handler attributes. Module imports and external script loading are unsupported. A separate opaque guard restricts child navigation and relays only source/session-bound SDK messages. The shell does not gain blanket inline-script permission; a missing startup handshake is held after ten seconds.
+
+## Optional Orion appearance
+
+Prepared UI can explicitly opt into [live Orion/Original styling](appearance.md) with a versioned body marker and scoped UI roles/known 2048 mapping. This is read-only appearance data, not a broker permission or generic website converter. Legacy/background entrypoints are unchanged. The updated frontend is required; native/human actual-game visual acceptance remains pending.
 
 ## Manifest
 
@@ -110,12 +118,16 @@ Unknown methods are denied in both the frame bridge and native broker. Broker op
 
 - Disable synchronously removes app, Dock, Spotlight, command, window, UI frame, and startup background frame contributions.
 - In-flight privileged requests block disable.
-- Package removal retains the plugin's namespaced data.
+- [Reviewed package removal](../architecture/capability-importer-package-removal.md) journals current/retained code retirement before deletion and retains namespaced data. Interrupted removals recover disabled; committed removals never restore partially deleted code. Cleanup failures can leave private retired files; this is not secure erasure. Unconfirmed removal requires recovery reload, not automatic reactivation.
+- Updated manager installations retain one previous reviewed version. **Review rollback** shows its fingerprint/permissions and restores code disabled, with workspace grants cleared. Private data is not rolled back and may be incompatible with older code.
+- Startup or **Reload packages / recover interrupted changes** recovers unfinished updates disabled/quarantined; unknown/corrupt recovery records block community activation. These paths require an updated binary, not a legacy fallback. [Exact scope and checks](../architecture/capability-importer-package-recovery.md).
 - Missing, disabled, incompatible, or cyclic dependencies prevent activation.
 - Uncaught sandbox errors quarantine the plugin.
 - A startup marker detects an incomplete community-plugin boot. The next launch keeps every community package out of the runtime while the kernel, shell, and Plugin Manager remain available.
 - **Try again** exits safe mode explicitly.
 
+[Isolated native background acceptance](../architecture/capability-importer-background-acceptance.md) covers disabled/startup behavior, background folder-request denial, synchronous-error quarantine/restart and synthetic-marker safe-mode cancel/retry. This is not actual startup-crash or comprehensive sandbox acceptance.
+
 ## Not yet public
 
-Workspace watch streams, brokered network, clipboard, assets, terminal/Git, AI chat/tools, signed archive packages, publisher verification, update rollback, and marketplace distribution remain disabled until their broker contracts and security tests land. Declaring an unsupported contribution fails installation rather than silently granting authority.
+Workspace watch streams, brokered network, clipboard, assets, terminal/Git, AI chat/tools, signed archive packages, publisher verification, data rollback, and marketplace distribution remain disabled until their broker contracts and security tests land. Declaring an unsupported contribution fails installation rather than silently granting authority.

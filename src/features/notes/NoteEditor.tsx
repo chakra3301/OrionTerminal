@@ -22,6 +22,7 @@ import { useVisualizer } from "@/features/notes/visualizer/visualizerStore";
 import { noteSchema } from "@/features/notes/noteSchema";
 import { log } from "@/lib/log";
 import { NoteSaveStatus } from "./NoteSaveStatus";
+import { isLightTheme, useThemeStore } from "@/store/themeStore";
 
 /** A stored asset → the BlockNote block to insert for it. */
 function blockForAsset(asset: Asset): PartialBlock {
@@ -79,6 +80,7 @@ function EditorBody({
   initialBlocks: unknown[];
   onFirstBackspace: () => void;
 }) {
+  const light = useThemeStore(s => isLightTheme(s.theme));
   const stageBlocks = useNotesStore((s) => s.stageBlocks);
   const flushNote = useNotesStore((s) => s.flushNote);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -225,7 +227,7 @@ function EditorBody({
     >
       <BlockNoteView
         editor={editor}
-        theme="dark"
+        theme={light ? "light" : "dark"}
         formattingToolbar={false}
         slashMenu={false}
       >

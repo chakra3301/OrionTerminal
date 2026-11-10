@@ -140,7 +140,7 @@ async fn check_sdk(script: &Path, root: &Path) -> bool {
     match tokio::time::timeout(std::time::Duration::from_secs(10), command.output()).await {
         Ok(Ok(output)) if output.status.success() => String::from_utf8_lossy(&output.stdout).lines().last()
             .and_then(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-            .is_some_and(|v| v["ready"] == true && v["version"] == "1.0.31"),
+            .is_some_and(|v| v["ready"] == true && v["version"] == "1.1.0"),
         _ => false,
     }
 }
@@ -160,7 +160,7 @@ pub async fn cursor_status(app: AppHandle) -> CursorStatus {
     let supported = version.as_deref().map(supported_node).unwrap_or(false);
     let ready = installed && supported && sdk_ok && key_saved;
     let detail = if version.is_some() && !supported {
-        "Cursor SDK requires Node 22.13 or newer. Upgrade Node and restart Orion Terminal.".into()
+        "Cursor SDK requires Node 22.13 or newer. Upgrade Node and restart Orion Studio.".into()
     } else { detail(installed, sdk_ok, key_saved) };
     CursorStatus {
         installed,
@@ -203,7 +203,7 @@ pub async fn cursor_send(
         version = probe_node_version() => version,
     };
     if !node_version.as_deref().map(supported_node).unwrap_or(false) {
-        return Err("Cursor SDK requires Node 22.13 or newer. Upgrade Node and restart Orion Terminal.".into());
+        return Err("Cursor SDK requires Node 22.13 or newer. Upgrade Node and restart Orion Studio.".into());
     }
     let script = resolve_script(&app).ok_or_else(|| {
         "cursor-agent.mjs not found - rebuild the app or run from the project root".to_string()
@@ -307,7 +307,10 @@ pub async fn cursor_send(
                 line = lines.next_line() => {
                     match line {
                         Ok(Some(text)) => {
-                            for ev in transcode::cursor_line_to_events(&text, &mut cursor_state) {
+                            for mut ev in transcode::cursor_line_to_events(&text, &mut cursor_state) {
+                                if ev.get("usage").is_some_and(|usage| usage.is_object()) {
+                                    ev["usage_run_id"] = json!(ui_run_id);
+                                }
                                 let _ = app_loop.emit("claude:event", EventPayload {
                                     chat_id: chat_loop.clone(),
                                     event: ev,

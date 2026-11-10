@@ -50,7 +50,7 @@ pub fn write(app: &AppHandle) -> Option<String> {
     let exe = std::env::current_exe().ok()?;
     let config_dir = app.path().app_config_dir().ok()?;
     let _ = std::fs::create_dir_all(&config_dir);
-    let db_path = config_dir.join("orion.db");
+    let db_path = config_dir.join(crate::app_profile::db_file());
     let config_path = config_dir.join("orion-mcp.json");
 
     // If the UI bridge is up, share its port + token so the MCP server can
@@ -62,6 +62,9 @@ pub fn write(app: &AppHandle) -> Option<String> {
         "ORION_DB_PATH": db_path.to_string_lossy(),
         "ORION_CONTEXT_PATH": context_path.to_string_lossy(),
     });
+    if let Some(app) = crate::app_profile::current().mcp_app {
+        env_map[crate::mcp_server::APP_SCOPE_ENV] = serde_json::json!(app);
+    }
     if let Some(bridge) = crate::ui_bridge::current() {
         env_map["ORION_BRIDGE_PORT"] = serde_json::json!(bridge.port.to_string());
         env_map["ORION_BRIDGE_TOKEN"] = serde_json::json!(bridge.token.clone());
@@ -145,7 +148,7 @@ pub fn orion_server(app: &AppHandle) -> Option<crate::cli_engine::config::OrionS
     let exe = std::env::current_exe().ok()?;
     let config_dir = app.path().app_config_dir().ok()?;
     let _ = std::fs::create_dir_all(&config_dir);
-    let db_path = config_dir.join("orion.db");
+    let db_path = config_dir.join(crate::app_profile::db_file());
     let context_path = config_dir.join("orion-context.json");
     let mut env: Vec<(String, String)> = vec![
         (
@@ -157,6 +160,9 @@ pub fn orion_server(app: &AppHandle) -> Option<crate::cli_engine::config::OrionS
             context_path.to_string_lossy().into_owned(),
         ),
     ];
+    if let Some(app) = crate::app_profile::current().mcp_app {
+        env.push((crate::mcp_server::APP_SCOPE_ENV.into(), app.into()));
+    }
     if let Some(bridge) = crate::ui_bridge::current() {
         env.push(("ORION_BRIDGE_PORT".into(), bridge.port.to_string()));
         env.push(("ORION_BRIDGE_TOKEN".into(), bridge.token.clone()));
@@ -191,7 +197,7 @@ impl ScopedConfig {
 pub fn scoped_server(app: &AppHandle, tools: Option<&[String]>, ui_run_id: Option<&str>) -> Result<crate::cli_engine::config::OrionServer, String> {
     crate::ui_bridge::validate_run_id(ui_run_id)?;
     let tools = crate::mcp_grants::normalized(tools)?;
-    let mut server = orion_server(app).ok_or("Orion MCP bridge is unavailable. Restart the app before sending.")?;
+    let mut server = orion_server(app).ok_or_else(|| format!("{} MCP bridge is unavailable. Restart the app before sending.", crate::app_profile::short_name()))?;
     server.env.push((crate::mcp_grants::ENV_KEY.into(), serde_json::to_string(&tools).map_err(|e| e.to_string())?));
     if let Some(id) = ui_run_id {
         server.env.push(("ORION_UI_RUN_ID".into(), id.into()));
@@ -206,7 +212,7 @@ pub fn write_scoped(app: &AppHandle, tools: Option<&[String]>, ui_run_id: Option
         .map(|(k, v)| (k, serde_json::Value::String(v))).collect();
     let mut servers = serde_json::Map::new();
     servers.insert("orion".into(), serde_json::json!({"command": server.command, "args": server.args, "env": env}));
-    for (name, config) in read_user_mcp_servers(&config_dir.join("orion.db")) {
+    for (name, config) in read_user_mcp_servers(&config_dir.join(crate::app_profile::db_file())) {
         let prefix = format!("mcp__{name}");
         if name != "orion" && tools.is_none_or(|ts| ts.iter().any(|t| t == &prefix || t.starts_with(&format!("{prefix}__")))) {
             servers.insert(name, config);

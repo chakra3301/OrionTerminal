@@ -69,7 +69,7 @@ fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
         .path()
         .app_config_dir()
         .map_err(|e| e.to_string())?
-        .join("orion.db"))
+        .join(crate::app_profile::db_file()))
 }
 
 /// Fresh short-lived connection with a busy timeout so concurrent writers

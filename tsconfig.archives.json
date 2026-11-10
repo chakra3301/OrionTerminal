@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/store/appDefaults": ["src/standalone/archives/appDefaults.ts"],
+      "@/*": ["src/*"],
+      "open-pencil-pdf": ["node_modules/@open-pencil/core/dist/io/formats/pdf/index.d.ts"]
+    }
+  },
+  "include": ["src/standalone/archives", "src/vite-env.d.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+}

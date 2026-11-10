@@ -1,21 +1,23 @@
 import { useEffect, useRef } from "react";
+import { productName, productShortName } from "@/lib/productName";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { confirm, message } from "@tauri-apps/plugin-dialog";
 import { log } from "@/lib/log";
 import { createQuitCoordinator } from "./quitCoordinator";
-import { quitRisks } from "./quitRisks";
 
-export function useQuitGuard(bootReady: boolean): void {
+/** `risks` lists what an immediate quit would lose (Orion: `quitRisks`; Archives 47: `archivesQuitRisks`). */
+export function useQuitGuard(bootReady: boolean, risks: (bootReady: boolean) => string[]): void {
   const ready = useRef(bootReady); ready.current = bootReady;
+  const riskCheck = useRef(risks); riskCheck.current = risks;
   useEffect(() => {
     if (!isTauri()) return;
     let disposed = false, off: (() => void) | undefined;
     const coordinator = createQuitCoordinator({
-      risks: () => quitRisks(ready.current),
+      risks: () => riskCheck.current(ready.current),
       confirm: (risks) => confirm(
         `${risks.map((r) => `• ${r}`).join("\n")}\n\nQuit without saving? Memory-only drafts will be lost. Running operations may finish or be interrupted; quitting is not rollback. Keep working to save or stop them first.`,
-        { title: "Quit Orion Terminal?", kind: "warning", okLabel: "Quit without saving", cancelLabel: "Keep working" },
+        { title: `Quit ${productName()}?`, kind: "warning", okLabel: "Quit without saving", cancelLabel: "Keep working" },
       ),
       decide: (requestId, allow) => invoke("app_quit_decide", { requestId, allow }),
       freeze: () => {
@@ -24,7 +26,7 @@ export function useQuitGuard(bootReady: boolean): void {
       },
       report: (error) => {
         log.error("Quit check failed", error);
-        void message("Orion could not complete its quit check and has stayed open. Save your work before trying again.", { title: "Quit paused", kind: "error" }).catch(() => {});
+        void message(`${productShortName()} could not complete its quit check and has stayed open. Save your work before trying again.`, { title: "Quit paused", kind: "error" }).catch(() => {});
       },
     });
     void (async () => {

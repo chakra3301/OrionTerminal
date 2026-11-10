@@ -1,9 +1,12 @@
 import Database from "@tauri-apps/plugin-sql";
+import { useArchiveSearchRevision } from "./archiveSearchRevision";
 import { invoke } from "@tauri-apps/api/core";
 import { log } from "@/lib/log";
 import { decodeVectorBytes, encodeVectorBytes } from "./vectorStorage";
 
-const DB_URL = "sqlite:orion.db";
+/** Must match app_profile.rs: the standalone Archives 47 build keeps its own
+ * library file and never opens Orion Studio's. */
+export const DB_URL = import.meta.env.VITE_APP_TARGET === "archives" ? "sqlite:archives.db" : "sqlite:orion.db";
 
 let dbPromise: Promise<Database> | null = null;
 
@@ -37,9 +40,15 @@ export type AppStateKey =
   | "preview"
   | "xdesign.doc"
   | "xdesign.projects"
+  | "xdesign.libraries"
+  | "xdesign.roomLibraries"
+  | "xdesign.rooms"
+  | `xdesign.roomGrants.${string}`
+  | `xdesign.roomComments.${string}`
+  | `xdesign.roomLibraryPending.${string}`
+  | `xdesign.roomImagePending.${string}`
   | `xdesign.project.${string}`
   | `xdesign.fx.${string}`
-  | `xdesign.model.${string}`
   | "shell.focusedWindowId"
   | "rosie.ttsEnabled"
   | "voice.listenMode"
@@ -48,17 +57,26 @@ export type AppStateKey =
   | "ai.sessionOwners"
   | "ai.background"
   | "appconfig"
+  | "archives.appearance"
+  | "archives.brainPins"
   | "plugins.state"
+  | "plugins.appearance"
   | "widget.monitor"
+  | "provider_usage"
   | "reduce_glass"
+  | "theme_extras"
+  | "custom_themes"
   | "tab_autocomplete"
   | "repolens"
+  | "intake.analysis"
+  | "intake.plans"
   | "learn_scratchpad"
   | "note_visualizer"
   | "auth.user"
   | "auth.session"
   | "auth.setupSkipped"
-  | "onboarding.completed";
+  | "onboarding.completed"
+  | "agents.options";
 
 export async function getAppState<T = unknown>(
   key: AppStateKey,
@@ -86,6 +104,10 @@ export async function setAppState<T = unknown>(
   value: T,
 ): Promise<void> {
   const db = await getDb();
+  if (key.startsWith("xdesign.project.")) {
+    await invoke("xdesign_state_save", { projectId: key.slice("xdesign.project.".length), document: JSON.stringify(value) });
+    return;
+  }
   await db.execute(
     `INSERT INTO app_state (key, value) VALUES ($1, $2)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
@@ -93,10 +115,64 @@ export async function setAppState<T = unknown>(
   );
 }
 
-export async function setXDesignStateAtomic(writes: Array<{ key: AppStateKey; value: unknown }>): Promise<void> {
+/** Publish a library only if its catalog still matches the revision reviewed by this window. */
+export async function compareAndSetXDesignLibraries(value: unknown, expected: unknown): Promise<void> {
+  const db = await getDb();
+  const result = await db.execute(
+    `INSERT INTO app_state (key, value) SELECT 'xdesign.libraries', $1
+     WHERE $2 IS NULL OR EXISTS (SELECT 1 FROM app_state WHERE key = 'xdesign.libraries' AND value = $2)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value WHERE app_state.value = $2`,
+    [JSON.stringify(value), expected === null ? null : JSON.stringify(expected)],
+  );
+  if (result.rowsAffected !== 1) throw new Error("Component libraries changed in another window. Refresh before publishing.");
+}
+
+export async function compareAndSetXDesignRoomLibraries(value: unknown, expected: unknown): Promise<void> {
+  const db = await getDb();
+  const result = await db.execute(
+    `INSERT INTO app_state (key, value) SELECT 'xdesign.roomLibraries', $1
+     WHERE $2 IS NULL OR EXISTS (SELECT 1 FROM app_state WHERE key = 'xdesign.roomLibraries' AND value = $2)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value WHERE app_state.value = $2`,
+    [JSON.stringify(value), expected === null ? null : JSON.stringify(expected)],
+  );
+  if (result.rowsAffected !== 1) throw new Error("Shared library cache changed in another window. Reload before continuing.");
+}
+
+export async function compareAndSetXDesignRoomLibraryPending(projectId: string, value: unknown, expected: unknown): Promise<void> {
+  if (!/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i.test(projectId)) throw new Error("Invalid shared library project identity.");
+  const db = await getDb();
+  const result = await db.execute(
+    `INSERT INTO app_state (key, value) SELECT $1, $2
+     WHERE ($3 IS NULL OR EXISTS (SELECT 1 FROM app_state WHERE key = $1 AND value = $3))
+       AND EXISTS (SELECT 1 FROM app_state AS projects, json_each(projects.value, '$.registry') AS entry
+         WHERE projects.key = 'xdesign.projects' AND json_extract(entry.value, '$.id') = $4)
+       AND EXISTS (SELECT 1 FROM app_state WHERE key = $5)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value WHERE app_state.value = $3`,
+    [`xdesign.roomLibraryPending.${projectId}`, JSON.stringify(value), expected === null ? null : JSON.stringify(expected), projectId, `xdesign.project.${projectId}`],
+  );
+  if (result.rowsAffected !== 1) throw new Error("The library request or project changed in another window. Reload before continuing.");
+}
+
+export async function compareAndSetXDesignRoomImagePending(projectId: string, value: unknown, expected: unknown): Promise<void> {
+  if (!/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(projectId)) throw new Error("Invalid shared image project identity.");
+  const db = await getDb();
+  const result = await db.execute(
+    `INSERT INTO app_state (key, value) SELECT $1, $2
+     WHERE ($3 IS NULL OR EXISTS (SELECT 1 FROM app_state WHERE key = $1 AND value = $3))
+       AND EXISTS (SELECT 1 FROM app_state AS projects, json_each(projects.value, '$.registry') AS entry
+         WHERE projects.key = 'xdesign.projects' AND json_extract(entry.value, '$.id') = $4)
+       AND EXISTS (SELECT 1 FROM app_state WHERE key = $5)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value WHERE app_state.value = $3`,
+    [`xdesign.roomImagePending.${projectId}`, JSON.stringify(value), expected === null ? null : JSON.stringify(expected), projectId, `xdesign.project.${projectId}`],
+  );
+  if (result.rowsAffected !== 1) throw new Error("The image transfer or project changed in another window. Reload before continuing.");
+}
+
+export async function setXDesignStateAtomic(writes: Array<{ key: AppStateKey; value: unknown }>, importReceipt?: import('@/apps/xdesign/projectAssetImport').ProjectImportReceipt): Promise<void> {
   await getDb();
   await invoke("xdesign_state_commit", {
     writes: writes.map(({ key, value }) => ({ key, value: value === null ? null : JSON.stringify(value) })),
+    ...(importReceipt ? { importReceipt } : {}),
   });
 }
 
@@ -794,6 +870,7 @@ export async function searchArchive(
     .filter(Boolean)
     .map((t) => t + "*")
     .join(" ");
+  if (await invoke<boolean>("media_download_refresh_caption_matches", { query: ftsQuery })) useArchiveSearchRevision.getState().changed();
   const db = await getDb();
   const rows = await db.select<SearchRow[]>(
     `SELECT s.entity_id  AS entity_id,

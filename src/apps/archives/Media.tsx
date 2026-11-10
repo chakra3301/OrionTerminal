@@ -204,7 +204,7 @@ export function ArchivesMedia() {
         <div style={{ flex: 1 }} />
         <span className="ar-media-hint">
           <Filter size={11} />
-          ⌘/⇧ click to multi-select · drag files in to capture
+          ⌘ or ⇧ click to select several · drop files to capture
         </span>
       </div>
 
@@ -231,8 +231,9 @@ export function ArchivesMedia() {
 
       {filtered.length === 0 ? (
         <div className="ar-empty-state ar-media-empty">
+          <FilmIcon size={20} />
           <div className="title">
-            {all.length === 0 ? "Nothing captured yet." : "No matches."}
+            {all.length === 0 ? "Nothing captured yet" : "No matches"}
           </div>
           <div className="hint">
             {all.length === 0
@@ -294,6 +295,8 @@ function AssetTile({
   onDelete: () => void;
 }) {
   const src = asset.filePath ? convertFileSrc(asset.filePath) : null;
+  const [posterFailed,setPosterFailed] = useState(false);
+  useEffect(() => { setPosterFailed(false); }, [asset.id,asset.posterPath]);
 
   return (
     <div
@@ -321,6 +324,8 @@ function AssetTile({
       <div className={`ar-media-preview kind-${asset.kind}`}>
         {asset.kind === "image" && src ? (
           <img src={src} alt={asset.title} loading="lazy" />
+        ) : asset.posterPath && !posterFailed ? (
+          <img src={convertFileSrc(asset.posterPath)} alt={asset.title} loading="lazy" onError={() => setPosterFailed(true)} />
         ) : asset.kind === "video" && src ? (
           <video
             src={src}

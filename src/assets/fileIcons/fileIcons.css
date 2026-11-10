@@ -1,0 +1,27 @@
+@font-face {
+  font-family: "seti";
+  src: url("./seti.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+/* Sized like VS Code's explorer: a 16px column, glyph at 150% of the 13px label. */
+.ot-file-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  overflow: visible;
+  font-family: "seti";
+  font-size: 19.5px;
+  line-height: 1;
+  font-style: normal;
+  font-weight: normal;
+  color: var(--fi-dark);
+  -webkit-font-smoothing: antialiased;
+  speak: never;
+}
+:root[data-color-mode="light"] .ot-file-icon { color: var(--fi-light); }

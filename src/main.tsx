@@ -3,6 +3,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "@/app/App";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
+import { installPageMenuGuard } from "@/lib/pageMenuGuard";
+import { installPanelDragGuard } from "@/lib/panelDragGuard";
 
 import "@fontsource/space-grotesk/300.css";
 import "@fontsource/space-grotesk/400.css";
@@ -18,6 +20,9 @@ import "@/styles/tokens.css";
 import "@/styles/themes.css";
 import "@/styles.css";
 
+installPanelDragGuard();
+installPageMenuGuard();
+
 window.addEventListener("error", (e) => {
   // eslint-disable-next-line no-console
   console.error("[orion] uncaught", e.error || e.message);
@@ -30,7 +35,7 @@ window.addEventListener("unhandledrejection", (e) => {
 const root = document.getElementById("root");
 if (!root) throw new Error("root element missing");
 
-// Orion Terminal is a top-level app and must never run inside a frame. Refuse
+// Orion Studio is a top-level app and must never run inside a frame. Refuse
 // to mount if a preview or external page navigates a nested frame back to the
 // application entry point.
 if (window.top !== window.self) {
@@ -38,7 +43,7 @@ if (window.top !== window.self) {
   root.innerHTML =
     '<div style="display:grid;place-items:center;height:100vh;color:#5a706a;' +
     'font:13px/1.5 ui-sans-serif,system-ui,sans-serif;text-align:center;padding:24px">' +
-    "Orion Terminal can\u2019t run inside a frame.</div>";
+    "Orion Studio can\u2019t run inside a frame.</div>";
 } else {
   ReactDOM.createRoot(root).render(
     <React.StrictMode>

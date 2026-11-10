@@ -2,6 +2,7 @@ import { ulid } from "ulid";
 import { useXDesign } from "./store";
 import { planToShapes, resolveColorRefs, type DesignPlan } from "./designPlan";
 import { toast } from "@/store/toastStore";
+import { ingestPencilPlans } from "./pencil/designPlans";
 
 /** Seed/reuse a plan's color variables and return the name→id map used to
  * resolve color/<name> refs. */
@@ -25,6 +26,7 @@ function seedColors(plan: DesignPlan): Map<string, string> {
  * reuse) the color variables, resolve color/<name> refs to var ids, then
  * append the auto-layout shape graph and select the root. */
 export function ingestDesignPlan(plan: DesignPlan): void {
+  if(useXDesign.getState().pencilDocument){ingestPencilPlans([plan]);toast.success("Design generated",{body:"⌘Z to undo"});return;}
   const nameToId = seedColors(plan);
   const { shapes } = planToShapes(plan, () => ulid());
   const resolved = resolveColorRefs(shapes, nameToId);
@@ -37,6 +39,7 @@ export function ingestDesignPlan(plan: DesignPlan): void {
  * keep the one they like (delete the rest). Each screen is offset horizontally
  * by its width plus a gutter; colors are seeded once (shared token set). */
 export function ingestDesignPlans(plans: DesignPlan[]): void {
+  if(useXDesign.getState().pencilDocument){ingestPencilPlans(plans);toast.success(`${plans.length} directions generated`,{body:"⌘Z to undo"});return;}
   if (plans.length === 0) return;
   if (plans.length === 1) return ingestDesignPlan(plans[0]!);
   const GUTTER = 160;

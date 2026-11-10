@@ -1,0 +1,12 @@
+.xd-hist-panel { display:flex;flex-direction:column;gap:6px;color:var(--xd-text);font-size:11px; }
+.xd-hist-bar { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+.xd-hist-bar label,.xd-hist-source { display:flex;align-items:center;gap:6px;color:var(--xd-text-2); }
+.xd-hist-source select,.xd-hist-bar select { min-width:0; }
+.xd-hist-graph { height:100px;border:1px solid var(--xd-border);background:var(--xd-bg);color:var(--xd-text-2);cursor:crosshair; }
+.xd-hist-graph svg { display:block;width:100%;height:100%; }
+.xd-hist-colors { mix-blend-mode:screen; }
+.xd-hist-cursor { stroke:var(--xd-text);stroke-width:1;opacity:.6; }
+.xd-hist-stats { display:grid;grid-template-columns:1fr 1fr;gap:2px 12px; }
+.xd-hist-stat { display:flex;justify-content:space-between;gap:6px;font-variant-numeric:tabular-nums; }
+.xd-hist-stat span { color:var(--xd-text-2); }
+.xd-hist-note { margin:0;color:var(--xd-text-3); }

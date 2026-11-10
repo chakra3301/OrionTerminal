@@ -66,6 +66,19 @@ test('rejects stale locks, altered archives, and escaping material paths', () =>
   assert.throws(() => checkDistributionLicenses(root), /leaves the repository/);
 }));
 
+test('rejects changes and symlinks in a reviewed vendored source tree', () => fixture(({ root, put, manifest }) => {
+  const dir = 'src-tauri/vendor/driver';
+  put(`${dir}/src/lib.rs`, 'reviewed source');
+  Object.assign(manifest.native[0], { sourceDirectory: dir, sourceTreeSha256: sha256(`src/lib.rs\0${sha256('reviewed source')}\n`) });
+  put('resources/distribution-license-manifest.json', JSON.stringify(manifest));
+  checkDistributionLicenses(root);
+  put(`${dir}/src/lib.rs`, 'changed');
+  assert.throws(() => checkDistributionLicenses(root), /Changed vendored source/);
+  put(`${dir}/src/lib.rs`, 'reviewed source');
+  fs.symlinkSync(path.join(root, 'notice.txt'), path.join(root, dir, 'linked'));
+  assert.throws(() => checkDistributionLicenses(root), /Symlink in vendored source/);
+}));
+
 test('excludes only generated Finder metadata without deleting original inputs', () => fixture(({ root, put }) => {
   const original = put('public/.DS_Store', 'private metadata'); put('dist/nested/.DS_Store', 'copy'); const keep = put('dist/nested/keep.txt', 'keep');
   const plugin = excludeFinderMetadata(); plugin.configResolved({ root, build: { outDir: 'dist' } }); plugin.closeBundle();
@@ -79,3 +92,17 @@ test('checked-in distribution material is complete and configured for app bundli
   for (const item of ['../THIRD_PARTY_LICENSES', '../THIRD_PARTY_SOURCES', '../resources/distribution-license-manifest.json', '../dist/licenses']) assert.ok(config.bundle.resources.includes(item));
   assert.ok(fs.readFileSync('src/apps/xdesign/fx/fxModel.ts', 'utf8').includes('${noiseLicense}'));
 });
+
+
+test('includes embedded worker modules in the main inventory and applies its license checks', () => fixture(({ root, put }) => {
+  put('node_modules/embedded/package.json', '{"name":"embedded","version":"1","license":"MIT"}');
+  put('node_modules/embedded/LICENSE', 'Embedded license');
+  const id=put('node_modules/embedded/index.js', 'export {}');
+  const plugin=frontendLicenses('main',root,()=>new Set([id])); const assets=[];
+  plugin.buildStart();
+  plugin.generateBundle.call({emitFile:asset=>assets.push(asset)}, {}, {chunk:{type:'chunk',moduleIds:[id]}});
+  const records=JSON.parse(assets.find(asset=>asset.fileName.endsWith('.json')).source);
+  assert.equal(records.length,1);assert.equal(records[0].name,'embedded');assert.equal(records[0].files[0].text,'Embedded license');
+  put('node_modules/embedded/package.json', '{"name":"embedded","version":"1","license":"GPL-3.0-only"}');
+  assert.throws(()=>plugin.generateBundle.call({emitFile(){}},{},{}),/Unreviewed frontend license/);
+}));

@@ -1,0 +1,1710 @@
+{
+  "revision": "b3f35ab650d96b9ed0237108fd7faa2bb9b23c1d",
+  "packageVersion": "0.15.1",
+  "tools": [
+    {
+      "name": "get_selection",
+      "description": "Get details about currently selected nodes.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "get_node",
+      "description": "Get detailed properties of a node by ID. Use depth to limit child recursion (0 = node only, 1 = direct children, etc). Default: unlimited.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "find_nodes",
+      "description": "Find nodes by name pattern and/or type.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "get_jsx",
+      "description": "Get JSX representation of a node and its children. Compact round-trip format — same syntax as the render tool.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "render",
+      "description": "Render JSX to design nodes. Supports inline SVG paths, including open stroked paths: <svg viewBox=\"0 0 24 24\" size={24}><path d=\"M2 12 L22 12\" stroke=\"#000\" fill=\"none\" /></svg>. Use replace_id to replace a placeholder while preserving its position.",
+      "execution": {
+        "kind": "async",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "orion-integration-smoke",
+      "limits": "Declarative JSX, data constants and design helpers; no executable JavaScript or implicit remote Icon elements."
+    },
+    {
+      "name": "update_node",
+      "description": "Update properties of an existing node: position, size, opacity, corner radius, visibility, text, font.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_layout",
+      "description": "Set auto-layout (flexbox) on a frame. Direction, alignment, spacing, padding.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_layout_child",
+      "description": "Configure auto-layout child: sizing (FIXED/HUG/FILL), grow, alignment, absolute positioning.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_radius",
+      "description": "Set corner radius. Use individual corners for independent values.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_fill",
+      "description": "Set fill on a node. Solid: color=\"#ff0000\". Linear gradient: gradient=\"top-bottom\" or \"left-right\" with color (start) and color_end (end).",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_stroke",
+      "description": "Set the stroke (border) of a node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_text",
+      "description": "Set text content of a text node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_text_properties",
+      "description": "Set text layout properties: alignment, auto-resize, text case, decoration, truncation.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "delete_node",
+      "description": "Delete a node by ID.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "reparent_node",
+      "description": "Move a node into a different parent.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "node_resize",
+      "description": "Resize a node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "batch_update",
+      "description": "Execute multiple modifications in one call. Each operation is {id, props} where props can include: spacing, padding, padding_horizontal, padding_vertical, counter_align, sizing_horizontal, sizing_vertical, grow, name, visible, corner_radius, auto_resize (for text), direction. Runs all updates with one layout recompute.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "stock_photo",
+      "description": "Search stock photos and apply to leaf image placeholders or closed area geometry. Pass a JSON array; each item is {id, query, index?, orientation?}. Containers with content, text, lines, and structural nodes are rejected.",
+      "execution": {
+        "kind": "async",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write",
+        "network:access"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "resources-dialog-and-orion-agent",
+      "verification": "orion-integration-smoke",
+      "limits": "Typed bounded native service requests, keychain-only provider credentials, source attribution and atomic document publication. Mocked connected-workflow checks; actual provider/desktop/renderer/export fidelity and aggregate resource acceptance remain unverified."
+    },
+    {
+      "name": "describe",
+      "description": "Semantic description of one or more nodes. Pass `id` for a single node, or `ids` for multiple nodes in one call. Omit depth for auto — adapts to subtree size (small block → deeper, large page → shallower).",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "calc",
+      "description": "Arithmetic calculator. ALWAYS use instead of mental math. Pass one expression or a JSON array of expressions — all evaluated in one call. Supports: + - * / % ** ( ) min max floor ceil round abs sqrt pow. Examples: \"844 - 56 - 96 - 82\", '[\"1440 * 8 / 12\", \"(952 - 16) / 2\", \"floor(390 * 0.6)\"]'",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "eval",
+      "description": "Execute JavaScript with full Figma Plugin API access. Use for operations not covered by other tools. The `figma` global is available.",
+      "execution": {
+        "kind": "async",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:read",
+        "document:write",
+        "code:execute"
+      ],
+      "availability": "eval",
+      "integration": "host-tool",
+      "surface": "isolated-script-dialog-and-orion-agent",
+      "verification": "orion-integration-smoke",
+      "limits": "Published figma API on a separate draft in an opaque worker; checked graph and one-step history. Local admission/timeout limits; live browser/native isolation and renderer-dependent APIs remain unverified."
+    },
+    {
+      "name": "viewport_zoom_to_fit",
+      "description": "Zoom viewport to fit specified nodes.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "view"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "get_page_tree",
+      "description": "Get the node tree of the current page. Returns lightweight hierarchy: id, type, name, size. Use depth, root_id, or node_types to keep large pages small. Use get_node for full properties of a specific node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "get_current_page",
+      "description": "Get the current page name and ID.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "list_pages",
+      "description": "List all pages in the document.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "select_nodes",
+      "description": "Select one or more nodes by ID.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "view"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "query_nodes",
+      "description": "Query nodes using XPath selectors. Node types are element names (FRAME, TEXT, RECTANGLE, ELLIPSE, etc.). Attributes: name, width, height, x, y, visible, opacity, cornerRadius, fontSize, fontFamily, fontWeight, layoutMode, itemSpacing, paddingTop/Right/Bottom/Left, strokeWeight, rotation, locked, blendMode, text, lineHeight, letterSpacing.\n\nExamples:\n//FRAME — all frames\n//FRAME[@width < 300] — frames narrower than 300px\n//COMPONENT[starts-with(@name, 'Button')] — components starting with \"Button\"\n//SECTION/FRAME — direct frame children of sections\n//SECTION//TEXT — all text nodes inside sections\n//*[@cornerRadius > 0] — any node with corner radius\n//TEXT[contains(@text, 'Hello')] — text nodes containing \"Hello\"",
+      "execution": {
+        "kind": "async",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "orion-integration-smoke"
+    },
+    {
+      "name": "get_components",
+      "description": "List reusable components from the document and enabled component libraries, optionally filtered by name.",
+      "execution": {
+        "kind": "async",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "list_libraries",
+      "description": "List available published component libraries.",
+      "execution": {
+        "kind": "async",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "orion-integration-smoke"
+    },
+    {
+      "name": "insert_library_component",
+      "description": "Insert a reusable component from an enabled library by stable library and asset identity.",
+      "execution": {
+        "kind": "async",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "orion-integration-smoke"
+    },
+    {
+      "name": "switch_page",
+      "description": "Switch to a different page by name or ID.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "view"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "page_bounds",
+      "description": "Get bounding box of all objects on the current page.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "get_font_status",
+      "description": "Report whether fonts used on the current page are faithfully available. Returns requested faces, their loaded source, active substitutions, and affected nodes.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "list_fonts",
+      "description": "List fonts used in the current page.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "list_available_fonts",
+      "description": "List font families the host can render (system fonts on desktop plus any bundled fonts). Use this to discover what fonts are available to set on a text node — distinct from list_fonts which only reports families currently used in the page.",
+      "execution": {
+        "kind": "async",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "diff_jsx",
+      "description": "Structural diff between two nodes in JSX format. Shows added/removed children, changed props.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "create_shape",
+      "description": "Create a shape on the canvas. Use FRAME for containers/cards, RECTANGLE for solid blocks, ELLIPSE for circles, TEXT for labels, LINE for rules and dividers, STAR for starbursts and badges, POLYGON for triangles and regular polygons, and SECTION for page sections. Use create_vector with an SVG path for arbitrary shapes.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "orion-integration-smoke"
+    },
+    {
+      "name": "search_icons",
+      "description": "Search Iconify for icons by keyword. Accepts multiple queries — all searched in parallel. Returns results keyed by query.",
+      "execution": {
+        "kind": "async",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "network:access"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "resources-dialog-and-orion-agent",
+      "verification": "orion-integration-smoke",
+      "limits": "Typed bounded native service requests, keychain-only provider credentials, source attribution and atomic document publication. Mocked connected-workflow checks; actual provider/desktop/renderer/export fidelity and aggregate resource acceptance remain unverified."
+    },
+    {
+      "name": "insert_icon",
+      "description": "Insert one or more vector icons onto the canvas. Pass a single name or multiple names to batch-insert into the same parent. If already cached by fetch_icons — instant, no network request.",
+      "execution": {
+        "kind": "async",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write",
+        "network:access"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "resources-dialog-and-orion-agent",
+      "verification": "orion-integration-smoke",
+      "limits": "Typed bounded native service requests, keychain-only provider credentials, source attribution and atomic document publication. Mocked connected-workflow checks; actual provider/desktop/renderer/export fidelity and aggregate resource acceptance remain unverified."
+    },
+    {
+      "name": "fetch_icons",
+      "description": "Pre-fetch icons from Iconify into cache. Batches by prefix (one HTTP request per set). Call this once with all needed icons, then use insert_icon to place them instantly. Popular sets: lucide (outline), mdi (filled), heroicons, tabler, solar, mingcute, ri (remix).",
+      "execution": {
+        "kind": "async",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "network:access"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "resources-dialog-and-orion-agent",
+      "verification": "orion-integration-smoke",
+      "limits": "Typed bounded native service requests, keychain-only provider credentials, source attribution and atomic document publication. Mocked connected-workflow checks; actual provider/desktop/renderer/export fidelity and aggregate resource acceptance remain unverified."
+    },
+    {
+      "name": "combine_as_variants",
+      "description": "Combine components sharing a parent into a component set (variant set). Components named \"Category/Value\" (e.g. \"Button/Primary\") derive variant properties from the name segments.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "create_component",
+      "description": "Convert a frame/group into a component.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "create_instance",
+      "description": "Create an instance of a component.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "expose_instance_swap",
+      "description": "Expose nested instances as an instance-swap slot on their component.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "create_page",
+      "description": "Create a new page.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "create_vector",
+      "description": "Create a vector node from SVG path data or a VectorNetwork.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "create_slice",
+      "description": "Create a slice (export region) on the canvas.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "import_svg",
+      "description": "Import raw SVG markup onto the canvas as editable vector nodes. Supports common SVG shapes, inherited presentation attributes, transforms, gradients, and internal <use> references.",
+      "execution": {
+        "kind": "async",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "orion-integration-smoke"
+    },
+    {
+      "name": "set_effects",
+      "description": "Set effects on a node (drop shadow, inner shadow, blur). Pass an array or a single effect.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_opacity",
+      "description": "Set opacity of a node (0-1).",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_font",
+      "description": "Set font properties of a text node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_visible",
+      "description": "Set visibility of a node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_constraints",
+      "description": "Set resize constraints for a node within its parent.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_rotation",
+      "description": "Set rotation angle of a node in degrees.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_minmax",
+      "description": "Set min/max width and height constraints on a node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_font_range",
+      "description": "Set font properties for a text range.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_text_resize",
+      "description": "Set text auto-resize mode.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_blend",
+      "description": "Set blend mode of a node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_locked",
+      "description": "Set locked state of a node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_stroke_align",
+      "description": "Set stroke alignment of a node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "set_image_fill",
+      "description": "Set an image fill on a node from base64-encoded image data.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "clone_node",
+      "description": "Clone (duplicate) a node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "node_move",
+      "description": "Move a node to new coordinates.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "rename_node",
+      "description": "Rename a node in the layers panel.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "group_nodes",
+      "description": "Group selected nodes.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "ungroup_node",
+      "description": "Ungroup a group node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "flatten_nodes",
+      "description": "Flatten nodes into a single vector.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "node_to_component",
+      "description": "Convert one or more frames/groups into components.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "node_bounds",
+      "description": "Get absolute bounding box of a node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "node_ancestors",
+      "description": "Get the ancestor chain from a node to the page root.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "node_children",
+      "description": "Get direct children of a node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "node_tree",
+      "description": "Get a node tree with types and hierarchy.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "node_bindings",
+      "description": "Get variable bindings for a node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "node_replace_with",
+      "description": "Replace a node with JSX content.",
+      "execution": {
+        "kind": "async",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "arrange",
+      "description": "Arrange top-level nodes on the canvas in a grid, row, or column layout. Useful after batch creation to tidy up overlapping frames.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "list_variables",
+      "description": "List all design variables (colors, numbers, strings, booleans).",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "list_collections",
+      "description": "List all variable collections.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "get_variable",
+      "description": "Get a variable by ID.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "find_variables",
+      "description": "Find variables by name pattern.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "create_variable",
+      "description": "Create a new variable in a collection.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "orion-integration-smoke"
+    },
+    {
+      "name": "set_variable",
+      "description": "Set the value of a variable for a specific mode.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "orion-integration-smoke"
+    },
+    {
+      "name": "delete_variable",
+      "description": "Delete a variable.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "bind_variable",
+      "description": "Bind a variable to a node property. For fills/strokes color bindings use indexed format like \"fills/0/color\".",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "unbind_variable",
+      "description": "Remove a variable binding from a node property.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "properties"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "get_collection",
+      "description": "Get a variable collection by ID.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "create_collection",
+      "description": "Create a new variable collection.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "orion-integration-smoke"
+    },
+    {
+      "name": "delete_collection",
+      "description": "Delete a variable collection and all its variables.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "boolean_union",
+      "description": "Union (combine) multiple nodes.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "boolean_subtract",
+      "description": "Subtract the second node from the first.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "boolean_intersect",
+      "description": "Intersect multiple nodes.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "boolean_exclude",
+      "description": "Exclude (XOR) multiple nodes.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "path_get",
+      "description": "Get vector path data of a node.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "path_set",
+      "description": "Set vector path data on a node. Provide a VectorNetwork JSON.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "path_scale",
+      "description": "Scale vector path from center.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "path_flip",
+      "description": "Flip vector path horizontally or vertically.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "path_move",
+      "description": "Move all path points by an offset.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "document"
+      },
+      "capabilities": [
+        "document:write"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "viewport_get",
+      "description": "Get current viewport position and zoom level.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "viewport_set",
+      "description": "Set viewport position and zoom.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "view"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "export_svg",
+      "description": "Export nodes as SVG markup. Returns the SVG string.",
+      "execution": {
+        "kind": "async",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "export_pdf",
+      "description": "Export nodes as a vector PDF document. Text remains selectable, paths stay sharp at any zoom. Returns base64-encoded PDF data.",
+      "execution": {
+        "kind": "async",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "export_image",
+      "description": "Export nodes as a raster image (PNG, JPG, or WEBP). Returns base64-encoded image data. Use to visually verify designs.",
+      "execution": {
+        "kind": "async",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "analyze_colors",
+      "description": "Analyze color palette usage across the current page. Shows frequency, variable bindings, and optionally clusters similar colors.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "analyze_typography",
+      "description": "Analyze typography usage across the current page. Shows font families, sizes, weights, and their frequencies.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "analyze_spacing",
+      "description": "Analyze spacing values (gap, padding) across the current page. Checks grid compliance.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "analyze_clusters",
+      "description": "Find repeated design patterns (potential components). Groups nodes by structural signature — type, size, and child structure.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "analyze_overlaps",
+      "description": "Detect visual overlaps and layout overflows across the current page. Useful for finding content that covers footers, text that bleeds outside frames, and accidental sibling overlaps.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "diff_create",
+      "description": "Create a structural diff between two node trees. Compares properties (fills, strokes, effects, text, size, position) in unified diff format.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "diff_show",
+      "description": "Preview what would change if properties were applied to a node. Shows a unified diff of current vs proposed state.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "design_to_tokens",
+      "description": "Extract design tokens from Figma variables as CSS custom properties, Tailwind theme config, or JSON. Resolves aliases, handles multiple modes (light/dark).",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    },
+    {
+      "name": "design_to_component_map",
+      "description": "Analyze the document and return a structured component decomposition: components (with variants, props, instance counts), screens, and a dependency overview.",
+      "execution": {
+        "kind": "sync",
+        "mutation": "none"
+      },
+      "capabilities": [
+        "document:read"
+      ],
+      "availability": "default",
+      "integration": "host-tool",
+      "surface": "design-actions-and-orion-agent",
+      "verification": "not-run"
+    }
+  ],
+  "editorTools": [
+    {
+      "key": "SELECT",
+      "label": "Move",
+      "shortcut": "V"
+    },
+    {
+      "key": "FRAME",
+      "label": "Frame",
+      "shortcut": "F",
+      "flyout": [
+        "FRAME",
+        "SECTION"
+      ]
+    },
+    {
+      "key": "RECTANGLE",
+      "label": "Rectangle",
+      "shortcut": "R",
+      "flyout": [
+        "RECTANGLE",
+        "LINE",
+        "ELLIPSE",
+        "POLYGON",
+        "STAR"
+      ]
+    },
+    {
+      "key": "PEN",
+      "label": "Pen",
+      "shortcut": "P"
+    },
+    {
+      "key": "TEXT",
+      "label": "Text",
+      "shortcut": "T"
+    },
+    {
+      "key": "HAND",
+      "label": "Hand",
+      "shortcut": "H"
+    }
+  ],
+  "auditNote": "Integration records reachability. Smoke tests cover only their stated cases, not full upstream feature parity or visual fidelity. Dedicated control detection is a static inventory, not an end-to-end UI test."
+}

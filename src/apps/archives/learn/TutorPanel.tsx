@@ -24,6 +24,7 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { ModelSelect } from "@/components/ModelSelect";
+import { AiActivity, OrionOrb } from "@/components/effects/OrionOrb";
 import { useModelPrefs } from "@/store/modelPrefsStore";
 import { useLearn } from "./useLearn";
 import { tutorSystemPrompt } from "./pedagogy";
@@ -320,7 +321,7 @@ export function TutorPanel() {
 
       {/* ── Header ──────────────────────────────────────────────── */}
       <div className="learn-tutor-header">
-        <div className="learn-tutor-orb" aria-hidden />
+        <OrionOrb size={24} accent="var(--neon-green)" state={running ? "thinking" : "idle"} />
         <div className="learn-tutor-title-wrap">
           <span className="learn-tutor-name">Tutor</span>
           {scope && <span className="learn-tutor-scope">{scope}</span>}
@@ -341,7 +342,7 @@ export function TutorPanel() {
       <div ref={scrollRef} className="learn-tutor-messages scroll">
         {messages.length === 0 && (
           <div className="learn-tutor-empty">
-            <div className="learn-tutor-empty-orb" aria-hidden />
+            <OrionOrb size={48} accent="var(--neon-green)" />
             <p className="learn-tutor-empty-text">
               Ask me anything about this lesson — I&apos;ll guide you Socratically.
             </p>
@@ -356,7 +357,7 @@ export function TutorPanel() {
               {m.role === "user" ? (
                 m.content
               ) : m.pending && !m.content ? (
-                <span>thinking</span>
+                <AiActivity accent="var(--neon-green)" />
               ) : (
                 <Markdown>{m.content}</Markdown>
               )}

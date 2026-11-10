@@ -1,0 +1,86 @@
+# Incubator — supported static-app preparation proposal
+
+2026-10-01. **Owner approved the shown E0 appearance and subsequent E1 implementation. E1's deterministic recipe/contracts and bounded native source-capture/persistence slices are implemented and offline checked; [generated-candidate staging/shared review](capability-importer-static-app-staging.md) are now also implemented/offline checked. [Reviewed existing disabled-install handoff](capability-importer-static-app-install.md) is now also implemented/offline checked; isolated end-to-end native acceptance remains.** Owner requested imported things match Orion Terminal's styling **before preparation work**. E0 appearance adaptation below precedes E1. Earlier continuation audited feature gaps instead of widening fault injection. [Scope](capability-importer-scope.md), [handoff](capability-importer-handoff.md), [2048 evidence](capability-importer-2048-fixture.md).
+
+## Audit: the missing product step
+
+- `IncubatorApp.tsx` and `SkillIntakePanel.tsx` explicitly leave repository app/tool conversion unsupported.
+- `LocalPackageIntake.tsx` accepts an already prepared `orion-plugin.json` directory. Its captured-byte inspection, rights review and disabled-only publication should remain the installation boundary.
+- `integrationPlan.ts` generates historical human checklists, not artifacts. Non-skill plans correctly remain blocked without a validated executable artifact; choosing target=app is not preparation authority.
+- The real 2048 adapter/generator/tests exist privately outside the product. They establish bounded feasibility, not a shipped repository-to-package flow.
+- Public `aiTools`, views/settings/file-handler slots are still rejected in `manifest.ts`. Remote connectors and XDesign jobs need their own contracts/fixtures; unrestricted MCP configuration and Ripper setup are not substitutes.
+
+## Ranked next features
+
+1. **Known-recipe static-app preparation**, recommended now: bring the approved 2048 adaptation into an explicit in-app source→candidate flow.
+2. Brokered read-only remote connector: needs an owner-selected service/fixture, origin and keychain-reference/grant design; no trading/account writes.
+3. XDesign job/asset handoff and Ripper candidates: needs selected source/output and validated cancellation/placement/provenance; do not auto-run Ripper npm/dev-server setup.
+4. Managed local engines: blocked on approved isolation/dependency/hardware/budget decisions.
+
+Further corruption/disk-full/power-loss/process injection is **not** a feature prerequisite or newly approved by this plan. Keep those gates separate and stop expanding the 2048 test matrix by default.
+
+## E0 first — Orion-native appearance for imported apps
+
+**Owner direction:** things brought into Incubator should fit Orion Terminal visually, not just sit inside a themed outer window. Reading this as functional app adaptation in the restrained modern Control Panel/workstation language—not a new design system, wallpaper/glow pass or blanket recoloring. Original-reference visual fidelity is explicitly relaxed for this styling layer; functionality, meaningful domain colors, brand marks/attribution and actual content remain intact.
+
+### Product behavior
+
+- **Orion styling** defaults for newly prepared supported apps: Space Grotesk UI, JetBrains Mono for code/compact numeric labels where appropriate; host surface/text/control tokens, compact hierarchy, spacing, focus/hover/disabled/error/loading states and soft theme-correct corners. Filled controls use opaque on-accent text. No compulsory neon/glass everywhere.
+- Follow the **active theme**, including Ivory Keep/light, Liquid/Minimal/BMW M/dark and validated custom palettes/finishes. Preserve each theme's proportions, Reduce transparency/motion and solid fallback; don't hardcode a dark green skin.
+- Adapt actual interior controls/panels as well as outer chrome. Preserve document/canvas/code/image output styling unless separately requested; data-semantic colors remain distinguishable (tile levels, charts, warnings), not flattened into one accent.
+- Keep **Original styling** as a per-app option when feasible, with source stylesheet/assets retained. Mode/theme changes update in place, never reload the iframe/reset game, remount the editor or erase pending work. Persist preference through host-managed metadata, not by rewriting imported instructions/game data.
+- Disclose a versioned appearance overlay and its coverage/diff in candidate review. Not all foreign UIs can be automatically normalized; map known recipe selectors/components, state limited coverage for complex/custom surfaces, never claim universal compatibility.
+- Skills keep their actual instruction/resource bytes; their Skill Codex/Forge presentation already uses host UI. A visual preference is not approval to rewrite skill instructions or generated content.
+
+### Audit and safe implementation seam
+
+Pre-E0 audit: `pluginDocument.ts` prepended a fixed dark base (`#03060a/#e6f4ec`, dark color scheme). Opaque nested frames do not inherit shell variables or fonts; `SandboxPluginFrame.tsx` has no appearance snapshot/live theme subscription, and its guard forwards only SDK responses. A one-time CSS color change cannot satisfy live light/custom-theme consistency.
+
+Proposed first green slice: a **versioned, read-only appearance snapshot/live update bridge** plus an owned opt-in style pack and 2048 selector mapping. Use existing `themeStore` as sole theme authority and `workstation.css`/`workstationApps.css` as visual canon. Resolve/validate a small allowlist of colors, lengths/typography identifiers and reduction/capability flags; send data only through source/session/version-bound host→guard→content messages. No arbitrary CSS, DOM handles, credentials, renderer-store access, wildcard message commands or permission grants. Stale/disabled/replaced frames must ignore updates; UI frames only. Do not change iframe document/session/version dependencies on a theme change.
+
+Appearance fonts must be locally bundled/licensed and embedded as permitted data resources: current CSP only permits data fonts. No remote font fetch, weakened CSP/sandbox or a copy of every shell CSS rule. Trusted owned styles are scoped to mapped UI regions/classes, not `*` resets that recolor SVGs/charts/documents. App-supplied appearance claims cannot gain privileges. Existing installed packages are not silently retrofitted; default applies to reviewed new adapters/explicit migrations.
+
+**2048 first appearance target:** native-feeling score toolbar, buttons/status/overlay, panel/board/cells and typography that match the current host material; retain the 4×4 puzzle, readable value progression, brand/notice, move/merge/win behavior and animation timing with reduced-motion support. Fit available in-canvas height and small widths; avoid the current cropped board/save-warning layout shift. Original CSS remains available beneath a separate declared overlay. No synthetic QA controls or invented gameplay history in the prepared app.
+
+**Acceptance gates:** bounded schema/message tests (invalid/stale/spoofed updates), safe embedded fonts, light/dark/custom palettes, original-mode restoration, mode/reduction toggles and live theme updates without document reload/native calls/game mutation. Then isolated native visual/keyboard/focus and functional acceptance against the mapped app. Static style exploration must use trusted, explicitly labelled illustrative markup/no imported script execution; interactive preview remains separately approved runtime activation. The planning turn had no dependency/AI/native build. Owner subsequently approved E0 implementation.
+
+### E0 first implementation · 2026-10-01
+
+[SDK guide](../plugin-sdk/appearance.md). Explicit body `data-orion-appearance="v1"` enrollment, standard roles/2048 recipe only; original package/source styles retained, no legacy/background retrofit. Versioned validated read-only source/session-bound updates, root/workstation palette sampling, local data WOFF2, material/reduction flags, stale/disabled/replaced/change guards. Host Orion/Original controls persist separately with ordered durable-before-visible saves and failed/unknown hydration protection. Theme/style updates preserve frame/session; no new native RPC or grant. 2048 maps responsive geometry, score controls, storage-warning overlay, game/notice regions and warm domain value progression. Opaque local material does not expose parent wallpaper.
+
+Focused tests + tsc and owned minified-client check pass. Labelled static study checks actual nested opaque/CSP rendering with four built-ins, validated synthetic custom palette, reductions, Original and narrow/short layouts; local fonts loaded, cells/tiles aligned and same frame/content identity. Screenshot capture failed twice (including owner retry): no human visual acceptance. No imported game script or native broker ran. Separately named manually prepared private appearance candidate retains source/game/controller/input/storage/notices; not installed/run and **not E1 generation**. Existing QA/data/proof/global/production remain untouched. Subsequent owner continuation completed [isolated native checks](capability-importer-appearance-native-acceptance.md): fresh separate Appearance Proof/profile, reviewed disabled appearance install/explicit enable, real built-in theme/Original/transparency changes without game mutation/new SDK calls, New Game/save/Original restart and disabled cold restart. Real WebKit exposed grid stretch; scoped inset-grid/box-sizing fix and one corrective private rebuild yield396×396. Final fixture disabled/app closed; five successful game calls, no gameplay keys (foreground false), provider send/new faults/production replacement. Direct native frame IDs, custom/narrow/all tile/overlay/focus/expanded notice checks and owner visual sign-off remain. Preserve earlier planning/static results as historical, not current candidate status.
+
+## Approved E1 implementation: one known recipe, not a universal converter
+
+Owner explicitly agreed to proceed after live visual review. [First green slice](capability-importer-static-app-recipe.md) now provides bounded pinned-source validation, deterministic 35-file candidate data, source/recipe/output lineage and full byte regeneration verification. 24 focused frontend +38 owned-adapter checks/tsc/notice gates pass; no fetch/native/UI/staging/install/runtime action in this slice. [Native source capture/persistence](capability-importer-static-app-capture.md) is now also implemented (schema32, shared transport/jobs, strict source/capture lineage and revalidation); offline native/frontend checks pass, no live fetch/profile/build action. [Generated-candidate persistence/shared review](capability-importer-static-app-staging.md) now add immutable schema33 staging, native fixed-byte/dynamic-provenance checks and the shared explicit escaped review panel. [Reviewed disabled-install handoff](capability-importer-static-app-install.md) now reuses the captured new-identity publisher, with native source/output/fingerprint/rights/grants binding and existing Manager ownership; live operations/native acceptance retain distinct approvals.
+
+**Supported source:** original gabrielecirulli/2048 at `478b6ec346e3787f589e4af751378d06ded4cbbc` only, plus exact already-audited font/notice pins and bytes. Unknown revisions, other repositories, missing/mutated files or terms, modules/build systems/backends/engines are blocked with actionable explanations. No approximate substitute/mock app.
+
+**Recipe:** deterministic versioned transforms using the owned storage/input/bootstrap adapter already checked in the private proof, plus E0's declared Orion appearance overlay/default. Preserve original engine/CSS/font/notice bytes for provenance/Original mode; adapt visible UI through the separate scoped layer, retain actual branding, disclose divergence and local-adapter identity. Do not ship synthetic QA controls or fabricated gameplay/test receipts. Source hashes/notices are identity evidence, not publisher authentication or rights/security clearance. Font provenance/visual limitations stay visible.
+
+### Three bounded green steps
+
+1. **Recipe and provenance contracts + deterministic generator.** Proposed versioned static-source/candidate records bind complete input path/size/hash inventory, pinned revisions/notices, recipe and adapter hashes, output inventory and measured/unknown coverage. These contracts/generator are now implemented in `src/features/staticApps/`; native persistence/publication is not. Keep analysis plans advisory/optional; no AI call required. Port the owned generator/adapter to the locked stack without a Python runtime/new dependency; verify golden output, unchanged engine bytes, malformed/unsupported inputs, escaping and source tampering. Owned adapter unit tests may execute owned code; preparation tests never evaluate upstream JavaScript.
+2. **Native captured-source acquisition/staging.** Explicit fetch of the recipe's enumerated files using existing bounded public GitHub transport/job policy. Include required font/notice sources in the disclosed capture, no hidden follow-up requests/README links. No clone/hooks/scripts/npm/compiler/submodules/authenticated URL or source evaluation. Cancelled/stale/failed capture cannot publish a candidate or replace installed code. Persist immutable source and generated bytes privately with bounded retention/ordered publication and optional plan reference. Append migrations if required; do not repurpose skill tables or make repository documents installable skills.
+3. **Explicit preparation review and existing install handoff.** Incubator and shared Settings show supported recipe/revision, complete source/notice inventory, exact adapter changes, permissions and honest coverage. Fetch→prepare→review→install disabled→Manager enable remain separate actions. Candidate identity is host-generated and distinct from upstream; source/recipe/output links survive restart. Reuse native captured-byte package validation and the existing new-identity disabled installer; no legacy fallback, auto-enable or competing lifecycle registry. Manager exclusively owns later update/rollback/removal.
+
+Persisted lineage is **candidate metadata**, not a second installed registry or grant authority. Installation approval binds the exact generated output fingerprint/current-new identity and rights/permissions, not a model assessment, historical plan or source URL alone. Source/candidate failure, uncertain installation and disabled/missing Incubator must retain retry/evidence without automatic privileged resumption. Installed capability status is derived from the existing manager.
+
+## Non-goals and approvals
+
+- No generic React/Node/Python converter, network/process/AI grant, localStorage compatibility promise, editor/core self-modification, weight/runtime/dependency installation or automatic Ripper execution.
+- No provider upload/AI adapter generation, private GitHub access, upstream parity/security/legal certification, UI-polish pass or release/production replacement.
+- No automatic commits/reset/stash/broad suites; preserve dirty work. Follow existing theme/chrome conventions if UI is approved; existing stacks/dependencies only.
+- Native command additions require an updated **isolated** proof binary for later acceptance; focused tests first, one justified private rebuild at the acceptance gate, not repeated builds during planning.
+- Approval of E1 would permit this bounded implementation, not installation/activation/source upload; live use retains native reviews and normal approvals.
+
+## Acceptance before calling E1 shipped
+
+- Supported pinned source yields a source/recipe/output-bound SDK candidate; unsupported source yields no installable placeholder.
+- No upstream execution, dependency setup or AI request during fetch/preparation; exact trusted adapter transforms and source/notice inventory inspectable.
+- Tampered paths/bytes, missing notices, oversized/partial captures and stale/cancelled callbacks fail closed; prior installs unchanged.
+- Source, candidate, divergence/rights/unknown coverage survive real restart without becoming authority.
+- Exact generated candidate installs disabled through existing capture review; explicit Manager enable runs the real game in the isolated app. Functional/persistence/denial and lifecycle checks distinguish prior manual fixture evidence from new in-product flow acceptance.
+- No data rewind/secure erasure implied by code rollback/removal, no silent synthetic-state seed or widening SDK RPC/close-journal guarantees.
+
+Current QA0.1.1/current and0.1.0/prior remain disabled, synthetic score4/best4/fresh-live data retained; original game code removed/data0/best8 retained; modes restored, proof/watchers closed. **The original proposal performed no execution/fetch/install/provider/fault work. Subsequent approval implemented the pure recipe and offline-tested native source capture/persistence slices; candidate persistence/shared UI implementation now passes focused offline checks; reviewed disabled-install handoff now also passes focused checks; isolated live acceptance remains. Owner-controlled Appearance Proof remains separately live and uninspected here.**

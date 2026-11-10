@@ -284,7 +284,7 @@ export const BUILTIN_DESIGN_SYSTEMS: DesignSystem[] = [
     builtin: true,
     aesthetic: "high-contrast / technical — neon on near-black, confident and engineered",
     description:
-      "Orion Terminal's native language: deep space backgrounds, a single neon accent per surface, sharp mono labels, generous negative space.",
+      "Orion Studio's native language: deep space backgrounds, a single neon accent per surface, sharp mono labels, generous negative space.",
     colors: [
       { name: "bg", value: "#03060a", role: "Deepest background" },
       { name: "surface", value: "#060a0f", role: "Card / section" },

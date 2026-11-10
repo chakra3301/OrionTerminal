@@ -1,0 +1,130 @@
+html[data-orion-style="orion"] {
+  --orion-background: #03060a; --orion-panel: #060a0f; --orion-raised: #0a1015;
+  --orion-text: #e6f4ec; --orion-secondary: #9ab0a8; --orion-muted: #5a706a;
+  --orion-line: #e6f4ec22; --orion-hover: #e6f4ec10; --orion-accent: #e6ff3a;
+  --orion-onAccent: #03060a; --orion-error: #ff3ea5;
+  --orion-radius-small: 5.1px; --orion-radius-medium: 8.5px; --orion-radius-large: 13.6px;
+  background: var(--orion-background); color: var(--orion-text);
+}
+html[data-orion-style="orion"]::-webkit-scrollbar,
+html[data-orion-style="orion"] ::-webkit-scrollbar { width: 10px; height: 10px; }
+html[data-orion-style="orion"]::-webkit-scrollbar-track,
+html[data-orion-style="orion"] ::-webkit-scrollbar-track { background: var(--orion-background); }
+html[data-orion-style="orion"]::-webkit-scrollbar-thumb,
+html[data-orion-style="orion"] ::-webkit-scrollbar-thumb {
+  background: var(--orion-muted); background-clip: padding-box; border: 3px solid transparent; border-radius: 999px;
+}
+html[data-orion-style="orion"]::-webkit-scrollbar-corner,
+html[data-orion-style="orion"] ::-webkit-scrollbar-corner { background: var(--orion-background); }
+html[data-orion-style="orion"] body {
+  background: var(--orion-background); color: var(--orion-text);
+  font-family: "Orion Space Grotesk", system-ui, sans-serif; color-scheme: inherit;
+}
+[data-orion-style="orion"] [data-orion-ui="panel"] {
+  background: var(--orion-panel); border: 1px solid var(--orion-line); border-radius: var(--orion-radius-large);
+}
+[data-orion-style="orion"] [data-orion-ui="toolbar"] { display: flex; align-items: center; gap: 8px; padding: 12px 16px; }
+[data-orion-style="orion"] [data-orion-ui="muted"] { color: var(--orion-secondary); font-size: 12px; }
+[data-orion-style="orion"] [data-orion-ui="title"] { font-size: 20px; font-weight: 500; letter-spacing: -.035em; }
+[data-orion-style="orion"] [data-orion-ui="input"] {
+  background: var(--orion-hover); color: var(--orion-text); border: 1px solid var(--orion-line);
+  border-radius: var(--orion-radius-small); padding: 8px 12px; font: inherit; box-sizing: border-box;
+}
+[data-orion-style="orion"] [data-orion-ui="button"] {
+  min-height: 34px; padding: 8px 13px; background: var(--orion-text); color: var(--orion-onAccent);
+  font: 500 12px/1.35 "Orion Space Grotesk", system-ui, sans-serif;
+  border: 1px solid transparent; border-radius: var(--orion-radius-small); cursor: pointer; box-sizing: border-box;
+}
+[data-orion-style="orion"] [data-orion-ui="button"]:disabled { opacity: .45; cursor: default; }
+[data-orion-style="orion"] [data-orion-ui="button"]:hover:not(:disabled) { filter: brightness(.92); }
+[data-orion-style="orion"] [data-orion-ui]:focus-visible { outline: 2px solid var(--orion-text); outline-offset: 3px; }
+
+/* A recipe owns this mapping; unrelated documents and canvases are never selected. */
+html[data-orion-style="orion"][data-orion-skin="2048"] body { margin: 0; padding: 20px 16px; font-size: 13px; box-sizing: border-box; }
+[data-orion-style="orion"][data-orion-skin="2048"] .container { width: min(100%, 480px); margin: 0 auto; }
+[data-orion-style="orion"][data-orion-skin="2048"] .heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+[data-orion-style="orion"][data-orion-skin="2048"] h1.title { float: none; margin: 0; font: 500 40px/1.15 "Orion Space Grotesk", sans-serif; letter-spacing: -.065em; color: var(--orion-text); }
+[data-orion-style="orion"][data-orion-skin="2048"] .scores-container { display: flex; gap: 6px; text-align: right; }
+[data-orion-style="orion"][data-orion-skin="2048"] :is(.score-container, .best-container) {
+  margin: 0; padding: 22px 14px 8px; min-width: 66px; height: auto;
+  border: 1px solid var(--orion-line); border-radius: var(--orion-radius-medium); box-sizing: border-box;
+  background: var(--orion-panel); color: var(--orion-text); font: 400 20px/1.2 "Orion JetBrains Mono", monospace;
+}
+[data-orion-style="orion"][data-orion-skin="2048"] :is(.score-container, .best-container)::after {
+  top: 7px; color: var(--orion-secondary); font: 500 10px/1 "Orion Space Grotesk", sans-serif; text-transform: none; letter-spacing: 0;
+}
+[data-orion-style="orion"][data-orion-skin="2048"] .score-addition { color: var(--orion-text); font-size: 15px; }
+[data-orion-style="orion"][data-orion-skin="2048"] .above-game { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+[data-orion-style="orion"][data-orion-skin="2048"] .game-intro { float: none; flex: 1; margin: 0; line-height: 1.5; color: var(--orion-secondary); }
+[data-orion-style="orion"][data-orion-skin="2048"] :is(.restart-button, .retry-button, .keep-playing-button, #save-retry) {
+  float: none; min-height: 34px; padding: 8px 13px; height: auto; line-height: 1.35;
+  border-radius: var(--orion-radius-small); border: 1px solid transparent; box-sizing: border-box;
+  background: var(--orion-text); color: var(--orion-onAccent); font: 500 12px/1.35 "Orion Space Grotesk", sans-serif;
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+}
+[data-orion-style="orion"][data-orion-skin="2048"] :is(.restart-button, .retry-button, .keep-playing-button, #save-retry):focus-visible {
+  outline: 2px solid var(--orion-text); outline-offset: 3px;
+}
+[data-orion-style="orion"][data-orion-skin="2048"] .adapter-status { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 30px; width: min(100%, 480px); margin: 0 auto 12px; }
+[data-orion-style="orion"][data-orion-skin="2048"] #save-status { margin: 0; color: var(--orion-secondary); font-size: 11px; line-height: 1.5; }
+[data-orion-style="orion"][data-orion-skin="2048"] #save-retry { min-height: 28px; padding: 5px 10px; }
+/* Storage warnings don't move a board that is accepting keyboard input. */
+[data-orion-style="orion"][data-orion-skin="2048"] #save-warning { position: absolute; top: 34px; inset-inline: 0; z-index: 30; margin: 0; padding: 10px 12px; border: 1px solid var(--orion-line); border-radius: var(--orion-radius-medium); background: var(--orion-panel); color: var(--orion-error); font-size: 11px; line-height: 1.5; }
+[data-orion-style="orion"][data-orion-skin="2048"] :is(.restart-button, .retry-button, .keep-playing-button, #save-retry):disabled { opacity: .45; cursor: default; }
+[data-orion-style="orion"][data-orion-skin="2048"] .adapter-notices { max-width: 480px; margin: 20px auto; color: var(--orion-secondary); font-size: 11px; line-height: 1.6; }
+[data-orion-style="orion"][data-orion-skin="2048"] .adapter-notices pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 10px/1.5 "Orion JetBrains Mono", monospace; }
+[data-orion-style="orion"][data-orion-skin="2048"] .container > p { font-size: 12px; line-height: 1.65; color: var(--orion-secondary); }
+[data-orion-style="orion"][data-orion-skin="2048"] .game-container {
+  --orion-board-gap: clamp(7px, 2.3vw, 12px); --orion-board-pad: clamp(9px, 2.6vw, 14px);
+  width: min(100%, max(180px, calc(100svh - 250px)));
+  height: auto; aspect-ratio: 1; padding: var(--orion-board-pad); margin: 16px auto 0;
+  border: 1px solid var(--orion-line); border-radius: var(--orion-radius-large);
+  background: var(--orion-panel); touch-action: none; position: relative; box-sizing: border-box;
+}
+[data-orion-style="orion"][data-orion-skin="2048"] .game-container:focus-visible { outline: 2px solid var(--orion-text); outline-offset: 3px; }
+[data-orion-style="orion"][data-orion-skin="2048"] :is(.heading, .above-game, .grid-row)::after { display: none; }
+[data-orion-style="orion"][data-orion-skin="2048"] .grid-container { position: absolute; inset: var(--orion-board-pad); width: auto; display: flex; flex-direction: column; gap: var(--orion-board-gap); height: auto; }
+[data-orion-style="orion"][data-orion-skin="2048"] .grid-row { display: flex; gap: var(--orion-board-gap); flex: 1; margin: 0; }
+[data-orion-style="orion"][data-orion-skin="2048"] .grid-cell { float: none; flex: 1; width: auto; height: auto; margin: 0; background: var(--orion-hover); border-radius: var(--orion-radius-small); }
+[data-orion-style="orion"][data-orion-skin="2048"] .tile-container { position: absolute; inset: var(--orion-board-pad); }
+[data-orion-style="orion"][data-orion-skin="2048"] .tile { width: calc((100% - 3 * var(--orion-board-gap)) / 4); height: calc((100% - 3 * var(--orion-board-gap)) / 4); }
+[data-orion-style="orion"][data-orion-skin="2048"] .tile .tile-inner {
+  display: grid; place-items: center; width: 100%; height: 100%; line-height: 1;
+  border-radius: var(--orion-radius-small); background: var(--orion-raised); color: var(--orion-text);
+  font: 500 clamp(18px, 5vw, 34px)/1 "Orion Space Grotesk", sans-serif; box-shadow: none;
+}
+[data-orion-style="orion"][data-orion-skin="2048"] .tile.tile-4 .tile-inner { background: color-mix(in srgb, #ede0c8 12%, var(--orion-raised)); }
+/* Keep 2048's warm value progression distinct from host warning/selection colors. */
+[data-orion-style="orion"][data-orion-skin="2048"] .tile.tile-8 .tile-inner { background: color-mix(in srgb, #f2b179 38%, var(--orion-raised)); }
+[data-orion-style="orion"][data-orion-skin="2048"] .tile.tile-16 .tile-inner { background: color-mix(in srgb, #f59563 46%, var(--orion-raised)); }
+[data-orion-style="orion"][data-orion-skin="2048"] .tile.tile-32 .tile-inner { background: color-mix(in srgb, #f67c5f 54%, var(--orion-raised)); }
+[data-orion-style="orion"][data-orion-skin="2048"] .tile.tile-64 .tile-inner { background: color-mix(in srgb, #f65e3b 62%, var(--orion-raised)); }
+[data-orion-style="orion"][data-orion-skin="2048"] :is(.tile-128, .tile-256, .tile-512) .tile-inner { background: color-mix(in srgb, #edcc61 38%, var(--orion-raised)); font-size: clamp(16px, 4.2vw, 27px); }
+[data-orion-style="orion"][data-orion-skin="2048"] :is(.tile-1024, .tile-2048) .tile-inner { background: #edc22e; color: #2e2714; font-size: clamp(13px, 3.6vw, 23px); }
+[data-orion-style="orion"][data-orion-skin="2048"] .tile.tile-super .tile-inner { background: #3c3a32; color: #f9f6f2; }
+[data-orion-style="orion"][data-orion-skin="2048"] .game-message { inset: 0; background: var(--orion-panel); border-radius: var(--orion-radius-large); }
+[data-orion-style="orion"][data-orion-skin="2048"] .game-message:is(.game-won, .game-over) { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+[data-orion-style="orion"][data-orion-skin="2048"] .game-message p { margin: 0; font-size: clamp(24px, 6vw, 40px); color: var(--orion-text); }
+[data-orion-style="orion"][data-orion-skin="2048"] .game-message .lower { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0; }
+[data-orion-style="orion"][data-orion-skin="2048"] :is(.game-explanation, .note, hr) { color: var(--orion-secondary); font-size: 12px; line-height: 1.65; border-color: var(--orion-line); }
+@supports (container-type: size) {
+  [data-orion-style="orion"][data-orion-skin="2048"] .tile { container-type: size; }
+  [data-orion-style="orion"][data-orion-skin="2048"] .tile .tile-inner { font-size: clamp(10px, 42cqi, 34px); text-align: center; }
+  [data-orion-style="orion"][data-orion-skin="2048"] :is(.tile-128, .tile-256, .tile-512) .tile-inner { font-size: clamp(9px, 34cqi, 27px); }
+  [data-orion-style="orion"][data-orion-skin="2048"] :is(.tile-1024, .tile-2048) .tile-inner { font-size: clamp(9px, 28cqi, 23px); }
+  [data-orion-style="orion"][data-orion-skin="2048"] .tile.tile-super .tile-inner { font: 400 clamp(6px, 20cqi, 11px)/1.2 "Orion JetBrains Mono", monospace; overflow-wrap: anywhere; }
+}
+@supports ((backdrop-filter: blur(6px)) or (-webkit-backdrop-filter: blur(6px))) {
+  [data-orion-style="orion"][data-orion-material="glass"][data-orion-transparency="normal"] [data-orion-ui="panel"],
+  [data-orion-style="orion"][data-orion-skin="2048"][data-orion-material="glass"][data-orion-transparency="normal"] :is(.scores-container > div, .game-container) {
+    background: linear-gradient(160deg, color-mix(in srgb, var(--orion-text) 4%, transparent), transparent 55%), var(--orion-panel);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+}
+@media (max-height: 440px) {
+  html[data-orion-style="orion"][data-orion-skin="2048"] body { padding: 12px; }
+  [data-orion-style="orion"][data-orion-skin="2048"] h1.title { font-size: 30px; }
+  [data-orion-style="orion"][data-orion-skin="2048"] .above-game { margin-top: 10px; }
+  [data-orion-style="orion"][data-orion-skin="2048"] .game-container { width: min(100%, max(144px, calc(100svh - 190px))); margin-top: 10px; }
+}
+[data-orion-style="orion"][data-orion-motion="reduce"] :is([data-orion-ui], .tile, .tile-inner, .score-addition, .game-message) { transition-duration: .001ms !important; animation-duration: .001ms !important; }

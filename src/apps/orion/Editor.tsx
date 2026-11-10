@@ -1,4 +1,7 @@
 import Monaco, { type OnMount } from "@monaco-editor/react";
+import { useEditorTheme, editorThemeName } from "./editorAppearance";
+import { useThemeStore } from "@/store/themeStore";
+import { defineEditorThemes } from "./monacoTheme";
 import { useEffect, useRef, useState } from "react";
 import { ipc } from "@/lib/ipc";
 import { useTabsStore } from "@/store/tabsStore";
@@ -32,7 +35,10 @@ function blameAge(ts: number): string {
   return `${Math.floor(s / 31_536_000)}y ago`;
 }
 
+const PROSE_LANGUAGES = new Set(["markdown", "plaintext"]);
+
 export function OrionEditor({ path }: { path: string }) {
+  const editorTheme = useEditorTheme();
   const buffer = useTabsStore((s) => s.fileBuffers[path]);
   const markLoaded = useTabsStore((s) => s.markLoaded);
   const updateBuffer = useTabsStore((s) => s.updateBuffer);
@@ -48,6 +54,14 @@ export function OrionEditor({ path }: { path: string }) {
   const pendingDecosRef = useRef<DecorationsCollection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mountTick, setMountTick] = useState(0);
+  // Prose wraps so long lines reflow when panes resize instead of running
+  // under the neighbouring rail; code stays unwrapped. ⌥Z flips it.
+  const proseByDefault = PROSE_LANGUAGES.has(languageForPath(path));
+  const [wrapOverride, setWrapOverride] = useState<boolean | null>(null);
+  const proseRef = useRef(proseByDefault);
+  proseRef.current = proseByDefault;
+  useEffect(() => setWrapOverride(null), [path]);
+  const wrapped = wrapOverride ?? proseByDefault;
   const [enclosingSymbol, setEnclosingSymbol] = useState<string | null>(null);
   const symbolTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -358,7 +372,7 @@ export function OrionEditor({ path }: { path: string }) {
   const onMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    monaco.editor.setTheme("orion-neon");
+    monaco.editor.setTheme(editorThemeName(useThemeStore.getState().theme));
 
     editor.onDidChangeCursorPosition(() => {
       reportStatus();
@@ -385,6 +399,10 @@ export function OrionEditor({ path }: { path: string }) {
       const first = e.changes[0];
       if (first) recordEdit(path, first.range.startLineNumber);
       scheduleGitDecorations();
+    });
+
+    editor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyZ, () => {
+      setWrapOverride((w) => !(w ?? proseRef.current));
     });
 
     // ⌘F12 — project-wide definition jump (F12 stays Monaco's own,
@@ -573,7 +591,8 @@ export function OrionEditor({ path }: { path: string }) {
         language={languageForPath(path)}
         value={buffer?.contents ?? ""}
         path={path}
-        theme="orion-neon"
+        theme={editorTheme}
+        beforeMount={defineEditorThemes}
         onMount={onMount}
         onChange={(v) => {
           if (typeof v === "string") updateBuffer(path, v);
@@ -591,7 +610,7 @@ export function OrionEditor({ path }: { path: string }) {
           scrollBeyondLastLine: false,
           renderWhitespace: "selection",
           renderLineHighlight: "all",
-          wordWrap: "off",
+          wordWrap: wrapped ? "on" : "off",
           automaticLayout: true,
           tabSize: 2,
           detectIndentation: true,

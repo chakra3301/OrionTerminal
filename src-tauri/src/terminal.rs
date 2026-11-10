@@ -194,8 +194,8 @@ pub fn terminal_open(
 
 /// Spawn an interactive Claude Code session directly inside a pty. Same as
 /// running `claude` in a shell, but bypasses the shell so the session is a
-/// dedicated surface with no extra prompt state. Model pinned to Opus 4.7 to
-/// match the chat-rail path. Also registers Orion's in-process MCP server
+/// dedicated surface with no extra prompt state. Uses Claude Code's own
+/// default model (change it with `/model`). Also registers Orion's in-process MCP server
 /// (same binary, --mcp-serve mode) so the agent has Orion-aware tools
 /// alongside its built-in Read/Edit/Bash toolset.
 #[tauri::command]
@@ -210,10 +210,10 @@ pub fn terminal_open_claude(
 }
 
 /// Spawn an interactive coding-agent CLI directly inside a pty. Generalises
-/// the Claude Code surface to any installed agent harness — `claude`, `hermes`,
-/// or `pi` — each launched in its own native interactive mode. Claude also gets
-/// Orion's in-process MCP server (same binary, --mcp-serve) and an Opus pin to
-/// match the chat-rail path.
+/// the Claude Code surface to any installed agent harness — `claude`, `codex`,
+/// `hermes` or `pi` — each launched in its own native interactive mode with its
+/// own login and default model (switch inside the TUI, e.g. `/model`). Claude
+/// also gets Orion's in-process MCP server (same binary, --mcp-serve).
 #[tauri::command]
 pub fn terminal_open_agent(
     app: AppHandle,
@@ -223,24 +223,37 @@ pub fn terminal_open_agent(
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
-    let mut builder = match agent.as_str() {
-        "hermes" => {
-            let mut b = CommandBuilder::new("hermes");
-            b.arg("chat");
-            b
-        }
-        "pi" => CommandBuilder::new("pi"),
+    let name = match agent.as_str() {
+        "hermes" | "pi" | "codex" => agent.as_str(),
         // Default to claude for the legacy "claude" agent and any unknown id.
+        _ => "claude",
+    };
+    let program = crate::agent_cli::program(name);
+    if !program.starts_with('/') {
+        return Err(format!("{name} isn't installed. Install it with `{}`", crate::agent_cli::install_hint(name)));
+    }
+    let mut builder = CommandBuilder::new(&program);
+    match name {
+        "hermes" => {
+            builder.args(["chat", "--in", &cwd]);
+            if let Some((k, v)) = crate::agent_cli::hermes_env(&app) {
+                builder.env(k, v);
+            }
+        }
+        "codex" => {
+            builder.args(["-C", &cwd]);
+        }
+        "pi" => {}
         _ => {
-            let mut b = CommandBuilder::new("claude");
-            b.args(["--model", crate::claude_cli::OPUS_MODEL]);
+            let b = &mut builder;
             if let Some(mcp_config_path) = crate::mcp_config::write(&app) {
                 b.args(["--mcp-config", &mcp_config_path]);
             }
-            b
         }
-    };
+    }
     standard_env(&mut builder, &cwd);
+    builder.env("PATH", crate::agent_cli::agent_path());
+    builder.env("COLORTERM", "truecolor");
     // Identify ourselves so claude doesn't try to auto-install its VS Code
     // extension (which fails with ERR_STREAM_PREMATURE_CLOSE when `code` is
     // not on PATH). Setting TERM_PROGRAM to a non-IDE value makes claude skip

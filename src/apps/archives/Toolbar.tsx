@@ -37,6 +37,7 @@ const VIEW_LABEL: Record<ArchivesView, string> = {
   notes: "Notes",
   mood: "Mood boards",
   media: "Media library",
+  downloads: "Downloads",
   favorites: "Favorites",
   chats: "Past chats",
   database: "Database",

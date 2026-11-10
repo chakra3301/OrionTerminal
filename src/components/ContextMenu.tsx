@@ -114,7 +114,10 @@ function ContextMenuView({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
-    const onScroll = () => onClose();
+    const onScroll = (event: Event) => {
+      if (event.target instanceof Node && ref.current?.contains(event.target)) return;
+      onClose();
+    };
     window.addEventListener("mousedown", onDown, true);
     window.addEventListener("keydown", onKey);
     window.addEventListener("blur", onClose);

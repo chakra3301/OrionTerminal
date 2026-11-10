@@ -1,0 +1,481 @@
+/*
+ * Archives 47 standalone window, styled like EMP: flat panes, near-square
+ * corners, a sidebar with the wordmark, uppercase tracked labels, a slim status
+ * bar and one highlight colour. Colours come from appearance.ts (`--a47-*` and
+ * the remapped Orion tokens); when frosted, panes are translucent over the
+ * macOS window blur. Sizes follow EMP's design/tokens.json.
+ *
+ * Selectors start with `body:has(> #root)` (ID weight) so they beat Orion's
+ * theme rules (`:root[data-color-mode] body :is(...)`) without !important.
+ */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+/* <body> carries Orion's `bg-bg` utility (an opaque fill that also becomes the
+   canvas colour); it must lose here or the native window never shows through. */
+body:has(> #root),
+body.bg-bg:has(> #root) {
+  background: transparent;
+}
+html[data-a47-frosted="off"] body:has(> #root) {
+  background: var(--bg-0);
+}
+
+.a47-window {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 22px;
+  height: 100%;
+  color: var(--t-primary);
+  font-family: var(--f-display);
+  -webkit-font-smoothing: antialiased;
+}
+.a47-body {
+  min-height: 0;
+  display: flex;
+}
+
+/* ── Panes ─────────────────────────────────────────────────────────────── */
+body:has(> #root) .a47-window :is(.ar-shell, .ar-view-host, .ar-today, .ar-notes, .note-page, .ot-window-body) {
+  background: transparent;
+}
+body:has(> #root) .a47-window .ar-main {
+  background: var(--a47-surface);
+}
+/* Views that paint their own full-size fill; the pane under them already has the glass. */
+body:has(> #root) .a47-window .ar-brain {
+  background-color: transparent;
+}
+body:has(> #root) .a47-window .ar-sidebar {
+  background: var(--a47-sidebar);
+  border-right: 0;
+  padding: 0 8px 8px;
+  gap: 1px;
+}
+body:has(> #root) .a47-window :is(.ar-claude-pane, .ot-claude-rail) {
+  background: var(--a47-sidebar);
+}
+body:has(> #root) .a47-window .ot-resize-handle.vertical {
+  background: var(--a47-line);
+  width: 1px;
+}
+/* Cards and editors sit one step up, flat (no card-in-card glow). */
+body:has(> #root) .a47-window :is(.ar-card, .ar-note-card, .ar-db-card, .note-editor-body) {
+  background: var(--a47-raised);
+  border: 1px solid var(--a47-rim);
+  border-radius: var(--r-lg);
+  box-shadow: var(--a47-sheen);
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+.a47-brand {
+  display: flex;
+  align-items: flex-end;
+  height: 52px;
+  padding: 0 10px 10px 82px; /* clears the traffic lights */
+  flex-shrink: 0;
+}
+.a47-brand__mark {
+  display: block;
+  height: 15px;
+  aspect-ratio: 8932 / 999;
+  background: var(--a47-accent);
+  mask-size: 100% 100%;
+  -webkit-mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+}
+body:has(> #root) .a47-window .ar-sidebar .ar-search {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--a47-line);
+  border-radius: 0;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+body:has(> #root) .a47-window .ar-sidebar :is(.ar-section, .ar-section-row > span) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 4px 6px 10px;
+  color: var(--a47-accent);
+  font-family: var(--f-display);
+  font-size: 10.24px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+body:has(> #root) .a47-window .ar-sidebar .ar-section.ar-section-row {
+  padding: 0 4px 0 0;
+}
+/* EMP's dither square before each section label. */
+body:has(> #root) .a47-window .ar-sidebar :is(.ar-section:not(.ar-section-row), .ar-section-row > span)::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  background: repeating-conic-gradient(currentColor 0% 25%, transparent 0% 50%) 0 0 / 2px 2px;
+}
+body:has(> #root) .a47-window .ar-nav {
+  height: 29px;
+  padding: 0 8px 0 10px;
+  gap: 10px;
+  border-radius: var(--r-sm);
+  color: var(--t-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: none;
+  background: transparent;
+}
+body:has(> #root) .a47-window .ar-nav:hover {
+  background: var(--a47-hover);
+}
+body:has(> #root) .a47-window .ar-nav.active {
+  background: var(--a47-selected);
+  color: var(--t-primary);
+  box-shadow: none;
+}
+body:has(> #root) .a47-window .ar-nav.active svg {
+  color: var(--a47-accent);
+}
+body:has(> #root) .a47-window .ar-nav .badge {
+  font-family: var(--f-display);
+  font-size: 11px;
+  color: var(--t-faint);
+}
+body:has(> #root) .a47-window .ar-sidebar .ar-sidebar-settings {
+  margin-top: auto;
+  flex-shrink: 0;
+  border-top: 1px solid var(--a47-line);
+  border-radius: 0;
+  padding-top: 8px;
+  height: 37px;
+}
+
+/* ── Top bar: EMP's tab-strip height, uppercase tracked crumb ──────────── */
+body:has(> #root) .a47-window .ar-toolbar {
+  height: 34px;
+  padding: 0 10px 0 12px;
+  background: transparent;
+  border-bottom: 1px solid var(--a47-line);
+}
+body:has(> #root) .a47-window .ar-toolbar .crumb {
+  font-family: var(--f-display);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  color: var(--t-tertiary);
+}
+body:has(> #root) .a47-window .ar-toolbar .crumb .here {
+  color: var(--t-primary);
+}
+body:has(> #root) .a47-window .ar-toolbar .icon-btn {
+  border-radius: var(--r-md);
+  color: var(--t-tertiary);
+}
+body:has(> #root) .a47-window .ar-toolbar .icon-btn:hover {
+  background: var(--a47-hover);
+  color: var(--t-primary);
+}
+body:has(> #root) .a47-window .ot-claude-header {
+  border-bottom: 1px solid var(--a47-line);
+  background: transparent;
+}
+
+/* ── Status bar ────────────────────────────────────────────────────────── */
+.a47-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 12px;
+  border-top: 1px solid var(--a47-line);
+  background: var(--a47-sidebar);
+  color: var(--t-tertiary);
+  font-size: 11px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.a47-statusbar__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.a47-statusbar__item:empty {
+  display: none;
+}
+.a47-statusbar__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--a47-accent);
+}
+.a47-statusbar__spacer {
+  flex: 1;
+}
+.a47-statusbar__version {
+  color: var(--a47-accent);
+}
+
+/* ── Overlays: Settings, ⌘K and prompts are opaque cards on a light scrim ─ */
+body:has(> #root) :is(.cp-overlay, .ot-spotlight-overlay, .ot-prompt-overlay) {
+  background: rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+body:has(> #root) :is(.cp-surface, .ot-spotlight, .ot-prompt-card) {
+  background: var(--bg-1);
+  border: 1px solid var(--a47-line-strong);
+  border-radius: var(--r-lg);
+  box-shadow: 0 2px 4px -2px rgba(0, 0, 0, 0.07), 0 8px 12px -6px rgba(0, 0, 0, 0.06), 0 20px 28px -14px rgba(0, 0, 0, 0.12);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body:has(> #root) .cp-surface .cp-rail {
+  background: var(--bg-0);
+}
+body:has(> #root) .cp-surface .cp-rail-item.active {
+  background: var(--a47-selected);
+  box-shadow: none;
+}
+body:has(> #root) .cp-surface .cp-rail-item.active svg {
+  color: var(--a47-accent);
+}
+/* Orion's violet/cyan control accents become the highlight inside Settings. */
+.a47-settings,
+.a47-settings * {
+  --neon-cyan: var(--a47-accent);
+  --neon-violet: var(--a47-accent);
+  --acc-rgb: var(--neon-green-rgb);
+}
+
+/* ── Settings extras ───────────────────────────────────────────────────── */
+.a47-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.a47-settings-actions .ot-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.a47-setting {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--a47-line);
+}
+.a47-setting__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.a47-setting__title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t-primary);
+}
+.a47-setting__sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--t-tertiary);
+}
+
+/* EMP's colour wheel. */
+.a47-wheel {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-top: 12px;
+}
+.a47-wheel__disc {
+  position: relative;
+  flex: none;
+  width: 168px;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--a47-line), 0 1px 2px rgba(0, 0, 0, 0.05);
+  cursor: crosshair;
+  touch-action: none;
+}
+.a47-wheel__disc:focus-visible {
+  outline: 1px solid var(--a47-accent);
+  outline-offset: 4px;
+}
+.a47-wheel__dim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.a47-wheel__marker {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 2px 4px -2px rgba(0, 0, 0, 0.2), 0 8px 12px -6px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(31, 35, 40, 0.12);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+.a47-wheel__side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 200px;
+}
+.a47-wheel__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.a47-wheel__caption {
+  color: var(--t-faint);
+  font-size: 10.24px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.a47-wheel__brightness {
+  width: 100%;
+  height: 8px;
+  margin: 0;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--a47-line);
+  appearance: none;
+  cursor: pointer;
+}
+.a47-wheel__brightness::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--a47-line-strong);
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  appearance: none;
+}
+.a47-wheel__hex {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.a47-wheel__swatch {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-md);
+  box-shadow: inset 0 0 0 1px var(--a47-line-strong);
+}
+.a47-wheel__input {
+  width: 100%;
+  font-family: var(--f-mono);
+}
+
+/* ── Buttons: primary actions are filled with the highlight colour ─────
+ * Orion paints these white (ink) or as Liquid glass; here they follow the
+ * colour picker, with --t-on-accent picking dark or white text. */
+body:has(> #root) :is(
+  .or-home-btn-primary, .ar-new-btn, .rl-btn--primary, .hm-btn.primary,
+  .ot-prompt-btn.primary, .cc-send:not(.stop), .ar-brain-detail-actions button.ask,
+  .cp-surface .cp-btn:not(.ghost), .cp-surface .ot-settings-btn.primary, .cp-surface .pm-install,
+  .skill-intake .cp-btn:not(.ghost), .ot-claude-input button.send:not([aria-label="Stop response"])
+) {
+  background: var(--a47-accent);
+  color: var(--t-on-accent);
+  border: 1px solid transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body:has(> #root) :is(
+  .or-home-btn-primary, .ar-new-btn, .rl-btn--primary, .hm-btn.primary,
+  .ot-prompt-btn.primary, .cc-send:not(.stop), .ar-brain-detail-actions button.ask,
+  .cp-surface .cp-btn:not(.ghost), .cp-surface .ot-settings-btn.primary, .cp-surface .pm-install,
+  .skill-intake .cp-btn:not(.ghost), .ot-claude-input button.send:not([aria-label="Stop response"])
+):hover:not(:disabled) {
+  background: var(--a47-accent);
+  color: var(--t-on-accent);
+  filter: brightness(1.08);
+}
+
+/* Glass tint slider in Settings → Appearance. */
+.a47-tint {
+  display: grid;
+  grid-template-columns: auto 1fr 40px;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+.a47-tint__range {
+  height: 8px;
+  margin: 0;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--a47-line-strong);
+  appearance: none;
+  cursor: pointer;
+}
+.a47-tint__range::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--a47-line-strong);
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  appearance: none;
+}
+.a47-tint__value {
+  color: var(--t-tertiary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Style switch in Settings → Appearance. */
+.a47-segmented {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--a47-line-strong);
+  border-radius: var(--r-md);
+}
+.a47-segmented button {
+  min-width: 64px;
+  height: 24px;
+  border: 0;
+  border-radius: calc(var(--r-md) - 2px);
+  background: transparent;
+  color: var(--t-secondary);
+  font: 500 12px var(--f-display);
+  cursor: pointer;
+}
+.a47-segmented button.on {
+  background: var(--a47-selected);
+  color: var(--t-primary);
+  box-shadow: inset 0 0 0 1px rgba(var(--neon-green-rgb), 0.3);
+}
+
+/* Note links follow the highlight colour (BlockNote paints them system blue). */
+body:has(> #root) .a47-window .bn-inline-content a {
+  color: var(--a47-accent);
+  text-decoration-color: rgba(var(--neon-green-rgb), 0.45);
+  text-underline-offset: 2px;
+}
+/* The title is a one-line input: shrink long titles rather than clipping them. */
+body:has(> #root) .a47-window .note-editor-title {
+  font-size: clamp(20px, 2vw, 28px);
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html,
+  body {
+    background: var(--bg-0);
+  }
+}

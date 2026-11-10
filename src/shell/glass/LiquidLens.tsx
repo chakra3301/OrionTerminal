@@ -46,9 +46,9 @@ const FRAG = /* glsl */ `
   uniform vec4  uRects[${MAX_RECTS}]; // cx, cy, halfW, halfH (top-left px)
 
   // accents (liquid theme): violet / cyan / green
-  const vec3 VIOLET = vec3(0.753, 0.482, 1.0);
-  const vec3 CYAN   = vec3(0.373, 0.910, 1.0);
-  const vec3 GREEN  = vec3(0.302, 1.0, 0.627);
+  const vec3 VIOLET = vec3(0.698, 0.643, 0.933);
+  const vec3 CYAN   = vec3(0.612, 0.796, 0.902);
+  const vec3 GREEN  = vec3(0.486, 0.812, 0.651);
 
   float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -65,9 +65,9 @@ const FRAG = /* glsl */ `
     vec3 col = mix(vec3(0.010, 0.020, 0.034), vec3(0.020, 0.045, 0.075),
                    smoothstep(0.0, 1.0, uv.y));
     // soft, premium accent glows
-    col += VIOLET * 0.13 * glow(uv, vec2(0.5, 1.08), vec2(0.60, 0.40));
-    col += CYAN   * 0.07 * glow(uv, vec2(0.16, 0.96), vec2(0.42, 0.32));
-    col += GREEN  * 0.05 * glow(uv, vec2(0.85, 0.04), vec2(0.48, 0.34));
+    col += VIOLET * 0.06 * glow(uv, vec2(0.5, 1.08), vec2(0.60, 0.40));
+    col += CYAN   * 0.04 * glow(uv, vec2(0.16, 0.96), vec2(0.42, 0.32));
+    col += GREEN  * 0.02 * glow(uv, vec2(0.85, 0.04), vec2(0.48, 0.34));
     // subtle, sparse stars
     vec2 cell = floor(px / 3.5);
     float s = hash(cell);

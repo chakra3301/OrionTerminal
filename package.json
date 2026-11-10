@@ -26,32 +26,46 @@
     "audit:native": "cd src-tauri && cargo audit",
     "audit:native:target": "node scripts/audit-native.mjs",
     "test:native-policy": "node scripts/mcp-policy-smoke.mjs",
-    "optimize:characters": "node scripts/optimize-characters.mjs"
+    "optimize:characters": "node scripts/optimize-characters.mjs",
+    "test:xdesign:fidelity": "node scripts/run-xdesign-fidelity.mjs",
+    "test:xdesign:photoshop": "node scripts/run-xdesign-photoshop.mjs",
+    "archives:web": "vite --config vite.archives.config.ts",
+    "archives:build-web": "tsc --noEmit -p tsconfig.archives.json && vite build --config vite.archives.config.ts",
+    "archives:dev": "ORION_APP_TARGET=archives tauri dev --features tauri/macos-private-api --config src-tauri/tauri.archives.conf.json --config src-tauri/tauri.archives.dev.conf.json",
+    "archives:build": "ORION_APP_TARGET=archives tauri build --features tauri/macos-private-api --config src-tauri/tauri.archives.conf.json",
+    "archives:app": "sh scripts/install-archives.sh"
   },
   "dependencies": {
     "@blocknote/mantine": "^0.39.1",
     "@blocknote/react": "^0.39.1",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/space-grotesk": "^5.2.10",
+    "@huggingface/transformers": "4.2.0",
     "@monaco-editor/react": "^4.7.0",
+    "@open-pencil/core": "0.15.1",
+    "@open-pencil/scene-graph": "0.15.1",
+    "@open-pencil/vue": "0.15.1",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-sql": "^2",
-    "@huggingface/transformers": "4.2.0",
+    "@valibot/to-json-schema": "1.8.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-web-links": "^0.12.0",
     "@xterm/addon-webgl": "^0.19.0",
     "@xterm/xterm": "^6.0.0",
+    "acorn": "8.18.0",
+    "border-beam": "1.3.0",
     "cmdk": "^1.1.1",
     "fuse.js": "^7.3.0",
     "highlight.js": "^11.11.1",
+    "jszip": "3.10.1",
     "lucide-react": "^0.475.0",
+    "metal-fx": "2.0.10",
     "monaco-editor": "0.56.0",
     "polygon-clipping": "^0.15.7",
-    "jszip": "3.10.1",
     "react": "~19.2.5",
     "react-dom": "~19.2.5",
     "react-hotkeys-hook": "^4.6.1",
@@ -59,20 +73,43 @@
     "react-resizable-panels": "^2.1.7",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
+    "thinking-orbs": "0.3.1",
     "three": "^0.184.0",
     "ulid": "^2.3.0",
-    "zustand": "^5.0.3"
+    "valibot": "1.5.0",
+    "vue": "3.5.43",
+    "zustand": "^5.0.3",
+    "fflate": "0.8.3"
   },
   "overrides": {
-    "monaco-editor": { "dompurify": "3.4.15" },
-    "@blocknote/core": { "uuid": "11.1.1" },
-    "@connectrpc/connect-node": { "undici": "6.28.1" },
-    "@huggingface/transformers": { "sharp": "0.35.4" },
-    "onnxruntime-node": { "adm-zip": "0.6.1" }
+    "monaco-editor": {
+      "dompurify": "3.4.17"
+    },
+    "@blocknote/core": {
+      "uuid": "11.1.1"
+    },
+    "@connectrpc/connect-node": {
+      "undici": "6.29.1"
+    },
+    "@huggingface/transformers": {
+      "sharp": "0.35.5"
+    },
+    "onnxruntime-node": {
+      "adm-zip": "0.6.1"
+    },
+    "@open-pencil/core": {
+      "expr-eval": "npm:expr-eval-fork@3.0.3"
+    },
+    "pptxgenjs": {
+      "image-size": "2.0.4"
+    },
+    "source-map-js": "1.2.2"
   },
-  "engines": { "node": ">=22.13.0" },
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "devDependencies": {
-    "@cursor/sdk": "1.0.31",
+    "@cursor/sdk": "1.1.0",
     "@gltf-transform/core": "^4.3.0",
     "@gltf-transform/extensions": "^4.4.0",
     "@gltf-transform/functions": "^4.4.0",

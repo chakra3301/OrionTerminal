@@ -5,7 +5,10 @@
  */
 
 import { lazy, Suspense, useState } from "react";
-import { X, Check, Sparkles, LoaderCircle } from "lucide-react";
+import { useEditorTheme } from "@/apps/orion/editorAppearance";
+import { defineEditorThemes } from "@/apps/orion/monacoTheme";
+import { X, Check, Sparkles } from "lucide-react";
+import { OrionOrb } from "@/components/effects/OrionOrb";
 import { useFxStore } from "./fxStore";
 import { validateFxShader } from "./compositor";
 import { generateFxShader } from "./fxClaude";
@@ -23,6 +26,7 @@ export function FxShaderModal({
   initialCode: string;
   onClose: () => void;
 }) {
+  const editorTheme = useEditorTheme();
   const [code, setCode] = useState(initialCode);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
@@ -89,7 +93,7 @@ export function FxShaderModal({
             onClick={generate}
           >
             {generating ? (
-              <LoaderCircle size={13} className="xd-fx-spin" />
+              <OrionOrb size={20} state="working" accent="var(--neon-magenta)" />
             ) : (
               <Sparkles size={13} />
             )}
@@ -101,7 +105,8 @@ export function FxShaderModal({
             <Monaco
               height="100%"
               language="cpp"
-              theme="vs-dark"
+              theme={editorTheme}
+              beforeMount={defineEditorThemes}
               value={code}
               onChange={(v) => {
                 setCode(v ?? "");

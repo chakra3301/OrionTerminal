@@ -133,7 +133,7 @@ struct NotesView: View {
             .navigationTitle("Notes")
             .navigationDestination(for: Note.self) { NoteEditorScreen(note: $0, model: model) }
             .toolbar { ToolbarItem(placement: .topBarTrailing) {
-                Button { path.append(model.createNote(.note)) } label: { Image(systemName: "plus") }
+                Button { if let note = model.createNote(.note) { path.append(note) } } label: { Image(systemName: "plus") }
             } }
             .toolbarColorScheme(.dark, for: .navigationBar)
             .searchable(text: $query, prompt: "Search notes")
@@ -212,7 +212,7 @@ struct JournalView: View {
             .navigationTitle("Journal")
             .navigationDestination(for: Note.self) { NoteEditorScreen(note: $0, model: model) }
             .toolbar { ToolbarItem(placement: .topBarTrailing) {
-                Button { path.append(model.createNote(.journal)) } label: { Image(systemName: "plus") }
+                Button { if let note = model.createNote(.journal) { path.append(note) } } label: { Image(systemName: "plus") }
             } }
             .toolbarColorScheme(.dark, for: .navigationBar)
         }

@@ -10,7 +10,6 @@ import { useDesignSystems } from "@/store/designSystemStore";
 import { logActivity } from "@/lib/db";
 import { log } from "@/lib/log";
 import { markProjectDirty, unsavedXDesignReason } from "./saveState";
-import { useModelStore } from "./model3d/modelStore";
 import { useXDesign } from "@/apps/xdesign/store";
 import {
   flushActive,
@@ -39,7 +38,6 @@ export const XDESIGN_CONTRIBUTION_IDS = {
   applyAction: "xdesign_apply",
 } as const;
 
-let modelSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let designSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let fxSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let lastLoggedProjectId: string | null = null;
@@ -133,6 +131,7 @@ async function addRectAction(value: unknown, assertActive: () => void = () => {}
   const radius = optionalNumber(payload, "radius", 0);
   const fill = optionalColor(payload, "fill", "#00e0ff");
   await ensureDesignProject(assertActive);
+  if(useXDesign.getState().pencilDocument){const {runCanvasCommands}=await import("./claudeCommands");runCanvasCommands([{action:"addRect",x,y,w,h,fill,radius}]);return;}
   useXDesign.getState().addShape({
     kind: "rect",
     x,
@@ -155,6 +154,7 @@ async function addEllipseAction(value: unknown, assertActive: () => void = () =>
   const h = dimension(payload, "h");
   const fill = optionalColor(payload, "fill", "#00e0ff");
   await ensureDesignProject(assertActive);
+  if(useXDesign.getState().pencilDocument){const {runCanvasCommands}=await import("./claudeCommands");runCanvasCommands([{action:"addEllipse",x,y,w,h,fill}]);return;}
   useXDesign.getState().addShape({
     kind: "ellipse",
     x,
@@ -176,6 +176,7 @@ async function addFrameAction(value: unknown, assertActive: () => void = () => {
   const h = dimension(payload, "h");
   const fill = optionalColor(payload, "fill", "rgba(255,255,255,0.03)");
   await ensureDesignProject(assertActive);
+  if(useXDesign.getState().pencilDocument){const {runCanvasCommands}=await import("./claudeCommands");runCanvasCommands([{action:"addFrame",x,y,w,h,fill}]);return;}
   useXDesign.getState().addShape({
     kind: "frame",
     x,
@@ -204,6 +205,7 @@ async function addTextAction(value: unknown, assertActive: () => void = () => {}
   const y = finite(payload, "y");
   const fill = optionalColor(payload, "fill", "#e6f4ec");
   await ensureDesignProject(assertActive);
+  if(useXDesign.getState().pencilDocument){const {runCanvasCommands}=await import("./claudeCommands");runCanvasCommands([{action:"addText",x,y,text,fontSize,fill}]);return;}
   useXDesign.getState().addShape({
     kind: "text",
     x,
@@ -218,7 +220,8 @@ async function addTextAction(value: unknown, assertActive: () => void = () => {}
   });
 }
 
-function canvasSnapshot(): Record<string, unknown> {
+async function canvasSnapshot(): Promise<Record<string, unknown>> {
+  if(useXDesign.getState().pencilDocument){const {pencilCanvasSnapshot}=await import("./pencil/legacyCommands");return pencilCanvasSnapshot();}
   const state = useXDesign.getState();
   return {
     activePageId: state.activePageId,
@@ -232,7 +235,8 @@ function canvasSnapshot(): Record<string, unknown> {
   };
 }
 
-function selectionSnapshot(): Record<string, unknown> {
+async function selectionSnapshot(): Promise<Record<string, unknown>> {
+  if(useXDesign.getState().pencilDocument){const snapshot=await canvasSnapshot();const ids=new Set(snapshot.selection as string[]);return {...snapshot,shapes:(snapshot.shapes as {id:string}[]).filter(shape=>ids.has(shape.id))};}
   const state = useXDesign.getState();
   return {
     selection: Array.from(state.selection),
@@ -253,25 +257,21 @@ async function applyAction(value: unknown, assertActive: () => void = () => {}):
   if (useXDProjects.getState().transitioning || useXDProjects.getState().activeId !== projectId) {
     throw new Error("Project changed before canvas tool execution; retry the tool.");
   }
-  const outcome = runCanvasCommands(
-    ops as Parameters<typeof runCanvasCommands>[0],
-  );
+  const commands=ops as Parameters<typeof runCanvasCommands>[0];
+  const outcome=useXDesign.getState().pencilDocument?await (await import("./pencil/legacyCommands")).runPencilCommandsAsync(commands):runCanvasCommands(commands);
   return { applied: outcome.applied, results: outcome.results };
 }
 
 function clearPersistenceTimers(): void {
   if (designSaveTimer) clearTimeout(designSaveTimer);
   if (fxSaveTimer) clearTimeout(fxSaveTimer);
-  if (modelSaveTimer) clearTimeout(modelSaveTimer);
-  modelSaveTimer = null;
-  setXDesignActivity("model-save-pending", false, "");
   designSaveTimer = null;
   fxSaveTimer = null;
   setXDesignActivity("design-save-pending", false, "");
   setXDesignActivity("fx-save-pending", false, "");
 }
 
-function canSave(kind: "design" | "fx" | "model"): boolean {
+function canSave(kind: "design" | "fx"): boolean {
   const { activeId, registry, transitioning } = useXDProjects.getState();
   return !transitioning && !!activeId && projectKind(registry.find((project) => project.id === activeId)) === kind;
 }
@@ -327,20 +327,6 @@ function scheduleFxSave(): void {
   }, 400);
 }
 
-function scheduleModelSave(): void {
-  if (!canSave("model")) return;
-  const activeId = useXDProjects.getState().activeId!;
-  markProjectDirty(activeId);
-  if (modelSaveTimer) clearTimeout(modelSaveTimer);
-  setXDesignActivity("model-save-pending", true, "Wait for the 3D model to finish saving before disabling the plugin.");
-  modelSaveTimer = setTimeout(() => {
-    modelSaveTimer = null;
-    setXDesignActivity("model-save-pending", false, "");
-    if (useXDProjects.getState().activeId !== activeId || !canSave("model")) return;
-    void flushActive().catch(() => {});
-  }, 400);
-}
-
 function disposeXDesignRuntime(): void {
   clearPersistenceTimers();
   clearXDesignActivities();
@@ -384,14 +370,11 @@ export function registerXDesignContributions(
 ): void {
   subscriptions.add(disposeXDesignRuntime);
   subscriptions.add(useXDesign.subscribe((state, previous) => {
-    if (state.shapes !== previous.shapes || state.pages !== previous.pages || state.activePageId !== previous.activePageId || state.variables !== previous.variables || state.modes !== previous.modes || state.activeModeId !== previous.activeModeId) scheduleDesignSave();
+    if (state.pencilDocument !== previous.pencilDocument || state.photoDocuments !== previous.photoDocuments || state.photoDrafts !== previous.photoDrafts || state.photoSavePaths !== previous.photoSavePaths || state.photoResume !== previous.photoResume || state.shapes !== previous.shapes || state.pages !== previous.pages || state.activePageId !== previous.activePageId || state.variables !== previous.variables || state.modes !== previous.modes || state.activeModeId !== previous.activeModeId) scheduleDesignSave();
   }));
   subscriptions.add(useHtmlArtifact.subscribe((state, previous) => {
     if (state.projectId === previous.projectId &&
       (state.html !== previous.html || state.title !== previous.title || state.open !== previous.open)) scheduleDesignSave();
-  }));
-  subscriptions.add(useModelStore.subscribe((state, previous) => {
-    if (state.spec !== previous.spec || state.reference !== previous.reference) scheduleModelSave();
   }));
   subscriptions.add(
     useFxStore.subscribe((state, previous) => {

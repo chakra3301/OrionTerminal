@@ -17,6 +17,7 @@ import {
   type ProjectRow,
 } from "@/lib/db";
 import { openChatById } from "@/apps/archives/searchNav";
+import { archivesHost } from "@/apps/archives/host";
 import { useContextMenu } from "@/components/ContextMenu";
 import { promptText } from "@/components/PromptModal";
 import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
@@ -182,8 +183,9 @@ export function ArchivesChats() {
             <MessageSquare size={20} />
             <div className="title">No conversations yet</div>
             <div className="hint">
-              Start a thread in Orion's Code Companion or the Archive
-              Assistant. Replies land here.
+              {archivesHost().productName === "Orion Studio"
+                ? "Start a thread in Orion's Code Companion or the Archive Assistant. Replies land here."
+                : "Start a thread with the Archive Assistant. Replies land here."}
             </div>
           </div>
         ) : filtered.length === 0 ? (

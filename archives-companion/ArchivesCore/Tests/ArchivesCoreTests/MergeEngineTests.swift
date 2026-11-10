@@ -57,7 +57,7 @@ final class MergeEngineTests: XCTestCase {
         let macTag = Tag(id: "01AAA", name: "Idea")
         let phoneTag = Tag(id: "01BBB", name: "idea")  // different casing too
         let a = payload("mac", tags: [macTag])
-        let b = payload("phone", tags: [phoneTag],
+        let b = payload("phone", tags: [phoneTag], assets: [Asset(id: "asset1", kind: .image, createdAt: 1)],
                         assetTags: [AssetTag(assetID: "asset1", tagID: "01BBB")])
         let merged = MergeEngine.merge(a, b)
 

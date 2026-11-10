@@ -6,7 +6,7 @@ export async function loadCursorSdk(root = process.env.ORION_CURSOR_SDK_ROOT) {
   if (!root || !isAbsolute(root)) throw Error("Cursor SDK runtime is not configured. Install it in Control Panel → Providers.");
   const dir = realpathSync(join(root, "node_modules/@cursor/sdk"));
   const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
-  if (pkg.name !== "@cursor/sdk" || pkg.version !== "1.0.31") throw Error("Install the reviewed @cursor/sdk@1.0.31 runtime in Control Panel.");
+  if (pkg.name !== "@cursor/sdk" || pkg.version !== "1.1.0") throw Error("Install the reviewed @cursor/sdk@1.1.0 runtime in Control Panel.");
   const entry = pkg.exports?.["."]?.import;
   if (typeof entry !== "string") throw Error("Cursor SDK has no supported ESM entrypoint");
   const file = realpathSync(resolve(dir, entry));

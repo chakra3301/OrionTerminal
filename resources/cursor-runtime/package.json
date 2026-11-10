@@ -3,7 +3,15 @@
   "private": true,
   "version": "1.0.0",
   "description": "User-installed optional Cursor SDK runtime; SDK retains Cursor's terms",
-  "engines": { "node": ">=22.13.0" },
-  "dependencies": { "@cursor/sdk": "1.0.31" },
-  "overrides": { "@connectrpc/connect-node": { "undici": "6.28.1" } }
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "dependencies": {
+    "@cursor/sdk": "1.1.0"
+  },
+  "overrides": {
+    "@connectrpc/connect-node": {
+      "undici": "6.29.1"
+    }
+  }
 }

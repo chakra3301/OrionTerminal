@@ -1,13 +1,12 @@
 use keyring::Entry;
 
-const SERVICE: &str = "personal-workstation";
 
 fn account(key_ref: &str) -> String {
     format!("provider:{}", key_ref)
 }
 
 fn entry(key_ref: &str) -> Result<Entry, String> {
-    Entry::new(SERVICE, &account(key_ref))
+    Entry::new(&crate::app_profile::keychain_service(), &account(key_ref))
         .map_err(|e| format!("Secret storage unavailable ({})", e))
 }
 

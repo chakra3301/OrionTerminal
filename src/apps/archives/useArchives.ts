@@ -7,6 +7,7 @@ export type ArchivesView =
   | "notes"
   | "mood"
   | "media"
+  | "downloads"
   | "favorites"
   | "chats"
   | "database"

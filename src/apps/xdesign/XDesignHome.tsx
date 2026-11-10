@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import {
   Plus,
   MoreHorizontal,
@@ -10,7 +11,6 @@ import {
   Film,
   ImageIcon,
   Sparkles,
-  Box,
   type LucideIcon,
 } from "lucide-react";
 import { confirmAction } from "@/components/ConfirmModal";
@@ -19,6 +19,7 @@ import { log } from "@/lib/log";
 import {
   useXDProjects,
   loadDoc,
+  projectKind,
   type XDDoc,
   type XDProjectMeta,
 } from "./projectsStore";
@@ -26,6 +27,9 @@ import { useRailIntent, type RailIntentMode } from "./railIntentStore";
 import { ProjectThumb } from "./ProjectThumb";
 import { ProjectNameInput } from "./ProjectNameInput";
 import { useXDesignSaveState } from "./saveState";
+import { openProjectFile } from "./projectFiles";
+import { ProjectImportRecovery } from './ProjectImportRecovery';
+import { useProjectPreviews, type PreviewEntry } from "./projectPreview";
 
 // Project start types. "Blank canvas" is the default normal project; the rest
 // create a project then arm the matching AI flow in the Claude rail.
@@ -37,21 +41,22 @@ type StartType = {
   /** Tool flow to arm after creating the project (null = plain canvas). */
   intent: RailIntentMode | null;
   name: string;
-  /** Project kind — "fx" opens the shader compositor, "model" opens the img2model studio, instead of the canvas. */
-  kind?: "fx" | "model";
+  /** Project kind — "fx" opens the shader compositor instead of the canvas. */
+  kind?: "fx";
+  beta?: boolean;
 };
 
 const START_TYPES: StartType[] = [
   { id: "blank", label: "Blank canvas", desc: "Start from an empty board", Icon: LayoutGrid, intent: null, name: "Untitled" },
-  { id: "webpage", label: "Webpage", desc: "Experimental · webpage saved with project", Icon: Globe, intent: "webpage", name: "Webpage" },
+  { id: "webpage", label: "Webpage", desc: "A responsive page, saved with the project", beta: true, Icon: Globe, intent: "webpage", name: "Webpage" },
   { id: "deck", label: "Slide deck", desc: "Build a presentable deck", Icon: Presentation, intent: "deck", name: "Deck" },
-  { id: "motion", label: "Motion", desc: "Experimental · verify playback and export", Icon: Film, intent: "motion", name: "Motion" },
+  { id: "motion", label: "Motion", desc: "Animate frames and export video", beta: true, Icon: Film, intent: "motion", name: "Motion" },
   { id: "image", label: "Image generator", desc: "Generate a raster image", Icon: ImageIcon, intent: "image", name: "Image" },
-  { id: "fx", label: "FX scene", desc: "Basic FX tested · advanced output experimental", Icon: Sparkles, intent: null, name: "FX Scene", kind: "fx" },
-  { id: "model", label: "3D model", desc: "Experimental · reference image to procedural 3D", Icon: Box, intent: null, name: "3D Model", kind: "model" },
+  { id: "fx", label: "FX scene", desc: "Shader and particle scenes", beta: true, Icon: Sparkles, intent: null, name: "FX Scene", kind: "fx" },
 ];
 
 async function startProject(t: StartType): Promise<void> {
+  if(t.id==="blank"){const {newPencilProject}=await import("./pencil/runtime");await newPencilProject();return;}
   await useXDProjects
     .getState()
     .newProject(t.intent || t.kind ? t.name : undefined, t.kind ?? "design");
@@ -73,11 +78,14 @@ function relativeTime(ts: number): string {
 function ProjectCard({
   meta,
   doc,
+  preview,
 }: {
   meta: XDProjectMeta;
   doc: XDDoc | null;
+  preview: PreviewEntry | undefined;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [failedRevision, setFailedRevision] = useState<number | null>(null);
   const [renaming, setRenaming] = useState(false);
   const draft = useXDesignSaveState((s) => s.names[meta.id]);
 
@@ -105,10 +113,15 @@ function ProjectCard({
         onClick={open}
         onDoubleClick={open}
         title={`Open ${meta.name}`}
+        aria-label={`Open ${meta.name}`}
       >
-        <ProjectThumb doc={doc} />
+        {preview && failedRevision !== preview.revision ? (
+          <img className="xd-home-card-image" src={`${convertFileSrc(preview.path)}?v=${preview.revision}`} alt=""
+            draggable={false} decoding="async" onError={() => setFailedRevision(preview.revision)} />
+        ) : (
+          <ProjectThumb doc={doc} />
+        )}
         {meta.kind === "fx" && <span className="xd-fx-badge">FX</span>}
-        {meta.kind === "model" && <span className="xd-fx-badge xd-model-badge">3D</span>}
       </button>
       <div className="xd-home-card-meta">
         <div className="xd-home-card-info">
@@ -134,7 +147,8 @@ function ProjectCard({
             type="button"
             className="xd-home-card-menu-btn"
             onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Project options"
+            aria-label={`Options for ${meta.name}`}
+            aria-expanded={menuOpen}
           >
             <MoreHorizontal size={15} />
           </button>
@@ -173,6 +187,7 @@ function NewProjectMenu() {
       <button
         type="button"
         className="xd-home-new"
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
         <Plus size={16} /> New project
@@ -193,7 +208,7 @@ function NewProjectMenu() {
               >
                 <t.Icon size={16} />
                 <span className="xd-home-start-text">
-                  <span className="xd-home-start-label">{t.label}</span>
+                  <span className="xd-home-start-label">{t.label}{t.beta && <span className="xd-home-beta">Beta</span>}</span>
                   <span className="xd-home-start-desc">{t.desc}</span>
                 </span>
               </button>
@@ -210,24 +225,33 @@ export function XDesignHome() {
   const ready = useXDProjects((s) => s.ready);
   const loadError = useXDProjects((s) => s.loadError);
   const [docs, setDocs] = useState<Record<string, XDDoc | null>>({});
+  const previews = useProjectPreviews((s) => s.entries);
+  const previewsLoaded = useProjectPreviews((s) => s.loaded);
+  const previewed = Object.keys(previews).sort().join(" ");
 
-  // Lazy-load each project's doc for its thumbnail. Re-runs when the registry
-  // changes (new / deleted / renamed-bump) so previews stay fresh.
+  useEffect(() => { void useProjectPreviews.getState().load(); }, []);
+
+  // Full docs only feed the shape fallback, so they're read only for design
+  // projects that have no stored preview, once the stored ones are known.
   useEffect(() => {
+    if (!previewsLoaded) return;
+    const covered = new Set(previewed.split(" "));
     let cancelled = false;
     void Promise.all(
-      registry.map(async (m) => [m.id, await loadDoc(m.id)] as const),
+      registry
+        .filter((m) => projectKind(m) === "design" && !covered.has(m.id))
+        .map(async (m) => [m.id, await loadDoc(m.id)] as const),
     ).then((pairs) => {
       if (!cancelled) setDocs(Object.fromEntries(pairs));
     }).catch((error) => log.warn("XDesign thumbnail load failed", error));
     return () => {
       cancelled = true;
     };
-  }, [registry]);
+  }, [registry, previewsLoaded, previewed]);
 
   if (!ready) return <div className="xd-home">
-    <h1>XDesign</h1>
-    <p role={loadError ? "alert" : "status"}>{loadError ?? "Loading projects…"}</p>
+    <h1 className="xd-home-title">XDesign</h1>
+    <p className="xd-home-sub" role={loadError ? "alert" : "status"}>{loadError ?? "Loading projects…"}</p>
     {loadError && <button type="button" className="xd-home-new"
       onClick={() => { void useXDProjects.getState().init().catch(() => {}); }}>Retry loading projects</button>}
   </div>;
@@ -239,10 +263,12 @@ export function XDesignHome() {
       <header className="xd-home-header">
         <div>
           <h1 className="xd-home-title">XDesign</h1>
-          <p className="xd-home-sub">Your design projects, all in one place.</p>
+          <p className="xd-home-sub">Pick up a project or choose a starting point.</p>
         </div>
-        <NewProjectMenu />
+        <div style={{display:"flex",gap:8}}><button type="button" className="xd-home-new" onClick={()=>{void openProjectFile().catch(error=>toast.error("Project could not be opened",{body:String(error)}));}}>Open project…</button><NewProjectMenu /></div>
       </header>
+
+      <ProjectImportRecovery />
 
       <div className="xd-home-section">
         <h2 className="xd-home-section-title">Start something new</h2>
@@ -255,7 +281,7 @@ export function XDesignHome() {
               onClick={() => void startProject(t).catch(() => {})}
             >
               <t.Icon size={20} />
-              <span className="xd-home-start-label">{t.label}</span>
+              <span className="xd-home-start-label">{t.label}{t.beta && <span className="xd-home-beta">Beta</span>}</span>
               <span className="xd-home-start-desc">{t.desc}</span>
             </button>
           ))}
@@ -273,7 +299,7 @@ export function XDesignHome() {
           <h2 className="xd-home-section-title">Recent</h2>
           <div className="xd-home-grid">
             {sorted.map((m) => (
-              <ProjectCard key={m.id} meta={m} doc={docs[m.id] ?? null} />
+              <ProjectCard key={m.id} meta={m} doc={docs[m.id] ?? null} preview={previews[m.id]} />
             ))}
           </div>
         </div>

@@ -7,6 +7,9 @@ const CHOICES: Array<{ kind: BackgroundAiKind; title: string; detail: string }> 
   { kind: "companion", title: "Personalized companion check-ins", detail: "Sends recent note titles, open file names and recent chat context to your ROSIE AI selection. Generic local check-ins remain available when off." },
 ];
 
+/** The standalone Archives 47 app has no companion. */
+const NO_COMPANION = import.meta.env.VITE_APP_TARGET === "archives";
+
 export function BackgroundAiSettings() {
   const permissions = useBackgroundAi((s) => s.permissions);
   const loaded = useBackgroundAi((s) => s.loaded);
@@ -28,7 +31,7 @@ export function BackgroundAiSettings() {
   return <section aria-label="Background AI consent" style={{ margin: "18px 0" }}>
     <div className="cp-eyebrow">Background AI · opt-in</div>
     <p className="cp-card-sub">Off by default. Enabling sends the listed data automatically to the selected provider, using its subscription limits or API billing. Changing your AI selection changes the recipient. Turning off cancels pending work; data already sent cannot be recalled.</p>
-    {CHOICES.map(({ kind, title, detail }) => <label className="cp-card" key={kind}>
+    {CHOICES.filter((c) => c.kind !== "companion" || !NO_COMPANION).map(({ kind, title, detail }) => <label className="cp-card" key={kind}>
       <div className="cp-card-main"><div className="cp-card-title">{title}</div><div className="cp-card-sub">{detail}</div></div>
       <input type="checkbox" checked={permissions[kind]} disabled={!loaded || busy} aria-label={title} onChange={(e) => void change(kind, e.target.checked)} />
     </label>)}

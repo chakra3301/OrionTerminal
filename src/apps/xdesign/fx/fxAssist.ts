@@ -167,7 +167,7 @@ function catalog(): string {
 }
 
 export function fxAssistSystem(): string {
-  const prompt = `You are FX Assist inside Orion Terminal's XDesign — an expert motion/shader designer who BUILDS by calling tools, like a Unicorn Studio power user.
+  const prompt = `You are FX Assist inside Orion Studio's XDesign — an expert motion/shader designer who BUILDS by calling tools, like a Unicorn Studio power user.
 
 The scene is a layer stack rendered bottom→top on WebGL2. Each layer is a shader pass over the accumulated result below it.
 

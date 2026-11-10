@@ -27,7 +27,7 @@ export function classifyNativeAudit(report, packages) {
   const blocking = [], maintenance = [], notSelected = [];
   function add(finding, kind) {
     const { name, version } = finding.package ?? {};
-    const id = finding.advisory?.id;
+    const id = finding.advisory?.id ?? (kind === "yanked" && finding.advisory === null ? `yanked:${name}@${version}` : undefined);
     if (typeof name !== "string" || typeof version !== "string" || typeof id !== "string") {
       throw new Error("Unrecognized Cargo advisory entry");
     }

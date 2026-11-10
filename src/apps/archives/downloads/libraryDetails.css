@@ -1,0 +1,12 @@
+.dl-library-details { margin-top: 14px; padding-block: 14px; border-top: 1px solid var(--work-line); font: 12px/1.6 var(--f-display); color: var(--t-secondary); }
+.dl-library-details summary { color: var(--t-primary); cursor: pointer; font-weight: 500; }
+.dl-library-details p { margin: 10px 0; overflow-wrap: anywhere; }
+.dl-library-details form { display: grid; gap: 8px; }
+.dl-library-details input { width: 100%; min-width: 0; padding: 8px 10px; color: var(--t-primary); background: var(--work-raised); border: 1px solid var(--work-line-strong); border-radius: var(--r-sm); font: inherit; }
+.dl-library-details input:focus { outline: none; border-color: var(--t-primary); }
+.dl-library-details .dl-library-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dl-library-details button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid var(--work-line-strong); border-radius: var(--r-sm); background: var(--work-hover); color: var(--t-primary); font: inherit; cursor: pointer; }
+.dl-library-details button:disabled { opacity: .45; cursor: default; }
+.dl-library-details button:focus-visible { outline: 1px solid var(--t-primary); outline-offset: 2px; }
+.dl-library-description { white-space: pre-wrap; max-height: 140px; overflow: auto; }
+.ar-downloads .dl-kind-filter { max-width: 115px; min-width: 0; font: inherit; color: var(--t-secondary); background: var(--work-raised); border: 1px solid var(--work-line); border-radius: var(--r-sm); padding: 6px; }

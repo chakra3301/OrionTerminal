@@ -43,7 +43,7 @@ function EnableSignIn() {
     <>
       <h2 className="ot-settings-h2">Sign-in</h2>
       <p className="ot-settings-p">
-        Optional. Add a username and password to lock Orion Terminal behind a
+        Optional. Add a username and password to lock Orion Studio behind a
         sign-in screen on launch. This is a privacy gate, not disk encryption —
         and forgetting it never costs you data (there's a reset on the lock
         screen that keeps everything).
@@ -158,7 +158,7 @@ function ManageAccount() {
     <>
       <h2 className="ot-settings-h2">Account</h2>
       <p className="ot-settings-p">
-        Sign-in is enabled. Orion Terminal locks on launch (a valid session
+        Sign-in is enabled. Orion Studio locks on launch (a valid session
         lasts 7 days).
       </p>
       <div className="ot-settings-status">

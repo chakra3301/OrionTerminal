@@ -1,0 +1,63 @@
+.ot-spotlight, .ot-rosie-panel, .ot-dock, .ot-prompt-card { position: relative; }
+.ot-ai-progress { padding: 6px 2px; }
+.ot-themed-border {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  border-radius: inherit;
+  pointer-events: none;
+  contain: layout paint;
+  overflow: clip;
+}
+/* Beam needs an empty centre because its host is transparent. Metal already
+   punches its own rounded hole: a second mask creates a second edge. */
+.ot-themed-border[data-border="beam"] {
+  padding: 10px;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+/* Upstream explicitly enables pointer events on its wrapped child. */
+.ot-themed-border, .ot-themed-border * { pointer-events: none !important; }
+.ot-themed-border .ot-border-effect {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+.ot-border-effect-host, .ot-border-effect > .metal-fx-content { width: 100%; height: 100%; border-radius: inherit; }
+/* Use the genuine shader as a single material edge, not the package's complete
+   button housing, white inner rim and wandering catch-light stacked together. */
+.ot-themed-border .ot-metal-border { background: transparent; filter: none; transition: none !important; }
+.ot-metal-border > .metal-fx-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; border-radius: inherit; }
+.ot-themed-border .ot-metal-border::before,
+.ot-themed-border .ot-metal-border::after { content: none; box-shadow: none; }
+.ot-themed-border .ot-metal-border .metal-fx-inner { display: none; }
+.ot-themed-border[data-border="metal"] { --ot-metal-rim: #becbd8; }
+.ot-themed-border[data-border="metal"][data-finish="gold"] { --ot-metal-rim: #d1ae68; }
+.ot-themed-border[data-border="metal"][data-finish="chromatic"] { --ot-metal-rim: #c6bfe0; }
+.ot-themed-border .metal-fx-fallback,
+.ot-themed-border[data-border="metal"] .ot-border-still {
+  border: 1.75px solid var(--ot-metal-rim);
+  border-radius: inherit;
+  box-shadow: none;
+}
+.ot-themed-border .metal-fx-fallback { opacity: var(--ot-border-strength, 1); }
+.ot-border-still { border: 1px solid #6fdfffa6; border-radius: inherit; box-shadow: inset 0 0 7px #00e0ff26; }
+.ot-border-still[data-palette="mono"] { border-color: #dbe8eeaa; box-shadow: inset 0 0 7px #ffffff15; }
+.ot-border-still[data-palette="sunset"] { border-color: #ffa56caa; box-shadow: inset 0 0 7px #ff704d30; }
+.ot-border-still[data-palette="colorful"] { border-color: #bba4ffaa; box-shadow: inset 0 1px 5px #00e0ff30, inset 0 -1px 5px #ff3ea530; }
+.ot-border-still[data-shape="line"] { border-top: 0; border-left: 0; border-right: 0; box-shadow: none; }
+
+.orion-orb {
+  display: inline-flex;
+  width: var(--orb-size);
+  height: var(--orb-size);
+  flex: 0 0 var(--orb-size);
+  vertical-align: middle;
+  pointer-events: none;
+}
+.orion-ai-activity { display: inline-flex; align-items: center; gap: 9px; color: var(--t-secondary); font: 10px var(--f-mono); letter-spacing: .035em; vertical-align: middle; }

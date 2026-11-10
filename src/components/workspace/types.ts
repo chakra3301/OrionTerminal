@@ -1,10 +1,14 @@
-export type AgentCli = "claude" | "hermes" | "pi";
+export type AgentCli = "claude" | "codex" | "hermes" | "pi";
 
 export const AGENT_LABELS: Record<AgentCli, string> = {
   claude: "Claude Code",
+  codex: "Codex",
   hermes: "Hermes",
   pi: "Pi",
 };
+
+/** Agent tab view: Cursor-style chat, or the CLI's own TUI in a terminal. */
+export type AgentView = "chat" | "terminal";
 
 export type AssetFilter = {
   kinds?: string[];
@@ -20,7 +24,7 @@ export type TabDescriptor =
   | { kind: "files-tree" }
   | { kind: "preview" }
   | { kind: "claude" }
-  | { kind: "claude-code"; id?: string; agent?: AgentCli }
+  | { kind: "claude-code"; id?: string; agent?: AgentCli; view?: AgentView }
   | { kind: "terminal"; id?: string; initialCommand?: string }
   | { kind: "problems" }
   | { kind: "search" }
@@ -32,6 +36,10 @@ export type Tab = {
   descriptor: TabDescriptor;
   label: string;
   dirty?: boolean;
+  /** Cursor/VS Code preview tab: opened by a single click, shown in italics and
+   *  replaced by the next single-click open until it is pinned (double-click,
+   *  edit, or an explicit open). */
+  preview?: boolean;
   scrollState?: unknown;
 };
 

@@ -113,8 +113,9 @@ function ProjectCard({ project }: { project: ProjectRow }) {
         className="or-home-card-preview"
         onClick={open}
         title={project.root_path}
+        aria-label={`Open ${project.name}`}
       >
-        <Folder size={42} strokeWidth={1.25} />
+        <Folder size={20} strokeWidth={1.5} aria-hidden />
       </button>
       <div className="or-home-card-meta">
         <div className="or-home-card-info">
@@ -149,16 +150,17 @@ function ProjectCard({ project }: { project: ProjectRow }) {
           <span className="or-home-card-path" title={project.root_path}>
             {prettyPath(project.root_path)}
           </span>
-          <span className="or-home-card-time">
-            {relativeTime(project.last_opened_at)}
-          </span>
         </div>
+        <span className="or-home-card-time">
+          {relativeTime(project.last_opened_at)}
+        </span>
         <div className="or-home-card-actions">
           <button
             type="button"
             className="or-home-card-menu-btn"
             onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Project options"
+            aria-label={`Options for ${project.name}`}
+            aria-expanded={menuOpen}
           >
             <MoreHorizontal size={15} />
           </button>
@@ -229,8 +231,9 @@ export function OrionHome() {
             className="or-home-empty-new"
             onClick={() => void openFolder()}
           >
-            <FolderOpen size={28} />
+            <FolderOpen size={24} aria-hidden />
             <span>Open your first project</span>
+            <small>Choose a folder on your Mac to open its files, editor, and terminal.</small>
           </button>
         </div>
       ) : (

@@ -84,11 +84,11 @@ export function ArchivesJournal() {
   if (ordered.length === 0) {
     return (
       <div className="ar-empty-state ar-journal-empty">
-        <Sparkles size={20} color="var(--neon-green)" />
-        <div className="title">Nothing in the journal yet.</div>
+        <Sparkles size={20} />
+        <div className="title">Nothing in the journal yet</div>
         <div className="hint">
-          Start the first entry — Claude will start spotting patterns once you
-          write a few.
+          Write your first entry. After a few, your AI starts spotting
+          patterns.
         </div>
         <button
           type="button"
@@ -181,7 +181,7 @@ export function ArchivesJournal() {
           </>
         ) : (
           <div className="ar-empty-state" style={{ flex: 1 }}>
-            <div className="title">No entry selected.</div>
+            <div className="title">No entry selected</div>
           </div>
         )}
       </div>

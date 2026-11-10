@@ -1,0 +1,458 @@
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { humanBytes, ImageCommandDialog, ImageExportDialog, ImageSizeDialog, ImageTrimDialog, NewSnapshotDialog, replacedColor, replacementFor } from "./ImageDialogs";
+import { contentAwareFillCommand, FADE, fillCommand, HDR_TONING, matchColorCommand, REPLACE_COLOR, SHADOWS_HIGHLIGHTS, STROKE } from "./imageCommands";
+import { usePhotoWorkspace } from "./runtime";
+import type { PhotoState } from "./types";
+
+const native = vi.hoisted(() => ({ run: vi.fn(), save: vi.fn(), open: vi.fn(), write: vi.fn(), read: vi.fn(), invoke: vi.fn(), sample: vi.fn(), tauri: false }));
+vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => native.tauri, invoke: native.invoke, convertFileSrc: (path: string) => path }));
+vi.mock("@tauri-apps/plugin-dialog", () => ({ save: native.save, open: native.open }));
+vi.mock("../../../lib/ipc", () => ({ ipc: { saveFileAtomic: native.write, readFile: native.read } }));
+vi.mock("./runtime", async original => ({ ...await original<typeof import("./runtime")>(), runPhotoCommand: native.run }));
+vi.mock("./eyedropper", async original => ({ ...await original<typeof import("./eyedropper")>(), sampleImageColor: native.sample }));
+const background = { id: 1, name: "Background", kind: "Raster", visible: true, opacity: 1, fill: 1, blend: "Normal", clipped: false, hasMask: false, locks: { transparency: true, pixels: false, position: true, all: false } };
+const state: PhotoState = { name: "Shot", width: 400, height: 300, mode: "Rgb", depth: 8, resolution: 72, activeLayer: 1, hasSelection: false, selectionBounds: null, layers: [background], canUndo: false, canRedo: false };
+let root: Root, container: HTMLDivElement;
+beforeEach(() => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); native.run.mockReset().mockResolvedValue({}); native.tauri = false; native.invoke.mockReset(); native.save.mockReset(); native.open.mockReset(); native.write.mockReset().mockResolvedValue(undefined); native.read.mockReset();
+  usePhotoWorkspace.setState({ projectId: "project", busy: false, error: null, state });
+  container = document.createElement("div"); container.className = "xd-photo"; document.body.append(container); root = createRoot(container);
+});
+afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
+const field = <T extends Element = HTMLInputElement>(label: string) => container.querySelector<T>(`[aria-label="${label}"]`)!;
+const button = (text: string) => [...container.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === text)!;
+const submit = () => act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+const input = (label: string, value: string) => act(async () => { const element = field(label); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(element, value); element.dispatchEvent(new Event("input", { bubbles: true })); });
+const select = (label: string, value: string) => act(async () => { const element = field<HTMLSelectElement>(label); element.value = value; element.dispatchEvent(new Event("change", { bubbles: true })); });
+const blur = (label: string) => act(async () => { field(label).dispatchEvent(new FocusEvent("focusout", { bubbles: true })); });
+const click = (element: Element, init: MouseEventInit = {}) => act(async () => { element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...init })); });
+const readouts = () => [...container.querySelectorAll(".xd-ps-dialog-readout")].map(line => line.textContent);
+
+describe("Photoshop command dialogs", () => {
+  it("separates Fade's blend modes into Photoshop's groups", async () => {
+    await act(async () => root.render(<ImageCommandDialog command={FADE} close={vi.fn()}/>));
+    expect([...field<HTMLSelectElement>("Mode").querySelectorAll("hr")].map(hr => hr.nextElementSibling!.textContent)).toEqual(["Darken", "Lighten", "Overlay", "Difference", "Hue"]);
+  });
+  it("lays out Fill like Photoshop and sends only what the chosen contents use", async () => {
+    await act(async () => root.render(<ImageCommandDialog command={fillCommand([{ id: "p1", name: "Bubbles" }, { id: "p2", name: "Clouds" }], "p2")} close={vi.fn()}/>));
+    expect([...container.querySelectorAll("legend")].map(legend => legend.textContent)).toEqual(["Options", "Blending"]);
+    expect(field<HTMLSelectElement>("Mode").value).toBe("Normal"); expect(field<HTMLSelectElement>("Custom Pattern").value).toBe("p2");
+    expect([...field<HTMLSelectElement>("Mode").options].slice(0, 5).map(option => option.textContent)).toEqual(["Normal", "Dissolve", "Behind", "Clear", "Darken"]);
+    expect([...field<HTMLSelectElement>("Mode").querySelectorAll("hr")].map(hr => hr.nextElementSibling!.textContent)).toEqual(["Darken", "Lighten", "Overlay", "Difference", "Hue"]);
+    expect([field("Color"), field("Custom Pattern"), field("Color Adaptation")].map(control => control.disabled)).toEqual([true, true, true]);
+    await select("Contents", "color"); await input("Color", "#123456"); await select("Mode", "Multiply"); await input("Opacity", "40"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("edit.fill", { contents: "color", color: "#123456", mode: "Multiply", opacity: 40, preserveTransparency: false });
+    await act(async () => root.render(<ImageCommandDialog key="pattern" command={fillCommand([{ id: "p1", name: "Bubbles" }], null)} close={vi.fn()}/>));
+    await select("Contents", "pattern"); expect(field("Custom Pattern").disabled).toBe(false); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("edit.fill", { contents: "pattern", pattern: "p1", mode: "Multiply", opacity: 40, preserveTransparency: false });
+    await act(async () => root.render(<ImageCommandDialog key="history" command={fillCommand([], null, "source")} close={vi.fn()}/>));
+    await select("Contents", "history"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("edit.fill", { contents: "history", historySource: "source", mode: "Multiply", opacity: 40, preserveTransparency: false });
+  });
+  it("lays out Content-Aware Fill like Photoshop's panel and samples a saved selection for Custom", async () => {
+    await act(async () => root.render(<ImageCommandDialog command={contentAwareFillCommand([])} close={vi.fn()}/>));
+    expect(container.querySelector("h3")!.textContent).toBe("Content-Aware Fill");
+    expect([...container.querySelectorAll("legend")].map(legend => legend.textContent)).toEqual(["Sampling Area Options", "Fill Settings", "Output Settings"]);
+    expect([...container.querySelectorAll<HTMLInputElement>('[role="radiogroup"] input')].map(radio => radio.closest("label")!.textContent)).toEqual(["Auto", "Rectangular"]);
+    expect([...field<HTMLSelectElement>("Color Adaptation").options].map(option => option.textContent)).toEqual(["None", "Default", "High", "Very High"]);
+    expect([...field<HTMLSelectElement>("Rotation Adaptation").options].map(option => option.textContent)).toEqual(["None", "Low", "Medium", "High", "Full"]);
+    expect([...field<HTMLSelectElement>("Output To").options].map(option => option.textContent)).toEqual(["Current Layer", "New Layer", "Duplicate Layer"]);
+    expect(container.querySelector(".xd-ps-dialog-buttons input[type=checkbox]")).not.toBeNull();
+    await submit();
+    expect(native.run).toHaveBeenLastCalledWith("edit.contentAwareFill", { sampling: "auto", colorAdaptation: "default", rotationAdaptation: "none", scale: false, mirror: false, output: "new" });
+    await act(async () => root.render(<ImageCommandDialog key="custom" command={contentAwareFillCommand([{ index: 3, name: "Alpha 1" }])} close={vi.fn()}/>));
+    expect([...container.querySelectorAll<HTMLInputElement>('[role="radiogroup"] input')].map(radio => radio.value)).toEqual(["auto", "rectangular", "custom"]);
+    expect(field<HTMLSelectElement>("Sampling Channel").disabled).toBe(true);
+    await click(container.querySelector('input[type="radio"][value="custom"]')!);
+    expect(field<HTMLSelectElement>("Sampling Channel").disabled).toBe(false);
+    await click(field("Mirror")); await select("Output To", "current"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("edit.contentAwareFill", { sampling: "custom", channel: 3, colorAdaptation: "default", rotationAdaptation: "none", scale: false, mirror: true, output: "current" });
+  });
+  it("groups Stroke like Photoshop, remembers the last values and resets to them with Alt", async () => {
+    const close = vi.fn();
+    await act(async () => root.render(<ImageCommandDialog command={STROKE} close={close}/>));
+    expect(container.querySelector("h3")!.textContent).toBe("Stroke");
+    expect([...container.querySelectorAll("legend")].map(legend => legend.textContent)).toEqual(["Stroke", "Location", "Blending"]);
+    expect([...container.querySelectorAll(".xd-ps-dialog-unit")].map(unit => unit.textContent)).toEqual(["px", "%"]);
+    expect([...container.querySelectorAll(".xd-ps-dialog-buttons button")].map(button => button.textContent)).toEqual(["OK", "Cancel"]);
+    await input("Width", "3"); await click(container.querySelector('input[type="radio"][value="outside"]')!); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("edit.stroke", { width: 3, location: "outside", opacity: 100 }); expect(close).toHaveBeenCalledOnce();
+    await act(async () => root.render(<ImageCommandDialog key="again" command={STROKE} close={close}/>));
+    expect(field("Width").value).toBe("3"); expect(container.querySelector<HTMLInputElement>('input[type="radio"][value="outside"]')!.checked).toBe(true);
+    await input("Width", "9");
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "Alt", altKey: true })); });
+    expect(button("Reset")).toBeDefined(); await click(button("Reset"), { altKey: true });
+    expect(field("Width").value).toBe("3"); expect(close).toHaveBeenCalledOnce();
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keyup", { key: "Alt" })); });
+    await click(button("Cancel")); expect(close).toHaveBeenCalledTimes(2);
+  });
+  it("names repeated labels by their group and pairs adjustment fields with sliders", async () => {
+    await act(async () => root.render(<ImageCommandDialog command={SHADOWS_HIGHLIGHTS} close={vi.fn()}/>));
+    expect(field("Shadows Amount").value).toBe("35"); expect(field("Highlights Amount").value).toBe("0"); expect(field("Shadows Amount slider").type).toBe("range");
+    await click(field("Show More Options"));
+    await input("Highlights Radius slider", "80"); expect(field("Highlights Radius").value).toBe("80");
+  });
+  it("shows only the two Amounts until Show More Options is on, then Black and White Clip too", async () => {
+    await act(async () => root.render(<ImageCommandDialog command={SHADOWS_HIGHLIGHTS} close={vi.fn()}/>));
+    expect([...container.querySelectorAll("legend")].map(legend => legend.textContent)).toEqual(["Shadows", "Highlights"]);
+    expect(container.querySelectorAll('input[type="number"]')).toHaveLength(2);
+    expect(field("Show More Options").checked).toBe(false); expect(button("Load…")).toBeDefined(); expect(button("Save…")).toBeDefined();
+    expect(container.querySelector(".xd-ps-dialog")!.classList.contains("is-scroll")).toBe(true);
+    await click(field("Show More Options"));
+    expect([...container.querySelectorAll("legend")].map(legend => legend.textContent)).toEqual(["Shadows", "Highlights", "Adjustments"]);
+    expect(field("Black Clip").value).toBe("0.01"); expect(field("White Clip").value).toBe("0.01");
+    await input("Black Clip", "0.5"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("image.adjustments.shadowsHighlights", expect.objectContaining({ shadowAmount: 35, blackClip: 0.5, whiteClip: 0.01 }));
+  });
+  it("saves settings to and loads them from a JSON file, opening the extra options when they differ", async () => {
+    await act(async () => root.render(<ImageCommandDialog command={SHADOWS_HIGHLIGHTS} close={vi.fn()}/>));
+    await input("Shadows Amount", "60"); native.save.mockResolvedValue("/tmp/s.json"); await click(button("Save…"));
+    expect(native.write).toHaveBeenCalledWith("/tmp/s.json", expect.stringContaining('"shadowAmount": 60'));
+    native.open.mockResolvedValue("/tmp/l.json"); native.read.mockResolvedValue(JSON.stringify({ shadowAmount: 10, whiteClip: 3, midtone: 999 }));
+    await click(button("Load…"));
+    expect(field("Show More Options").checked).toBe(true); expect(field("Shadows Amount").value).toBe("10"); expect(field("White Clip").value).toBe("3"); expect(field("Midtone").value).toBe("0");
+    native.read.mockResolvedValue("[1]"); await click(button("Load…")); expect(container.querySelector('[role="alert"]')!.textContent).toContain("not a settings file");
+  });
+  it("previews live while values change and stops when Preview is off", async () => {
+    native.tauri = true; native.invoke.mockResolvedValue({ width: 1, height: 1, png: "AAAA" });
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:preview", revokeObjectURL: vi.fn() }));
+    const document_ = { id: "d", version: "v1", name: "Shot", width: 400, height: 300, previewPath: "/p.png" } as never;
+    await act(async () => root.render(<ImageCommandDialog command={SHADOWS_HIGHLIGHTS} document={document_} canvas={container} close={vi.fn()}/>));
+    const previewBox = () => container.querySelector<HTMLInputElement>(".xd-ps-dialog-buttons input[type=checkbox]")!;
+    expect(previewBox().checked).toBe(true);
+    await act(async () => { await new Promise(done => setTimeout(done, 300)); });
+    expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_command_preview", expect.objectContaining({ command: "image.adjustments.shadowsHighlights", params: expect.objectContaining({ shadowAmount: 35 }) }));
+    expect(container.querySelector("img.xd-photo-canvas-preview")).not.toBeNull();
+    await input("Shadows Amount", "70"); await act(async () => { await new Promise(done => setTimeout(done, 400)); });
+    expect(native.invoke).toHaveBeenLastCalledWith("xdesign_photo_command_preview", expect.objectContaining({ params: expect.objectContaining({ shadowAmount: 70 }) }));
+    await click(previewBox()); expect(container.querySelector("img.xd-photo-canvas-preview")).toBeNull();
+  });
+  it("previews HDR Toning live through the same command preview, with its Method", async () => {
+    native.tauri = true; native.invoke.mockImplementation(async (command: string) => command === "xdesign_photo_command_preview" ? { width: 1, height: 1, png: "AAAA" } : null);
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:preview", revokeObjectURL: vi.fn() }));
+    const document_ = { id: "d", version: "v1", name: "Shot", width: 400, height: 300, previewPath: "/p.png" } as never;
+    await act(async () => root.render(<ImageCommandDialog command={HDR_TONING} document={document_} canvas={container} close={vi.fn()}/>));
+    expect(container.querySelector<HTMLInputElement>(".xd-ps-dialog-buttons input[type=checkbox]")!.checked).toBe(true);
+    await act(async () => { await new Promise(done => setTimeout(done, 300)); });
+    expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_command_preview", expect.objectContaining({ command: "image.adjustments.hdrToning", params: expect.objectContaining({ radius: 30, saturation: 20 }) }));
+    expect(container.querySelector("img.xd-photo-canvas-preview")).not.toBeNull();
+    await select("Method", "exposureGamma"); await act(async () => { await new Promise(done => setTimeout(done, 400)); });
+    expect(native.invoke).toHaveBeenLastCalledWith("xdesign_photo_command_preview", expect.objectContaining({ command: "image.adjustments.hdrToning", params: expect.objectContaining({ method: "exposureGamma" }) }));
+  });
+  it("lists the Match Color destination and gates the selection statistics", async () => {
+    await act(async () => root.render(<ImageCommandDialog command={matchColorCommand([{ id: "a", version: "1", name: "Sunset" }])} close={vi.fn()}/>));
+    expect(container.querySelector(".xd-ps-dialog-readout")!.textContent).toBe("Target: Shot (Background, RGB/8)");
+    expect(field("Use Selection in Target to Calculate Adjustment").disabled).toBe(true); expect(field("Use Selection in Source to Calculate Colors").disabled).toBe(true);
+    await select("Source", "a"); expect(field("Use Selection in Source to Calculate Colors").disabled).toBe(false);
+    await click(field("Use Selection in Source to Calculate Colors")); expect(field("Use Selection in Source to Calculate Colors").checked).toBe(true);
+    await click(field("Use Selection in Source to Calculate Colors"));
+  });
+  it("converts the Replace Color result swatch both ways and defaults to the foreground color", async () => {
+    expect(replacedColor("#ff0000", 120, 0, 0)).toBe("#00ff00"); expect(replacedColor("#808080", 0, 0, 100)).toBe("#ffffff");
+    expect(replacementFor("#ff0000", "#00ff00")).toEqual({ hue: 120, saturation: 0, lightness: 0 });
+    await act(async () => root.render(<ImageCommandDialog command={REPLACE_COLOR} initial={{ color: "#336699" }} close={vi.fn()}/>));
+    expect(field("Color").value).toBe("#336699");
+    await input("Hue", "120"); expect(field("Result").value).toBe(replacedColor("#336699", 120, 0, 0));
+    await input("Result", "#ff0000"); expect(Number(field("Hue").value)).not.toBe(120);
+    expect(button("Load…")).toBeDefined();
+  });
+  it("drops a remembered source image once it is no longer open", async () => {
+    await act(async () => root.render(<ImageCommandDialog command={matchColorCommand([{ id: "a", version: "1", name: "Sunset" }])} close={vi.fn()}/>));
+    expect([...field<HTMLSelectElement>("Source").options].map(option => option.text)).toEqual(["None", "Sunset"]);
+    await select("Source", "a"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", { luminance: 100, intensity: 100, fade: 0, neutralize: false, useSelectionInSource: false, useSelectionInTarget: false, sourcePhoto: { id: "a", version: "1" } });
+    await act(async () => root.render(<ImageCommandDialog key="closed" command={matchColorCommand([])} close={vi.fn()}/>));
+    expect(field<HTMLSelectElement>("Source").value).toBe("");
+  });
+  it("lists the source image's layers under Merged, sends the chosen one as sourceLayer and starts another source at Merged", async () => {
+    native.tauri = true;
+    const sky = { ...background, id: 4, name: "Sky", kind: "Group", locks: undefined, children: [{ ...background, id: 5, name: "Cloud", locks: undefined }] };
+    native.invoke.mockImplementation(async (command: string, args: { source: { photoId: string } }) => command === "xdesign_photo_source_inspect" ? { ...state, layers: args.source.photoId === "a" ? [background, sky] : [background] } : null);
+    const layers = () => [...field<HTMLSelectElement>("Layer").options].map(option => option.text);
+    const sent = { luminance: 100, intensity: 100, fade: 0, neutralize: false, useSelectionInSource: false, useSelectionInTarget: false };
+    await act(async () => root.render(<ImageCommandDialog command={matchColorCommand([{ id: "a", version: "1", name: "Sunset" }, { id: "b", version: "3", name: "Beach" }])} close={vi.fn()}/>));
+    await select("Source", ""); expect(layers()).toEqual(["Merged"]); expect(field<HTMLSelectElement>("Layer").disabled).toBe(true);
+    await select("Source", "a");
+    expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_source_inspect", { projectId: "project", source: { photoId: "a", version: "1" } });
+    expect(layers()).toEqual(["Merged", "Background", "Sky", "Sky / Cloud"]); expect(field<HTMLSelectElement>("Layer").disabled).toBe(false);
+    await select("Layer", "5"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", { ...sent, sourcePhoto: { id: "a", version: "1" }, sourceLayer: 5 });
+    await select("Source", "b");
+    expect(field<HTMLSelectElement>("Layer").value).toBe("merged"); expect(layers()).toEqual(["Merged", "Background"]);
+    await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", { ...sent, sourcePhoto: { id: "b", version: "3" } });
+    await select("Source", "a"); expect(field<HTMLSelectElement>("Layer").value).toBe("merged");
+    await select("Layer", "4"); await select("Source", ""); expect(field<HTMLSelectElement>("Layer").disabled).toBe(true);
+    await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", sent);
+    await act(async () => usePhotoWorkspace.setState({ busy: true })); await select("Source", "a"); expect(field<HTMLSelectElement>("Layer").disabled).toBe(true);
+  });
+  it("disables the Match Color Layer menu and says so when the source image can't be read", async () => {
+    native.tauri = true; native.invoke.mockImplementation(async (command: string) => { if (command === "xdesign_photo_source_inspect") throw new Error("That image version is gone"); return null; });
+    await act(async () => root.render(<ImageCommandDialog command={matchColorCommand([{ id: "a", version: "1", name: "Sunset" }])} close={vi.fn()}/>));
+    await select("Source", ""); await select("Source", "a");
+    expect(field<HTMLSelectElement>("Layer").disabled).toBe(true); expect(container.querySelector('[role="alert"]')!.textContent).toContain("That image version is gone");
+  });
+  it("shapes HDR Toning's Toning Curve over the image's luminosity histogram, sends every level of it, remembers it and resets it", async () => {
+    native.tauri = true; const bins = Array.from({ length: 256 }, (_, level) => level % 9 + 1);
+    native.invoke.mockImplementation(async (command: string) => command === "xdesign_photo_histogram" ? [bins] : null);
+    const photo = { id: "d", version: "v1", name: "Shot", width: 400, height: 300, previewPath: "/p.png" } as never, wait = () => act(async () => { await new Promise(done => setTimeout(done, 150)); });
+    const sent = { radius: 30, strength: .5, gamma: 1, exposure: 0, detail: 30, shadow: 0, highlight: 0, vibrance: 0, saturation: 20 };
+    await act(async () => root.render(<ImageCommandDialog command={HDR_TONING} document={photo} close={vi.fn()}/>)); await wait();
+    expect([...container.querySelectorAll("legend")].map(legend => legend.textContent)).toEqual(["Edge Glow", "Tone and Detail", "Advanced", "Toning Curve and Histogram"]);
+    expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_histogram", { projectId: "project", photoId: "d", version: "v1", layer: null, below: false, space: "luminosity" });
+    expect(container.querySelector('[aria-label="Toning Curve"] .xd-photo-curve-histogram')).not.toBeNull(); expect(button("Reset Curve").disabled).toBe(true);
+    await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.hdrToning", sent);
+    await input("Curve output", "40"); expect(button("Reset Curve").disabled).toBe(false);
+    native.run.mockClear(); await submit(); expect(native.run).toHaveBeenCalledOnce();
+    const [command, params] = native.run.mock.calls[0]!, curve = (params as { curve: [number, number][] }).curve;
+    expect(command).toBe("image.adjustments.hdrToning"); expect(params).toEqual({ ...sent, curve });
+    expect(curve).toHaveLength(256); expect([curve[0], curve[128], curve[255]]).toEqual([[0, 40], [128, 147.92], [255, 255]]);
+    await act(async () => root.render(<ImageCommandDialog key="again" command={HDR_TONING} document={photo} close={vi.fn()}/>));
+    expect(field("Curve output").value).toBe("40");
+    await click(button("Reset Curve")); expect(field("Curve output").value).toBe("0");
+    await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.hdrToning", sent);
+    await input("Curve output", "40"); await act(async () => usePhotoWorkspace.setState({ busy: true }));
+    expect(field("Curve output").disabled).toBe(true); expect(button("Reset Curve").disabled).toBe(true); expect(field("Toning Curve black point slider").getAttribute("aria-disabled")).toBe("true");
+  });
+  describe("Photoshop's Replace Color samples, Match Color Ignore Selection and HDR Toning methods", () => {
+    const photo = { id: "d", version: "v1", name: "Shot", width: 400, height: 300, previewPath: "/p.png" } as never;
+    const thumbnail = () => container.querySelector<HTMLImageElement>(".xd-ps-dialog-thumb img")!;
+    const at = (x: number, y: number, init: MouseEventInit = {}) => act(async () => { thumbnail().dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: x, clientY: y, ...init })); });
+    const replace = async (props: { layerPixels?: boolean; key?: string } = {}) => {
+      await act(async () => root.render(<ImageCommandDialog key={props.key} command={REPLACE_COLOR} initial={{ color: "#336699" }} document={photo} layerPixels={props.layerPixels} close={vi.fn()}/>));
+      vi.spyOn(thumbnail(), "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 400, height: 300, right: 400, bottom: 300, x: 0, y: 0 } as DOMRect);
+    };
+    const base = { fuzziness: 40, hue: 0, saturation: 0, lightness: 0 };
+    it("adds and subtracts Replace Color samples with the + and − eyedroppers, Shift and Alt, and centres Localized Color Clusters on every click", async () => {
+      native.sample.mockReset().mockResolvedValue("#ff0000"); await replace();
+      expect(field("Localized Color Clusters").checked).toBe(false); expect(field("Range").disabled).toBe(true); expect(field("Range").value).toBe("100");
+      expect(field("Eyedropper Tool").getAttribute("aria-pressed")).toBe("true");
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, color: "#336699" });
+      await at(10, 20); expect(field("Color").value).toBe("#ff0000");
+      await click(field("Add to Sample")); expect(field("Add to Sample").getAttribute("aria-pressed")).toBe("true"); expect(field("Eyedropper Tool").getAttribute("aria-pressed")).toBe("false");
+      await at(30, 40); await at(50, 60, { altKey: true }); await click(field("Subtract from Sample")); await at(70, 80); await at(90, 100, { shiftKey: true });
+      expect(native.sample).toHaveBeenCalledOnce(); expect(field("Color").value).toBe("#ff0000");
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, color: "#ff0000", points: [[30, 40], [90, 100]], subtractPoints: [[50, 60], [70, 80]] });
+      await click(field("Localized Color Clusters")); expect(field("Range").disabled).toBe(false); await input("Range", "25");
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, points: [[10, 20], [30, 40], [90, 100]], subtractPoints: [[50, 60], [70, 80]], localized: true, range: 25 });
+      await click(field("Eyedropper Tool")); await at(5, 6);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, points: [[5, 6]], localized: true, range: 25 });
+      await input("Color", "#00ff00");
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, color: "#00ff00" });
+      await click(field("Localized Color Clusters")); await at(5, 6);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, color: "#ff0000" });
+      await click(field("Add to Sample")); for (let index = 0; index < 63; index++) await at(index, 1);
+      expect(container.querySelector('[role="alert"]')).toBeNull(); await at(200, 1); expect(container.querySelector('[role="alert"]')!.textContent).toBe("Use at most 64 color samples.");
+      await submit(); expect((native.run.mock.lastCall![1] as { points: unknown[] }).points).toHaveLength(63);
+    });
+    it("previews the Replace Color selection with the added, subtracted and localized samples", async () => {
+      native.tauri = true; native.sample.mockReset().mockResolvedValue("#ff0000"); native.invoke.mockResolvedValue({ width: 1, height: 1, png: "AAAA" });
+      vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:preview", revokeObjectURL: vi.fn() }));
+      await replace({ key: "preview" }); await at(10, 20); await click(field("Add to Sample")); await at(30, 40); await at(50, 60, { altKey: true }); await click(field("Localized Color Clusters")); await input("Range", "30");
+      await act(async () => { await new Promise(done => setTimeout(done, 400)); });
+      expect(native.invoke).toHaveBeenLastCalledWith("xdesign_photo_command_preview", expect.objectContaining({ command: "select.colorRange", params: expect.objectContaining({ points: [[10, 20], [30, 40]], subtractPoints: [[50, 60]], localized: true, range: 30, fuzziness: 40 }) }));
+      expect(native.invoke).toHaveBeenCalledWith("xdesign_photo_command_preview", expect.objectContaining({ command: "image.adjustments.replaceColor", params: { ...base, points: [[10, 20], [30, 40]], subtractPoints: [[50, 60]], localized: true, range: 30 } }));
+    });
+    it("keeps Replace Color to one sample colour on a mask or channel target", async () => {
+      native.sample.mockReset().mockResolvedValue("#ff0000"); await replace({ key: "layer" }); await click(field("Localized Color Clusters")); await submit();
+      await replace({ key: "mask", layerPixels: false });
+      expect(field("Localized Color Clusters").disabled).toBe(true); expect(field("Range").disabled).toBe(true); expect(field("Add to Sample").disabled).toBe(true); expect(field("Subtract from Sample").disabled).toBe(true);
+      await at(10, 20, { shiftKey: true }); await at(30, 40, { altKey: true }); expect(native.sample).toHaveBeenCalledTimes(2);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.replaceColor", { ...base, color: "#ff0000" });
+      await replace({ key: "layer again" }); expect(field("Localized Color Clusters").checked).toBe(true);
+      await click(field("Localized Color Clusters")); await submit();
+    });
+    it("puts Match Color's Ignore Selection under Destination Image, live only with a selection on layer pixels, and sends it only when on", async () => {
+      const match = (key: string, layerPixels?: boolean) => act(async () => root.render(<ImageCommandDialog key={key} command={matchColorCommand([])} layerPixels={layerPixels} close={vi.fn()}/>));
+      const sent = { luminance: 100, intensity: 100, fade: 0, neutralize: false, useSelectionInSource: false, useSelectionInTarget: false }, ignore = "Ignore Selection when Applying Adjustment";
+      await match("none"); expect(field(ignore).disabled).toBe(true);
+      const destination = [...container.querySelectorAll("fieldset")].find(set => set.querySelector("legend")?.textContent === "Destination Image")!;
+      expect(destination.textContent).toBe("Destination ImageTarget: Shot (Background, RGB/8)Ignore Selection when Applying Adjustment");
+      expect([...container.querySelectorAll("legend")].filter(legend => legend.textContent === "Destination Image")).toHaveLength(1);
+      await act(async () => usePhotoWorkspace.setState({ state: { ...state, hasSelection: true } })); expect(field(ignore).disabled).toBe(false);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", sent);
+      await click(field(ignore)); await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", { ...sent, ignoreSelection: true });
+      await match("mask", false); expect(field(ignore).checked).toBe(true); expect(field(ignore).disabled).toBe(true);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.matchColor", sent);
+      await match("layer"); await click(field(ignore)); await submit();
+    });
+    it("leads HDR Toning with Photoshop's four Methods and leaves each only the options it uses", async () => {
+      const sent = { radius: 30, strength: .5, gamma: 1, exposure: 0, detail: 30, shadow: 0, highlight: 0, vibrance: 0, saturation: 20 }, labels = ["Radius", "Strength", "Gamma", "Exposure", "Detail", "Shadow", "Highlight", "Vibrance", "Saturation"];
+      const live = () => labels.filter(label => !field(label).disabled);
+      await act(async () => root.render(<ImageCommandDialog command={HDR_TONING} document={photo} close={vi.fn()}/>));
+      expect(container.querySelector("select")!.getAttribute("aria-label")).toBe("Method");
+      expect([...field<HTMLSelectElement>("Method").options].map(option => [option.value, option.text])).toEqual([["localAdaptation", "Local Adaptation"], ["equalizeHistogram", "Equalize Histogram"], ["exposureGamma", "Exposure and Gamma"], ["highlightCompression", "Highlight Compression"]]);
+      expect(live()).toEqual(labels); expect(field("Curve output").disabled).toBe(false);
+      await select("Method", "exposureGamma"); expect(live()).toEqual(["Gamma", "Exposure"]); expect(field("Curve output").disabled).toBe(true);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.hdrToning", { ...sent, method: "exposureGamma" });
+      for (const method of ["equalizeHistogram", "highlightCompression"]) { await select("Method", method); expect(live()).toEqual([]); await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.hdrToning", { ...sent, method }); }
+      await select("Method", "localAdaptation"); expect(live()).toEqual(labels);
+      await submit(); expect(native.run).toHaveBeenLastCalledWith("image.adjustments.hdrToning", sent);
+    });
+  });
+});
+
+describe("New Snapshot", () => {
+  it("offers the next default name and Photoshop's three sources", async () => {
+    const close = vi.fn();
+    await act(async () => root.render(<NewSnapshotDialog next="Snapshot 3" close={close}/>));
+    expect(field("Name").value).toBe("Snapshot 3");
+    expect([...field<HTMLSelectElement>("From").options].map(option => option.textContent)).toEqual(["Full Document", "Merged Layers", "Current Layer"]);
+    await input("Name", "  Before grade "); await select("From", "merged"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("history.snapshot.new", { name: "Before grade", from: "merged" }); expect(close).toHaveBeenCalled();
+    await input("Name", " "); expect(button("OK").disabled).toBe(true);
+  });
+});
+
+describe("Image Size", () => {
+  it("keeps proportions, reports the new size and picks the reduction method automatically", async () => {
+    await act(async () => root.render(<ImageSizeDialog state={state} canvas={false} close={vi.fn()}/>));
+    expect(readouts()).toEqual(["Image Size: 352K", "Dimensions: 400 px × 300 px"]);
+    await input("Width", "200");
+    expect(field("Height").value).toBe("150"); expect(readouts()).toEqual(["Image Size: 88K (was 352K)", "Dimensions: 200 px × 150 px"]);
+    await submit(); expect(native.run).toHaveBeenLastCalledWith("image.imageSize", { width: 200, height: 150, resolution: 72, resample: "lanczos" });
+  });
+  it("changes only the resolution when Resample is off", async () => {
+    await act(async () => root.render(<ImageSizeDialog state={state} canvas={false} close={vi.fn()}/>));
+    await select("Width unit", "in"); expect(field("Width").value).toBe("5.56");
+    await click(field("Resample"));
+    expect(field("Height").disabled).toBe(true); expect(field<HTMLButtonElement>("Constrain aspect ratio").getAttribute("aria-pressed")).toBe("true");
+    await input("Width", "2"); expect(field("Resolution").value).toBe("200");
+    await submit(); expect(native.run).toHaveBeenLastCalledWith("image.imageSize", { width: 400, height: 300, resolution: 200, resample: "none" });
+  });
+  it("holds print size when the resolution changes with Resample on", async () => {
+    await act(async () => root.render(<ImageSizeDialog state={state} canvas={false} close={vi.fn()}/>));
+    await select("Width unit", "in"); await input("Resolution", "144");
+    expect(readouts()[1]).toBe("Dimensions: 800 px × 600 px");
+    await click(field("Constrain aspect ratio")); await input("Height", "100"); expect(readouts()[1]).toBe("Dimensions: 800 px × 100 px");
+    await select("Resample method", "nearest"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("image.imageSize", { width: 800, height: 100, resolution: 144, resample: "nearest" });
+  });
+  it("fits a preset turned to the image's orientation and falls back to Custom once edited", async () => {
+    await act(async () => root.render(<ImageSizeDialog state={state} canvas={false} close={vi.fn()}/>));
+    await select("Fit To", "4 x 6 in 300 ppi");
+    expect(readouts()[1]).toBe("Dimensions: 1600 px × 1200 px"); expect(field("Width").value).toBe("5.33"); expect(field("Resolution").value).toBe("300");
+    await select("Fit To", "original"); expect(readouts()[1]).toBe("Dimensions: 400 px × 300 px");
+    await select("Fit To", "640 x 480 px 72 ppi"); await input("Width", "320");
+    expect(field<HTMLSelectElement>("Fit To").value).toBe("custom");
+    await submit(); expect(native.run).toHaveBeenLastCalledWith("image.imageSize", { width: 320, height: 240, resolution: 72, resample: "lanczos" });
+  });
+});
+
+describe("Canvas Size", () => {
+  it("converts Relative values, anchors the growth and extends with the background color", async () => {
+    await act(async () => root.render(<ImageSizeDialog state={state} canvas close={vi.fn()}/>));
+    expect([...container.querySelectorAll("legend")].map(legend => legend.textContent)).toEqual(["Current Size: 352K", "New Size: 352K"]);
+    expect(field<HTMLSelectElement>("Canvas extension color").value).toBe("background");
+    await click(field("Relative")); expect(field("Width").value).toBe("0");
+    await input("Width", "100"); await blur("Width"); await click(field("Relative")); expect(field("Width").value).toBe("500");
+    await click(field("Anchor top left"));
+    expect(field("Anchor top left").getAttribute("aria-pressed")).toBe("true");
+    expect(container.querySelectorAll(".xd-ps-dialog-anchors svg")).toHaveLength(3);
+    await act(async () => root.render(<ImageSizeDialog state={{ ...state, tools: { foreground: [1, 0, 0, 1], background: [0, 0, 1, 1] } }} canvas close={vi.fn()}/>));
+    expect(field("Canvas extension custom color").value).toBe("#0000ff");
+    await select("Canvas extension color", "foreground"); expect(field("Canvas extension custom color").value).toBe("#ff0000");
+    await input("Canvas extension custom color", "#123456"); expect(field<HTMLSelectElement>("Canvas extension color").value).toBe("other"); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("image.canvasSize", { width: 500, height: 300, anchor: "topLeft", extensionColor: "#123456" });
+  });
+  it("offers no extension color without a Background layer", async () => {
+    await act(async () => root.render(<ImageSizeDialog state={{ ...state, layers: [{ ...background, name: "Layer 0", locks: undefined }] }} canvas close={vi.fn()}/>));
+    expect(field<HTMLSelectElement>("Canvas extension color").disabled).toBe(true);
+    expect(humanBytes(6016 * 6016 * 4)).toBe("138.1M"); expect(humanBytes(3 * 1024 ** 3)).toBe("3.00G");
+  });
+});
+
+describe("Export As", () => {
+  it("exports through the native save panel with the chosen quality", async () => {
+    const choose = vi.fn().mockResolvedValue(undefined); native.save.mockResolvedValue("/tmp/Shot.jpg");
+    await act(async () => root.render(<ImageExportDialog name="Shot.psd" choose={choose} close={vi.fn()}/>));
+    expect(container.querySelector('[role="dialog"]')!.getAttribute("aria-label")).toBe("Export As");
+    await select("Format", "jpg"); await input("Quality", "70"); await click(button("Export"));
+    expect(native.save).toHaveBeenCalledWith({ defaultPath: "Shot.jpg", filters: [{ name: "JPEG", extensions: ["jpg", "jpeg"] }] });
+    expect(choose).toHaveBeenCalledWith("/tmp/Shot.jpg", 70);
+  });
+  it("saves a copy as Photoshop PDF, which Export As doesn't offer", async () => {
+    const options = () => [...container.querySelectorAll<HTMLOptionElement>('[aria-label="Format"] option')].map(option => option.textContent);
+    await act(async () => root.render(<ImageExportDialog name="Shot.psd" choose={vi.fn()} close={vi.fn()}/>));
+    expect(options()).not.toContain("Photoshop PDF");
+    const choose = vi.fn().mockResolvedValue(undefined); native.save.mockResolvedValue("/tmp/Shot.pdf");
+    await act(async () => root.render(<ImageExportDialog key="copy" name="Shot.psd" kind="copy" choose={choose} close={vi.fn()}/>));
+    expect(container.querySelector('[role="dialog"]')!.getAttribute("aria-label")).toBe("Save a Copy");
+    expect(options().slice(0, 2)).toEqual(["Photoshop (PSD)", "Photoshop PDF"]);
+    await select("Format", "pdf"); await click(button("Save"));
+    expect(native.save).toHaveBeenCalledWith({ defaultPath: "Shot.pdf", filters: [{ name: "Photoshop PDF", extensions: ["pdf"] }] });
+    expect(choose).toHaveBeenCalledWith("/tmp/Shot.pdf", undefined);
+  });
+  it("titles the first save of an image Save As, as Photoshop does, with PSD first", async () => {
+    const options = () => [...container.querySelectorAll<HTMLOptionElement>('[aria-label="Format"] option')].map(option => option.textContent);
+    const choose = vi.fn().mockResolvedValue(undefined); native.save.mockResolvedValue("/tmp/Shot.psd");
+    await act(async () => root.render(<ImageExportDialog name="Shot.jpg" kind="save" choose={choose} close={vi.fn()}/>));
+    expect(container.querySelector('[role="dialog"]')!.getAttribute("aria-label")).toBe("Save As");
+    expect(options().slice(0, 2)).toEqual(["Photoshop (PSD)", "Photoshop PDF"]);
+    await click(button("Save"));
+    expect(native.save).toHaveBeenCalledWith({ defaultPath: "Shot.psd", filters: [{ name: "Photoshop (PSD)", extensions: ["psd", "psb"] }] });
+    expect(choose).toHaveBeenCalledWith("/tmp/Shot.psd", undefined);
+  });
+});
+
+describe("Trim dialog", () => {
+  const radios = () => [...container.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
+  it("offers Photoshop's Based On and Trim Away, with Transparent Pixels only when the image can be transparent", async () => {
+    await act(async () => root.render(<ImageTrimDialog state={state} close={vi.fn()}/>));
+    expect([...container.querySelectorAll("legend")].map(legend => legend.textContent)).toEqual(["Based On", "Trim Away"]);
+    expect(radios().map(radio => [radio.value, radio.disabled, radio.checked])).toEqual([["transparent", true, false], ["topLeft", false, true], ["bottomRight", false, false]]);
+    expect([...container.querySelectorAll(".xd-ps-dialog-checks input")].map(box => [box.getAttribute("aria-label"), (box as HTMLInputElement).checked])).toEqual([["Top", true], ["Bottom", true], ["Left", true], ["Right", true]]);
+    await act(async () => root.render(<ImageTrimDialog key="layers" state={{ ...state, layers: [{ ...background, id: 2, name: "Layer 1", locks: undefined }] }} close={vi.fn()}/>));
+    expect(radios()[0]!.disabled).toBe(false); expect(radios()[0]!.checked).toBe(true);
+  });
+  it("runs image.trim with the chosen base and sides, and remembers them", async () => {
+    const close = vi.fn();
+    await act(async () => root.render(<ImageTrimDialog state={state} close={close}/>));
+    await click(radios()[2]!); await click(field("Left")); await submit();
+    expect(native.run).toHaveBeenLastCalledWith("image.trim", { basedOn: "bottomRight", top: true, bottom: true, left: false, right: true }); expect(close).toHaveBeenCalledOnce();
+    await act(async () => root.render(<ImageTrimDialog key="again" state={state} close={close}/>));
+    expect(radios()[2]!.checked).toBe(true); expect(field("Left").checked).toBe(false);
+    for (const side of ["Top", "Bottom", "Right"]) await click(field(side));
+    expect(button("OK").disabled).toBe(true);
+  });
+});
+
+describe("Dialog positions", () => {
+  it("reopens a moved dialog where it was left", async () => {
+    const drag = (x: number, y: number) => act(async () => {
+      const header = container.querySelector("header")!, form = container.querySelector("form")!;
+      form.parentElement!.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800 } as DOMRect);
+      form.getBoundingClientRect = () => ({ left: 300, top: 200, right: 500, bottom: 400, width: 200, height: 200 } as DOMRect);
+      const at = (type: string, cx: number, cy: number) => header.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: cx, clientY: cy }));
+      at("pointerdown", 10, 10); at("pointermove", 10 + x, 10 + y); at("pointerup", 10 + x, 10 + y);
+    });
+    await act(async () => root.render(<ImageCommandDialog command={STROKE} close={vi.fn()}/>));
+    await drag(40, 25);
+    expect(container.querySelector("form")!.style.transform).toBe("translate(40px, 25px)");
+    await act(async () => root.render(<div key="other"><ImageCommandDialog command={STROKE} close={vi.fn()}/></div>));
+    expect(container.querySelector("form")!.style.transform).toBe("translate(40px, 25px)");
+    await act(async () => root.render(<ImageSizeDialog state={state} canvas={false} close={vi.fn()}/>));
+    expect(container.querySelector("form")!.style.transform).toBe("translate(0px, 0px)");
+  });
+});
+
+describe("Image Size resample list", () => {
+  it("uses Photoshop's wording for the methods the engine can run", async () => {
+    await act(async () => root.render(<ImageSizeDialog state={state} canvas={false} close={vi.fn()}/>));
+    expect([...field<HTMLSelectElement>("Resample method").options].map(option => [option.value, option.text])).toEqual([
+      ["automatic", "Automatic"], ["preserveDetails", "Preserve Details (enlargement)"], ["lanczos", "Bicubic Sharper (reduction)"], ["bicubic", "Bicubic (smooth gradients)"], ["nearest", "Nearest Neighbor (hard edges)"], ["bilinear", "Bilinear"]]);
+  });
+});
+
+describe("Image Size preview", () => {
+  it("shows a thumbnail that follows the new proportions", async () => {
+    const document_ = { id: "d", version: "v1", name: "Shot", width: 400, height: 300, previewPath: "/p.png" } as never;
+    await act(async () => root.render(<ImageSizeDialog state={state} document={document_} canvas={false} close={vi.fn()}/>));
+    const thumb = () => container.querySelector<HTMLImageElement>(".xd-ps-dialog-thumb img")!;
+    expect([thumb().width, thumb().height]).toEqual([160, 120]);
+    await click(field("Constrain aspect ratio")); await input("Width", "100");
+    expect(Number(field("Width").value)).toBe(100); expect(Number(field("Height").value)).toBe(300);
+    expect(thumb().width / thumb().height).toBeCloseTo(100 / 300, 1);
+  });
+});

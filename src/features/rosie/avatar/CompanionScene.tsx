@@ -5,11 +5,15 @@ import {
   useRef,
 } from "react";
 import { CharacterModelBoundary } from "@/features/characters/CharacterModelBoundary";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, events, useFrame, useThree, type CanvasProps } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import * as THREE from "three";
-import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { cloneCharacter, characterBones, HorizontalRootAnchor, AuthoredBonePose } from "@/features/characters/modelInstance";
+import { prepareCompanion, type CompanionRoles, type PreparedCompanion } from "@/features/characters/companionRig";
+import { findBone } from "@/features/characters/sleeveGestures";
+import { CompanionAnimator } from "@/features/characters/companionAnimator";
+import { CompanionRequestReactions } from "@/features/characters/companionRequests";
 import { useVoice } from "@/store/voiceStore";
 import { useRosie } from "@/features/rosie/rosieStore";
 import { useCompanionMode, type CompanionMode } from "./companionMode";
@@ -18,53 +22,17 @@ import { useCompanionProactive } from "./companionProactiveStore";
 import { dragState } from "./dragState";
 import { useCharacterStore } from "@/store/characterStore";
 import {
-  ROSIE_ID,
-  resolveClips,
   BUILTIN_CHARACTERS,
+  type BuiltinCharacter,
   type Character,
+  versionedCharacterUrl,
 } from "@/features/characters/catalog";
 
-// The merged companion (mesh + all 10 clips, built by scripts/build-companion-glb.mjs).
-// null → holographic placeholder (also the graceful fallback if it fails to load).
-const MODEL_URL: string | null = "/companion/companion.glb";
-
-// Framing knobs. FIT_HEIGHT is how much of the camera frame her standing height
-// fills — kept well under the visible frustum (~2.46u) so limbs/hair don't clip
-// off the canvas edges while she moves.
 const FIT_HEIGHT = 1.7;
-const MODEL_FACING = 0; // radians; flip to Math.PI if she faces away
+const MODEL_FACING = 0;
+const OVERSCAN = 1.5;
 
-// Her resting loop. Idle_15 is the authored calm idle.
-const IDLE_CLIP = "Idle_15";
-
-// Clips she randomly plays as idle fidgets, then eases back to the idle loop.
-// Falls are excluded (they end prone — would snap upright on the return); Arise
-// is reserved for a future spawn-in one-shot.
-const FIDGET_CLIPS = [
-  "Agree_Gesture",
-  "All_Night_Dance",
-  "FunnyDancing_02",
-  "Angry_To_Tantrum_Sit",
-  "Crawl_and_Look_Back",
-  "Depressed_Full_Turn_Left",
-  "Walking",
-  "Running",
-  "Confident_Walk",
-  "Formal_Bow",
-  "Ground_Flip_and_Sweep_Up",
-  "Idle_10",
-  "Angry_Ground_Stomp_1",
-];
-const FIDGET_MIN_GAP = 120; // seconds — a random fidget every ~2–5 min (subtle,
-const FIDGET_MAX_GAP = 300; // not constant; she mostly just idles in Idle_15)
-
-// Event clips (user mapping). Spawn-in plays once when she appears; the error
-// reaction when a R.O.S.I.E turn fails. (Spawn = Fall4 as requested; if it ends
-// prone we can chain "Arise" to recover.)
-const SPAWN_CLIPS = ["Fall4"];
-const ERROR_CLIP = "Angry_To_Tantrum_Sit";
-const GESTURE_CLIP = "Agree_Gesture"; // played when she proactively asks something
-// Modes where she idly looks around (procedural head motion layered on Idle_15).
+// Procedural attention stays separate from the authored motion clips.
 const LOOK_AROUND_MODES = new Set<CompanionMode>([
   "thinking",
   "working",
@@ -142,463 +110,135 @@ function Placeholder({ mode }: { mode: CompanionMode }) {
   );
 }
 
-// ── Animation rig ──────────────────────────────────────────────────────────
 type Rig = {
-  mixer: THREE.AnimationMixer | null;
-  clips: Record<string, THREE.AnimationClip>;
-  idle: THREE.AnimationAction | null;
-  action: THREE.AnimationAction | null; // current fidget / one-shot
-  fadeOutAt: number;
-  fading: boolean;
-  nextAt: number;
-  last: string;
-  queue: string[]; // pending priority one-shots (spawn-in, error reaction)
-  hips?: THREE.Bone;
-  hipsRest?: THREE.Vector3;
+  scene: THREE.Object3D;
+  clips: THREE.AnimationClip[];
+  roles?: CompanionRoles;
+  center: THREE.Vector3;
+  size: THREE.Vector3;
   head?: THREE.Bone;
   neck?: THREE.Bone;
-  spine?: THREE.Bone;
-  lookW: number; // eased look-around weight
-  // Drag ragdoll spring (pendulum swing of the whole body).
-  swingZ: number;
-  swingVZ: number;
-  swingX: number;
-  swingVX: number;
-  lastVisible: boolean;
-  lastErr: boolean;
-  lastGesture: number;
-  testAction: THREE.AnimationAction | null;
-  testName: string;
+  hips?: THREE.Bone;
+  springs?: PreparedCompanion;
 };
 
-const _lookEuler = new THREE.Euler();
-const _lookQuat = new THREE.Quaternion();
-
-/** Play a clip once (LoopOnce + clamp), crossfading out the idle loop. */
-function startClipOnce(
-  r: Rig,
-  m: THREE.AnimationMixer,
-  name: string,
-  t: number,
-) {
-  const clip = r.clips[name];
-  if (!clip) return;
-  const a = m.clipAction(clip);
-  a.reset();
-  a.setLoop(THREE.LoopOnce, 1);
-  a.clampWhenFinished = true;
-  a.fadeIn(0.3).play();
-  if (r.idle) r.idle.fadeOut(0.3);
-  r.action = a;
-  r.last = name;
-  r.fadeOutAt = t + 0.3 + clip.duration;
-  r.fading = false;
+function useRig(url: string, builtin: BuiltinCharacter | undefined): Rig {
+  const gltf = useGLTF(versionedCharacterUrl(url));
+  return useMemo(() => {
+    if (builtin) {
+      const prepared = prepareCompanion(gltf, builtin.id);
+      return {
+        scene: prepared.scene, clips: prepared.clips, roles: prepared.roles, center: prepared.center, size: prepared.size,
+        head: findBone(prepared.scene, "DEF-spine.006"), neck: findBone(prepared.scene, "DEF-spine.005"), springs: prepared,
+      };
+    }
+    const scene = cloneCharacter(gltf.scene);
+    const bones = characterBones(scene);
+    scene.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(gltf.scene, true);
+    return { scene, clips: gltf.animations, center: box.getCenter(new THREE.Vector3()), size: box.getSize(new THREE.Vector3()), head: bones.head, neck: bones.neck, hips: bones.hips };
+  }, [gltf, builtin]);
 }
 
-function RosieModel({ mode }: { mode: CompanionMode }) {
-  const { scene, animations } = useGLTF(MODEL_URL as string);
-  const rig = useRef<Rig>({
-    mixer: null,
-    clips: {},
-    idle: null,
-    action: null,
-    fadeOutAt: 0,
-    fading: false,
-    nextAt: -1, // sentinel — seeded from the live clock on the first frame
-    last: "",
-    queue: [],
-    lookW: 0,
-    swingZ: 0,
-    swingVZ: 0,
-    swingX: 0,
-    swingVX: 0,
-    lastVisible: false,
-    lastErr: false,
-    lastGesture: 0,
-    testAction: null,
-    testName: "",
-  });
-  const swingRef = useRef<THREE.Group>(null);
-
+function CharacterCompanion({ url, builtin, mode }: { url: string; builtin?: BuiltinCharacter; mode: CompanionMode }) {
+  const rig = useRig(url, builtin);
+  const { scene } = rig;
+  const frameWidth = useThree((s) => s.viewport.width);
   const fit = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(scene);
-    const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
-    box.getSize(size);
-    box.getCenter(center);
-    return { scale: FIT_HEIGHT / (size.y || 1), center };
-  }, [scene]);
+    const scale = Math.min(FIT_HEIGHT / (rig.size.y || 1), (frameWidth * 0.8 / OVERSCAN) / (rig.size.x || 1));
+    return { scale, center: rig.center };
+  }, [rig, frameWidth]);
+  const animator = useRef<CompanionAnimator | null>(null);
+  const anchor = useRef<HorizontalRootAnchor | null>(null);
+  const pose = useMemo(() => new AuthoredBonePose(scene), [scene]);
+  const visible = useRosie((s) => s.companionVisible);
+  const motion = useRef({
+    time: 0, lookW: 0, lastVisible: true, lastGesture: 0, resetVersion: dragState.resetVersion,
+  });
+  const lookEuler = useMemo(() => new THREE.Euler(), []);
+  const lookQuat = useMemo(() => new THREE.Quaternion(), []);
+  const screenOffset = useMemo(() => new THREE.Vector3(), []);
 
   useEffect(() => {
-    const r = rig.current;
-    const m = new THREE.AnimationMixer(scene);
-    r.mixer = m;
-    r.clips = {};
-    for (const c of animations) r.clips[c.name] = c;
-    r.action = null;
-    r.fading = false;
-    r.nextAt = -1;
-    r.last = "";
-    r.queue = [];
-    r.lookW = 0;
-    r.lastVisible = false;
-    r.lastErr = false;
-    r.lastGesture = useCompanionProactive.getState().gestureNonce;
-    r.testAction = null;
-    r.testName = "";
-
-    // Register clip names for the clip-test overlay.
-    useCompanionDebug.getState().setNames(Object.keys(r.clips).sort());
-
-    // Start her resting idle loop.
-    const idleClip = r.clips[IDLE_CLIP] ?? animations[0];
-    if (idleClip) {
-      const a = m.clipAction(idleClip);
-      a.setLoop(THREE.LoopRepeat, Infinity);
-      a.play();
-      r.idle = a;
-    }
-
-    // Bones we drive directly: root (keep her planted) + head/neck (look-around).
-    scene.traverse((o) => {
-      const b = o as THREE.Bone;
-      if (!b.isBone) return;
-      if (b.name === "Hips") {
-        r.hips = b;
-        r.hipsRest = b.position.clone();
-      } else if (b.name === "Head") r.head = b;
-      else if (b.name === "neck") r.neck = b;
-      else if (b.name === "Spine") r.spine = b;
+    const controller = new CompanionAnimator(scene, rig.clips, Math.random, rig.roles);
+    controller.onSwitch = () => rig.springs?.reset();
+    animator.current = controller;
+    anchor.current = rig.hips ? new HorizontalRootAnchor(scene, rig.hips) : null;
+    useCompanionDebug.getState().setNames(controller.names);
+    motion.current.lastVisible = useRosie.getState().companionVisible;
+    const requests = new CompanionRequestReactions(useRosie.getState());
+    const unsubscribe = useRosie.subscribe((state) => {
+      const reactions = requests.observe(state);
+      if (state.companionVisible && !useCompanionDebug.getState().testMode) {
+        for (const name of reactions) controller.queue(name);
+      }
     });
-
+    motion.current.lastGesture = useCompanionProactive.getState().gestureNonce;
     return () => {
-      m.stopAllAction();
-      r.mixer = null;
-      r.idle = null;
-      r.action = null;
+      unsubscribe();
+      controller.dispose();
+      rig.springs?.dispose();
+      animator.current = null;
+      anchor.current = null;
     };
-  }, [scene, animations]);
+  }, [scene, rig]);
+
+  useEffect(() => {
+    // Hidden canvases do not tick, so remember dismissal outside the frame loop.
+    if (!visible) motion.current.lastVisible = false;
+  }, [visible]);
 
   useFrame((state, rawDt) => {
-    const r = rig.current;
-    const m = r.mixer;
-    if (!m) return;
-    const dt = Math.min(rawDt, 0.05); // clamp post-pause spikes
-    const t = state.clock.elapsedTime;
-    m.update(dt);
-
+    const controller = animator.current;
+    if (!controller) return;
+    const dt = Math.min(rawDt, 0.05);
+    const r = motion.current;
+    if (rawDt > 0.1 || r.resetVersion !== dragState.resetVersion) {
+      rig.springs?.reset();
+      r.resetVersion = dragState.resetVersion;
+    }
+    r.time += dt;
+    const t = r.time;
     const dbg = useCompanionDebug.getState();
-    if (dbg.testMode) {
-      // Clip-test mode: loop whichever clip is selected, overriding everything.
-      const want = dbg.names[dbg.index];
-      if (want && want !== r.testName && r.clips[want]) {
-        // Hard-reset every action first. `clipAction` returns a CACHED action
-        // per clip, so the selected clip may BE the idle/fidget action —
-        // fading specific actions would fade out the very one we're starting,
-        // and fade-without-stop leaks weight-0 actions as you cycle. stopAllAction
-        // sidesteps both (test mode overrides everything anyway).
-        m.stopAllAction();
-        r.action = null;
-        r.fading = false;
-        const a = m.clipAction(r.clips[want]);
-        a.reset();
-        a.setLoop(THREE.LoopRepeat, Infinity);
-        a.clampWhenFinished = false;
-        a.fadeIn(0.25).play();
-        r.testAction = a;
-        r.testName = want;
-      }
-    } else {
-      // Leaving test mode → stop the test clip and restore the idle loop.
-      if (r.testName) {
-        r.testAction?.stop();
-        r.testAction = null;
-        r.testName = "";
-        r.action?.stop();
-        r.action = null;
-        r.fading = false;
-        r.idle?.reset().fadeIn(0.3).play();
-        r.nextAt = t + 4;
-      }
-
-      // Event triggers: spawn-in when she appears, frustrated reaction on a
-      // failed R.O.S.I.E turn. Queued as priority one-shots (play in any mode).
-      const rs = useRosie.getState();
-      if (rs.companionVisible && !r.lastVisible) {
-        r.queue.push(...SPAWN_CLIPS);
-        r.fadeOutAt = t; // cut any current fidget so the entrance plays now
-      }
-      r.lastVisible = rs.companionVisible;
-      const hasErr = !!rs.error;
-      if (hasErr && !r.lastErr) {
-        r.queue.push(ERROR_CLIP);
-        r.fadeOutAt = t;
-      }
-      r.lastErr = hasErr;
-      const gestureNonce = useCompanionProactive.getState().gestureNonce;
-      if (gestureNonce !== r.lastGesture) {
-        r.lastGesture = gestureNonce;
-        r.queue.push(GESTURE_CLIP);
-        r.fadeOutAt = t;
-      }
-
-      // Seed the first-fidget delay from the live clock — the canvas clock may
-      // be long past 0 when this rig (re)mounts after a character switch.
-      if (r.nextAt < 0) r.nextAt = t + 75;
-
-      // Fidget / one-shot machine. When the active clip ends, crossfade back to
-      // the idle loop — re-enabling the idle action first, since three.js
-      // disables an action once it fades to weight 0 (a bare fadeIn won't revive
-      // it → nothing drives the bones → the T-pose).
-      if (r.action) {
-        if ((mode !== "idle" && !r.fading) || (!r.fading && t >= r.fadeOutAt)) {
-          r.action.fadeOut(0.4);
-          if (r.idle && r.queue.length === 0) {
-            r.idle.enabled = true;
-            r.idle.fadeIn(0.4);
-          }
-          r.fading = true;
-        }
-        if (r.fading && r.action.getEffectiveWeight() < 0.02) {
-          r.action.stop();
-          r.action = null;
-          r.fading = false;
-          r.nextAt =
-            t + FIDGET_MIN_GAP + Math.random() * (FIDGET_MAX_GAP - FIDGET_MIN_GAP);
-        }
-      } else if (r.queue.length > 0) {
-        startClipOnce(r, m, r.queue.shift()!, t);
-      } else if (mode === "idle" && t >= r.nextAt) {
-        const pool = FIDGET_CLIPS.filter((n) => r.clips[n] && n !== r.last);
-        const name = pool[Math.floor(Math.random() * pool.length)];
-        if (name) startClipOnce(r, m, name, t);
-      }
+    const rosie = useRosie.getState();
+    const gesture = useCompanionProactive.getState().gestureNonce;
+    if (!dbg.testMode) {
+      if (rosie.companionVisible && !r.lastVisible) controller.queue(controller.greeting);
+      if (gesture !== r.lastGesture) controller.queue(controller.gesture);
     }
+    r.lastVisible = rosie.companionVisible;
+    r.lastGesture = gesture;
+    pose.restore();
+    controller.update(dt, mode === "idle", dbg.testMode ? dbg.names[dbg.index] ?? null : null);
+    anchor.current?.update();
+    pose.capture();
 
-    // Keep her planted: lock root horizontal drift so locomotion clips play in
-    // place (vertical stays free for sit/flip). Applied after mixer.update.
-    if (r.hips && r.hipsRest) {
-      r.hips.position.x = r.hipsRest.x;
-      r.hips.position.z = r.hipsRest.z;
-    }
-
-    // Idle look-around: subtle organic head turn layered on top of whatever the
-    // mixer produced, while she's thinking / working / listening.
-    const lookTarget = !dbg.testMode && LOOK_AROUND_MODES.has(mode) ? 1 : 0;
+    const lookTarget = !dbg.testMode && !dragState.dragging && LOOK_AROUND_MODES.has(mode) ? 1 : 0;
     r.lookW += (lookTarget - r.lookW) * Math.min(1, dt * 2.5);
-    if (r.lookW > 0.01 && r.head) {
+    if (r.lookW > 0.01 && rig.head) {
       const yaw = (Math.sin(t * 0.5) * 0.32 + Math.sin(t * 0.21) * 0.13) * r.lookW;
       const pitch = Math.sin(t * 0.37) * 0.08 * r.lookW;
-      _lookEuler.set(pitch, yaw, 0);
-      _lookQuat.setFromEuler(_lookEuler);
-      r.head.quaternion.multiply(_lookQuat);
-      if (r.neck) {
-        _lookEuler.set(pitch * 0.4, yaw * 0.4, 0);
-        _lookQuat.setFromEuler(_lookEuler);
-        r.neck.quaternion.multiply(_lookQuat);
+      lookEuler.set(pitch, yaw, 0);
+      lookQuat.setFromEuler(lookEuler);
+      rig.head.quaternion.multiply(lookQuat);
+      if (rig.neck) {
+        lookEuler.set(pitch * 0.4, yaw * 0.4, 0);
+        lookQuat.setFromEuler(lookEuler);
+        rig.neck.quaternion.multiply(lookQuat);
       }
     }
-
-    // Drag ragdoll: a damped-spring pendulum swing of the whole body toward the
-    // drag motion. Velocity decays when she's held still so she settles upright;
-    // on release the spring keeps its momentum and flops back to 0. Layered as a
-    // parent-group rotation (rig-axis-independent → no T-pose risk).
-    const ds = dragState;
-    ds.vx -= ds.vx * Math.min(1, dt * 7);
-    ds.vy -= ds.vy * Math.min(1, dt * 7);
-    const tZ = ds.dragging ? THREE.MathUtils.clamp(-ds.vx * 0.22, -0.7, 0.7) : 0;
-    const tX = ds.dragging ? THREE.MathUtils.clamp(ds.vy * 0.16, -0.5, 0.5) : 0;
-    const K = 95;
-    const C = 11; // < critical (≈19.5) → underdamped, so she overshoots/flops
-    r.swingVZ += (K * (tZ - r.swingZ) - C * r.swingVZ) * dt;
-    r.swingZ += r.swingVZ * dt;
-    r.swingVX += (K * (tX - r.swingX) - C * r.swingVX) * dt;
-    r.swingX += r.swingVX * dt;
-    if (swingRef.current) {
-      swingRef.current.rotation.z = r.swingZ;
-      swingRef.current.rotation.x = r.swingX;
-    }
-    // Secondary floppiness: head/spine lag a bit beyond the body swing + a slump
-    // while she's actually held, so she reads as limp rather than a rigid figure.
-    const held = ds.dragging ? 1 : 0;
-    if (r.spine) {
-      _lookEuler.set(held * 0.18, 0, r.swingZ * 0.25);
-      _lookQuat.setFromEuler(_lookEuler);
-      r.spine.quaternion.multiply(_lookQuat);
-    }
-    if (r.head) {
-      _lookEuler.set(held * 0.12, 0, r.swingZ * 0.5);
-      _lookQuat.setFromEuler(_lookEuler);
-      r.head.quaternion.multiply(_lookQuat);
+    if (rig.springs) {
+      // Moving the DOM widget doesn't move the Three scene: feed the real
+      // screen displacement (world units) so dragging swings hair and sleeves.
+      const viewport = state.viewport.getCurrentViewport(state.camera, screenOffset.set(0, 0, 0));
+      screenOffset.set(dragState.screenX * viewport.width / Math.max(1, state.size.width),
+        -dragState.screenY * viewport.height / Math.max(1, state.size.height), 0);
+      rig.springs.updateSprings(rawDt, screenOffset);
     }
   });
 
   return (
-    <group ref={swingRef}>
-      <group rotation={[0, MODEL_FACING, 0]} scale={fit.scale}>
-        <group position={[-fit.center.x, -fit.center.y, -fit.center.z]}>
-          <primitive object={scene} />
-        </group>
-      </group>
-    </group>
-  );
-}
-
-// ── Generic companion (a chosen character standing in for R.O.S.I.E) ────────
-// Meshy / uploaded models only ship idle/run/walk(/spin), so this is a lean rig
-// vs RosieModel: idle loop + occasional fidget + the same drag ragdoll swing.
-// Mode coloring still comes from ModeLight.
-function CharacterCompanion({ url }: { url: string }) {
-  const gltf = useGLTF(url);
-  const scene = useMemo(() => cloneSkeleton(gltf.scene), [gltf.scene]);
-  const swingRef = useRef<THREE.Group>(null);
-  const st = useRef({
-    mixer: null as THREE.AnimationMixer | null,
-    idle: null as THREE.AnimationAction | null,
-    action: null as THREE.AnimationAction | null,
-    fadeOutAt: 0,
-    fading: false,
-    nextAt: -1, // sentinel — seeded from the live clock on the first frame
-    root: undefined as THREE.Bone | undefined,
-    rootRest: undefined as THREE.Vector3 | undefined,
-    swingZ: 0,
-    swingVZ: 0,
-    swingX: 0,
-    swingVX: 0,
-  });
-
-  const fit = useMemo(() => {
-    scene.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(scene);
-    const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
-    box.getSize(size);
-    box.getCenter(center);
-    return { scale: FIT_HEIGHT / (size.y || 1), center };
-  }, [scene]);
-
-  const names = useMemo(
-    () => gltf.animations.map((c) => c.name),
-    [gltf.animations],
-  );
-  const clips = useMemo(() => resolveClips(names), [names]);
-  const fidgetPool = useMemo(
-    () =>
-      names.filter((n) => {
-        const l = n.toLowerCase();
-        return (
-          l.includes("run") ||
-          l.includes("walk") ||
-          l.includes("spin") ||
-          l.includes("jump")
-        );
-      }),
-    [names],
-  );
-
-  useEffect(() => {
-    const s = st.current;
-    const m = new THREE.AnimationMixer(scene);
-    s.mixer = m;
-    s.action = null;
-    s.fading = false;
-    s.nextAt = -1;
-    const idleClip =
-      gltf.animations.find((c) => c.name === clips.idle) ?? gltf.animations[0];
-    if (idleClip) {
-      const a = m.clipAction(idleClip);
-      a.setLoop(THREE.LoopRepeat, Infinity);
-      a.play();
-      s.idle = a;
-    }
-    scene.traverse((o) => {
-      const b = o as THREE.Bone;
-      if (b.isBone && /hips|pelvis|root/i.test(b.name) && !s.root) {
-        s.root = b;
-        s.rootRest = b.position.clone();
-      }
-    });
-    return () => {
-      m.stopAllAction();
-      s.mixer = null;
-      s.idle = null;
-      s.action = null;
-      s.root = undefined;
-    };
-  }, [scene, gltf.animations, clips.idle]);
-
-  useFrame((state, rawDt) => {
-    const s = st.current;
-    const m = s.mixer;
-    if (!m) return;
-    const dt = Math.min(rawDt, 0.05);
-    const t = state.clock.elapsedTime;
-    m.update(dt);
-
-    // Seed the first-fidget delay from the live clock — the canvas clock may
-    // be long past 0 when this rig mounts after a character switch.
-    if (s.nextAt < 0) s.nextAt = t + 20 + Math.random() * 40;
-
-    // Fidget machine: idle loop, occasional one-shot, then ease back.
-    if (s.action) {
-      if (!s.fading && t >= s.fadeOutAt) {
-        s.action.fadeOut(0.4);
-        if (s.idle) {
-          s.idle.enabled = true;
-          s.idle.fadeIn(0.4);
-        }
-        s.fading = true;
-      }
-      if (s.fading && s.action.getEffectiveWeight() < 0.02) {
-        s.action.stop();
-        s.action = null;
-        s.fading = false;
-        s.nextAt = t + 90 + Math.random() * 180;
-      }
-    } else if (t >= s.nextAt && fidgetPool.length) {
-      const name = fidgetPool[Math.floor(Math.random() * fidgetPool.length)];
-      const clip = gltf.animations.find((c) => c.name === name);
-      if (clip) {
-        const a = m.clipAction(clip);
-        a.reset();
-        a.setLoop(THREE.LoopOnce, 1);
-        a.clampWhenFinished = true;
-        a.fadeIn(0.3).play();
-        s.idle?.fadeOut(0.3);
-        s.action = a;
-        s.fadeOutAt = t + 0.3 + clip.duration;
-        s.fading = false;
-      } else {
-        s.nextAt = t + 60;
-      }
-    }
-
-    // Keep planted: pin root horizontal so locomotion clips play in place.
-    if (s.root && s.rootRest) {
-      s.root.position.x = s.rootRest.x;
-      s.root.position.z = s.rootRest.z;
-    }
-
-    // Drag ragdoll swing (identical spring to RosieModel).
-    const ds = dragState;
-    ds.vx -= ds.vx * Math.min(1, dt * 7);
-    ds.vy -= ds.vy * Math.min(1, dt * 7);
-    const tZ = ds.dragging ? THREE.MathUtils.clamp(-ds.vx * 0.22, -0.7, 0.7) : 0;
-    const tX = ds.dragging ? THREE.MathUtils.clamp(ds.vy * 0.16, -0.5, 0.5) : 0;
-    const K = 95;
-    const C = 11;
-    s.swingVZ += (K * (tZ - s.swingZ) - C * s.swingVZ) * dt;
-    s.swingZ += s.swingVZ * dt;
-    s.swingVX += (K * (tX - s.swingX) - C * s.swingVX) * dt;
-    s.swingX += s.swingVX * dt;
-    if (swingRef.current) {
-      swingRef.current.rotation.z = s.swingZ;
-      swingRef.current.rotation.x = s.swingX;
-    }
-  });
-
-  return (
-    <group ref={swingRef}>
+    <group name="companion-body" position={[0, 0, 0]} rotation={[0, 0, 0]}>
       <group rotation={[0, MODEL_FACING, 0]} scale={fit.scale}>
         <group position={[-fit.center.x, -fit.center.y, -fit.center.z]}>
           <primitive object={scene} />
@@ -635,25 +275,18 @@ function Avatar() {
   const custom = useCharacterStore((s) => s.custom);
   const selected = useMemo<Character | null>(
     () =>
-      [...BUILTIN_CHARACTERS, ...custom].find((c) => c.id === selectedId) ?? null,
+      [...BUILTIN_CHARACTERS, ...custom].find((c) => c.id === selectedId) ?? BUILTIN_CHARACTERS[0] ?? null,
     [selectedId, custom],
   );
   const placeholder = <Placeholder mode={mode} />;
 
-  // R.O.S.I.E (the default) keeps her full behavior rig; any other chosen
-  // character renders through the lean generic companion rig.
-  const isRosie = !selected || selectedId === ROSIE_ID;
-  const inner = isRosie ? (
-    MODEL_URL ? (
-      <RosieModel mode={mode} />
-    ) : (
-      placeholder
-    )
-  ) : (
+  const inner = selected ? (
     <CharacterCompanion
       url={selected.custom ? convertFileSrc(selected.filePath) : selected.url}
+      builtin={selected.custom ? undefined : selected}
+      mode={mode}
     />
-  );
+  ) : placeholder;
 
   const body = (
     <CharacterModelBoundary key={selectedId} fallback={placeholder}>
@@ -668,10 +301,7 @@ function Avatar() {
   );
 }
 
-// On "demand" the scene only renders when something calls invalidate(). This
-// ticker invalidates at a capped FPS so the idle avatar animates at ~30fps
-// instead of the GPU-pegging 60 — roughly halving her always-on cost while
-// she's visible, with no visible difference for a small holographic blob.
+// Demand rendering limits idle GPU work; grabbing temporarily raises the cap.
 function FrameThrottle({ fps }: { fps: number }) {
   const invalidate = useThree((s) => s.invalidate);
   useEffect(() => {
@@ -682,28 +312,47 @@ function FrameThrottle({ fps }: { fps: number }) {
   return null;
 }
 
+const companionEvents: CanvasProps["events"] = (state) => ({
+  ...events(state),
+  compute(event, state) {
+    const rect = state.gl.domElement.getBoundingClientRect();
+    state.pointer.set((event.clientX - rect.left) / rect.width * 2 - 1,
+      -(event.clientY - rect.top) / rect.height * 2 + 1);
+    state.raycaster.setFromCamera(state.pointer, state.camera);
+  },
+});
+
 export function CompanionScene({
   frameloop = "always",
+  eventSource,
+  dragging = false,
 }: {
   // "never" parks the render loop (dismissed / window hidden) so the one
   // long-lived WebGL context costs ~nothing when she isn't on screen.
   // "demand" + FrameThrottle keeps her alive but at a capped framerate.
   frameloop?: "always" | "demand" | "never";
+  eventSource?: CanvasProps["eventSource"];
+  dragging?: boolean;
 }) {
   return (
-    <Canvas
-      frameloop={frameloop}
-      camera={{ position: [0, 0.15, 3.2], fov: 42 }}
-      dpr={[1, 2]}
-      gl={{ alpha: true, antialias: true }}
-      style={{ background: "transparent" }}
-    >
-      <ambientLight intensity={0.65} />
-      <directionalLight position={[2, 3, 4]} intensity={1.1} />
-      <Avatar />
-      {frameloop === "demand" && <FrameThrottle fps={30} />}
-    </Canvas>
+    <div style={{ position: "absolute", left: `${(1 - OVERSCAN) * 50}%`, top: `${(1 - OVERSCAN) * 50}%`, width: `${OVERSCAN * 100}%`, height: `${OVERSCAN * 100}%`, pointerEvents: eventSource ? "none" : "auto" }}>
+      <Canvas
+        frameloop={frameloop}
+        eventSource={eventSource}
+        events={companionEvents}
+        camera={{ position: [0, 0.15 * OVERSCAN, 3.2 * OVERSCAN], fov: 42 }}
+        dpr={1}
+        gl={{ alpha: true, antialias: true }}
+        style={{ background: "transparent" }}
+      >
+        <ambientLight intensity={0.65} />
+        <directionalLight position={[2, 3, 4]} intensity={1.1} />
+        <Avatar />
+        {frameloop === "demand" && <FrameThrottle fps={dragging ? 60 : 30} />}
+      </Canvas>
+    </div>
   );
 }
 
-if (MODEL_URL) useGLTF.preload(MODEL_URL);
+const defaultCharacter = BUILTIN_CHARACTERS[0];
+if (defaultCharacter) useGLTF.preload(versionedCharacterUrl(defaultCharacter.url));

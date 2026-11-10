@@ -79,15 +79,15 @@ jobs:
       - name: Verify packaged MCP grants without a model or user profile
         run: |
           test "$(uname -m)" = arm64
-          npm run test:native-policy -- --binary "$PWD/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Terminal.app/Contents/MacOS/orion-terminal"
+          npm run test:native-policy -- --binary "$PWD/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Studio.app/Contents/MacOS/orion-terminal"
 
       - name: Rehearse packaged cold recovery without a live profile
         run: |
-          python3 scripts/rehearse-profile-recovery.py --binary "$PWD/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Terminal.app/Contents/MacOS/orion-terminal" --report "$RUNNER_TEMP/profile-recovery.json"
+          python3 scripts/rehearse-profile-recovery.py --binary "$PWD/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Studio.app/Contents/MacOS/orion-terminal" --report "$RUNNER_TEMP/profile-recovery.json"
 
       - name: Verify release bundle and disk image
         run: |
-          codesign --verify --deep --strict "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Terminal.app"
+          codesign --verify --deep --strict "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Orion Studio.app"
           for image in src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg; do hdiutil verify "$image"; done
 
       - name: Stage release asset (stable name)
@@ -110,7 +110,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.value }}
-          name: Orion Terminal — ${{ steps.tag.outputs.value }}
+          name: Orion Studio — ${{ steps.tag.outputs.value }}
           body_path: docs/releases/v0.1.0-alpha.1.md
           # Alpha builds must not replace the stable /releases/latest target.
           prerelease: true

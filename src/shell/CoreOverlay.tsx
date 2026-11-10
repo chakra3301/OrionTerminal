@@ -1,6 +1,8 @@
 import { Component, Suspense, lazy, useEffect, type ReactNode } from "react";
 import { useCoreReactions } from "@/shell/Splash/coreReactions";
 import { useWallpaperStore } from "@/store/wallpaperStore";
+import { useVisualActivity } from "@/components/effects/useVisualActivity";
+import { useShell } from "@/shell/store/useShell";
 
 const EnergyCore = lazy(() =>
   import("@/shell/Splash/EnergyCore").then((m) => ({ default: m.EnergyCore })),
@@ -19,14 +21,11 @@ class CoreBoundary extends Component<
   }
 }
 
-const reduced =
-  typeof window !== "undefined" &&
-  (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
-
 // Same interactivity as the startup core: keystrokes spark it, and the cursor
 // tilts it (with a velocity-driven spark on fast moves).
-function useCoreInteraction() {
+function useCoreInteraction(enabled: boolean) {
   useEffect(() => {
+    if (!enabled) return;
     const { spark, setPointer } = useCoreReactions.getState();
 
     const onKey = () => spark();
@@ -62,22 +61,24 @@ function useCoreInteraction() {
       window.removeEventListener("mousemove", onMove);
       setPointer(0, 0);
     };
-  }, []);
+  }, [enabled]);
 }
 
-export function CoreOverlay() {
-  useCoreInteraction();
+export function CoreOverlay({ preview = false }: { preview?: boolean }) {
+  const occluded = useShell((s) => s.windows.some((w) => w.maximized && !w.minimized));
+  const { ref, active } = useVisualActivity<HTMLDivElement>(preview || !occluded);
+  useCoreInteraction(!preview && active);
   const hue = useWallpaperStore((s) => s.coreHue);
   return (
-    <div className="ot-wp-core">
+    <div ref={ref} className="ot-wp-core">
       <div className="ot-wp-core-glow" />
       <div className="ot-wp-core-canvas">
         <CoreBoundary>
           <Suspense fallback={null}>
             <EnergyCore
               mode="idle"
-              reduced={reduced}
-              particleCount={reduced ? 220 : 520}
+              paused={!active}
+              particleCount={520}
               hue={hue}
             />
           </Suspense>

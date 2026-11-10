@@ -340,3 +340,31 @@
     opacity: 1;
   }
 }
+
+/* Alpha polish: the password input sits inside .ot-auth-input, so the field rule
+   above also boxed it (a box inside a box). Reset the inner input, keep focus on the
+   outer border only (DESIGN.md: text fields never get a ring), and lift the small
+   text that read poorly over the red glass. */
+.ot-auth-field .ot-auth-input input {
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.ot-auth-field input:focus,
+.ot-auth-input:focus-within {
+  border-color: color-mix(in srgb, var(--t-primary) 55%, transparent);
+  box-shadow: none;
+}
+.ot-auth-field .ot-auth-input input:focus { border: 0; }
+.ot-auth-sub { margin-bottom: 6px; }
+.ot-auth-field > span { color: var(--t-secondary, #9ab0a8); }
+.ot-auth-error {
+  color: var(--t-primary, #e6f4ec);
+  background: rgba(3, 6, 10, 0.55);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+.ot-auth-reset-link { color: var(--t-secondary, #9ab0a8); }
+.ot-auth-reset-link:hover { color: var(--t-primary, #e6f4ec); }

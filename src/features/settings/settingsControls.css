@@ -1,0 +1,13 @@
+.ot-setting-slider { display: grid; gap: 4px; margin-top: 18px; }
+.ot-setting-slider > label { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--t-secondary); font: 500 12px/1.5 var(--f-display); }
+.ot-setting-slider output { min-width: 44px; text-align: right; color: var(--t-primary); font: 11px/1.5 var(--f-mono); font-variant-numeric: tabular-nums; }
+.ot-setting-slider input.ot-setting-range[type="range"] { appearance: none; -webkit-appearance: none; display: block; width: 100%; height: 30px; margin: 0; padding: 0; border: 0; border-radius: 6.8px; background: var(--range-paint) center / 100% 4px no-repeat; cursor: pointer; }
+.ot-setting-range::-webkit-slider-runnable-track { height: 4px; border: 0; border-radius: 999px; background: transparent; }
+.ot-setting-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border: 2px solid var(--bg-2); border-radius: 50%; background: var(--t-primary); box-shadow: 0 1px 5px #0006; transition: box-shadow 150ms ease; }
+.ot-setting-range::-moz-range-track { height: 4px; border: 0; border-radius: 999px; background: transparent; }
+.ot-setting-range::-moz-range-progress { background: transparent; }
+.ot-setting-range::-moz-range-thumb { width: 12px; height: 12px; border: 2px solid var(--bg-2); border-radius: 50%; background: var(--t-primary); box-shadow: 0 1px 5px #0006; }
+.ot-setting-range:focus-visible { outline: 2px solid var(--neon-cyan); outline-offset: 3px; }
+.ot-setting-range:active::-webkit-slider-thumb { box-shadow: 0 0 0 5px color-mix(in srgb, var(--neon-cyan) 14%, transparent); }
+.ot-setting-slider > p { margin: 0; color: var(--t-tertiary); font: 11px/1.6 var(--f-display); }
+@media (prefers-reduced-motion: reduce) { .ot-setting-range::-webkit-slider-thumb { transition: none; } }

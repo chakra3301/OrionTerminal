@@ -1,11 +1,11 @@
-# Orion Terminal plugin platform
+# Orion Studio plugin platform
 
 Status: P3 local community SDK underway; Plugin API v1 is not yet frozen
 Date: 2026-08-04
 
 ## Product definition
 
-Orion Terminal is a local-first workstation host. The host supplies a dependable runtime; installed plugins supply the user's working capabilities.
+Orion Studio is a local-first workstation host. The host supplies a dependable runtime; installed plugins supply the user's working capabilities.
 
 The FL Studio comparison describes the product model, not an audio-specific architecture: a stable host, strong extension points, first-party capability packs, and an ecosystem that users assemble around their work.
 
@@ -29,7 +29,7 @@ The FL Studio comparison describes the product model, not an audio-specific arch
 
 ## Host kernel
 
-The following stays built into Orion Terminal:
+The following stays built into Orion Studio:
 
 - Boot, recovery, updater, and safe mode
 - Shell, windows, focus, dock, Spotlight, and base navigation

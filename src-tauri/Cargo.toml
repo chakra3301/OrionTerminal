@@ -2,7 +2,7 @@
 license = "Apache-2.0"
 name = "orion-terminal"
 version = "0.1.0"
-description = "Orion Terminal — personal workstation"
+description = "Orion Studio — personal workstation"
 authors = ["Luca Orion"]
 edition = "2021"
 
@@ -20,7 +20,8 @@ tauri-plugin-dialog = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# Imported vector control points must survive native history JSON exactly.
+serde_json = { version = "1", features = ["float_roundtrip"] }
 walkdir = "2"
 keyring = "3"
 base64 = "0.22"
@@ -34,9 +35,9 @@ portable-pty = "0.9"
 parking_lot = "0.12"
 once_cell = "1"
 # Used by the in-process MCP server (mode-switched via --mcp-serve) to read
-# the Orion SQLite DB directly. Its libsqlite3-sys version must match sqlx;
-# 0.32 allows sqlx 0.8.6 rather than pinning the vulnerable sqlx 0.8.0.
-rusqlite = { version = "0.32", features = ["bundled", "backup", "hooks"] }
+# the Orion SQLite DB directly. Match the patched SQLx driver below so both
+# paths use SQLite 3.54.1 (RUSTSEC-2026-0459), without a database migration.
+rusqlite = { version = "0.41", features = ["bundled", "backup", "hooks", "fallible_uint"] }
 # Match the frontend `ulid` package — note ids etc. should be the same
 # shape regardless of who creates them (frontend zustand stores vs. the
 # in-process MCP server's write tools).
@@ -52,3 +53,29 @@ notify-debouncer-mini = "0.4"
 # CPU/memory stats for the desktop monitor widget. (Temp/GPU on Apple Silicon
 # need sudo/powermetrics, so the widget sticks to what sysinfo can read freely.)
 sysinfo = "0.33"
+photocraft-engine = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-io = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-format = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-compose = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-raster = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-algo = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-vector = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+photocraft-codecs = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a", features = ["heif", "avif"] }
+photocraft-psd = { git = "https://github.com/storytold/photocraft", rev = "47f9306fd06d5dee11acb84b108606f4c867222a" }
+fontique = { version = "=0.11.1", default-features = false, features = ["std"] }
+
+# `tauri dev` builds unoptimised; the photocraft image engine then renders a 512px tile in
+# ~51ms instead of ~3ms, which makes photo editing unusable. Optimise dependencies only:
+# they compile once, and Orion's own crate keeps fast incremental dev builds.
+[profile.dev.package."*"]
+opt-level = 3
+
+# photocraft-format with batched tile flushes (vendor/photocraft/ORION_CHANGES.md). Remove once
+# the pinned revision above saves new objects without two F_FULLFSYNCs each.
+[patch."https://github.com/storytold/photocraft"]
+photocraft-format = { path = "vendor/photocraft/crates/format" }
+
+# Tauri 2 still requires SQLx 0.8. This driver changes only its SQLite FFI
+# requirement; see vendor/sqlx-sqlite/ORION_CHANGES.md.
+[patch.crates-io]
+sqlx-sqlite = { path = "vendor/sqlx-sqlite" }

@@ -1,0 +1,21 @@
+.ar-sidecars { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--work-line-strong); min-width: 0; color: var(--t-primary); font: 12px/1.5 var(--f-display); }
+.ar-sidecars > summary { cursor: pointer; color: var(--t-primary); font-weight: 500; }
+.ar-sidecars > summary svg { display: inline; vertical-align: -2px; margin-right: 6px; color: var(--neon-green); }
+.ar-sidecars p { color: var(--t-secondary); margin: 9px 0; overflow-wrap: anywhere; }
+.ar-sidecars label { display: flex; gap: 6px; align-items: center; margin: 10px 0 6px; color: var(--t-secondary); }
+.ar-sidecars select, .ar-sidecars input { box-sizing: border-box; min-width: 0; max-width: 100%; border: 1px solid var(--work-line-strong); background: var(--work-hover); color: var(--t-primary); border-radius: var(--r-md); padding: 8px 10px; font: 12px var(--f-display); }
+.ar-sidecars select { width: 100%; text-overflow: ellipsis; }
+.ar-sidecars button { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 8px 11px; border: 1px solid var(--work-line-strong); border-radius: var(--r-md); background: var(--work-hover); color: var(--t-primary); font: 500 12px var(--f-display); cursor: pointer; }
+.ar-sidecars button:disabled { opacity: .45; cursor: default; }
+.ar-sidecars :is(button,input,select):focus-visible { outline: 2px solid var(--neon-green); outline-offset: 2px; }
+.ar-sidecar-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.ar-sidecar-actions > span { flex: 1 1 160px; overflow-wrap: anywhere; }
+.ar-sidecar-index, .ar-sidecar-search { margin-top: 12px; padding-top: 6px; border-top: 1px solid var(--work-line-strong); }
+.ar-sidecar-search input { flex: 1 1 150px; }
+.ar-sidecar-results { display: grid; gap: 6px; margin-top: 10px; }
+.ar-sidecar-results > button { display: grid; text-align: left; justify-content: stretch; min-width: 0; }
+.ar-sidecar-results strong, .ar-sidecar-results span { display: block; overflow-wrap: anywhere; }
+.ar-sidecar-results span { font-weight: 400; font-size: 11px; color: var(--t-secondary); }
+.ar-sidecars p.ar-sidecar-error { color: var(--neon-magenta); }
+.ar-sidebar-search-mode { display: flex; align-items: center; gap: 7px; padding: 8px 10px; font: 11px var(--f-display); color: var(--t-secondary); border-bottom: 1px solid var(--work-line-strong); }
+.ar-sidebar-search-mode input { accent-color: var(--neon-green); }

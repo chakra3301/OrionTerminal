@@ -1,4 +1,4 @@
-# Orion Terminal — Public alpha guide
+# Orion Studio — Public alpha guide
 
 An open-source alpha for macOS Apple Silicon. Expect rough edges, back up important work, and report reproducible problems. Choose **`v0.1.0-alpha.1`** for this source; older beta downloads predate these changes. Check the release's commit, checksum and [tested scope](docs/aaa-rebuild/2026-09-13-alpha-release-gates.md).
 
@@ -8,7 +8,7 @@ An open-source alpha for macOS Apple Silicon. Expect rough edges, back up import
 
 Personal builds are **ad-hoc signed but not notarized**, so macOS Gatekeeper may warn on first launch. A warning—or an ad-hoc signature—does not establish whether a download is safe. Only open builds from a source you trust.
 
-1. Open the `.dmg` and drag **Orion Terminal** to **Applications**.
+1. Open the `.dmg` and drag **Orion Studio** to **Applications**.
 2. First launch is blocked with an “unverified developer” warning. To get past it once:
    - **macOS 14 Sonoma & earlier:** right-click the app → **Open** → confirm **Open**.
    - **macOS 15 Sequoia & later:** double-click once (it’s blocked), then **System Settings → Privacy & Security** → scroll down → **Open Anyway**.
@@ -49,7 +49,7 @@ These are test suggestions, not blanket acceptance. The [bounded alpha scope and
 - Apple-Silicon-only DMG; no Intel/Windows/Linux builds yet.
 - UI is dark-only (light theme cut for beta).
 - XDesign multiplayer is intentionally out of scope.
-- img2model, advanced FX/shader/video export, website reconstruction and untested provider combinations remain **experimental**, not universal subscription parity.
+- Advanced FX/shader/video export, website reconstruction and untested provider combinations remain **experimental**, not universal subscription parity.
 - Full VoiceOver/accessibility, real historical-user upgrades and broader recovery/streaming/provider coverage remain incomplete; these are not blanket release promises.
 - Remote CI and user-reported fresh Apple Silicon installation, core save/reopen/PNG export and ChatGPT onboarding passed at `86ec7cf`. The setup/default logic also had isolated native checks before the final visual simplification. The final minimal setup and titlebar status have not had another human smoke test; automated release checks are tied to the tagged commit.
 - Five native UNIC maintenance advisories remain in the selected target graph; no blocking advisories remained in the patched baseline audit.
@@ -75,7 +75,7 @@ This source build creates private startup snapshots under the app configuration 
 To rehearse recovery without replacing a live profile, use an executable built from this updated source:
 
 ```sh
-"/path/to/Orion Terminal.app/Contents/MacOS/orion-terminal" \
+"/path/to/Orion Studio.app/Contents/MacOS/orion-terminal" \
   --restore-db-copy "/path/to/backups/orion-…db" "/path/to/NEW-directory"
 ```
 

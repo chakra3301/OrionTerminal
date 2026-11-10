@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useEditorTheme } from "./editorAppearance";
+import { defineEditorThemes } from "./monacoTheme";
 import { Check, X, FilePlus, ChevronUp, ChevronDown } from "lucide-react";
 import { DiffEditor, type DiffOnMount } from "@monaco-editor/react";
 import { usePendingEdits } from "@/store/pendingEditsStore";
@@ -17,6 +19,7 @@ function basename(p: string): string {
 }
 
 export function OrionDiffReview({ path }: { path: string }) {
+  const editorTheme = useEditorTheme();
   const edit = usePendingEdits((s) => s.edits[path]);
   const diffRef = useRef<Parameters<DiffOnMount>[0] | null>(null);
   const [hunkIdx, setHunkIdx] = useState(0);
@@ -137,7 +140,8 @@ export function OrionDiffReview({ path }: { path: string }) {
           language={languageForPath(path)}
           original={edit.original}
           modified={edit.updated}
-          theme="orion-neon"
+          theme={editorTheme}
+          beforeMount={defineEditorThemes}
           onMount={(editor) => {
             diffRef.current = editor;
           }}

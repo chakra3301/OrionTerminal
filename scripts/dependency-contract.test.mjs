@@ -41,10 +41,11 @@ test("BlockNote's reviewed uuid override retains the v4 API used by its sources"
   for (const id of ids) assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 });
 
-test("Cursor loads with the reviewed Undici Headers override without making a request", async () => {
+test("Cursor's fetch transport loads without the former Node/Undici dependency", async () => {
   const fromCursor = createRequire(require.resolve("@cursor/sdk"));
-  const fromConnect = createRequire(fromCursor.resolve("@connectrpc/connect-node"));
-  const { Headers } = fromConnect("undici");
+  assert.throws(() => fromCursor.resolve("@connectrpc/connect-node"), { code: "MODULE_NOT_FOUND" });
+  const { createConnectTransport } = fromCursor("@connectrpc/connect-web");
+  assert.equal(typeof createConnectTransport({ baseUrl: "https://example.invalid" }).unary, "function");
   const headers = new Headers({ "content-type": "application/json" });
   assert.equal(headers.get("Content-Type"), "application/json");
   const sdk = await import("@cursor/sdk");

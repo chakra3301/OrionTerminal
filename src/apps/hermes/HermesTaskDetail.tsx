@@ -19,6 +19,7 @@ import {
   modelShort,
 } from "@/apps/hermes/util";
 import { useProjectStore } from "@/store/projectStore";
+import { AiActivity } from "@/components/effects/OrionOrb";
 
 const MOVABLE: HermesColumn[] = ["backlog", "ready", "review", "done", "blocked"];
 
@@ -350,6 +351,7 @@ function Transcript({
             void useHermes.getState().updateAgent(agent.id, { prompt });
         }}
       />
+      {running && <div className="ot-ai-progress"><AiActivity label={body ? "working" : "starting"} working={!!body} accent="var(--neon-violet)" /></div>}
       <pre
         ref={outRef}
         className={`hm-m-scroll transcript${agent.error ? " err" : ""}`}

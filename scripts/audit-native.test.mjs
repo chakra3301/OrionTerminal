@@ -21,6 +21,15 @@ test("active vulnerable or unsound packages fail the target gate", () => {
   const result = classifyNativeAudit(report(), new Set(["rsa@0.9.10", "glib@0.18.5"]));
   assert.deepEqual(result.blocking.map(x => x.name), ["rsa", "glib"]);
 });
+test("yanked crates have no advisory id and still block selected targets", () => {
+  const input = report();
+  input.warnings.yanked = [{ kind: "yanked", package: { name: "async-executor", version: "1.14.0" }, advisory: null }];
+  const result = classifyNativeAudit(input, new Set(["async-executor@1.14.0"]));
+  assert.deepEqual(result.blocking, [{ id: "yanked:async-executor@1.14.0", name: "async-executor", version: "1.14.0", kind: "yanked" }]);
+  assert.equal(classifyNativeAudit(input, new Set()).notSelected.at(-1).kind, "yanked");
+  input.warnings.yanked[0].package = {};
+  assert.throws(() => classifyNativeAudit(input, new Set()), /Unrecognized/);
+});
 test("filtered, ignored, or incomplete evidence fails closed", () => {
   const ignored = report(); ignored.settings.ignore.push("RUSTSEC-2023-0071");
   assert.throws(() => classifyNativeAudit(ignored, new Set()), /unfiltered/);

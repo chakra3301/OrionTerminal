@@ -24,7 +24,7 @@ export function ModelSelect({ surface, disabled = false }: { surface: ModelSurfa
       onChange={(e) => setModel(surface, e.target.value)}
     >
       {surface !== "default" && <option value="">Use default AI</option>}
-      {!available && <option value={selected} disabled>Choose a model · selection unavailable</option>}
+      {!available && <option value={selected} disabled>{providers.some((p) => p.enabled) ? "Choose a model" : "No AI connected"}</option>}
       {providers
         .filter((p) => p.enabled)
         .map((p) => (

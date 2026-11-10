@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 2,
+  "defaultCharacter": "rosie",
+  "characters": [
+    {
+      "id": "rosie",
+      "name": "R.O.S.I.E",
+      "model": "/characters/rosie.glb",
+      "sha256": "d26a12bae081d8ef12c97e7b152314f94395944cf47f8a2e1b6063589eaba8df",
+      "bytes": 3121244,
+      "rig": "Rigify DEF deform skeleton; no hands (oversized closed sleeves)",
+      "motion": "Sleeve gestures baked at load (src/features/characters/sleeveGestures.ts); live hair/sleeve springs",
+      "source": {
+        "file": "rosie-cybernetic.glb",
+        "sha256": "d3e62f37a8a12fba241bc6e5ee423df0d146708f32d59d67f9c1f5e8b79a7de4",
+        "springHandoff": "Orion-Rosie-Live-Physics"
+      },
+      "optimization": "gltf-transform: dedup, prune, WebP 1024px q86, quantize, meshopt. Geometry, skin, rig and source clip unchanged."
+    },
+    {
+      "id": "mxshy",
+      "name": "M.X.S.H.Y",
+      "model": "/characters/mxshy.glb",
+      "sha256": "c00b7134c26a0cf6e1bf3912c0e35bd895c05d40464ed8f6c656782f56c5783d",
+      "bytes": 3261884,
+      "rig": "Rigify DEF deform skeleton; no hands (oversized closed sleeves)",
+      "motion": "Sleeve gestures baked at load (src/features/characters/sleeveGestures.ts); live hair/sleeve springs",
+      "source": {
+        "file": "Detailed_Mushroom_Companion_Orion_Runtime.glb",
+        "sha256": "a2617d3f65a61d4d03b24ae96d1a94288cc315a1c12d3feefc4541e3e5e5acd1",
+        "springHandoff": "Detailed_Mushroom_Live_Spring_Handoff"
+      },
+      "optimization": "gltf-transform: dedup, prune, WebP 1024px q86, quantize, meshopt. Geometry, skin, rig and source clip unchanged."
+    },
+    {
+      "id": "ang3l",
+      "name": "A.N.G.3.L",
+      "model": "/characters/ang3l.glb",
+      "sha256": "25a039e2ba49574b561c74cef4712c60bf16fabe46a32ccb17ca0a53ba4312f7",
+      "bytes": 3611280,
+      "rig": "Rigify DEF deform skeleton; no hands (oversized closed sleeves)",
+      "motion": "Sleeve gestures baked at load (src/features/characters/sleeveGestures.ts); live hair/sleeve springs",
+      "source": {
+        "file": "ANGEL_Detailed_Web_Runtime_v2.glb",
+        "sha256": "75d88371661301aa0840148f73f5baae77d304bd4108039e8ede31cf54333286",
+        "springHandoff": "ANGEL_Detailed_Live_Spring_Handoff_v2"
+      },
+      "optimization": "gltf-transform: dedup, prune, WebP 1024px q86, quantize, meshopt. Geometry, skin, rig and source clip unchanged."
+    },
+    {
+      "id": "suki",
+      "name": "S.U.K.I",
+      "model": "/characters/suki.glb",
+      "sha256": "ef3942c843ca89db6c1abdb0e61d12a3a4eb773aa981e06f26274817949a2ba0",
+      "bytes": 3025264,
+      "rig": "Rigify DEF deform skeleton; no hands (oversized closed sleeves)",
+      "motion": "Sleeve gestures baked at load (src/features/characters/sleeveGestures.ts); live hair/sleeve springs",
+      "source": {
+        "file": "Cream_ORION_Web_Runtime_v2.glb",
+        "sha256": "48685bb179043568fbce8154531f6920b125aa4d7faaed2e8ddff95f98c5ffa4",
+        "springHandoff": "Cream_ORION_Live_Spring_Handoff_v2"
+      },
+      "optimization": "gltf-transform: dedup, prune, WebP 1024px q86, quantize, meshopt. Geometry, skin, rig and source clip unchanged."
+    }
+  ]
+}

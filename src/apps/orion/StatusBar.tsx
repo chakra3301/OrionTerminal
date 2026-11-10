@@ -1,4 +1,5 @@
-import { GitBranch, FolderGit2, Check } from "lucide-react";
+import { GitBranch, FolderGit2, Check, Plus } from "lucide-react";
+import { promptText } from "@/components/PromptModal";
 import { useTabsStore, isFileTabDirty } from "@/store/tabsStore";
 import { useProjectStore } from "@/store/projectStore";
 import { useNotesStore } from "@/store/notesStore";
@@ -62,17 +63,19 @@ export function OrionStatusBar() {
     pendingNoteWrites.has(activeTab.descriptor.noteId);
   const dirty = fileDirty || noteDirty;
 
-  const label = activeTab?.label ?? "—";
+  // Like Cursor, file details only appear while a document has focus.
   const isFile = activeTab?.descriptor.kind === "file";
+  const isDocument = isFile || activeTab?.descriptor.kind === "note";
+  const label = isDocument ? activeTab!.label : null;
   const extension =
     activeTab?.descriptor.kind === "file"
       ? activeTab.descriptor.path.split(".").pop()?.toUpperCase() ?? "TXT"
-      : activeTab?.descriptor.kind ?? "—";
+      : null;
 
   const openProblems = () =>
     useWorkspace.getState().openTab({ kind: "problems" });
   const openChanges = () =>
-    useWorkspace.getState().openTab({ kind: "changes" });
+    void import("@/apps/orion/store/sidebarStore").then((m) => m.useOrionSidebar.getState().setView("scm"));
 
   const isRepo = useGit((s) => s.isRepo);
   const branch = useGit((s) => s.branch);
@@ -87,7 +90,21 @@ export function OrionStatusBar() {
     void ipc
       .gitBranches(root)
       .then(({ current, branches }) => {
-        const items: MenuItem[] = branches.map((b) => ({
+        const create: MenuItem = {
+          label: "Create new branch…",
+          icon: <Plus size={12} />,
+          onClick: () => {
+            void promptText({ title: "New branch", label: `Branch from ${current || "HEAD"}`, placeholder: "feature/name", confirmLabel: "Create branch" }).then((name) => {
+              if (!name?.trim()) return;
+              ipc
+                .gitCreateBranch(root, name.trim())
+                .then(() => toast.success(`Switched to ${name.trim()}`))
+                .catch((e) => toast.error("Couldn't create branch", { body: e instanceof Error ? e.message : String(e) }))
+                .finally(() => useGit.getState().refresh());
+            });
+          },
+        };
+        const items: MenuItem[] = [create, { type: "separator" }, ...branches.map((b): MenuItem => ({
           label: b,
           icon: b === current ? <Check size={12} /> : <GitBranch size={12} />,
           disabled: b === current,
@@ -102,7 +119,7 @@ export function OrionStatusBar() {
               )
               .finally(() => useGit.getState().refresh());
           },
-        }));
+        }))];
         openFromButton(el, items);
       })
       .catch((e) =>
@@ -153,9 +170,11 @@ export function OrionStatusBar() {
           ⚠ {warningCount}
         </span>
       </button>
-      <span className="item" style={{ color: "var(--t-secondary)" }}>
-        {label}
-      </span>
+      {label && (
+        <span className="item" style={{ color: "var(--t-secondary)" }}>
+          {label}
+        </span>
+      )}
       {dirty && (
         <span className="item" style={{ color: "var(--neon-yellow)" }}>
           ● unsaved
@@ -192,8 +211,8 @@ export function OrionStatusBar() {
       )}
       {isFile && es.language && <span className="item">{es.language}</span>}
       <LspIndicator />
-      <span className="item">{extension}</span>
-      <span className="item">UTF-8</span>
+      {extension && <span className="item">{extension}</span>}
+      {isFile && <span className="item">UTF-8</span>}
       <span className="item cyan">⌘K claude</span>
     </div>
   );

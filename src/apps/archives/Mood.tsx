@@ -31,6 +31,9 @@ import { ASSET_DRAG_MIME } from "@/lib/dragMimes";
 import { log } from "@/lib/log";
 import { relativeTime } from "@/lib/time";
 
+/** Stable empty list: a fresh `[]` from a store selector re-renders forever (empty boards crashed). */
+const NO_MEMBERS: string[] = [];
+
 export function ArchivesMood() {
   const openBoardId = useArchives((s) => s.openBoardId);
   const boards = useMoodBoardsStore((s) => s.boards);
@@ -138,8 +141,8 @@ function MoodBoardList() {
 
       {boards.length === 0 && !creating ? (
         <div className="ar-empty-state ar-mood-empty">
-          <ImageIcon size={20} color="var(--neon-magenta)" />
-          <div className="title">No mood boards yet.</div>
+          <ImageIcon size={20} />
+          <div className="title">No mood boards yet</div>
           <div className="hint">
             Make one per project, dream, or vibe. Drop any kind of asset onto
             it.
@@ -247,7 +250,7 @@ function MoodBoardCard({
 const BOARD_TILE_DRAG_MIME = "application/x-orion-board-tile";
 
 function MoodBoardDetail({ board }: { board: MoodBoard }) {
-  const members = useMoodBoardsStore((s) => s.members.get(board.id) ?? []);
+  const members = useMoodBoardsStore((s) => s.members.get(board.id) ?? NO_MEMBERS);
   const removeAssetFromBoard = useMoodBoardsStore((s) => s.removeAsset);
   const renameBoard = useMoodBoardsStore((s) => s.rename);
   const deleteBoard = useMoodBoardsStore((s) => s.remove);
@@ -446,8 +449,8 @@ function MoodBoardDetail({ board }: { board: MoodBoard }) {
       <div className="ar-mood-detail-body scroll">
         {items.length === 0 ? (
           <div className="ar-empty-state ar-mood-empty">
-            <ImageIcon size={20} color="var(--neon-magenta)" />
-            <div className="title">Empty board.</div>
+            <ImageIcon size={20} />
+            <div className="title">This board is empty</div>
             <div className="hint">
               Drag assets in, paste, or click "Add asset" to pick from your
               library.
@@ -694,7 +697,7 @@ function AddAssetPicker({
         <div className="ar-mood-picker-body scroll">
           {candidates.length === 0 ? (
             <div className="ar-empty-state">
-              <div className="title">No assets to add.</div>
+              <div className="title">No assets to add</div>
               <div className="hint">
                 Drop or paste files into Archives to capture them, then come
                 back here.

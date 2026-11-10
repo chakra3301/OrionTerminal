@@ -3,7 +3,7 @@ import type { NoteBlocks } from "@/store/notesStore";
 import type { NoteKind } from "@/lib/db";
 import { useNotesStore } from "@/store/notesStore";
 import { useArchives } from "@/apps/archives/useArchives";
-import { useShell } from "@/shell/store/useShell";
+import { revealArchives } from "@/apps/archives/host";
 import { toast } from "@/store/toastStore";
 import { log } from "@/lib/log";
 
@@ -166,7 +166,7 @@ export async function applyTemplate(template: Template): Promise<void> {
     if (template.kind === "note") a.setOpenNoteId(note.id);
     else a.setSelectedNoteId(note.id);
     if (template.kind === "project") a.setOpenProjectId(note.id);
-    useShell.getState().openApp("archives");
+    revealArchives();
     toast.success(`New ${template.label}`, { body: noteTitle });
   } catch (e) {
     log.error("apply template failed", e);

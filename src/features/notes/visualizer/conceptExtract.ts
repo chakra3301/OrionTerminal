@@ -36,7 +36,7 @@ type TermStat = {
 };
 
 /** Tokenize one sentence into terms, merging runs of capitalized words into
- * a single entity ("Orion Terminal"). Returns lowercase terms + entity flag. */
+ * a single entity ("Orion Studio"). Returns lowercase terms + entity flag. */
 function termsOfSentence(sentence: string): Array<{ term: string; entity: boolean }> {
   const raw = sentence.match(/[A-Za-z][A-Za-z'-]*|\d{4}/g) ?? [];
   const out: Array<{ term: string; entity: boolean }> = [];

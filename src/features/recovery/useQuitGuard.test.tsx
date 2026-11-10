@@ -8,7 +8,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({ confirm: mocks.confirm, message: v
 vi.mock("./quitRisks", () => ({ quitRisks: mocks.risks }));
 vi.mock("@/lib/log", () => ({ log: { error: vi.fn() } }));
 import { useQuitGuard } from "./useQuitGuard";
-function Host() { useQuitGuard(true); return null; }
+function Host() { useQuitGuard(true, mocks.risks); return null; }
 it("listens before recovering an early native request, cancels and restores input", async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   const order: string[] = []; const id = "01M2BEKZ9HN58B3845N5FDJWS5";
